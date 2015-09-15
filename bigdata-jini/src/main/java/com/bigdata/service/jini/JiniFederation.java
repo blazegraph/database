@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -59,18 +58,12 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
-import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
-import com.bigdata.jini.start.BigdataZooDefs;
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.DelegateTransactionService;
 import com.bigdata.journal.IDistributedTransactionService;
@@ -80,7 +73,6 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IRunnableBuffer;
-import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IClientService;
 import com.bigdata.service.IDataService;
@@ -106,9 +98,11 @@ import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.service.proxy.RemoteRunnableBuffer;
 import com.bigdata.service.proxy.RemoteRunnableBufferImpl;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
 import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 import com.bigdata.zookeeper.ZooResourceLockService;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
 
 /**
  * Concrete implementation for Jini.
@@ -116,7 +110,7 @@ import com.bigdata.zookeeper.ZooResourceLockService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniFederation<T> extends AbstractDistributedFederation<T> implements
+public class JiniFederation<T> extends ZookeeperFederation<T> implements
         DiscoveryListener, ServiceDiscoveryListener {
 
     private LookupDiscoveryManager lookupDiscoveryManager;
@@ -135,117 +129,6 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
 
     private final ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
-    private final ZooKeeperAccessor zooKeeperAccessor;
-    
-    private final ZookeeperClientConfig zooConfig;
-    
-    /**
-     * Return the zookeeper client configuration.
-     */
-    public ZookeeperClientConfig getZooConfig() {
-        
-        return zooConfig;
-        
-    }
-
-    /**
-     * Return an object that may be used to obtain a {@link ZooKeeper} client
-     * and that may be used to obtain the a new {@link ZooKeeper} client if the
-     * current session has been expired (an absorbing state for the
-     * {@link ZooKeeper} client).
-     */
-    public ZooKeeperAccessor getZookeeperAccessor() {
-
-        return zooKeeperAccessor;
-        
-    }
-    
-    /**
-     * Return a {@link ZooKeeper} client.
-     * <p>
-     * Note: This is a shorthand for obtaining a valid {@link ZooKeeper} client
-     * from the {@link ZooKeeperAccessor}. If the session associated with the
-     * current {@link ZooKeeper} client is expired, then a distinct
-     * {@link ZooKeeper} client associated with a distinct session will be
-     * returned. See {@link #getZookeeperAccessor()} which lets you explicitly
-     * handle a {@link SessionExpiredException} or the {@link ZooKeeper}
-     * {@link ZooKeeper.States#CLOSED} state.
-     * 
-     * @see #getZookeeperAccessor()
-     * 
-     * @todo timeout variant w/ unit?
-     */
-    public ZooKeeper getZookeeper() {
-
-        try {
-
-            return zooKeeperAccessor.getZookeeper();
-            
-        } catch (InterruptedException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-
-    /**
-     * Create key znodes used by the federation.
-     * 
-     * @throws KeeperException
-     * @throws InterruptedException
-     * 
-     * @todo probably better written using a timeout than the caller's zk inst.
-     */
-    public void createKeyZNodes(final ZooKeeper zookeeper)
-            throws KeeperException, InterruptedException {
-
-        final String zroot = zooConfig.zroot;
-        final List<ACL> acl = zooConfig.acl;
-        
-        final String[] a = new String[] {
-
-                // znode for the federation root.
-                zroot,
-
-                // znode for configuration metadata.
-                zroot + "/" + BigdataZooDefs.CONFIG,
-
-                // znode dominating most locks.
-                zroot + "/" + BigdataZooDefs.LOCKS,
-
-                // znode dominating lock nodes for creating new physical services.
-                zroot + "/" + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
-
-                // znode whose children are the per-service type service configurations.
-                zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
-
-                // znode for the resource locks (IResourceLockManager)
-                zroot + "/" + BigdataZooDefs.LOCKS_RESOURCES,
-
-        };
-
-        for (String zpath : a) {
-
-            try {
-
-                zookeeper.create(zpath, new byte[] {}/* data */, acl,
-                        CreateMode.PERSISTENT);
-
-            } catch (NodeExistsException ex) {
-
-                // that's fine - the configuration already exists.
-                if (log.isDebugEnabled())
-                    log.debug("exists: " + zpath);
-
-                return;
-
-            }
-
-        }
-
-    }
-    
     /**
      * An object used to manage jini service registrar discovery.
      */
@@ -301,7 +184,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
 			final JiniClientConfig jiniConfig,
 			final ZookeeperClientConfig zooConfig) {
 
-		super(client);
+		super(client, zooConfig);
 
 		open = true;
 
@@ -326,11 +209,13 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
              * not insist on the zooconfig an this section needs to be
              * conditional on whether or not zookeeper was configured.
              */
-            
+
+        	/* Moved to com.bigdata.service.zookeeper.ZookeeperService in BLZG-1472
             this.zooConfig = zooConfig;
 
             zooKeeperAccessor = new ZooKeeperAccessor(zooConfig.servers,
                     zooConfig.sessionTimeout);
+            */
             
             /*
              * Note: This class will perform multicast discovery if ALL_GROUPS

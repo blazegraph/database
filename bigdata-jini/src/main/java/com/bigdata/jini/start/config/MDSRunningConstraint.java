@@ -2,6 +2,8 @@ package com.bigdata.jini.start.config;
 
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
+import com.bigdata.zookeeper.start.config.ServiceDependencyConstraint;
 
 /**
  * The {@link IMetadataService} must be discovered.
@@ -15,6 +17,13 @@ public class MDSRunningConstraint extends ServiceDependencyConstraint {
      * 
      */
     private static final long serialVersionUID = -1983273198622764005L;
+    
+    public boolean allow(ZookeeperFederation fed) throws Exception {
+    	if(fed instanceof JiniFederation)
+    		return allow((JiniFederation) fed);
+    	else 
+    		return false;
+    }
 
     public boolean allow(JiniFederation fed) throws Exception {
 

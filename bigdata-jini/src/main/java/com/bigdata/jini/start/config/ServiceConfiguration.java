@@ -24,9 +24,10 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.ServicesManagerServer;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration.ManagedServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.service.jini.IReplicatableService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.zookeeper.start.config.IServiceConstraint;
+import com.bigdata.zookeeper.util.ConfigMath;
 import com.sun.jini.tool.ClassServer;
 
 /**

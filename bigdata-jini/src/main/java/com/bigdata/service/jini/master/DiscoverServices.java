@@ -3,10 +3,10 @@ package com.bigdata.service.jini.master;
 import java.rmi.Remote;
 import java.util.concurrent.Callable;
 
-import org.apache.log4j.Logger;
-
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;

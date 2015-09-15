@@ -53,13 +53,12 @@ import net.jini.core.lookup.ServiceTemplate;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -75,6 +74,7 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Utility class that can be used to execute a distributed job. The master
@@ -675,7 +675,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     /**
      * The federation (from the ctor).
      */
-    public JiniFederation<?> getFederation() {
+    public JiniFederation getFederation() {
 
         return fed;
 

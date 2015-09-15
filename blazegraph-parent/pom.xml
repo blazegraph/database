@@ -204,9 +204,13 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
+    <module>../bigdata-zookeeper</module>
     <module>../bigdata-jini</module>
-<!-- Disable the automatic test execution for now.
     <module>../bigdata-jini-test</module>
+    <module>../bigdata-ha</module>
+<!-- Disable the automatic test execution for now. 
+     It is run as a separate Jenkins job.
+    <module>../bigdata-ha-test</module>
 -->
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
@@ -214,6 +218,7 @@ dependencies.
     <module>../bigdata-jar</module>
     <module>../bigdata-runtime</module>
     <module>../bigdata-core-test/</module>
+    <module>../bigdata-zookeeper-test</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
   </modules>

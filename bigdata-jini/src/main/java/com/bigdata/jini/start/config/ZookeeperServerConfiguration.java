@@ -56,6 +56,7 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.start.config.ZookeeperServerEntry;
 
 /**
  * zookeeper server configuration.

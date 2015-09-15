@@ -2,6 +2,8 @@ package com.bigdata.jini.start.config;
 
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
+import com.bigdata.zookeeper.start.config.ServiceDependencyConstraint;
 
 /**
  * The {@link ITransactionService} must be discovered.
@@ -15,6 +17,13 @@ public class TXRunningConstraint extends ServiceDependencyConstraint {
      * 
      */
     private static final long serialVersionUID = 6590113180404519952L;
+    
+    public boolean allow(ZookeeperFederation fed) throws Exception {
+    	if(fed instanceof JiniFederation)
+    		return allow((JiniFederation) fed);
+    	else 
+    		return false;
+    }
 
     public boolean allow(JiniFederation fed) throws Exception {
 

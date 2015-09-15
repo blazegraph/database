@@ -14,10 +14,10 @@ import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
-import com.bigdata.jini.start.config.ZookeeperServerEntry;
 import com.bigdata.jini.start.config.ZookeeperServerConfiguration.ZookeeperRunningException;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.start.config.ZookeeperServerEntry;
 
 /**
  * Manages the life cycle of a zookeeper instance with extensions to send a

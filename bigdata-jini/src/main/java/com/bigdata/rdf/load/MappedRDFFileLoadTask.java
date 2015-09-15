@@ -19,6 +19,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
@@ -169,9 +170,9 @@ implements Serializable {
      * The federation object used by the {@link IRemoteExecutor} on which this
      * task is executing.
      */
-    public JiniFederation<?> getFederation() {
+    public JiniFederation getFederation() {
 
-        return (JiniFederation<?>) super.getFederation();
+        return (JiniFederation) super.getFederation();
 
     }
 

@@ -36,6 +36,7 @@ import junit.framework.TestCase2;
 import net.jini.config.ConfigurationException;
 
 import com.bigdata.util.config.NicUtil;
+import com.bigdata.zookeeper.start.config.ZookeeperServerEntry;
 
 /**
  * Unit tests for the {@link ZookeeperServerEntry}.

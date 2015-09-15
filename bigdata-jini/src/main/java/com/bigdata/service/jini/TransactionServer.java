@@ -46,6 +46,7 @@ import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.DistributedTransactionService;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.ServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
@@ -226,7 +227,7 @@ public class TransactionServer extends AbstractServer {
         }
         
         @Override
-        public JiniFederation<?> getFederation() {
+        public JiniFederation getFederation() {
 
             return server.getClient().getFederation();
             

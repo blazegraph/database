@@ -39,11 +39,10 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.resources.ResourceFileFilter;
 import com.bigdata.service.jini.JiniClient;
@@ -51,6 +50,7 @@ import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
 
 /**
  * Abstract base class for unit tests requiring a running zookeeper and a

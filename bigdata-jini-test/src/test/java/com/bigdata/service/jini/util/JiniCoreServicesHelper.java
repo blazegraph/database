@@ -35,7 +35,7 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.LookupDiscovery;
 
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
-import com.bigdata.jini.util.ConfigMath;
+import com.bigdata.zookeeper.util.ConfigMath;
 
 /**
  * Helper class for jini core services (reggie, etc).
