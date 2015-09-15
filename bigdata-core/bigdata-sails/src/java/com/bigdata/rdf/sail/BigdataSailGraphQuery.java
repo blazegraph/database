@@ -31,6 +31,7 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailGraphQuery;
 
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
@@ -104,7 +105,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
             throws QueryEvaluationException {
 
         try {
-            new Bigdata2ASTSPARQLParser(getTripleStore()).preEvaluate(getTripleStore(), astContainer);
+            ASTDeferredIVResolution.preEvaluate(getTripleStore(), astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }

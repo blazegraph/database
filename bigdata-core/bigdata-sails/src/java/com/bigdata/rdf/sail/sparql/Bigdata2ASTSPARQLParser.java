@@ -50,8 +50,6 @@ import org.openrdf.query.parser.sparql.SPARQLParser;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
-import com.bigdata.rdf.sail.sparql.ast.ASTOperation;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
@@ -63,21 +61,14 @@ import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
-import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
-import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTUnresolvedTermsOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -99,19 +90,17 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     static private final URI queryIdHint = new URIImpl(QueryHints.NAMESPACE
             + QueryHints.QUERYID);
 
-    private final BigdataASTContext context;
 	private final Properties updateProperties;
 
 	public Bigdata2ASTSPARQLParser(AbstractTripleStore store) {
         
-        this(store.getProperties(), new BigdataASTContext(store));
+        this(store.getProperties());
         
     }
 
-    public Bigdata2ASTSPARQLParser(Properties updateProperties, BigdataASTContext context) {
+    public Bigdata2ASTSPARQLParser(Properties updateProperties) {
         
     	this.updateProperties = updateProperties;
-        this.context = context;
       
     }
 
@@ -333,42 +322,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     }
 
-    public void preUpdate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
-
-        UpdateRoot qc = (UpdateRoot)ast.getProperty(Annotations.ORIGINAL_AST);
-        
-        /*
-         * Handle dataset declaration. It only appears for DELETE/INSERT
-         * (aka ASTModify). It is attached to each DeleteInsertNode for
-         * which it is given.
-         */
-        for (Update update: qc.getChildren()) {
-            final DatasetNode dataSetNode = new DatasetDeclProcessor(new BigdataASTContext(store))
-                .process(update.getDatasetClauses(), true);
-            
-                if (dataSetNode != null) {
-        
-                        /*
-                         * Attach the data set (if present)
-                         * 
-                         * Note: The data set can only be attached to a
-                         * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
-                         */
-        
-                        ((IDataSetNode) update).setDataset(dataSetNode);
-        
-                }
-        }
-        final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
-        final ASTUnresolvedTermsOptimizer termsResolver = new ASTUnresolvedTermsOptimizer();
-        UpdateRoot queryRoot3 = (UpdateRoot) termsResolver.optimize(context2, new QueryNodeWithBindingSet(qc, null)).getQueryNode();
-        if (ast.getOriginalUpdateAST().getPrefixDecls()!=null && !ast.getOriginalUpdateAST().getPrefixDecls().isEmpty()) {
-            queryRoot3.setPrefixDecls(ast.getOriginalUpdateAST().getPrefixDecls());
-        }
-        ast.setOriginalUpdateAST(queryRoot3);
-
-    }
-    
     /**
      * Parse a SPARQL query.
      * 
@@ -559,70 +512,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         }
 
     }
-
-    
-    public void preEvaluate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
-
-        QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
-        ASTQueryContainer qc = (ASTQueryContainer)ast.getProperty(Annotations.PARSE_TREE);
-        
-        BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
-        
-        BigdataASTContext context = new BigdataASTContext(store);
-        resolver.processOnPrepareEvaluate(queryRoot, context);
-
-        /*
-         * Handle dataset declaration
-         * 
-         * Note: Filters can be attached in order to impose ACLs on the
-         * query. This has to be done at the application layer at this
-         * point, but it might be possible to extend the grammar for this.
-         * The SPARQL end point would have to be protected from external
-         * access if this were done. Perhaps the better way to do this is to
-         * have the NanoSparqlServer impose the ACL filters. There also
-         * needs to be an authenticated identity to make this work and that
-         * could be done via an integration within the NanoSparqlServer web
-         * application container.
-         * 
-         * Note: This handles VIRTUAL GRAPH resolution.
-         */
-        if (qc!=null && qc.getOperation()!=null) {
-            final DatasetNode dataSetNode = new DatasetDeclProcessor(context)
-                .process(qc.getOperation().getDatasetClauseList(), false);
-    
-            if (dataSetNode != null) {
-    
-                queryRoot.setDataset(dataSetNode);
-    
-            }
-        }
-        
-        /*
-         * I think here we could set the value expressions and do last- minute
-         * validation.
-         */
-        final ASTSetValueExpressionsOptimizer opt = new ASTSetValueExpressionsOptimizer();
-
-        final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
-
-        final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context2, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
-
-        try {
-
-            BigdataExprBuilder.verifyAggregate(queryRoot2);
-
-        } catch (VisitorException e) {
-
-            throw new MalformedQueryException(e.getMessage(), e);
-
-        }
-        
-        final ASTUnresolvedTermsOptimizer termsResolver = new ASTUnresolvedTermsOptimizer();
-        QueryRoot queryRoot3 = (QueryRoot) termsResolver.optimize(context2, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
-        
-        queryRoot3.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
-        ast.setOriginalAST(queryRoot3);
-	}
 
 //    public static void main(String[] args)
 //        throws java.io.IOException

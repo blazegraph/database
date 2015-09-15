@@ -95,6 +95,7 @@ import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -643,7 +644,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
             Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(store);
             astContainer = parser.parseUpdate2(queryStr, baseURI);
-            parser.preUpdate(store, astContainer);
+            ASTDeferredIVResolution.preUpdate(store, astContainer);
 
 
         }

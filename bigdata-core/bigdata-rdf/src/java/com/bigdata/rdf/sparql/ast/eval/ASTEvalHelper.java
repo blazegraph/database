@@ -75,6 +75,7 @@ import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -164,7 +165,7 @@ public class ASTEvalHelper {
             throws QueryEvaluationException {
 
         try {
-            new Bigdata2ASTSPARQLParser(store).preEvaluate(store, astContainer);
+            ASTDeferredIVResolution.preEvaluate(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -231,7 +232,7 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         try {
-            new Bigdata2ASTSPARQLParser(store).preEvaluate(store, astContainer);
+            ASTDeferredIVResolution.preEvaluate(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -489,7 +490,7 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         try {
-            new Bigdata2ASTSPARQLParser(store).preEvaluate(store, astContainer);
+            ASTDeferredIVResolution.preEvaluate(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -1065,7 +1066,7 @@ public class ASTEvalHelper {
             ) throws UpdateExecutionException {
 
         try {
-            new Bigdata2ASTSPARQLParser(conn.getTripleStore()).preUpdate(conn.getTripleStore(), astContainer);
+            ASTDeferredIVResolution.preUpdate(conn.getTripleStore(), astContainer);
         } catch (MalformedQueryException e) {
             throw new UpdateExecutionException(e.getMessage(), e);
         }
