@@ -81,9 +81,7 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.JavaServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration.AbstractServiceStarter;
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
@@ -107,6 +105,8 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
+import com.bigdata.zookeeper.util.ConfigMath;
 
 /**
  * Class layers in support to start and stop the {@link HAJournalServer}

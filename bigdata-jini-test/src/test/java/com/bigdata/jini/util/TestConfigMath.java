@@ -28,6 +28,8 @@ package com.bigdata.jini.util;
 
 import java.net.MalformedURLException;
 
+import com.bigdata.zookeeper.util.ConfigMath;
+
 import junit.framework.TestCase2;
 import net.jini.core.discovery.LookupLocator;
 
@@ -48,7 +50,7 @@ public class TestConfigMath extends TestCase2 {
                         new LookupLocator("jini://bigdata16/"),//
                         new LookupLocator("jini://bigdata17/"),//
                 },
-                ConfigMath
+                JiniUtil
                         .getLocators("jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"));
 
     }
@@ -56,7 +58,7 @@ public class TestConfigMath extends TestCase2 {
     public void test_getLocators_empty() throws MalformedURLException {
 
         assertSameArray(new LookupLocator[] {//
-                }, ConfigMath.getLocators(""));
+                }, JiniUtil.getLocators(""));
 
     }
 
@@ -64,7 +66,7 @@ public class TestConfigMath extends TestCase2 {
 
         try {
 
-            ConfigMath.getLocators(null/* locators */);
+            JiniUtil.getLocators(null/* locators */);
             
             fail("Expecting " + IllegalArgumentException.class);
             

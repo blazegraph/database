@@ -10,6 +10,7 @@ import com.bigdata.jini.lookup.entry.HostnameFilter;
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
 import com.bigdata.service.IClientService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -34,6 +35,13 @@ public class MaxClientServicesPerHostConstraint extends
 
     }
 
+    public boolean allow(ZookeeperFederation fed) throws Exception {
+    	if(fed instanceof JiniFederation)
+    		return allow((JiniFederation) fed);
+    	else 
+    		return false;
+    } 
+    
     public boolean allow(final JiniFederation fed) throws Exception {
 
         if (fed == null) // required

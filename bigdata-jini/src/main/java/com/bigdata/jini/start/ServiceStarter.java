@@ -38,7 +38,7 @@ import com.bigdata.jini.start.config.JavaServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.JavaServiceConfiguration.JavaServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.util.ConfigMath;
+import com.bigdata.zookeeper.util.ConfigMath;
 
 /**
  * Starts an unmanaged service using the specified configuration.

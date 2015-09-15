@@ -30,8 +30,6 @@ import org.apache.zookeeper.data.Stat;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
-import com.bigdata.jini.start.config.AbstractHostConstraint;
-import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.util.JiniUtil;
@@ -41,6 +39,9 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
+import com.bigdata.zookeeper.start.config.AbstractHostConstraint;
+import com.bigdata.zookeeper.start.config.IServiceConstraint;
 
 /**
  * This task notices when a new lock node is created and creates and runs a

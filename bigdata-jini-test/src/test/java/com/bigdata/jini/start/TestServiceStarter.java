@@ -55,6 +55,7 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.zookeeper.ZNodeDeletedWatcher;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Test suite for starting a bigdata service based on a

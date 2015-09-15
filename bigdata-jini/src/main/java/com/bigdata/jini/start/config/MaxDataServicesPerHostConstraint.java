@@ -11,6 +11,7 @@ import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.lookup.DataServiceFilter;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -34,6 +35,13 @@ public class MaxDataServicesPerHostConstraint extends
      * 
      */
     private static final long serialVersionUID = 4146058645608689955L;
+    
+    public boolean allow(ZookeeperFederation fed) throws Exception {
+    	if(fed instanceof JiniFederation)
+    		return allow((JiniFederation) fed);
+    	else 
+    		return false;
+    }
 
     public boolean allow(final JiniFederation fed) throws Exception {
 

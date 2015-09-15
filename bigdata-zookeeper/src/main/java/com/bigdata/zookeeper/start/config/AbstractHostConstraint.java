@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 10, 2009
  */
 
-package com.bigdata.jini.start.config;
+package com.bigdata.zookeeper.start.config;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -35,7 +35,7 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -199,7 +199,7 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
 
     abstract public boolean allow();
     
-    public boolean allow(JiniFederation ignored) {
+    public boolean allow(ZookeeperFederation ignored) {
         
         return allow();
         

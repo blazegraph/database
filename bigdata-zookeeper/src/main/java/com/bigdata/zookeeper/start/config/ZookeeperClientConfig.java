@@ -1,4 +1,4 @@
-package com.bigdata.jini.start.config;
+package com.bigdata.zookeeper.start.config;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -9,12 +9,12 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
 
-import com.bigdata.jini.util.ConfigMath;
+import com.bigdata.zookeeper.util.ConfigMath;
 
 /**
  * Helper class for the {@link ZooKeeper} client configuration.

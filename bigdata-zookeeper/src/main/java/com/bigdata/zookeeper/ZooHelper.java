@@ -38,11 +38,11 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.ZooKeeper;
 
-import com.bigdata.jini.start.config.AbstractHostConstraint;
 import com.bigdata.util.config.NicUtil;
+import com.bigdata.zookeeper.start.config.AbstractHostConstraint;
 
 /**
  * Utility class for issuing the four letter commands to a zookeeper service.

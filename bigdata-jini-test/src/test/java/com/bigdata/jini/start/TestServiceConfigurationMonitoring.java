@@ -41,6 +41,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.TransactionServerConfiguration;
 import com.bigdata.service.jini.TransactionServer;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Test suite for monitoring state changes for a {@link ServiceConfiguration}
