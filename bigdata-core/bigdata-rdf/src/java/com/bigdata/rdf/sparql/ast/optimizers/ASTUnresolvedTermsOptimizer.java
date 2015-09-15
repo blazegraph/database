@@ -28,9 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -45,7 +48,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
@@ -53,7 +55,6 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
@@ -75,7 +76,6 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
@@ -89,6 +89,28 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
 
     private static final Logger log = Logger
             .getLogger(ASTUnresolvedTermsOptimizer.class);
+
+    private interface Handler {
+        void handle(IV newIV);
+    }
+    
+    private final Map<BigdataValue, List<Handler>> deferred = new HashMap<>();
+    private final List<Runnable> deferredRunnables = new ArrayList<>();
+    
+    private void defer(final BigdataValue value, final Handler handler) {
+        if (value!=null) {
+            List<Handler> handlers = deferred.get(value);
+            if (handlers==null) {
+                handlers = new ArrayList<>();
+                deferred.put(value, handlers);
+            }
+            handlers.add(handler);
+        }
+    }
+
+    private void deferRunnable(final Runnable runnable) {
+        deferredRunnables.add(runnable);
+    }
 
     @Override
     public QueryNodeWithBindingSet optimize(
@@ -112,7 +134,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             
             // SELECT clause
             {
-                ProjectionNode projection = queryRoot.getProjection();
+                final ProjectionNode projection = queryRoot.getProjection();
                 if (projection!=null) {
                     fillInIV(context, projection);
                 }
@@ -121,7 +143,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             // Main CONSTRUCT clause
             {
     
-                GroupNodeBase constructClause = queryRoot.getConstruct();
+                final GroupNodeBase constructClause = queryRoot.getConstruct();
     
                 if (constructClause != null) {
     
@@ -134,7 +156,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             // Main WHERE clause
             {
     
-                final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
+                final GroupNodeBase<IGroupMemberNode> whereClause = queryRoot
                         .getWhereClause();
     
                 if (whereClause != null) {
@@ -147,9 +169,9 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             
             // HAVING clause
             {
-                HavingNode having = queryRoot.getHaving();
+                final HavingNode having = queryRoot.getHaving();
                 if (having!=null) {
-                    for (IConstraint c: having.getConstraints()) {
+                    for (final IConstraint c: having.getConstraints()) {
                         handleHaving(context, c);
                     }
                 }
@@ -158,9 +180,9 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             
             // BINDINGS clause
             {
-                BindingsClause bc = queryRoot.getBindingsClause();
+                final BindingsClause bc = queryRoot.getBindingsClause();
                 if (bc!=null) {
-                    for (IBindingSet bs: bc.getBindingSets()) {
+                    for (final IBindingSet bs: bc.getBindingSets()) {
                         handleBindingSet(context, bs);
                     }
                 }
@@ -181,7 +203,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
                     final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
                             .get(i);
     
-                    final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) namedSubquery
+                    final GroupNodeBase<IGroupMemberNode> whereClause = namedSubquery
                             .getWhereClause();
     
                     if (whereClause != null) {
@@ -195,6 +217,9 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             }
     
         }
+        
+        resolveIVs(context);
+        
         return new QueryNodeWithBindingSet(queryNode, bindingSets);
     }
 
@@ -204,7 +229,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
      * 
      * @param op
      */
-    private static void resolveGroupsWithUnknownTerms(AST2BOpContext context, final QueryNodeBase op) {
+    private void resolveGroupsWithUnknownTerms(final AST2BOpContext context, final QueryNodeBase op) {
 
         if (op==null) return;
     	/*
@@ -254,29 +279,31 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
 
                 final BindingsClause bindings = (BindingsClause) child;
 
-                List<IBindingSet> childs = bindings
+                final List<IBindingSet> childs = bindings
                         .getBindingSets();
                 
-                for (IBindingSet s: childs) {
+                for (final IBindingSet s: childs) {
                     handleBindingSet(context, s);
                 }
 
             } else if(child instanceof FilterNode) {
-                FilterNode node = (FilterNode)child;
+                final FilterNode node = (FilterNode)child;
                 fillInIV(context,node.getValueExpression());
             } else if(child instanceof ServiceNode) {
-                ServiceNode node = (ServiceNode) child;
-                TermNode serviceRef = node.getServiceRef();
-                IV newValue = resolveConstant(context, serviceRef.getValue());
-                if (newValue!=null) {
-                    node.setServiceRef(new ConstantNode(new Constant(newValue)));
-                }
+                final ServiceNode node = (ServiceNode) child;
+                final TermNode serviceRef = node.getServiceRef();
+                defer(serviceRef.getValue(), new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        node.setServiceRef(new ConstantNode(new Constant(newIV)));
+                    }
+                });
             } else if(child instanceof FunctionNode) {
                 fillInIV(context, child);
             } else if (child instanceof BindingsClause) {
-                List<IBindingSet> bsList = ((BindingsClause)child).getBindingSets();
+                final List<IBindingSet> bsList = ((BindingsClause)child).getBindingSets();
                 if (bsList!=null) {
-                    for (IBindingSet bs: bsList) {
+                    for (final IBindingSet bs: bsList) {
                         handleBindingSet(context, bs);
                     }
                 }
@@ -287,69 +314,76 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
 
     }
 
-    private static void handleHaving(AST2BOpContext context, IConstraint s) {
-        Iterator<BOp> itr = s.argIterator();
+    private void handleHaving(final AST2BOpContext context, final IConstraint s) {
+        final Iterator<BOp> itr = s.argIterator();
         while (itr.hasNext()) {
-            BOp bop = itr.next();
+            final BOp bop = itr.next();
             fillInIV(context, bop);
         }
     }
 
-    private static void handleBindingSet(AST2BOpContext context, IBindingSet s) {
-        Iterator<Entry<IVariable, IConstant>> itr = s.iterator();
+    private void handleBindingSet(final AST2BOpContext context, final IBindingSet s) {
+        final Iterator<Entry<IVariable, IConstant>> itr = s.iterator();
         while (itr.hasNext()) {
-            Entry<IVariable, IConstant> entry = itr.next();
-            Object value = entry.getValue().get();
+            final Entry<IVariable, IConstant> entry = itr.next();
+            final Object value = entry.getValue().get();
             if (value instanceof BigdataValue) {
-                IV newValue = resolveConstant(context, (BigdataValue)value);
-                if (newValue!=null) {
-                    entry.setValue(new Constant(newValue));
-                }
+                defer((BigdataValue)value, new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        entry.setValue(new Constant(newIV));
+                    }
+                });
             } else if (value instanceof TermId) {
-                IV newValue = resolveConstant(context, ((TermId)value).getValue());
-                if (newValue!=null) {
-                    entry.setValue(new Constant(newValue));
-                }
+                defer(((TermId)value).getValue(), new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        entry.setValue(new Constant(newIV));
+                    }
+                });
             }
         }
     }
 
-    private static void fillInIV(AST2BOpContext context, final BOp bop) {
+    private void fillInIV(final AST2BOpContext context, final BOp bop) {
         if (bop instanceof ConstantNode) {
             
             final BigdataValue value = ((ConstantNode) bop).getValue();
-            if (value==null) {
-                System.err.println("?");
-            } else {
+            if (value!=null) {
                 // even if iv is already filled in we should try to resolve it against triplestore,
                 // as previously resolved IV may be inlined, but triplestore expects term from lexicon relation
-                IV newValue = resolveConstant(context, value);
-                if (newValue!=null) {
-                    ((ConstantNode) bop).setArg(0, new Constant(newValue));
-                }
+                defer(value, new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        ((ConstantNode) bop).setArg(0, new Constant(newIV));
+                    }
+                });
             }
             return;
         }
 
         if (bop!=null) {
             for (int k = 0; k < bop.arity(); k++) {
-                BOp pathBop = bop.get(k);
+                final BOp pathBop = bop.get(k);
                 if (pathBop instanceof Constant) {
-                    Object v = ((Constant)pathBop).get();
+                    final Object v = ((Constant)pathBop).get();
+                    final int fk = k;
                     if (v instanceof BigdataValue) {
-                        IV newValue = resolveConstant(context, (BigdataValue)v);
-                        if (newValue!=null) {
-                            bop.args().set(k, new Constant(newValue));
-                        }
-                    } else if (v instanceof TermId) {
-                        IV newValue = resolveConstant(context, ((TermId)v).getValue());
-                        if (newValue!=null) {
-                            if (bop.args() instanceof ArrayList) {
-                                bop.args().set(k, new Constant(newValue));
-                            } else {
-                                System.err.println("!");
+                        defer((BigdataValue)v, new Handler(){
+                            @Override
+                            public void handle(final IV newIV) {
+                                bop.args().set(fk, new Constant(newIV));
                             }
-                        }
+                        });
+                    } else if (v instanceof TermId) {
+                        defer(((TermId)v).getValue(), new Handler(){
+                            @Override
+                            public void handle(final IV newIV) {
+                                if (bop.args() instanceof ArrayList) {
+                                    bop.args().set(fk, new Constant(newIV));
+                                }
+                            }
+                        });
                     }
                 } else {
                     fillInIV(context,pathBop);
@@ -370,74 +404,86 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         } else if (bop instanceof DatasetNode) {
             final DatasetNode dataset = ((DatasetNode) bop);
             final Set<IV> newDefaultGraphs = new HashSet<IV>();
-            for(IV iv: dataset.getDefaultGraphs().getGraphs()) {
-                final IV newValue = resolveConstant(context, iv.getValue());
-                if (newValue!=null) {
-                    newDefaultGraphs.add(newValue);
-                } else {
-                    newDefaultGraphs.add(iv);
-                }
+            for(final IV iv: dataset.getDefaultGraphs().getGraphs()) {
+                defer(iv.getValue(), new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        newDefaultGraphs.add(newIV);
+                    }
+                });
             }
-            dataset.setDefaultGraphs(new DataSetSummary(newDefaultGraphs, true));
+            deferRunnable(new Runnable(){
+                @Override
+                public void run() {
+                    dataset.setDefaultGraphs(new DataSetSummary(newDefaultGraphs, true));
+                }
+            });
             
             final Set<IV> newNamedGraphs = new HashSet<IV>();
             final Iterator<IV> namedGraphs = dataset.getNamedGraphs().getGraphs().iterator();
             while(namedGraphs.hasNext()) {
                 final IV iv = namedGraphs.next();
-                final IV newValue = resolveConstant(context, iv.getValue());
-                if (newValue!=null) {
-                    newNamedGraphs.add(newValue);
-                } else {
-                    newNamedGraphs.add(iv);
-                }
+                defer(iv.getValue(), new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        newNamedGraphs.add(newIV);
+                    }
+                });
             }
-            dataset.setNamedGraphs(new DataSetSummary(newNamedGraphs, true));
+            deferRunnable(new Runnable(){
+                @Override
+                public void run() {
+                    dataset.setNamedGraphs(new DataSetSummary(newNamedGraphs, true));
+                }
+            });
         } else if (bop instanceof PathNode) {
-            PathAlternative path = ((PathNode) bop).getPathAlternative();
+            final PathAlternative path = ((PathNode) bop).getPathAlternative();
             for (int k = 0; k < path.arity(); k++) {
-                BOp pathBop = path.get(k);
+                final BOp pathBop = path.get(k);
                 fillInIV(context,pathBop);
             }
         } else if (bop instanceof FunctionNode) {
             if (bop instanceof SubqueryFunctionNodeBase) {
                 resolveGroupsWithUnknownTerms(context, ((SubqueryFunctionNodeBase)bop).getGraphPattern());
             }
-            IValueExpression<? extends IV> ve = ((FunctionNode)bop).getValueExpression();
-            if (ve instanceof IVValueExpression) {
-                for (int k = 0; k < ve.arity(); k++) {
-                    BOp pathBop = ve.get(k);
+            final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
+            if (fve instanceof IVValueExpression) {
+                for (int k = 0; k < fve.arity(); k++) {
+                    final IValueExpression<? extends IV> ve = ((FunctionNode)bop).getValueExpression();
+                    final BOp pathBop = ve.get(k);
                     if (pathBop instanceof Constant && ((Constant)pathBop).get() instanceof TermId) {
-                        BigdataValue v = ((TermId) ((Constant)pathBop).get()).getValue();
-                        BigdataValue resolved = context.getAbstractTripleStore().getValueFactory().asValue(v);
-                        IV resolvedIV;
-                        if (resolved.getIV()==null) {
-                            resolvedIV = context.getAbstractTripleStore().getIV(resolved);
-                            if (resolvedIV!=null) {
-                                resolved.setIV(resolvedIV);
-                                resolvedIV.setValue(resolved);
-                                Constant newConstant = new Constant(resolvedIV);
-                                ve = (IValueExpression<? extends IV>) ((IVValueExpression)ve).setArg(k, newConstant);
-                                ((FunctionNode) bop).setArg(k, new ConstantNode(newConstant));
+                        final BigdataValue v = ((TermId) ((Constant)pathBop).get()).getValue();
+                        final int fk = k;
+                        defer(v, new Handler(){
+                            @Override
+                            public void handle(final IV newIV) {
+                                final BigdataValue resolved = context.getAbstractTripleStore().getValueFactory().asValue(v);
+                                if (resolved.getIV() == null && newIV!=null) {
+                                    resolved.setIV(newIV);
+                                    newIV.setValue(resolved);
+                                    final Constant newConstant = new Constant(newIV);
+                                    ((FunctionNode)bop).setValueExpression((IValueExpression<? extends IV>) ((IVValueExpression) ve).setArg(fk, newConstant));
+                                    ((FunctionNode) bop).setArg(fk, new ConstantNode(newConstant));
+                                }
                             }
-                        } else {
-                            fillInIV(context,pathBop); 
-                        }
+                        });
                     }
                 }
-                ((FunctionNode)bop).setValueExpression(ve);
-            } else if (ve instanceof Constant) {
-                Object value = ((Constant)ve).get();
+            } else if (fve instanceof Constant) {
+                final Object value = ((Constant)fve).get();
                 if (value instanceof BigdataValue) {
-                    IV newValue = resolveConstant(context, (BigdataValue)value);
-                    if (newValue!=null) {
-                        ((FunctionNode)bop).setValueExpression(new Constant(newValue));
-                    }
+                    defer((BigdataValue)value, new Handler(){
+                        @Override
+                        public void handle(final IV newIV) {
+                            ((FunctionNode)bop).setValueExpression(new Constant(newIV));
+                        }
+                    });
                 }
             }
         } else if (bop instanceof ValueExpressionNode) {
-            IValueExpression<? extends IV> ve = ((ValueExpressionNode)bop).getValueExpression();
+            final IValueExpression<? extends IV> ve = ((ValueExpressionNode)bop).getValueExpression();
             for (int k = 0; k < ve.arity(); k++) {
-                BOp pathBop = ve.get(k);
+                final BOp pathBop = ve.get(k);
                 fillInIV(context,pathBop);
             }
         } else if (bop instanceof GroupNodeBase) {
@@ -447,47 +493,99 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         }
     }
 
-    private static IV resolveConstant(AST2BOpContext context, final BigdataValue value) {
-        IV resolvedIV = null;
-        if (value instanceof Literal) {
-            String label = ((Literal)value).getLabel();
-            URI dataType = ((Literal)value).getDatatype();
-            String language = ((Literal)value).getLanguage();
-            BigdataValue resolved;
-            if (language!=null) {
-                resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, language);
-            } else {
-                resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, dataType);
-            }
-            if (resolved.getIV()==null) {;
-                resolvedIV = context.getAbstractTripleStore().getIV(resolved);
-                if (resolvedIV==null) {
-                    DTE dte = DTE.valueOf(dataType);
-                    if (dte!=null) {
-                        resolvedIV = IVUtility.decode(label, dte.name());
-                    } else {
-                        resolvedIV = TermId.mockIV(VTE.valueOf(value));
-                    }
-                    resolvedIV.setValue(resolved);
-                    resolved.setIV(resolvedIV);
-                }
-            } else {
-                resolvedIV = resolved.getIV();
-            }
-            resolvedIV.setValue(resolved);
-            resolved.setIV(resolvedIV);
-        } else {
+    private void resolveIVs(final AST2BOpContext context) {
         
-            BigdataValue resolved = context.getAbstractTripleStore().getValueFactory().asValue(value);
-            if (resolved!=null && resolved.getIV()==null) {
-                resolvedIV = context.getAbstractTripleStore().getIV(resolved);
-                if (resolvedIV!=null) {
-                    resolved.setIV(resolvedIV);
-                    resolvedIV.setValue(resolved);
-                }
+        final IV[] ivs = new IV[deferred.size()];
+        final BigdataValue[] values = new BigdataValue[deferred.size()];
+        {
+        
+            /*
+             * First, build up the set of unknown terms.
+             */
+            int i = 0;
+            
+            for (final BigdataValue v: deferred.keySet()) {
+
+                final BigdataValue toBeResolved = v.getValueFactory().asValue(v);
+                ivs[i] = v.getIV();
+                toBeResolved.clearInternalValue();
+                values[i++] = toBeResolved;
+                
             }
+
+            /*
+             * Batch resolution.
+             */
+            
+            if (log.isDebugEnabled())
+                log.debug("UNKNOWNS: " + Arrays.toString(values));
+
+            context.getAbstractTripleStore().getLexiconRelation()
+                    .addTerms(values, values.length, true/* readOnly */);
+
         }
-        return resolvedIV;
+
+        /*
+         * Replace the value expression with one which uses the resolved IV.
+         */
+
+        {
+            for (int i = 0; i<values.length; i++) {
+
+                final BigdataValue v = values[i];
+                final IV iv;
+                if (v.isRealIV()) {
+
+                    if (log.isInfoEnabled())
+                        log.info("RESOLVED: " + v + " => " + v.getIV());
+
+                    /*
+                     * Note: If the constant is an effective constant
+                     * because it was given in the binding sets then we also
+                     * need to capture the variable name associated with
+                     * that constant.
+                     */
+
+                    iv = v.getIV();
+                } else {
+                    if (v instanceof Literal) {
+                        final String label = ((Literal)v).getLabel();
+                        final URI dataType = ((Literal)v).getDatatype();
+                        final String language = ((Literal)v).getLanguage();
+                        BigdataValue resolved;
+                        if (language!=null) {
+                            resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, language);
+                        } else {
+                            resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, dataType);
+                        }
+                        final DTE dte = DTE.valueOf(dataType);
+                        if (dte!=null) {
+                            iv = IVUtility.decode(label, dte.name());
+                        } else {
+                            iv = TermId.mockIV(VTE.valueOf(v));
+                        }
+                        iv.setValue(resolved);
+                        resolved.setIV(iv);
+                    } else {
+                        iv = ivs[i];
+                    }
+                }
+                if (iv!=null) {
+                    iv.setValue(v);
+    
+                    for(final Handler handler: deferred.get(v)) {
+                        handler.handle(iv);
+                    }
+                }
+
+            }
+
+        }
+        
+        for(final Runnable r: deferredRunnables) {
+            r.run();
+        }
+
     }
 
 }

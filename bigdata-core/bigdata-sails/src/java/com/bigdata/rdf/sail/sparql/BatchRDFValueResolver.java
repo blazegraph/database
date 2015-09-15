@@ -314,8 +314,9 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                 } else if (value instanceof ASTIRI) {
                     iv = new TermId<BigdataValue>(VTE.URI,0);
                     bigdataValue = valueFactory.createURI(((ASTIRI)value).getValue());
-                    iv.setValue(bigdataValue);
+                    bigdataValue.clearInternalValue();
                     bigdataValue.setIV(iv);
+                    iv.setValue(bigdataValue);
                 } else if (value instanceof ASTRDFLiteral) {
                     ASTRDFLiteral rdfNode = (ASTRDFLiteral) value;
                     String lang = rdfNode.getLang();
