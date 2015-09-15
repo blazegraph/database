@@ -1,0 +1,440 @@
+<!--
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.3-BLZG-1378-SNAPSHOT</version>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+  </parent>
+  <groupId>com.blazegraph</groupId>
+  <artifactId>bigdata-ha-test</artifactId>
+  <version>1.5.3-BLZG-1378-SNAPSHOT</version>
+  <name>Blazegraph High Availability (HA) Tests</name>
+  <packaging>jar</packaging>
+
+    <profiles>
+     <profile>
+      <id>localZookeeper</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+       </activation>
+       <properties>
+	<zookeeper.Installation>${local.test.zookeeper.installDir}</zookeeper.Installation>
+        <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
+       </properties>
+     </profile>
+     <profile>
+      <id>testZookeeper</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+        <property>
+          <name>TEST_ZOOKEEPER_HOME</name>
+        </property>
+       </activation>
+       <properties>
+	<zookeeper.Installation>${env.TEST_ZOOKEEPER_HOME}</zookeeper.Installation>
+        <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
+       </properties>
+     </profile>
+    </profiles>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.6</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+ 	<version>1.0-alpha-2</version>
+        <executions>
+           <!-- Associate the read-project-properties goal with the initialize phase, to read the properties file. -->
+          <execution>
+            <phase>initialize</phase>
+            <goals>
+              <goal>read-project-properties</goal>
+            </goals>
+            <configuration>
+              <files>
+                <file>testServices.properties</file>
+              </files>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+         <basedir>${basedir}</basedir>
+         <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
+	 <forkCount>1</forkCount>
+         <reuseForks>true</reuseForks>
+         <printSummary>false</printSummary>
+         <disableXmlReport>false</disableXmlReport>
+	 <rerunFailingTestsCount>2</rerunFailingTestsCount>
+        </configuration>
+      </plugin>
+      <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+  	       <id>start-zookeeper</id>
+	       <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>process-test-resources</phase>
+               <configuration>
+                 <target>
+                   <ant antfile="build.xml" target="preTestPreparation"/>
+                 </target>
+               </configuration>
+             </execution>
+             <execution>
+  	       <id>stop-zookeeper</id>
+	       <goals>
+		<goal>run</goal>
+	       </goals>
+               <phase>test</phase>
+               <configuration>
+                 <target>
+                   <ant antfile="build.xml" target="postTestCleanup"/>
+                 </target>
+               </configuration>
+             </execution>
+           </executions>
+         </plugin>
+        <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war-html</artifactId>
+                  <version>${project.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <!-- other configurations here -->
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
+    </plugins>
+  </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <stylesheetfile>${basedir}/src/main/javadoc/stylesheet.css</stylesheetfile>
+          <show>public</show>
+          <maxmemory>1000m</maxmemory>
+          <author>true</author>
+	  <version>true</version>
+          <doctitle><![CDATA[<h1>Blazegraph High Availability (HA) Tests</h1>]]></doctitle>
+	  <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+<script>
+jQuery(document).ready(function(){
+  jQuery('ul.sf-menu').superfish({
+  pathClass: 'current',
+  cssArrows: false
+  });
+});
+
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-50971023-6', 'blazegraph.com');
+ga('send', 'pageview');
+</script>
+]]></bottom> 
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+
+  <repositories>
+    <repository>
+      <id>bigdata.releases</id>
+      <url>http://www.systap.com/maven/releases/</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit3.version}</version>
+      <scope>test</scope>
+    </dependency>
+     <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>junit-ext</artifactId>
+      <version>${junit-ext.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+     <groupId>com.blazegraph</groupId>
+     <artifactId>bigdata-war</artifactId>
+     <version>${project.version}</version>
+     <type>war</type> 
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core-test</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core-test</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-jini</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-jini-test</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-ha</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-rdf-test</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-rdf-test</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>${zookeeper.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-client</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-proxy</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-server</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-webapp</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+<!--
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jini-core</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+-->
+    <!-- this is the only version in maven central -->
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jini-ext</artifactId>
+        <version>2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-lib</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-platform</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-resources</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>start</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <!-- There is no artifact in maven central for tools 2.2.1 -->
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>tools</artifactId>
+        <version>2.2.2</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>com.sun.jini</groupId>
+	    <artifactId>sun-util</artifactId>
+	    <version>2.1</version>
+    </dependency>
+    <dependency>
+       <!-- log4j is the primary logger for bigdata. -->
+       <groupId>log4j</groupId>
+       <artifactId>log4j</artifactId>
+       <version>${log4j.version}</version>
+     </dependency>
+  </dependencies>
+</project>
