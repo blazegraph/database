@@ -100,6 +100,8 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
         
         /**
          * Reference to ASTDatasetClause list for operations deferred until evaluation stage
+         * 
+         * @see https://jira.blazegraph.com/browse/BLZG-1176
          */
         String DATASET_CLAUSES = "datasetClauses";
  
@@ -207,12 +209,24 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
        return new HashSet<IVariable<?>>();
     }
 
-    public void setDatasetClauses(List<ASTDatasetClause> uc) {
+    /**
+	 * Return the {@link ASTDatasetClause} list for operations deferred until
+	 * evaluation stage.
+	 * 
+	 * @see https://jira.blazegraph.com/browse/BLZG-1176
+     */
+    public void setDatasetClauses(final List<ASTDatasetClause> uc) {
         if (uc!=null && !uc.isEmpty()) {
             setProperty(Annotations.DATASET_CLAUSES, uc);
         }
     }
 
+    /**
+	 * Return the {@link ASTDatasetClause} list for operations deferred until
+	 * evaluation stage.
+	 * 
+	 * @see https://jira.blazegraph.com/browse/BLZG-1176
+	 */
     @SuppressWarnings("unchecked")
     public List<ASTDatasetClause> getDatasetClauses() {
         return (List<ASTDatasetClause>) getProperty(Annotations.DATASET_CLAUSES);
