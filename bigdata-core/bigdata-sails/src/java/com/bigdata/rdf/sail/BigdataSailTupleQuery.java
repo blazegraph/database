@@ -9,6 +9,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailTupleQuery;
 
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
@@ -82,7 +83,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     		throws QueryEvaluationException {
 
         try {
-            new Bigdata2ASTSPARQLParser(getTripleStore()).preEvaluate(getTripleStore(), astContainer);
+            ASTDeferredIVResolution.preEvaluate(getTripleStore(), astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }

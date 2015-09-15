@@ -49,6 +49,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.BatchRDFValueResolver;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.sparql.BigdataASTContext;
@@ -253,7 +254,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
         Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(tripleStore);
         ASTContainer astContainer = parser.parseQuery2(queryStr, baseURI);
-        parser.preEvaluate(tripleStore, astContainer);
+        ASTDeferredIVResolution.preEvaluate(tripleStore, astContainer);
         final QueryRoot ast = astContainer.getOriginalAST();
 
         
@@ -286,7 +287,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
         Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(tripleStore);
         ASTContainer ast = parser.parseUpdate2(updateStr, baseURI);
-        parser.preUpdate(tripleStore, ast);
+        ASTDeferredIVResolution.preUpdate(tripleStore, ast);
         return ast.getOriginalUpdateAST();
 
     }
