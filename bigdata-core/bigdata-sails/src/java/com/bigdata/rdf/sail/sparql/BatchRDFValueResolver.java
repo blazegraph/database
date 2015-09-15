@@ -115,7 +115,6 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
     private Map<Value, BigdataValue> vocab;
 
     /**
-     * @param context
      * @param readOnly
      *            When <code>true</code>, unknown RDF {@link Value}s are not
      *            recorded in the database.

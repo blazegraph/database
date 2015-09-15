@@ -21,7 +21,6 @@ public class ASTDeferredIVResolution {
     public static void preEvaluate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
         final QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
-        final ASTQueryContainer qc = (ASTQueryContainer)ast.getProperty(Annotations.PARSE_TREE);
         
         final BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
         
@@ -43,15 +42,22 @@ public class ASTDeferredIVResolution {
          * 
          * Note: This handles VIRTUAL GRAPH resolution.
          */
-        if (qc!=null && qc.getOperation()!=null) {
-            final DatasetNode dataSetNode = new DatasetDeclProcessor(context)
-                .process(qc.getOperation().getDatasetClauseList(), false);
-    
-            if (dataSetNode != null) {
-    
-                queryRoot.setDataset(dataSetNode);
-    
-            }
+        {
+			final ASTQueryContainer qc = (ASTQueryContainer) ast.getProperty(Annotations.PARSE_TREE);
+
+			if (qc != null && qc.getOperation() != null) {
+			
+				final DatasetNode dataSetNode = new DatasetDeclProcessor(context)
+						.process(qc.getOperation().getDatasetClauseList(), false);
+
+				if (dataSetNode != null) {
+
+					queryRoot.setDataset(dataSetNode);
+
+				}
+
+			}
+			
         }
         
         /*
