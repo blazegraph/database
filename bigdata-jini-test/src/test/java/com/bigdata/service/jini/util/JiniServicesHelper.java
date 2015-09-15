@@ -31,9 +31,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.IServiceListener;
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.resources.ResourceFileFilter;
 import com.bigdata.service.IDataService;
@@ -49,6 +47,8 @@ import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
+import com.bigdata.zookeeper.util.ConfigMath;
 
 /**
  * A helper class that starts the bigdata services for a bigdata federation. The

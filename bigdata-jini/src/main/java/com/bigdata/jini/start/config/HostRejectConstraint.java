@@ -31,6 +31,8 @@ import java.net.UnknownHostException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.zookeeper.start.config.AbstractHostConstraint;
+
 /**
  * Allows any of the specified hosts.
  * 

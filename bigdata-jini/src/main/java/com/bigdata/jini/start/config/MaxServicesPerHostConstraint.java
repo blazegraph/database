@@ -37,6 +37,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
 import com.bigdata.service.jini.MetadataServer.AdministrableMetadataService;
+import com.bigdata.zookeeper.start.config.IServiceConstraint;
 
 /**
  * Places a limit on the #of instances of a service which can be created on the

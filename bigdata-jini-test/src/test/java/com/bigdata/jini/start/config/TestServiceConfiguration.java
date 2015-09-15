@@ -37,10 +37,10 @@ import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationProvider;
 
 import com.bigdata.jini.start.config.BigdataServiceConfiguration;
-import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.TransactionServerConfiguration;
 import com.bigdata.service.jini.TransactionServer;
+import com.bigdata.zookeeper.start.config.IServiceConstraint;
 
 /**
  * Some unit tests for {@link ServiceConfiguration} and friends focused on

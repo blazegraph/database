@@ -1942,6 +1942,10 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             assertEquals(quorum1.getCastVote(serviceId1), quorum1.getCastVoteIfConsensus(serviceId0));
             assertNotSame(quorum1.getCastVote(serviceId1), quorum1.getCastVote(serviceId2));
             actor2.castVote(lastCommitTime);
+            //Added for CI failures
+
+            Thread.sleep(100);
+
             assertEquals(quorum1.getCastVoteIfConsensus(serviceId1), quorum1.getCastVoteIfConsensus(serviceId2));
             
             Thread.sleep(100);

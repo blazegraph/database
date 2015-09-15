@@ -1,8 +1,9 @@
-package com.bigdata.jini.start.config;
+package com.bigdata.zookeeper.start.config;
 
 import org.apache.zookeeper.ZooKeeper;
 
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
+
 
 /**
  * Constraint that zookeeper must be running (the {@link ZooKeeper} client
@@ -19,7 +20,7 @@ public class ZookeeperRunningConstraint extends
      */
     private static final long serialVersionUID = -9179574081166981787L;
 
-    public boolean allow(JiniFederation fed) throws Exception {
+    public boolean allow(ZookeeperFederation fed) throws Exception {
 
         final ZooKeeper.States state = fed.getZookeeper().getState();
 

@@ -33,12 +33,12 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.ha.QuorumPipeline;
-import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumMember;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Extended interface includes zookeeper specific definitions. The root of the

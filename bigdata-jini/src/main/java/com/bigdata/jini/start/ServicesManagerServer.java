@@ -46,7 +46,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ServicesManagerConfiguration;
@@ -63,6 +62,8 @@ import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
+import com.bigdata.zookeeper.start.config.IServiceConstraint;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.ServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
