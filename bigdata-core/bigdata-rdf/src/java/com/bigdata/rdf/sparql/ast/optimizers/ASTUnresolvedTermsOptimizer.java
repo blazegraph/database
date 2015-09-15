@@ -552,7 +552,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
                         final String label = ((Literal)v).getLabel();
                         final URI dataType = ((Literal)v).getDatatype();
                         final String language = ((Literal)v).getLanguage();
-                        BigdataValue resolved;
+                        final BigdataValue resolved;
                         if (language!=null) {
                             resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, language);
                         } else {
