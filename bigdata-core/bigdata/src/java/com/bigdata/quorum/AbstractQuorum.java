@@ -57,9 +57,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadGuard;
 import com.bigdata.util.concurrent.ThreadGuard.Guard;
 

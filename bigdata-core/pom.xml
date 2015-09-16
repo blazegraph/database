@@ -424,6 +424,11 @@ public class BuildInfo {
        <artifactId>bigdata-util</artifactId>
        <version>${project.version}</version>
     </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-cache</artifactId>
+       <version>${project.version}</version>
+     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>

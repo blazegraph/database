@@ -70,7 +70,6 @@ import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.rio.helpers.BasicParserSettings;
 import org.openrdf.sail.memory.MemoryStore;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.BufferMode;
@@ -82,6 +81,7 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Test harness for running the SPARQL test suites. This version runs against

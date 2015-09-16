@@ -54,7 +54,7 @@ import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrencyManager.Options;
 import com.bigdata.service.DataService;
 import com.bigdata.service.ndx.DataServiceTupleIterator;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * Test suite for the {@link IConcurrencyManager} interface on the

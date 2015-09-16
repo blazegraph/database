@@ -29,13 +29,13 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTComplexOptionalOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.TestASTSparql11SubqueryOptimizer;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Data driven test suite.

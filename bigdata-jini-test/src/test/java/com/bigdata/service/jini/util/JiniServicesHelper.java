@@ -44,7 +44,7 @@ import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.jini.TransactionServer;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;

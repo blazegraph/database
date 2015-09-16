@@ -59,8 +59,8 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * TestCase to test single writer/mutiple transaction committed readers with

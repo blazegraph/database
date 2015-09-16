@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -55,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Test suite for {@link ASTHashJoinOptimizer}.

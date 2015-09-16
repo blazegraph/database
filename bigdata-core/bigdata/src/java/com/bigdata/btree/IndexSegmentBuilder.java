@@ -52,7 +52,7 @@ import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
+import com.bigdata.cache.lru.IGlobalLRU.ILRUCache;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.ChecksumUtility;

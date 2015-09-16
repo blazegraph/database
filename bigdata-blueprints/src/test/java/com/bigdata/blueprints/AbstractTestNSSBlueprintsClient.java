@@ -32,7 +32,6 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -43,6 +42,7 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.config.NicUtil;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Vertex;
