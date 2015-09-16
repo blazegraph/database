@@ -27,8 +27,8 @@ import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 public class TestMemoryManager extends TestCase2 {
 

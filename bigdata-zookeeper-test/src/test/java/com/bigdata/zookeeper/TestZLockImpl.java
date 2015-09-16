@@ -46,8 +46,8 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for {@link ZLockImpl}.

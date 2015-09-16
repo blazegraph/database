@@ -69,8 +69,8 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A mock object providing the shared quorum state for a set of

@@ -231,6 +231,11 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-cache</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
      <groupId>com.blazegraph</groupId>
      <artifactId>bigdata-war</artifactId>
      <version>${project.version}</version>

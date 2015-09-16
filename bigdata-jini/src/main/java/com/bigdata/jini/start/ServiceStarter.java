@@ -33,11 +33,11 @@ import java.util.List;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 
-import com.bigdata.Banner;
 import com.bigdata.jini.start.config.JavaServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.JavaServiceConfiguration.JavaServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.util.Banner;
 import com.bigdata.zookeeper.util.ConfigMath;
 
 /**

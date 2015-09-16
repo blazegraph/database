@@ -37,7 +37,6 @@ import java.util.concurrent.Exchanger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
@@ -50,6 +49,7 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.WORMStrategy.StoreCounters;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager.ManagedJournal;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 
 /**

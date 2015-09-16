@@ -37,7 +37,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.solutions.SolutionSetStream;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
@@ -48,6 +47,7 @@ import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.htree.HTree;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.stream.Stream.StreamIndexMetadata;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**

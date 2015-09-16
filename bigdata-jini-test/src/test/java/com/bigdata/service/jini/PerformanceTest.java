@@ -54,9 +54,9 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.util.JiniServicesHelper;
-import com.bigdata.test.ExperimentDriver;
-import com.bigdata.test.ExperimentDriver.IComparisonTest;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver;
+import com.bigdata.testutil.ExperimentDriver.IComparisonTest;
+import com.bigdata.testutil.ExperimentDriver.Result;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.NV;
 

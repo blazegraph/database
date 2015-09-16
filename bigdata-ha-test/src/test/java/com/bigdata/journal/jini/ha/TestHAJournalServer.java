@@ -45,8 +45,8 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.msg.HADigestRequest;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Life cycle and related tests for a single remote {@link HAJournalServer} out

@@ -31,8 +31,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.journal.Journal;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Test suite for highly available configurations of the standalone

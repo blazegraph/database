@@ -72,7 +72,6 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -88,6 +87,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.config.NicUtil;
 

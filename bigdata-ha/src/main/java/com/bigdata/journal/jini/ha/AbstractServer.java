@@ -75,7 +75,6 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.PIDUtil;
 import com.bigdata.ha.HAGlue;
@@ -89,6 +88,7 @@ import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniClientConfig;
+import com.bigdata.util.Banner;
 import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.start.LifeCycle;

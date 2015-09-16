@@ -79,9 +79,9 @@ import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumError;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Computable;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.Memoizer;
 
 /**

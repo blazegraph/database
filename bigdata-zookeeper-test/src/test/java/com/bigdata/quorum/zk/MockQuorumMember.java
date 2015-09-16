@@ -29,7 +29,7 @@ import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * NOP client base class used for the individual clients for each

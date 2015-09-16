@@ -34,7 +34,7 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.Banner;
+import com.bigdata.util.Banner;
 
 /**
  * A service for distributing application {@link Callable}s across an

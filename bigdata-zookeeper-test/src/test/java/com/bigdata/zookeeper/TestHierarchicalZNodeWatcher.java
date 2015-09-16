@@ -36,7 +36,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher.Event;
 
-import com.bigdata.BigdataStatics;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Test suite for {@link HierarchicalZNodeWatcher}.

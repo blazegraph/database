@@ -55,7 +55,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.AbstractSplitter;
 import com.bigdata.service.ndx.ISplitter;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * Abstract base class for test suites for the {@link AbstractMasterTask} and

@@ -70,7 +70,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.util.Bytes;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * Class encapsulates logic for handling journal overflow events. Overflow is

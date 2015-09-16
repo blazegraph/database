@@ -75,12 +75,12 @@ import com.bigdata.resources.OverflowCounters;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService.Options;
 import com.bigdata.service.ndx.ClientIndexView;
-import com.bigdata.test.ExperimentDriver;
-import com.bigdata.test.ExperimentDriver.IComparisonTest;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver;
+import com.bigdata.testutil.ExperimentDriver.IComparisonTest;
+import com.bigdata.testutil.ExperimentDriver.Result;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.NV;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**

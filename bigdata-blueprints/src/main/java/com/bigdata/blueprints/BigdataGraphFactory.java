@@ -24,10 +24,10 @@ package com.bigdata.blueprints;
 
 import java.util.Properties;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
+import com.bigdata.util.BigdataStatics;
 
 
 /**

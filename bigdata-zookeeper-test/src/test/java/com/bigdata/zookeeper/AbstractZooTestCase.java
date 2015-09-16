@@ -48,7 +48,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.io.TestCase3;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 
 /**

@@ -39,8 +39,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Helper object for a running {@link Process} that DOES NOT require any input.

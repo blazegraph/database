@@ -47,7 +47,6 @@ import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
-import com.bigdata.Banner;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IRangeQuery;
@@ -78,6 +77,7 @@ import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.util.Banner;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.Latch;

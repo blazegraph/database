@@ -69,7 +69,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -180,6 +179,7 @@ import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.BytesUtil;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.NT;

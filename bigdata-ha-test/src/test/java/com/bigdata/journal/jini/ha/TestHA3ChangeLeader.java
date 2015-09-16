@@ -27,9 +27,9 @@ import java.util.Random;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
+import com.bigdata.util.BigdataStatics;
 
 public class TestHA3ChangeLeader extends AbstractHA3JournalServerTestCase  {
 	
