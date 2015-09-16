@@ -83,9 +83,6 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.InnerCause;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 
 /**
  * A status page for the service.
@@ -299,10 +296,11 @@ public class StatusServlet extends BigdataRDFServlet {
 
         }
 
-        final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+        final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
                 .getQueryController(indexManager);
         
-        QueryCancellationHelper.cancelQueries(queryIds, queryEngine);
+        //See BLZG-1464  
+        //QueryCancellationHelper.cancelQueries(queryIds, queryEngine);
 
         for (UUID queryId : queryIds) {
 
@@ -513,7 +511,7 @@ public class StatusServlet extends BigdataRDFServlet {
 		 * the QueryEngine).
 		 */
 
-		final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+		final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
 				.getQueryController(getIndexManager());
 
 		final UUID[] queryIds = queryEngine.getRunningQueries();
@@ -762,7 +760,7 @@ public class StatusServlet extends BigdataRDFServlet {
             {
 
                 final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
-                        .getQueryController(getIndexManager());
+                        .getInstance().getQueryController(getIndexManager());
 
                 final CounterSet counterSet = queryEngine.getCounters();
 
@@ -833,7 +831,7 @@ public class StatusServlet extends BigdataRDFServlet {
              * on the QueryEngine).
              */
 
-            final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+            final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
                     .getQueryController(getIndexManager());
 
             final UUID[] queryIds = queryEngine.getRunningQueries();

@@ -36,6 +36,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IGraphPatternContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
@@ -172,9 +173,23 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                 final FilterNode filter = (FilterNode) child;
 
+                /**
+                 * BLZG-1475: there are cases where we have nested FILTER
+                 * EXISTS or FILTER NOT EXISTS expressions; in such cases, we
+                 * rewrite the inner expressions first
+                 */
+                final IValueExpressionNode vexp = filter.getValueExpressionNode();
+                if (vexp!=null) {
+                   final Object gpGroup = 
+                      child.get(0).getProperty(Annotations.GRAPH_PATTERN, null);
+                   if (gpGroup instanceof GraphPatternGroup) {
+                      rewrite(sa, exogenousVars, query,
+                            (GraphPatternGroup<IGroupMemberNode>) gpGroup);
+                   }
+                }
+                
                 // rewrite filter.
-                rewrite(sa, exogenousVars, query, p, filter,
-                        filter.getValueExpressionNode());
+                rewrite(sa, exogenousVars, query, p, filter, vexp);
 
             }
 

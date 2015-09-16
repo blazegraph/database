@@ -26,6 +26,7 @@ package com.bigdata.quorum;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 
+
 /**
  * Wraps the token/join transitions in a testable manner.
  * 

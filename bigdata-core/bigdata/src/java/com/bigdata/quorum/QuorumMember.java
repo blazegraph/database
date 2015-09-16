@@ -31,9 +31,6 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
-import com.bigdata.ha.HACommitGlue;
-import com.bigdata.ha.QuorumCommit;
-
 /**
  * A non-remote interface for a service which will participate in a quorum as a
  * member service (as opposed to a client service that merely watches the
@@ -66,7 +63,7 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S>,
      * <p>
      * A service operating as a {@link QuorumMember} has both {@link Remote}
      * interface and a non-remote interface. These interfaces typically define
-     * similar methods (for example, compare {@link HACommitGlue}, which is
+     * similar methods (for example, compare {@link com.bigdata.ha.HACommitGlue}, which is
      * {@link Remote}, with {@link QuorumCommit}, which is non-remote). The
      * {@link Remote} interface in turn will have a local implementation object
      * inside of the JVM and an exported proxy for that {@link Remote}

@@ -117,6 +117,9 @@ public class TestAll extends TestCase {
 
         // Test suite for a merge join pattern
         suite.addTestSuite(TestMergeJoin.class);
+        
+        // Test suite for explain hint annotationss
+        suite.addTestSuite(TestExplainHints.class);
 
         // Test suite for aggregation queries.
         suite.addTestSuite(TestAggregationQuery.class);
