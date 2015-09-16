@@ -1,0 +1,9 @@
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+PREFIX x: <http://example.com/>
+
+SELECT (count(*) AS ?c) WHERE {
+  ?s a ?t .
+  ?s foaf:name|dc:title ?name .
+  FILTER (?s = x:x || ?s = x:x)
+}
