@@ -18,6 +18,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Task restarts persistent physical services that should be running on this

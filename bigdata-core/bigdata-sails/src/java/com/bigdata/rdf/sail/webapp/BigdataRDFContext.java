@@ -1283,7 +1283,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
              */
             {
 
-                final QueryEngine queryEngine = QueryEngineFactory
+                final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                         .getQueryController(getIndexManager());
 
                 if (queryEngine.pendingCancel(queryId2)) {
@@ -2251,7 +2251,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
                                 //
                         body.node("p")
                                 .text("totalElapsed=" + totalElapsedMillis
-                                        + "ms, elapsed=" + elapsedMillis + "ms"
+                                        + "ms, elapsed=" + elapsedMillis
+                                        + "ms, connFlush="+TimeUnit.NANOSECONDS.toMillis(e.getConnectionFlushNanos())//
+                                        + "ms, batchResolve="+TimeUnit.NANOSECONDS.toMillis(e.getBatchResolveNanos())//
 										+ (deleteInsertWhereStats == null ? ""
 												: ", whereClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.whereNanos.get())
 														+ "ms, deleteClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.deleteNanos.get())

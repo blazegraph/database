@@ -170,6 +170,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
           <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
       <plugin>
@@ -525,11 +526,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
-     </dependency>
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
       <version>${junit4.version}</version>
      </dependency>
      <dependency>
@@ -550,11 +546,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>rdf-properties</artifactId>
-       <version>${project.version}</version>
-    </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-util</artifactId>
        <version>${project.version}</version>
     </dependency>
      <dependency>

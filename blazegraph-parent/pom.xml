@@ -149,6 +149,7 @@ dependencies.
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
           <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack}</argLine>
+	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
     </plugins>
@@ -204,8 +205,13 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
-<!-- disabled pending BLZG-1270
+    <module>../bigdata-zookeeper</module>
     <module>../bigdata-jini</module>
+    <module>../bigdata-jini-test</module>
+    <module>../bigdata-ha</module>
+<!-- Disable the automatic test execution for now. 
+     It is run as a separate Jenkins job.
+    <module>../bigdata-ha-test</module>
 -->
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
@@ -213,6 +219,7 @@ dependencies.
     <module>../bigdata-jar</module>
     <module>../bigdata-runtime</module>
     <module>../bigdata-core-test/</module>
+    <module>../bigdata-zookeeper-test</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
   </modules>

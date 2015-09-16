@@ -67,11 +67,9 @@ import org.apache.zookeeper.KeeperException;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceDir;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
-import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniClient;
@@ -79,6 +77,9 @@ import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZNodeCreatedWatcher;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
+import com.bigdata.zookeeper.util.ConfigMath;
 
 /**
  * Abstract implementation for jini-based services.

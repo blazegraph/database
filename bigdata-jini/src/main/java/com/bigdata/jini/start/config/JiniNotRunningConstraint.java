@@ -1,6 +1,8 @@
 package com.bigdata.jini.start.config;
 
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
+import com.bigdata.zookeeper.start.config.ServiceDependencyConstraint;
 
 /**
  * Constraint that jini must be running (one or more service registrars must
@@ -15,6 +17,13 @@ public class JiniNotRunningConstraint extends ServiceDependencyConstraint {
      * 
      */
     private static final long serialVersionUID = 5490323726279787743L;
+    
+    public boolean allow(ZookeeperFederation fed) throws Exception {
+    	if(fed instanceof JiniFederation)
+    		return allow((JiniFederation) fed);
+    	else 
+    		return false;
+    }
 
     public boolean allow(JiniFederation fed) throws Exception {
 

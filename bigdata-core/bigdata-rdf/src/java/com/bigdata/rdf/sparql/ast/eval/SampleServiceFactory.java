@@ -345,7 +345,7 @@ public class SampleServiceFactory extends AbstractServiceFactory
 	                        ));
 	        
 	        final BOpContextBase context = new BOpContextBase(
-	        		QueryEngineFactory.getQueryController(
+	        		QueryEngineFactory.getInstance().getQueryController(
 	        				db.getIndexManager()));
 	
 	        final ISPO[] elements = (ISPO[]) sampleOp.eval(context);

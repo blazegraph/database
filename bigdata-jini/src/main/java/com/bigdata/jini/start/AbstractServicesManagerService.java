@@ -5,6 +5,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import net.jini.config.Configuration;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.jini.start.config.ServicesManagerConfiguration;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
@@ -13,7 +15,6 @@ import com.bigdata.service.AbstractService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
-import org.apache.log4j.Logger;
 
 /**
  * Core impl.

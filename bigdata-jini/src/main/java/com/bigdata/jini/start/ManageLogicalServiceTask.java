@@ -33,8 +33,8 @@ import java.util.concurrent.Callable;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.io.SerializerUtil;
@@ -44,6 +44,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.zookeeper.ZLock;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 import com.sun.jini.tool.ClassServer;
 
 /**
