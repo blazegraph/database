@@ -260,8 +260,8 @@ public class ArbitraryLengthPathNode
 
         final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
 
-        addProducedBinding(left(), producedBindings);
-        addProducedBinding(right(), producedBindings);
+        addVar(left(), producedBindings, true);
+        addVar(right(), producedBindings, true);
         
         final VarNode edgeVar = edgeVar();
         if (edgeVar != null) {
