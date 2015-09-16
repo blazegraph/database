@@ -509,6 +509,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-util</artifactId>
+       <version>${project.version}</version>
+       <type>test-jar</type>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
        <version>${project.version}</version>
        <type>test-jar</type>
@@ -557,6 +563,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-cache</artifactId>
        <version>${project.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-cache</artifactId>
+       <version>${project.version}</version>
+       <type>test-jar</type>
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>

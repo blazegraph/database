@@ -420,6 +420,12 @@ dependencies.
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-util</artifactId>
+       <version>${project.version}</version>
+       <type>test-jar</type>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
        <version>${project.version}</version>
     </dependency>
