@@ -46,8 +46,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IMROW;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.test.ExperimentDriver;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.testutil.ExperimentDriver;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * Test suite for MROW (Multiple Readers, One Writer) support.

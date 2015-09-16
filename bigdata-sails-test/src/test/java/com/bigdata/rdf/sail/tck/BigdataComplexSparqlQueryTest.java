@@ -46,7 +46,6 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
@@ -55,6 +54,7 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Bigdata integration for the {@link ComplexSPARQLQueryTest}.

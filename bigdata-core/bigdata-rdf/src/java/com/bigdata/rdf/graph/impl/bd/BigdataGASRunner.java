@@ -14,7 +14,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Logger;
 import org.openrdf.sail.SailConnection;
 
-import com.bigdata.Banner;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -26,6 +25,7 @@ import com.bigdata.rdf.graph.impl.util.GASRunnerBase;
 import com.bigdata.rdf.graph.util.GraphLoader;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.Banner;
 
 /**
  * Base class for running performance tests against the bigdata backend.

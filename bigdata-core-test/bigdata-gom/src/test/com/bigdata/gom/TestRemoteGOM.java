@@ -51,7 +51,6 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
 import com.bigdata.gom.om.IObjectManager;
@@ -69,6 +68,7 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.config.NicUtil;
 
 /**

@@ -34,7 +34,6 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
@@ -64,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.TestSubQuery;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Test suite for {@link ASTSparql11SubqueryOptimizer}.

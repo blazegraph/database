@@ -121,7 +121,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <version>2.18.1</version>
         <configuration>
           <includes>
-     	    <include>com/bigdata/cache/TestAll.java</include>
+     	    <include>com/bigdata/cache/lru/TestAll.java</include>
             <include>com/bigdata/io/TestAll.java</include>
             <include>com/bigdata/net/TestAll.java</include>
             <include>com/bigdata/config/TestAll.java</include>
@@ -552,8 +552,13 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
        <version>${project.version}</version>
+    </dependency> 
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-cache</artifactId>
+       <version>${project.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
        <version>${project.version}</version>

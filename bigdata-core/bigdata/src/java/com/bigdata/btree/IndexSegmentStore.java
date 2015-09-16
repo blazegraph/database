@@ -40,8 +40,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.cache.IGlobalLRU;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
+import com.bigdata.cache.lru.IGlobalLRU;
+import com.bigdata.cache.lru.IGlobalLRU.ILRUCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;

@@ -140,7 +140,7 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.Bytes;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.Latch;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;

@@ -62,7 +62,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.MovingAverageTask;
 import com.bigdata.util.concurrent.QueueSizeMovingAverageTask;
 import com.bigdata.util.concurrent.WriteTaskCounters;

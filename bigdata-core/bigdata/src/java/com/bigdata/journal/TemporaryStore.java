@@ -51,7 +51,7 @@ import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * A temporary store that supports named indices but no concurrency controls.

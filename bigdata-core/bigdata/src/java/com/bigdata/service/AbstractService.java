@@ -33,9 +33,9 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
-import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.util.Banner;
 
 /**
  * Abstract base class defines protocols for setting the service {@link UUID},

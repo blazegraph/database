@@ -28,9 +28,9 @@ import java.util.Map;
 
 import org.eclipse.jetty.server.Server;
 
-import com.bigdata.Banner;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.util.Banner;
 
 /**
  * Utility class provides a simple SPARQL end point with a REST API.  

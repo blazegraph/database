@@ -69,7 +69,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
+import com.bigdata.cache.lru.IGlobalLRU.ILRUCache;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -109,7 +109,7 @@ import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.Bytes;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 
 /**

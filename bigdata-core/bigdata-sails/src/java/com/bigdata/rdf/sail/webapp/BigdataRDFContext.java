@@ -75,7 +75,6 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -114,7 +113,8 @@ import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.BigdataStatics;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 
 /**
