@@ -1,4 +1,3 @@
-<?xml version="1.0"?>
 <!--
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
@@ -23,8 +22,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
@@ -32,10 +33,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>bigdata-util</artifactId>
+  <artifactId>bigdata-cache</artifactId>
   <version>1.5.3-master-SNAPSHOT</version>
-  <name>Blazegraph Utilities</name>
-  <url>http://maven.apache.org</url>
+  <name>Blazegraph Cache</name>
+  <packaging>jar</packaging>
+
+  <profiles></profiles>
+
   <build>
    <plugins>
     <plugin>
@@ -64,8 +68,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>Blazegraph Utilities</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <doctitle><![CDATA[<h1>Blazegraph Cache</h1>]]></doctitle>
+	  <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -81,92 +85,47 @@ m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
-]]></bottom>
- 
+]]></bottom> 
         </configuration>
       </plugin>
     </plugins>
   </reporting>
-  
+
+  <repositories>
+    <repository>
+      <id>bigdata.releases</id>
+      <url>http://www.systap.com/maven/releases/</url>
+    </repository>
+  </repositories>
+
   <dependencies>
     <dependency>
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
-    <dependency>
-     <groupId>com.blazegraph</groupId>
-     <artifactId>ctc-striterators</artifactId>
-     <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-ganglia</artifactId>
-     <version>${project.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>javax.servlet</groupId>
-        <artifactId>javax.servlet-api</artifactId>
-        <version>${servlet.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>colt</groupId>
-      <artifactId>colt</artifactId>
-      <version>${colt.version}</version>
-   </dependency>
-   <dependency>
-        <groupId>org.openrdf.sesame</groupId>
-        <artifactId>sesame-util</artifactId>
-        <version>${sesame.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>dsi-utils</artifactId>
-      <version>${project.version}</version>
-   </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>lgpl-utils</artifactId>
-      <version>${project.version}</version>
-   </dependency>
-   <dependency>
-           <groupId>com.github.stephenc.high-scale-lib</groupId>
-           <artifactId>high-scale-lib</artifactId>
-           <version>${highscalelib.version}</version>
-   </dependency>
-   <dependency>
-        <groupId>net.jini</groupId>
-        <artifactId>jini-ext</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>junit-ext</artifactId>
-      <version>${junit-ext.version}</version>
-      <scope>test</scope>
-    </dependency>
-     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit4.version}</version>
       <scope>test</scope>
     </dependency>
-     <dependency>
-       <groupId>com.fasterxml.jackson.core</groupId>
-       <artifactId>jackson-core</artifactId>
-       <version>${jackson.version}</version>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>junit-ext</artifactId>
+      <version>${junit-ext.version}</version>
     </dependency>
     <dependency>
-       <groupId>com.fasterxml.jackson.core</groupId>
-       <artifactId>jackson-annotations</artifactId>
-       <version>${jackson.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>${jackson.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
     </dependency>
+    <dependency>
+       <!-- log4j is the primary logger for bigdata. -->
+       <groupId>log4j</groupId>
+       <artifactId>log4j</artifactId>
+       <version>${log4j.version}</version>
+     </dependency>
   </dependencies>
-
-  </project>
+</project>
