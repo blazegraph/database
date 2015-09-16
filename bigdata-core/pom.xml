@@ -406,6 +406,11 @@ public class BuildInfo {
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
+       <artifactId>sparql-grammar</artifactId>
+       <version>${project.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
        <artifactId>lgpl-utils</artifactId>
        <version>${project.version}</version>
      </dependency>
