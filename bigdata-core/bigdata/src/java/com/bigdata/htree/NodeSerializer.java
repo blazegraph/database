@@ -29,7 +29,6 @@ package com.bigdata.htree;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.data.AbstractReadOnlyNodeData;
 import com.bigdata.btree.data.DefaultLeafCoder;
@@ -48,6 +47,7 @@ import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.io.compression.NOPRecordCompressor;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 
 /**

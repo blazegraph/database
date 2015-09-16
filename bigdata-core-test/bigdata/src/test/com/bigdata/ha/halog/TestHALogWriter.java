@@ -49,7 +49,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.util.Bytes;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * Test suite for {@link HALogWriter} and {@link HALogReader}.

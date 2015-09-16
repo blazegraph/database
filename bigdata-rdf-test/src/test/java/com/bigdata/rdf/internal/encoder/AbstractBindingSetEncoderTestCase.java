@@ -36,7 +36,6 @@ import junit.framework.TestCase2;
 
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -60,6 +59,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.util.BigdataStatics;
 
 /**
  * Base class for {@link IBindingSetEncoder}and {@link IBindingSetDecoder} test

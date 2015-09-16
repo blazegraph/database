@@ -51,7 +51,6 @@ import javax.servlet.ServletContextListener;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.Banner;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.BaseIndexStats;
@@ -76,6 +75,7 @@ import com.bigdata.service.DefaultClientDelegate;
 import com.bigdata.service.ScaleOutClientFactory;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.Banner;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**

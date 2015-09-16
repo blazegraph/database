@@ -55,10 +55,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.service.DataService;
-import com.bigdata.test.ExperimentDriver;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver;
+import com.bigdata.testutil.ExperimentDriver.Result;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.NV;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**

@@ -59,7 +59,7 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.service.EventReceiver.EventBTree;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**

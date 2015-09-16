@@ -33,7 +33,7 @@ import java.util.UUID;
 
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
-import com.bigdata.cache.IGlobalLRU;
+import com.bigdata.cache.lru.IGlobalLRU;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;

@@ -45,7 +45,7 @@ import junit.framework.TestCase;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.LockFutureTask;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * basic unit tests.

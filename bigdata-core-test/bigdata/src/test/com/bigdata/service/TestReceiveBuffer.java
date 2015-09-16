@@ -48,7 +48,7 @@ import java.util.concurrent.TimeoutException;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.service.ResourceService.ReadBufferTask;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 
 /**

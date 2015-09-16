@@ -41,7 +41,6 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectManager;
 import com.bigdata.journal.BufferMode;
@@ -50,6 +49,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.BigdataStatics;
 
 public class LocalGOMTestCase extends TestCase implements IGOMProxy {
 

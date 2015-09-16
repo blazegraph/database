@@ -32,7 +32,6 @@ import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.Leaf.ILeafListener;
 import com.bigdata.btree.data.ILeafData;
@@ -45,6 +44,7 @@ import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 
 /**

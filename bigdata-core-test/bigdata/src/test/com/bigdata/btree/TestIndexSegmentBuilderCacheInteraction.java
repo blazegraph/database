@@ -30,8 +30,8 @@ import com.bigdata.LRUNexus;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.keys.TestKeyBuilder;
-import com.bigdata.cache.IGlobalLRU;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
+import com.bigdata.cache.lru.IGlobalLRU;
+import com.bigdata.cache.lru.IGlobalLRU.ILRUCache;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 

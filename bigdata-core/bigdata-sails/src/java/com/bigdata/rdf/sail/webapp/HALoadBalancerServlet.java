@@ -40,7 +40,6 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.proxy.ProxyServlet;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.counters.CAT;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
@@ -50,6 +49,7 @@ import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.IHAPolicyLifeCycle;
 import com.bigdata.rdf.sail.webapp.lbs.IHARequestURIRewriter;
 import com.bigdata.rdf.sail.webapp.lbs.policy.NOPLBSPolicy;
+import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
 
