@@ -42,12 +42,12 @@ import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.jetty.xml.XmlConfiguration;
 
+import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.resources.IndexManager;
-import com.bigdata.util.Banner;
 import com.bigdata.util.config.NicUtil;
 
 /**

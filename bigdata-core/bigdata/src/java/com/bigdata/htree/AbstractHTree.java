@@ -13,6 +13,8 @@ import java.util.concurrent.locks.Lock;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTree.IBTreeCounters;
 import com.bigdata.btree.BTree;
@@ -46,8 +48,6 @@ import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.DataService;
-import com.bigdata.util.Banner;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
 

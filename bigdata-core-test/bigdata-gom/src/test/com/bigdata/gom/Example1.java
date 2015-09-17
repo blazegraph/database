@@ -9,12 +9,12 @@ import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.NanoSparqlObjectManager;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.httpd.Config;
 
 import cutthecrap.utils.striterators.ICloseableIterator;

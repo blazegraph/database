@@ -43,6 +43,7 @@ import junit.textui.ResultPrinter;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
@@ -59,7 +60,6 @@ import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.task.AbstractApiTask;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.config.NicUtil;

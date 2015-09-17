@@ -43,14 +43,14 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.osx.StatisticsCollectorForOSX;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.util.Banner;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.util.httpd.AbstractHTTPD;

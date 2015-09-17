@@ -38,6 +38,7 @@ import org.openrdf.query.parser.sparql.manifest.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.dataset.DatasetRepository;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
@@ -50,7 +51,6 @@ import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.ScaleOutClientFactory;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * Runs the SPARQL test suite against a JiniFederation, which must be

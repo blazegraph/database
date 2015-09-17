@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -44,7 +45,6 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * A canonicalizing collection of weakly held hard reference hash maps backed by

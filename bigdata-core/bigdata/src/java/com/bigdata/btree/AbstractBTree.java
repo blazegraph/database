@@ -46,6 +46,8 @@ import java.util.concurrent.locks.Lock;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
@@ -87,8 +89,6 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
-import com.bigdata.util.Banner;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;

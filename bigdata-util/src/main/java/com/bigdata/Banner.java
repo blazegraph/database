@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 24, 2008
  */
 
-package com.bigdata.util;
+package com.bigdata;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.Field;
@@ -45,6 +45,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.util.Depends;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.Depends.Dependency;
 import com.bigdata.util.config.LogUtil;
 import com.bigdata.util.config.NicUtil;

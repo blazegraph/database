@@ -37,6 +37,7 @@ import junit.framework.TestResult;
 import junit.framework.TestSuite;
 import junit.textui.ResultPrinter;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
@@ -47,7 +48,6 @@ import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ScaleOutClientFactory;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 
 /**
