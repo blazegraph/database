@@ -48,6 +48,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
@@ -58,7 +59,6 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;

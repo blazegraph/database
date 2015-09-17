@@ -35,6 +35,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -45,7 +46,6 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.util.Banner;
 import com.bigdata.util.Bytes;
 
 /**

@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTree.ChildMemoizer;
 import com.bigdata.btree.AbstractBTree.LoadChildRequest;
 import com.bigdata.btree.data.DefaultNodeCoder;
@@ -47,7 +48,6 @@ import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.Memoizer;

@@ -65,6 +65,7 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
@@ -72,7 +73,6 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.testutil.ExperimentDriver.Result;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;

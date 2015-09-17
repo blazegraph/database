@@ -34,6 +34,7 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -45,7 +46,6 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.config.NicUtil;
 
 /**

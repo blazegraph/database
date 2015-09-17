@@ -28,13 +28,13 @@ import java.io.InputStream;
 
 import junit.framework.Test;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * Test of RDR specific data interchange and query.

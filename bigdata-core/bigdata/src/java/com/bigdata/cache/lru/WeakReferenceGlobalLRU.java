@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.cache.ConcurrentWeakValueCache;
@@ -46,7 +47,6 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * Implementation based on a shared {@link HardReferenceQueue} and

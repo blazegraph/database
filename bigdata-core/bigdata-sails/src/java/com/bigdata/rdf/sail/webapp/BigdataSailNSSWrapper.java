@@ -30,10 +30,10 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.config.NicUtil;
 

@@ -34,11 +34,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BigdataMap;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.master.INotifyOutcome;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * Extends the master task to track outstanding asynchronous operations on work

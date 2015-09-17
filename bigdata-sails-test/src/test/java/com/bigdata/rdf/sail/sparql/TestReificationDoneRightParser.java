@@ -36,6 +36,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
@@ -59,7 +60,6 @@ import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * Test suite for the proposed standardization of "reification done right".
