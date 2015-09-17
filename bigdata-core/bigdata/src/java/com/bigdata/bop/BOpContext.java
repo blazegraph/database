@@ -517,20 +517,24 @@ public class BOpContext<E> extends BOpContextBase {
     }
     
     /**
-     * Return the {@link IQueryAttributes} associated with the specified query.
-     * 
-     * @param queryId
-     *            The {@link UUID} of some {@link IRunningQuery}.
-     * 
-     * @return The {@link IQueryAttributes} for that {@link IRunningQuery}.
-     * 
-     * @throws RuntimeException
-     *             if the {@link IRunningQuery} has halted.
-     * @throws RuntimeException
-     *             if the {@link IRunningQuery} is not found.
-     */
+	 * Return the {@link IQueryAttributes} associated with the specified query.
+	 * 
+	 * @param queryId
+	 *            The {@link UUID} of some {@link IRunningQuery} -or- null to
+	 *            use the {@link IQueryAttributes} of this query.
+	 * 
+	 * @return The {@link IQueryAttributes} for that {@link IRunningQuery}.
+	 * 
+	 * @throws RuntimeException
+	 *             if the {@link IRunningQuery} has halted.
+	 * @throws RuntimeException
+	 *             if the {@link IRunningQuery} is not found.
+	 */
     public IQueryAttributes getQueryAttributes(final UUID queryId) {
 
+		if (queryId == null) // See BLZG-1493
+			return getRunningQuery().getAttributes();
+    	
         return getRunningQuery(queryId).getAttributes();
 
     }
@@ -706,6 +710,29 @@ public class BOpContext<E> extends BOpContextBase {
             
         } else {
 
+        	/**
+			 * queryID is null.
+			 * 
+			 * Note: This is *not* the case addressed by BLZG-1493. That ticket
+			 * allows a null queryID to be interpreted as indicating the current
+			 * query. However this code path is pre-existing and is used to
+			 * locate an alternative source based on a NamedSolutionSetRef. When
+			 * the queryID is non-null (above) we look at the specified query.
+			 * When it is null (here) we look at the index manager for a durable
+			 * NamedSolutionSet.
+			 * 
+			 * BLZG-1493 might need to be applied here at some point. Right now,
+			 * this code path provides access to a durable named solution set.
+			 * If we need per-query scoped named solution sets that for cases
+			 * with multiple executions of the same sub-query (this is the case
+			 * that motivates BLZG-1493 - multiple sub-query evaluation for the
+			 * same property path) then we would need to refactor the
+			 * NamedSolutionSetRef to de-conflict these various use cases.
+			 * 
+			 * @see <a href="https://jira.blazegraph.com/browse/BLZG-1493" > NPE
+			 *      in nested star property paths </a>
+			 */
+        	
             // Resolve the object which will give us access to the named
             // solution set.
 //            final ICacheConnection cacheConn = CacheConnectionFactory
@@ -737,21 +764,25 @@ public class BOpContext<E> extends BOpContextBase {
     }
     
     /**
-     * Return the {@link IMemoryManager} associated with the specified query.
-     * 
-     * @param queryId
-     *            The {@link UUID} of some {@link IRunningQuery}.
-     * 
-     * @return The {@link IMemoryManager} for that {@link IRunningQuery}.
-     * 
-     * @throws RuntimeException
-     *             if the {@link IRunningQuery} has halted.
-     * @throws RuntimeException
-     *             if the {@link IRunningQuery} is not found.
-     */
+	 * Return the {@link IMemoryManager} associated with the specified query.
+	 * 
+	 * @param queryId
+	 *            The {@link UUID} of some {@link IRunningQuery} -or- null to
+	 *            use the {@link IMemoryManager} of this query.
+	 * 
+	 * @return The {@link IMemoryManager} for that {@link IRunningQuery}.
+	 * 
+	 * @throws RuntimeException
+	 *             if the {@link IRunningQuery} has halted.
+	 * @throws RuntimeException
+	 *             if the {@link IRunningQuery} is not found.
+	 */
     public IMemoryManager getMemoryManager(final UUID queryId) {
 
-        return getRunningQuery(queryId).getMemoryManager();
+		if (queryId == null) // See BLZG-1493
+			return getRunningQuery().getMemoryManager();
+
+		return getRunningQuery(queryId).getMemoryManager();
 
     }
 

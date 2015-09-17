@@ -81,13 +81,14 @@ public class TestNamedSolutionSetRef extends TestCase2 {
             assertTrue("joinVars", Arrays.deepEquals(joinVars, ref.getJoinVars()));
         }
 
-        try {
-            new NamedSolutionSetRef(null/*queryId*/, namedSet, joinVars);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
-            if (log.isInfoEnabled())
-                log.info("Expecting: " + IllegalArgumentException.class);
-        }
+        // Allowed by BLZG-1493. Used to scope the query attributes to the current query.
+//        try {
+//            new NamedSolutionSetRef(null/*queryId*/, namedSet, joinVars);
+//            fail("Expecting: " + IllegalArgumentException.class);
+//        } catch (IllegalArgumentException ex) {
+//            if (log.isInfoEnabled())
+//                log.info("Expecting: " + IllegalArgumentException.class);
+//        }
 
         try {
             new NamedSolutionSetRef(queryId, null/*namedSet*/, joinVars);
