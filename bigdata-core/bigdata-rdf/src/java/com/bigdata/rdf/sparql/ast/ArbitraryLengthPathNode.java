@@ -23,9 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -107,6 +109,12 @@ public class ArbitraryLengthPathNode
          */
         String EDGE_VAR = Annotations.class.getName() + ".edgeVar";
         
+        /**
+         * A list of intermediate variables (VarNodes) used by the ALP node
+         * that should be dropped from the solutions after each round.
+         */
+        String DROP_VARS = Annotations.class.getName() + ".dropVars";
+        
     }
 	
     /**
@@ -132,13 +140,14 @@ public class ArbitraryLengthPathNode
      * annotations.
      */
     public ArbitraryLengthPathNode(final TermNode left, final TermNode right, 
-    		final VarNode transitivityVarLeft, final VarNode transitivityVarRight,
+    		final VarNode tVarLeft, final VarNode tVarRight,
     		final PathMod mod) {
     	this(new BOp[] { new JoinGroupNode() }, NV.asMap(
     			new NV(Annotations.LEFT_TERM, left),
     			new NV(Annotations.RIGHT_TERM, right),
-    			new NV(Annotations.TRANSITIVITY_VAR_LEFT, transitivityVarLeft),
-    			new NV(Annotations.TRANSITIVITY_VAR_RIGHT, transitivityVarRight),
+    			new NV(Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
+    			new NV(Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
+                new NV(Annotations.DROP_VARS, Arrays.asList(tVarLeft, tVarRight)),
     			new NV(Annotations.LOWER_BOUND, mod == PathMod.ONE_OR_MORE ? 1L : 0L),
     			new NV(Annotations.UPPER_BOUND, mod == PathMod.ZERO_OR_ONE ? 1L : Long.MAX_VALUE)
     			));    			
@@ -149,13 +158,14 @@ public class ArbitraryLengthPathNode
      * annotations.
      */
     public ArbitraryLengthPathNode(final TermNode left, final TermNode right, 
-            final VarNode transitivityVarLeft, final VarNode transitivityVarRight,
+            final VarNode tVarLeft, final VarNode tVarRight,
             final long lowerBound, final long upperBound) {
         this(new BOp[] { new JoinGroupNode() }, NV.asMap(
                 new NV(Annotations.LEFT_TERM, left),
                 new NV(Annotations.RIGHT_TERM, right),
-                new NV(Annotations.TRANSITIVITY_VAR_LEFT, transitivityVarLeft),
-                new NV(Annotations.TRANSITIVITY_VAR_RIGHT, transitivityVarRight),
+                new NV(Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
+                new NV(Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
+                new NV(Annotations.DROP_VARS, Arrays.asList(tVarLeft, tVarRight)),
                 new NV(Annotations.LOWER_BOUND, lowerBound),
                 new NV(Annotations.UPPER_BOUND, upperBound)
                 ));             
@@ -224,6 +234,25 @@ public class ArbitraryLengthPathNode
     public void setEdgeVar(final VarNode edgeVar, final TermNode middle) {
         setProperty(Annotations.MIDDLE_TERM, middle);
         setProperty(Annotations.EDGE_VAR, edgeVar);
+    }
+    
+    /**
+     * Set the vars that should be dropped after each round.
+     * 
+     * @see Annotations#DROP_VARS
+     */
+    public void setDropVars(final List<VarNode> dropVars) {
+        super.setProperty(Annotations.DROP_VARS, dropVars);
+    }
+    
+    /**
+     * Get the vars that should be dropped after each round.
+     * 
+     * @see Annotations#DROP_VARS
+     */
+    @SuppressWarnings("unchecked")
+    public List<VarNode> dropVars() {
+        return (List<VarNode>) super.getProperty(Annotations.DROP_VARS);
     }
 
     /**
