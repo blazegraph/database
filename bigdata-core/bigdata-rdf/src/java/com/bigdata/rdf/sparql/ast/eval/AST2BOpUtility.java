@@ -2662,8 +2662,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
          */
         final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
               
+		// See BLZG-1493 (queryId is null to use the then running query rather
+		// than the parent to resolve the IHashJoinUtility instance for the
+        // sub-queries evaluated by the property path operator.
         final INamedSolutionSetRef namedSolutionSet = 
-              NamedSolutionSetRefUtility.newInstance(
+              NamedSolutionSetRefUtility.newInstance( 
               null/*ctx.queryId*/, solutionSetName, joinVars);
 
         left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
