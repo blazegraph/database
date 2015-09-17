@@ -2664,7 +2664,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
               
         final INamedSolutionSetRef namedSolutionSet = 
               NamedSolutionSetRefUtility.newInstance(
-              ctx.queryId, solutionSetName, joinVars);
+              null/*ctx.queryId*/, solutionSetName, joinVars);
 
         left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
               joinVars, null, projectInVarsArr, namedSolutionSet);       
