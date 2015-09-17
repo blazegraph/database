@@ -252,7 +252,7 @@ abstract public class HashIndexOpBase extends PipelineOp implements ISingleThrea
                 // Lookup the attributes for the query on which we will hang the
                 // solution set.
                 final IQueryAttributes attrs = context
-                        .getQueryAttributes(namedSetRef.getQueryId());
+                        .getQueryAttributes(namedSetRef.getQueryId()==null?context.getRunningQuery().getQueryId():namedSetRef.getQueryId());
 
                 IHashJoinUtility state = (IHashJoinUtility) attrs
                         .get(namedSetRef);

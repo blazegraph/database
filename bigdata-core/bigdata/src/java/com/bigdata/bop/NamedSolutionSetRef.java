@@ -150,8 +150,8 @@ public class NamedSolutionSetRef implements INamedSolutionSetRef {
             final IVariable[] joinVars//
             ) {
 
-        if (queryId == null)
-            throw new IllegalArgumentException();
+//        if (queryId == null)
+//            throw new IllegalArgumentException();
 
         if (namedSet == null)
             throw new IllegalArgumentException();
@@ -244,7 +244,7 @@ public class NamedSolutionSetRef implements INamedSolutionSetRef {
     public int hashCode() {
         if (h == 0) {
             // TODO Review this for effectiveness.
-            h = (queryId == null ? namespace.hashCode() + (int) timestamp
+            h = (queryId == null ? namespace==null?0:namespace.hashCode() + (int) timestamp
                     : queryId.hashCode())
                     + localName.hashCode()
                     + Arrays.hashCode(joinVars);
