@@ -560,6 +560,8 @@ public abstract class AbstractOptimizerTestCase extends
 			assert leftVar != null;
 			assert rightVar != null;
 			ArbitraryLengthPathNode rslt = new ArbitraryLengthPathNode(left, right, leftVar, rightVar, PathMod.ONE_OR_MORE);
+			rslt.addDropVar(leftVar);
+            rslt.addDropVar(rightVar);
 			card.apply(rslt);
 			rslt.setArg(0, joinGroupNode);
 			leftVar = null;
