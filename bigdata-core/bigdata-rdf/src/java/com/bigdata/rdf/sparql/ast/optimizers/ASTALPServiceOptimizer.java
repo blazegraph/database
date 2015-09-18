@@ -26,10 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -166,7 +166,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                 }
             }
 
-            final List<VarNode> dropVars = new ArrayList<>();
+            final Set<VarNode> dropVars = new LinkedHashSet<>();
             
             final int lowerBound = Integer.valueOf(subgroup.getQueryHint(LOWER_BOUND));
             final int upperBound = Integer.valueOf(subgroup.getQueryHint(UPPER_BOUND));
