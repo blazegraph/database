@@ -384,9 +384,6 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 			
 			alpNode = new ArbitraryLengthPathNode(ppInfo.s, ppInfo.o, tVarLeft, tVarRight, mod);
 			
-			alpNode.addDropVar(tVarLeft);
-            alpNode.addDropVar(tVarRight);
-			
 			group.addArg(alpNode);
 			
 			ppInfo = new PropertyPathInfo(tVarLeft, tVarRight, ppInfo);

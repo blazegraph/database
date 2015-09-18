@@ -111,7 +111,7 @@ public class ArbitraryLengthPathNode
         String EDGE_VAR = Annotations.class.getName() + ".edgeVar";
         
         /**
-         * A list of intermediate variables (VarNodes) used by the ALP node
+         * A set of intermediate variables (VarNodes) used by the ALP node
          * that should be dropped from the solutions after each round.
          */
         String DROP_VARS = Annotations.class.getName() + ".dropVars";
@@ -148,10 +148,14 @@ public class ArbitraryLengthPathNode
     			new NV(Annotations.RIGHT_TERM, right),
     			new NV(Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
     			new NV(Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
-                new NV(Annotations.DROP_VARS, new ArrayList<VarNode>()),
     			new NV(Annotations.LOWER_BOUND, mod == PathMod.ONE_OR_MORE ? 1L : 0L),
     			new NV(Annotations.UPPER_BOUND, mod == PathMod.ZERO_OR_ONE ? 1L : Long.MAX_VALUE)
-    			));    			
+    			));
+    	
+    	final Set<VarNode> dropVars = new LinkedHashSet<>();
+    	dropVars.add(tVarLeft);
+        dropVars.add(tVarRight);
+    	setProperty(Annotations.DROP_VARS, dropVars);
     }
     
     /**
@@ -170,6 +174,11 @@ public class ArbitraryLengthPathNode
                 new NV(Annotations.LOWER_BOUND, lowerBound),
                 new NV(Annotations.UPPER_BOUND, upperBound)
                 ));             
+        
+        final Set<VarNode> dropVars = new LinkedHashSet<>();
+        dropVars.add(tVarLeft);
+        dropVars.add(tVarRight);
+        setProperty(Annotations.DROP_VARS, dropVars);
     }
     
     /**
@@ -242,7 +251,7 @@ public class ArbitraryLengthPathNode
      * 
      * @see Annotations#DROP_VARS
      */
-    public void setDropVars(final List<VarNode> dropVars) {
+    public void setDropVars(final Set<VarNode> dropVars) {
         super.setProperty(Annotations.DROP_VARS, dropVars);
     }
     
@@ -261,8 +270,8 @@ public class ArbitraryLengthPathNode
      * @see Annotations#DROP_VARS
      */
     @SuppressWarnings("unchecked")
-    public List<VarNode> dropVars() {
-        return (List<VarNode>) super.getProperty(Annotations.DROP_VARS);
+    public Set<VarNode> dropVars() {
+        return (Set<VarNode>) super.getProperty(Annotations.DROP_VARS);
     }
 
     /**
