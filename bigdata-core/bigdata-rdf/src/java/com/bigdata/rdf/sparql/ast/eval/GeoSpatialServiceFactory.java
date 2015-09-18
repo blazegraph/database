@@ -41,6 +41,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
@@ -67,6 +68,8 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -87,7 +90,6 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.service.fts.FulltextSearchException;
@@ -97,7 +99,6 @@ import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
-import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
@@ -272,7 +273,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
    }
 
    /**
-    * Validate the search. There must be exactly one {@link BD#SEARCH}
+    * Validate the search. There must be exactly one {@link GeoSpatial#SEARCH}
     * predicate. There should not be duplicates of any of the search predicates
     * for a given searchVar.
     */
@@ -290,8 +291,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   "Search predicate appears multiple times for same search variable: predicate="
                         + uri + ", searchVar=" + searchVar);
 
-         if (uri.equals(GeoSpatial.PREDICATE)) {
-            assertObjectIsUri(sp); // the predicate of the triple must be fixed
+         if (uri.equals(GeoSpatial.PREDICATE) || uri.equals(GeoSpatial.CONTEXT)) {
+            assertObjectIsURI(sp);
          } else {
             assertObjectIsLiteralOrVariable(sp);
          }
@@ -304,14 +305,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
    }
 
-   private void assertObjectIsUri(final StatementPatternNode sp) {
+   private void assertObjectIsURI(final StatementPatternNode sp) {
 
       final TermNode o = sp.o();
 
       if (o instanceof URI) {
 
          throw new IllegalArgumentException(
-               "Object is not literal or variable: " + sp);
+               "Object is not a URI: " + sp);
 
       }
 
@@ -344,6 +345,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final IServiceOptions serviceOptions;
       private final TermNode searchFunction;
       private TermNode predicate = null;
+      private TermNode context = null;
       private TermNode spatialCircleCenter = null;
       private TermNode spatialCircleRadius = null;
       private TermNode spatialRectangleUpperLeft = null;
@@ -388,6 +390,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          searchFunction = sp.o();
 
          TermNode predicate = null;
+         TermNode context = null;
          TermNode spatialCircleCenter = null;
          TermNode spatialCircleRadius = null;
          TermNode spatialRectangleUpperLeft = null;
@@ -402,6 +405,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             if (GeoSpatial.PREDICATE.equals(p)) {
                predicate = meta.o();
+            } else if (GeoSpatial.CONTEXT.equals(p)) {
+            	context = meta.o();
             } else if (GeoSpatial.SPATIAL_CIRCLE_CENTER.equals(p)) {
                spatialCircleCenter = meta.o();
             } else if (GeoSpatial.SPATIAL_CIRCLE_RADIUS.equals(p)) {
@@ -424,6 +429,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.vars = new IVariable[] { searchVar };
 
          this.predicate = predicate;
+         this.context = context;
          this.spatialCircleCenter = spatialCircleCenter;
          this.spatialCircleRadius = spatialCircleRadius;
          this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
@@ -441,7 +447,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          // iterate over the incoming binding set, issuing search requests
          // for all bindings in the binding set
          return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction,
-               predicate, spatialCircleCenter, spatialCircleRadius,
+               predicate, context, spatialCircleCenter, spatialCircleRadius,
                spatialRectangleUpperLeft, spatialRectangleLowerRight,
                spatialUnit, timeStart, timeEnd, defaults, kb, this);
 
@@ -555,11 +561,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             throw new RuntimeException("Unknown geospatial search function.");
          }
          
-
-//         lowerBorderComponents = new Object[]{ (long)(double)lowerBorderComponents[0], (long)(double)lowerBorderComponents[1] };
-//         upperBorderComponents = new Object[]{ (long)(double)upperBorderComponents[0], (long)(double)upperBorderComponents[1] };
-         
-
+//         lowerBorderComponents = new Object[]{ 
+//            (long)(double)lowerBorderComponents[0], (long)(double)lowerBorderComponents[1] };
+//         upperBorderComponents = 
+//           new Object[]{ (long)(double)upperBorderComponents[0], (long)(double)upperBorderComponents[1] };
          
          // set up range scan
          final Var oVar = Var.var(); // object position variable
@@ -580,7 +585,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                (URI) s.getValue(), /* subject */
                (URI) query.getPredicate().getValue(), /* predicate */
                o.getValue(), /* object */
-               null, /* context */ // TODO: fix to make work for quads
+               null, /* context */
                null, /* filter */
                rangeBop); /* rangeBop */
 
@@ -623,8 +628,37 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          // set object (=z-order literal) position in the surrounding filter
          filter.setObjectPos(objectPos);
 
-         // set up the advancer, which iterates exactly over the values in range
-         // TODO: we want to have this multithreaded at some point
+         /**
+          * If the context is provided, we would need a key order such as
+          * PCOS or CPOS, but unfortunately these key order are not available.
+          * As a "workaround", we do not pass in the context into the predicate,
+          * but instead set an additional context check in the filter. 
+          * 
+          * This is, of course, not a good strategy when the context is very
+          * selective and the index access is not. We could do more sophisticated
+          * stuff here, but for now let's try with this solution.
+          */
+         final TermNode ctxTermNode = query.getContext(); 
+         if (ctxTermNode!=null) {
+            
+            final BigdataValue ctx = 
+               ctxTermNode==null ? null : ctxTermNode.getValue();
+            if (ctx!=null && !(ctx instanceof BigdataURI)) {
+               throw new IllegalArgumentException(
+                  "Context in GeoSpatial search must be a URI");
+            }  
+
+            // register context check in the filter
+            filter.addContextCheck(
+               keyOrder.getPositionInIndex(SPOKeyOrder.C), (BigdataURI)ctx);
+            
+         }
+         
+         
+         /**
+          * Set up the advancer, which iterates exactly over the values in range
+          * TODO: we want to have this multi threaded at some point
+          */
          final Advancer<SPO> bigMinAdvancer = 
             new ZOrderIndexBigMinAdvancer(
                lowerZOrderKey, upperZOrderKey, litExt, objectPos, vf);
@@ -674,6 +708,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final IBindingSet[] bindingSet;
       private final TermNode searchFunction;
       private final TermNode predicate;
+      private final TermNode context;
       private final TermNode spatialCircleCenter;
       private final TermNode spatialCircleRadius;
       private final TermNode spatialRectangleUpperLeft;
@@ -692,7 +727,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       public GeoSpatialInputBindingsIterator(final IBindingSet[] bindingSet,
             final TermNode searchFunction, final TermNode predicate,
-            final TermNode spatialCircleCenter,
+            final TermNode context, final TermNode spatialCircleCenter,
             final TermNode spatialCircleRadius,
             final TermNode spatialRectangleUpperLeft,
             final TermNode spatialRectangleLowerRight,
@@ -704,6 +739,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.bindingSet = bindingSet;
          this.searchFunction = searchFunction;
          this.predicate = predicate;
+         this.context = context;
          this.spatialCircleCenter = spatialCircleCenter;
          this.spatialCircleRadius = spatialCircleRadius;
          this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
@@ -808,7 +844,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Long timeEnd = resolveAsLong(this.timeEnd, bs);
 
          GeoSpatialSearchQuery sq = new GeoSpatialSearchQuery(searchFunction,
-               predicate, spatialCircleCenter, spatialCircleRadius,
+               predicate, context, spatialCircleCenter, spatialCircleRadius,
                spatialRectangleUpperLeft, spatialRectangleLowerRight,
                spatialUnit, timeStart, timeEnd, bs);
 
@@ -1049,12 +1085,27 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       // position of the subject in the tuples
       protected int objectPos = -1;
 
+      // position of the constrained context in the tuple (only used in
+      // quads mode if geo:context predicate is used)
+      Integer contextPos = null;
+      
+      // value of the constrained context (only used in quads mode if 
+      // geo:context predicate is used)
+      BigdataURI context = null;
+      
       public GeoSpatialFilterBase(
          final GeoSpatialLiteralExtension<BigdataValue> litExt) {
          
          this.litExt = litExt;
       }      
       
+      // sets member variables that imply an additional context check
+      public void addContextCheck(
+         final Integer contextPos, final BigdataURI context) {
+         
+         this.contextPos = contextPos;
+         this.context = context;
+      }
 
 
       public void setObjectPos(int objectPos) {
@@ -1071,6 +1122,45 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       public GeoSpatialLiteralExtension<BigdataValue> getGeoSpatialLiteralExtension() {
          return litExt;
       }
+
+
+
+      @Override
+      final protected boolean isValid(final ITuple tuple) {
+
+         // check that the context constraint is satisfied, if any
+         if (!contextIsValid(tuple)) {
+            return false;
+         }
+         
+         // delegate to subclass
+         return isValidInternal(tuple);
+      }
+      
+      
+      /**
+       * Check if the context is valid. If no context constraint is
+       * imposed (which means, if contextPos or context are null),
+       * then the method just returns true.
+       */
+      private boolean contextIsValid(final ITuple tuple) {
+         
+         // do not filter if not both the contextPos and context are set
+         if (contextPos==null || context==null) {
+            return true;
+         }
+         
+         final byte[] key = ((ITuple<?>) tuple).getKey();
+         final IV[] ivs = IVUtility.decode(key, contextPos+1);
+
+         final IV contextIV= ivs[contextPos];
+         return contextIV.equals(context.getIV());
+      }
+      
+      /**
+       * Check if the iv array is valid. To be implemented by subclasses.
+       */
+      protected abstract boolean isValidInternal(final ITuple tuple);
 
    }
 
@@ -1105,8 +1195,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       @Override
       @SuppressWarnings("rawtypes")      
-      protected boolean isValid(ITuple tuple) {
-         
+      protected boolean isValidInternal(final ITuple tuple) {
+                  
 			final PointLatLonTime p = asPoint(tuple);
 			
 			if (p==null) {
@@ -1130,11 +1220,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 		}
 
       @SuppressWarnings("rawtypes")
-      public PointLatLonTime asPoint(ITuple tuple) {
+      public PointLatLonTime asPoint(final ITuple tuple) {
 
          final byte[] key = ((ITuple<?>) tuple).getKey();
-
          final IV[] ivs = IVUtility.decode(key, objectPos+1);
+         
          final IV oIV= ivs[objectPos];
 
          if (oIV instanceof LiteralExtensionIV) {
@@ -1178,18 +1268,19 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.lowerBorder = lowerBorder;
          this.upperBorder = upperBorder;
       }
-
+      
       @SuppressWarnings("rawtypes")
       @Override
-      protected boolean isValid(ITuple tuple) {
+      protected boolean isValidInternal(final ITuple tuple) {
 
          // the advancer by design already returns only those values that
-         // are in the rectangle, so there's nothing to do here
+         // are in the rectangle, so there's nothing we need to do here
          return true;
       }
-
-
+      
+      
    }
+
 
    /**
     * Returns the statement patterns contained in the service node.
@@ -1231,7 +1322,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          if (object instanceof IVariable<?>) {
             
             if (predicate.equals(GeoSpatial.PREDICATE)
-               ||  predicate.equals(GeoSpatial.SEARCH)
+               || predicate.equals(GeoSpatial.CONTEXT)
+               || predicate.equals(GeoSpatial.SEARCH)
                || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_CENTER)
                || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_RADIUS)
                || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_LOWER_RIGHT) 
