@@ -32,10 +32,8 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.IRWStrategy;
-import com.bigdata.rwstore.PhysicalAddressResolutionException;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -461,12 +459,12 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             // close against further writes.
             store.closeForWrites(lastCommitTime/* closeTime */);
 
-            if (LRUNexus.INSTANCE != null) {
-
-                // discard the record level cache so we will read through.
-                LRUNexus.INSTANCE.deleteCache(store.getUUID());
-
-            }
+//            if (LRUNexus.INSTANCE != null) {
+//
+//                // discard the record level cache so we will read through.
+//                LRUNexus.INSTANCE.deleteCache(store.getUUID());
+//
+//            }
 
             // Verify read back.
             for (int i = 0; i < nrecs; i++) {

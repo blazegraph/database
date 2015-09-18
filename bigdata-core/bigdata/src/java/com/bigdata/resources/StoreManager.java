@@ -57,7 +57,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -69,7 +68,6 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.lru.IGlobalLRU.ILRUCache;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -4200,15 +4198,16 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        /*
-         * Clear record for that store from the LRUNexus and remove the entry
-         * for the store itself from the LRUNexus.
-         */
-        if (LRUNexus.INSTANCE != null) {
-
-            LRUNexus.INSTANCE.deleteCache(uuid);
-            
-        }
+        // @see BLZG-1501 (remove LRUNexus)
+//        /*
+//         * Clear record for that store from the LRUNexus and remove the entry
+//         * for the store itself from the LRUNexus.
+//         */
+//        if (LRUNexus.INSTANCE != null) {
+//
+//            LRUNexus.INSTANCE.deleteCache(uuid);
+//            
+//        }
         
         /*
          * delete the backing file.

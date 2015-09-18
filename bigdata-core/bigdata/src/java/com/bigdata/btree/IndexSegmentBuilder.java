@@ -40,11 +40,11 @@ import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
@@ -52,7 +52,6 @@ import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.cache.lru.IGlobalLRU.ILRUCache;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.ChecksumUtility;
@@ -356,7 +355,15 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *       the {@link #storeCache} as well. Make sure that we do this for read
      *       and write for both the {@link BTree} and the {@link IndexSegment}.
      */
-    final private ILRUCache<Long, Object> storeCache;
+	/*
+	 * The storeCache field is marked as "Deprecated" but it should stick around
+	 * for a while since we might wind up reusing this feature on an index local
+	 * basis at some point.
+	 * 
+	 * @see BLZG-1501 (remove LRUNexus)
+	 */
+    @Deprecated
+    final private ConcurrentMap<Long, Object> storeCache;
 
     /**
      * Used to serialize the nodes and leaves of the output tree.
@@ -1602,11 +1609,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          * not drive the records into the cache. [LIRS would partly address this
          * by not evicting records from the cache which are hot.]
          */
-        storeCache = (LRUNexus.INSTANCE != null && LRUNexus
-                .getIndexSegmentBuildPopulatesCache()) //
-                ? LRUNexus.INSTANCE.getCache(segmentUUID, addressManager)//
-                : null//
-                ;
+        // TODO BLZG-1501 (remove LRUNexus)
+        storeCache = null;
+//        storeCache = (LRUNexus.INSTANCE != null && LRUNexus
+//                .getIndexSegmentBuildPopulatesCache()) //
+//                ? LRUNexus.INSTANCE.getCache(segmentUUID, addressManager)//
+//                : null//
+//                ;
 
         /*
          * Create the index plan and do misc setup.
@@ -4616,21 +4625,22 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                      * B+Tree.
                      */
 
-                    if (LRUNexus.INSTANCE != null) {
-
-                        /*
-                         * Clear the records for the index segment from the
-                         * cache so we will read directly from the file. This is
-                         * necessary to ensure that the data on the file is good
-                         * rather than just the data in the cache.
-                         */
-                        
-                        System.out.println("Flushing index segment cache: "
-                                + builder.outFile);
-                        
-                        LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
-
-                    }
+//                  @see BLZG-1501 (remove LRUNexus)
+//                    if (LRUNexus.INSTANCE != null) {
+//
+//                        /*
+//                         * Clear the records for the index segment from the
+//                         * cache so we will read directly from the file. This is
+//                         * necessary to ensure that the data on the file is good
+//                         * rather than just the data in the cache.
+//                         */
+//                        
+//                        System.out.println("Flushing index segment cache: "
+//                                + builder.outFile);
+//                        
+//                        LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+//
+//                    }
                     
                     final IndexSegmentStore segStore = new IndexSegmentStore(
                             outFile);

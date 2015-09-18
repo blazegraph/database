@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
@@ -48,7 +49,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
 import com.bigdata.btree.IndexMetadata.Options;
@@ -68,7 +68,6 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.HardReferenceQueueWithBatchingUpdates;
-import com.bigdata.cache.lru.IGlobalLRU.ILRUCache;
 import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.cache.RingBuffer;
 import com.bigdata.counters.CounterSet;
@@ -265,7 +264,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Optional cache for {@link INodeData} and {@link ILeafData} instances and
      * always <code>null</code> if the B+Tree is transient.
      */
-    protected final ILRUCache<Long, Object> storeCache;
+	/*
+	 * The storeCache field is marked as "Deprecated" but it should stick around
+	 * for a while since we might wind up reusing this feature on an index local
+	 * basis at some point.
+	 * 
+	 * @see BLZG-1501 (remove LRUNexus)
+	 */
+    @Deprecated
+    protected final ConcurrentMap<Long, Object> storeCache;
 
     /**
      * Hard reference iff the index is mutable (aka unisolated) allows us to
@@ -664,75 +671,69 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //    public int referenceCount = 0;
 
     /**
-     * Nodes (that is nodes or leaves) are added to a hard reference queue when
-     * they are created or read from the store. On eviction from the queue a
-     * dirty node is serialized by a listener against the {@link IRawStore}.
-     * The nodes and leaves refer to their parent with a {@link WeakReference}s.
-     * Likewise, nodes refer to their children with a {@link WeakReference}.
-     * The hard reference queue in combination with {@link #touch(AbstractNode)}
-     * and with hard references held on the stack ensures that the parent and/or
-     * children remain reachable during operations. Once the node is no longer
-     * strongly reachable weak references to that node may be cleared by the VM -
-     * in this manner the node will become unreachable by navigation from its
-     * ancestors in the btree.  The special role of the hard reference queue is
-     * to further ensure that dirty nodes remain dirty by defering persistence
-     * until the reference count for the node is zero during an eviction from
-     * the queue.
-     * <p>
-     * Note that nodes are evicted as new nodes are added to the hard reference
-     * queue. This occurs in two situations: (1) when a new node is created
-     * during a split of an existing node; and (2) when a node is read in from
-     * the store. Inserts on this hard reference queue always drive evictions.
-     * Incremental writes basically make it impossible for the commit set to get
-     * "too large" - the maximum #of nodes to be written is bounded by the size
-     * of the hard reference queue. This helps to ensure fast commit operations
-     * on the store.
-     * <p>
-     * The minimum capacity for the hard reference queue is two (2) so that a
-     * split may occur without forcing eviction of either node participating in
-     * the split.
-     * <p>
-     * Note: The code in {@link Node#postOrderNodeIterator(boolean, boolean)} and
-     * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
-     * those iterators are used when persisting a node using a post-order
-     * traversal. If a hard reference queue eviction drives the serialization of
-     * a node and we touch the hard reference queue during the post-order
-     * traversal then we break down the semantics of
-     * {@link HardReferenceQueue#add(Object)} as the eviction does not
-     * necessarily cause the queue to reduce in length. Another way to handle
-     * this is to have {@link HardReferenceQueue#add(Object)} begin to evict
-     * objects before is is actually at capacity, but that is also a bit
-     * fragile.
-     * <p>
-     * Note: The {@link #writeRetentionQueue} uses a {@link HardReferenceQueue}.
-     * This is based on a {@link RingBuffer} and is very fast. It does not use a
-     * {@link HashMap} because we can resolve the {@link WeakReference} to the
-     * child {@link Node} or {@link Leaf} using top-down navigation as long as
-     * the {@link Node} or {@link Leaf} remains strongly reachable (that is, as
-     * long as it is on the {@link #writeRetentionQueue} or otherwise strongly
-     * held). This means that lookup in a map is not required for top-down
-     * navigation.
-     * <p>
-     * The {@link LRUNexus} provides an {@link INodeData} / {@link ILeafData}
-     * data record cache based on a hash map with lookup by the address of the
-     * node or leaf. This is tested when the child {@link WeakReference} was
-     * never set or has been cleared. This cache is also used by the
-     * {@link IndexSegment} for the linked-leaf traversal pattern, which does
-     * not use top-down navigation.
-     * 
-     * @todo consider a policy that dynamically adjusts the queue capacities
-     *       based on the height of the btree in order to maintain a cache that
-     *       can contain a fixed percentage, e.g., 5% or 10%, of the nodes in
-     *       the btree. The minimum and maximum size of the cache should be
-     *       bounded. Bounding the minimum size gives better performance for
-     *       small trees. Bounding the maximum size is necessary when the trees
-     *       grow very large. (Partitioned indices may be used for very large
-     *       indices and they can be distributed across a cluster of machines.)
-     *       <p>
-     *       There is a discussion of some issues regarding such a policy in the
-     *       code inside of
-     *       {@link Node#Node(BTree btree, AbstractNode oldRoot, int nentries)}.
-     */
+	 * Nodes (that is nodes or leaves) are added to a hard reference queue when
+	 * they are created or read from the store. On eviction from the queue a
+	 * dirty node is serialized by a listener against the {@link IRawStore}. The
+	 * nodes and leaves refer to their parent with a {@link WeakReference}s.
+	 * Likewise, nodes refer to their children with a {@link WeakReference}. The
+	 * hard reference queue in combination with {@link #touch(AbstractNode)} and
+	 * with hard references held on the stack ensures that the parent and/or
+	 * children remain reachable during operations. Once the node is no longer
+	 * strongly reachable weak references to that node may be cleared by the VM
+	 * - in this manner the node will become unreachable by navigation from its
+	 * ancestors in the btree. The special role of the hard reference queue is
+	 * to further ensure that dirty nodes remain dirty by defering persistence
+	 * until the reference count for the node is zero during an eviction from
+	 * the queue.
+	 * <p>
+	 * Note that nodes are evicted as new nodes are added to the hard reference
+	 * queue. This occurs in two situations: (1) when a new node is created
+	 * during a split of an existing node; and (2) when a node is read in from
+	 * the store. Inserts on this hard reference queue always drive evictions.
+	 * Incremental writes basically make it impossible for the commit set to get
+	 * "too large" - the maximum #of nodes to be written is bounded by the size
+	 * of the hard reference queue. This helps to ensure fast commit operations
+	 * on the store.
+	 * <p>
+	 * The minimum capacity for the hard reference queue is two (2) so that a
+	 * split may occur without forcing eviction of either node participating in
+	 * the split.
+	 * <p>
+	 * Note: The code in {@link Node#postOrderNodeIterator(boolean, boolean)}
+	 * and {@link DirtyChildIterator} MUST NOT touch the hard reference queue
+	 * since those iterators are used when persisting a node using a post-order
+	 * traversal. If a hard reference queue eviction drives the serialization of
+	 * a node and we touch the hard reference queue during the post-order
+	 * traversal then we break down the semantics of
+	 * {@link HardReferenceQueue#add(Object)} as the eviction does not
+	 * necessarily cause the queue to reduce in length. Another way to handle
+	 * this is to have {@link HardReferenceQueue#add(Object)} begin to evict
+	 * objects before is is actually at capacity, but that is also a bit
+	 * fragile.
+	 * <p>
+	 * Note: The {@link #writeRetentionQueue} uses a {@link HardReferenceQueue}.
+	 * This is based on a {@link RingBuffer} and is very fast. It does not use a
+	 * {@link HashMap} because we can resolve the {@link WeakReference} to the
+	 * child {@link Node} or {@link Leaf} using top-down navigation as long as
+	 * the {@link Node} or {@link Leaf} remains strongly reachable (that is, as
+	 * long as it is on the {@link #writeRetentionQueue} or otherwise strongly
+	 * held). This means that lookup in a map is not required for top-down
+	 * navigation.
+	 * <p>
+	 * 
+	 * @todo consider a policy that dynamically adjusts the queue capacities
+	 *       based on the height of the btree in order to maintain a cache that
+	 *       can contain a fixed percentage, e.g., 5% or 10%, of the nodes in
+	 *       the btree. The minimum and maximum size of the cache should be
+	 *       bounded. Bounding the minimum size gives better performance for
+	 *       small trees. Bounding the maximum size is necessary when the trees
+	 *       grow very large. (Partitioned indices may be used for very large
+	 *       indices and they can be distributed across a cluster of machines.)
+	 *       <p>
+	 *       There is a discussion of some issues regarding such a policy in the
+	 *       code inside of
+	 *       {@link Node#Node(BTree btree, AbstractNode oldRoot, int nentries)}.
+	 */
     final protected IHardReferenceQueue<PO> writeRetentionQueue;
 
     /**
@@ -1073,8 +1074,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
              * of the performance of the leaf iterator for the index segment
              * since leaves are not recoverable by random access without a
              * cache.
+             * 
+             * @see BLZG-1501 (remove LRUNexus)
              */
-            this.storeCache = LRUNexus.getCache(store);
+//            this.storeCache = LRUNexus.getCache(store);
+            this.storeCache = null;
             
 //            this.readRetentionQueue = newReadRetentionQueue();
         
@@ -3375,9 +3379,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * evicted node or leaf is dirty, then a data record will be coded for the
      * evicted node or leaf and written onto the backing store. A subsequent
      * attempt to modify the node or leaf will force copy-on-write for that node
-     * or leaf. Regardless of whether or not the node or leaf is dirty, it is
-     * touched on the {@link LRUNexus#getGlobalLRU()} when it is evicted from
-     * the write retention queue.
+     * or leaf.
      * </p>
      * <p>
      * For the mutable B+Tree we also track the #of references to the node/leaf
