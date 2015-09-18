@@ -78,6 +78,9 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
    // the GeoSpatialLiteralExtension object
    private final GeoSpatialLiteralExtension<BigdataValue> litExt;
    
+   // counters object for statistics
+   final GeoSpatialCounters geoSpatialCounters;
+   
    // value factory
    private final BigdataValueFactory vf;
       
@@ -88,7 +91,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       final byte[] searchMaxZOrder, /* the maximum search key (bottom right) */
       final GeoSpatialLiteralExtension<BigdataValue> litExt,
       final int zOrderComponentPos /* position of the zOrder in the index */,
-      final BigdataValueFactory vf) {
+      final BigdataValueFactory vf,
+      final GeoSpatialCounters geoSpatialCounters) {
 
       this.litExt = litExt;
       this.searchMinZOrder = litExt.unpadLeadingZero(searchMinZOrder);
@@ -99,6 +103,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       
       this.zOrderComponentPos = zOrderComponentPos;
       this.vf = vf;
+      this.geoSpatialCounters = geoSpatialCounters;
            
    }
 
@@ -128,6 +133,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          keyBuilder = KeyBuilder.newInstance();
 
       }
+      
+      final long rangeCheckCalStart = System.nanoTime();
       
       final byte[] key = tuple.getKey();
 
@@ -159,13 +166,21 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          inRange &= seachMinLong[i]<=divRecordComponents[i];
          inRange &= seachMaxLong[i]>=divRecordComponents[i];
       }
+      
+      final long rangeCheckCalEnd = System.nanoTime();
+      geoSpatialCounters.addRangeCheckCalculationTime(rangeCheckCalEnd-rangeCheckCalStart);
 
       if (!inRange) {
+
+         // this is a miss
+         geoSpatialCounters.registerZOrderIndexMiss();
+         
+         long bigMinCalStart = System.nanoTime();
          
          if (log.isDebugEnabled()) {
             log.debug("-> tuple " + tuple + " not in range");
          }
-
+         
          // calculate bigmin over the z-order component
          final byte[] bigMin = calculateBigMin(dividingRecord);
          
@@ -178,6 +193,9 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          @SuppressWarnings("rawtypes")
          LiteralExtensionIV bigMinIv = litExt.createIV(value);
          IVUtility.encode(keyBuilder, bigMinIv);
+
+         final long bigMinCalEnd = System.nanoTime();
+         geoSpatialCounters.addBigMinCalculationTime(bigMinCalEnd-bigMinCalStart);
          
          // advance to the specified key ...
          try {
@@ -192,6 +210,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                next = src.next(); 
             }
    
+
+            
             // go into recursion (if the next value is fine, this call will have
             // no effect, otherwise it will advance the cursor once more)
             advance(next);
@@ -204,9 +224,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          
       } else {
          
-         if (log.isDebugEnabled()) {
-            log.debug("-> inRange, nothing todo");
-         }
+         geoSpatialCounters.registerZOrderIndexHit();
          
       }
 
