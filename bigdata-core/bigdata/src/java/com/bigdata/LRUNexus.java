@@ -53,7 +53,6 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.BytesUtil;
 

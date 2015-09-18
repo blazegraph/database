@@ -41,6 +41,8 @@ import java.util.zip.InflaterInputStream;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.solutions.SolutionSetStream;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractNode;
@@ -63,8 +65,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.Banner;
-import com.bigdata.util.BigdataStatics;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 

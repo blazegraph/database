@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.util.BigdataStatics;
+import com.bigdata.BigdataStatics;
 import com.bigdata.util.httpd.Config;
 
 /**

@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.util.BigdataStatics;
+import com.bigdata.BigdataStatics;
 
 
 /**
