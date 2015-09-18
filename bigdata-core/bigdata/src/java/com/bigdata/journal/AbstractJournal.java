@@ -70,7 +70,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -1936,19 +1935,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             txLog.info("CLOSE-JOURNAL: uuid=" + getUUID() + ", file="
                     + getFile());
 
-		if (LRUNexus.INSTANCE != null) {
-
-			try {
-
-				LRUNexus.INSTANCE.deleteCache(getUUID());
-
-			} catch (Throwable t) {
-
-				log.error(t, t);
-
-			}
-
-		}
+//		if (LRUNexus.INSTANCE != null) {
+//
+//			try {
+//
+//				LRUNexus.INSTANCE.deleteCache(getUUID());
+//
+//			} catch (Throwable t) {
+//
+//				log.error(t, t);
+//
+//			}
+//
+//		}
 
 		if (deleteOnClose) {
 
@@ -1988,19 +1987,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			bufferStrategy.deleteResources();
 
-			if (LRUNexus.INSTANCE != null) {
-
-				try {
-
-					LRUNexus.INSTANCE.deleteCache(getUUID());
-
-				} catch (Throwable t) {
-
-					log.error(t, t);
-
-				}
-
-			}
+//          @see BLZG-1501 (remove LRUNexus)
+//			if (LRUNexus.INSTANCE != null) {
+//
+//				try {
+//
+//					LRUNexus.INSTANCE.deleteCache(getUUID());
+//
+//				} catch (Throwable t) {
+//
+//					log.error(t, t);
+//
+//				}
+//
+//			}
 
 		}
 
@@ -2819,28 +2819,29 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			txLog.info("ABORT");
 
-			if (LRUNexus.INSTANCE != null) {
-
-				/*
-				 * Discard the LRU for this store. It may contain writes which
-				 * have been discarded. The same addresses may be reissued by
-				 * the WORM store after an abort, which could lead to incorrect
-				 * reads from a dirty cache.
-				 * 
-				 * FIXME An optimization would essentially isolate the writes on
-				 * the cache per BTree or between commits. At the commit point,
-				 * the written records would be migrated into the "committed"
-				 * cache for the store. The caller would read on the uncommitted
-				 * cache, which would read through to the "committed" cache.
-				 * This would prevent incorrect reads without requiring us to
-				 * throw away valid records in the cache. This could be a
-				 * significant performance gain if aborts are common on a
-				 * machine with a lot of RAM.
-				 */
-
-				LRUNexus.getCache(this).clear();
-
-			}
+//          @see BLZG-1501 (remove LRUNexus)
+//			if (LRUNexus.INSTANCE != null) {
+//
+//				/*
+//				 * Discard the LRU for this store. It may contain writes which
+//				 * have been discarded. The same addresses may be reissued by
+//				 * the WORM store after an abort, which could lead to incorrect
+//				 * reads from a dirty cache.
+//				 * 
+//				 * FIXME An optimization would essentially isolate the writes on
+//				 * the cache per BTree or between commits. At the commit point,
+//				 * the written records would be migrated into the "committed"
+//				 * cache for the store. The caller would read on the uncommitted
+//				 * cache, which would read through to the "committed" cache.
+//				 * This would prevent incorrect reads without requiring us to
+//				 * throw away valid records in the cache. This could be a
+//				 * significant performance gain if aborts are common on a
+//				 * machine with a lot of RAM.
+//				 */
+//
+//				LRUNexus.getCache(this).clear();
+//
+//			}
 
 			/*
 			 * The buffer strategy has a hook which is used to discard buffered
@@ -4172,9 +4173,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					System.err.println(msg);
 				else if (log.isInfoEnabled())
 					log.info(msg);
-				if (BigdataStatics.debug && LRUNexus.INSTANCE != null) {
-					System.err.println(LRUNexus.INSTANCE.toString());
-				}
+//				if (BigdataStatics.debug && LRUNexus.INSTANCE != null) {
+//					System.err.println(LRUNexus.INSTANCE.toString());
+//				}
 			}
 
 			return cs.commitTime;

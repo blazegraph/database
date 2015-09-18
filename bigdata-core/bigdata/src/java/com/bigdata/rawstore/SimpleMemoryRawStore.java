@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
@@ -116,12 +115,14 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
     }
     
+    @Override
     public boolean isOpen() {
 
         return open;
         
     }
 
+    @Override
     public boolean isReadOnly() {
 
         if (!open)
@@ -131,24 +132,28 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
 
+    @Override
     public boolean isStable() {
         
         return false;
         
     }
 
+    @Override
     public boolean isFullyBuffered() {
         
         return true;
         
     }
     
+    @Override
     public UUID getUUID() {
         
         return uuid;
         
     }
     
+    @Override
     public IResourceMetadata getResourceMetadata() {
 
         return new ResourceMetadata(uuid);
@@ -176,12 +181,14 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
             
         }
         
+        @Override
         public boolean equals(IResourceMetadata o) {
 
             return this == o;
 
         }
 
+        @Override
         public long getCreateTime() {
 
             // does not support commit
@@ -189,6 +196,7 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
         }
 
+        @Override
         public long getCommitTime() {
 
             // does not support commit
@@ -196,6 +204,7 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
         }
 
+        @Override
         public String getFile() {
 
             // no backing file.
@@ -203,12 +212,14 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
         }
 
+        @Override
         public UUID getUUID() {
 
             return uuid;
 
         }
 
+        @Override
         public boolean isIndexSegment() {
 
             // not index segment.
@@ -216,6 +227,7 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
         }
 
+        @Override
         public boolean isJournal() {
 
             // not journal.
@@ -233,14 +245,18 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
     }
     
     /**
-     * This always returns <code>null</code>.
-     */
+	 * {@inheritDoc}
+	 * <P>
+	 * This always returns <code>null</code>.
+	 */
+    @Override
     public File getFile() {
         
         return null;
         
     }
     
+    @Override
     public void close() {
         
         if( !open ) throw new IllegalStateException();
@@ -252,18 +268,20 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
 
+    @Override
     public void deleteResources() {
         
         if(open) throw new IllegalStateException();
         
-        if (LRUNexus.INSTANCE != null) {
-
-            LRUNexus.INSTANCE.deleteCache(getUUID());
-
-        }
+//        if (LRUNexus.INSTANCE != null) {
+//
+//            LRUNexus.INSTANCE.deleteCache(getUUID());
+//
+//        }
         
     }
     
+    @Override
     public void destroy() {
         
         if(isOpen()) close();
@@ -272,7 +290,8 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
 
-    public ByteBuffer read(long addr) {
+    @Override
+    public ByteBuffer read(final long addr) {
 
         if (addr == 0L)
             throw new IllegalArgumentException("Address is 0L");
@@ -316,7 +335,8 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
 
-    public long write(ByteBuffer data) {
+    @Override
+    public long write(final ByteBuffer data) {
 
         if (data == null)
             throw new IllegalArgumentException("Buffer is null");
@@ -397,24 +417,23 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 //        
 //    }
 
+    @Override
     public void force(boolean metadata) {
         
         // NOP.
         
     }
     
+    @Override
     public long size() {
         
         return nextOffset;
         
     }
     
-    synchronized public CounterSet getCounters() {
-        if(root==null) {
-            root = new CounterSet();
-        }
-        return root;
+    @Override
+    public CounterSet getCounters() {
+    	return new CounterSet();
     }
-    private CounterSet root;
 
 }

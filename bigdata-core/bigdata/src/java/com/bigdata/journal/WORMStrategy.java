@@ -42,7 +42,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
@@ -1369,12 +1368,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      *       many other kinds of errors are likely to have long pauses while the
      *       OS attempts to get a good read/write from the file system.
      * 
-     * @todo If the record can be successfully read from the remote quorum, then
-     *       it will generally be inserted into the {@link LRUNexus} which will
-     *       reduce the likelihood that we will attempt to read it from the
-     *       backing file "soon.
-     *       <p>
-     *       We might want to maintain a set of known bad records and fail the
+     * @todo We might want to maintain a set of known bad records and fail the
      *       node when the size of that set grows too large. That would also
      *       help us to avoid "hanging" on a bad read when we know that we have
      *       to get the data from another node based on past experience for that
@@ -2446,9 +2440,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
-     * Extended to discard the write cache (we will depend on the
-     * {@link LRUNexus} to buffer recent writes on the journal since we can't
-     * read through the write cache after this).
+     * Extended to reset the write cache.
      * <p>
      * Note: The file is NOT closed and re-opened in a read-only mode in order
      * to avoid causing difficulties for concurrent readers.

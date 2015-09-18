@@ -31,9 +31,7 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
-import com.bigdata.cache.lru.IGlobalLRU;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
@@ -203,8 +201,7 @@ public interface IRawStore extends IAddressManager, ICounterSetAccess, IStreamSt
     public boolean isReadOnly();
 
     /**
-     * Close the store immediately, but does not clear any records for the store
-     * from the {@link IGlobalLRU}.
+     * Close the store immediately.
      * 
      * @exception IllegalStateException
      *                if the store is not open.
@@ -212,8 +209,7 @@ public interface IRawStore extends IAddressManager, ICounterSetAccess, IStreamSt
     public void close();
 
     /**
-     * Deletes the backing file(s) (if any) and clears any records for the store
-     * from the {@link IGlobalLRU}.
+     * Deletes the backing file(s) (if any).
      * 
      * @exception IllegalStateException
      *                if the store is open.
@@ -224,13 +220,12 @@ public interface IRawStore extends IAddressManager, ICounterSetAccess, IStreamSt
     public void deleteResources();
 
     /**
-     * Closes the store immediately (if open), deletes its persistent resources,
-     * and clears any records for the store from the {@link IGlobalLRU}. Does
-     * NOT throw an {@link IllegalStateException} if the store is already
-     * closed, but still deletes the backing resources.
-     * 
-     * @see #deleteResources()
-     */
+	 * Closes the store immediately (if open) and deletes its persistent
+	 * resources. Does NOT throw an {@link IllegalStateException} if the store
+	 * is already closed, but still deletes the backing resources.
+	 * 
+	 * @see #deleteResources()
+	 */
     public void destroy();
     
     /**
@@ -241,7 +236,7 @@ public interface IRawStore extends IAddressManager, ICounterSetAccess, IStreamSt
 
     /**
      * Return the {@link UUID} which identifies this {@link IRawStore}. This
-     * supports both {@link #getResourceMetadata()} and the {@link LRUNexus}.
+     * supports {@link #getResourceMetadata()}.
      */
     public UUID getUUID();
 
