@@ -123,6 +123,14 @@ public class LexiconConfiguration<V extends BigdataValue>
      */
     private final boolean geoSpatial;
     
+
+
+    /**
+     * Optional configuration string for the geospatial facilities.
+     */
+    private final String geoSpatialConfig;
+
+    
     /**
      * <code>true</code> if textual literals will be inlined.
      *
@@ -238,6 +246,13 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
 
     @Override
+    public String getGeoSpatialConfig() {
+       
+       return geoSpatialConfig;
+    }
+    
+    
+    @Override
     public boolean isInlineDateTimes() {
         return inlineDateTimes;
     }
@@ -324,7 +339,8 @@ public class LexiconConfiguration<V extends BigdataValue>
             final Vocabulary vocab,
             final BigdataValueFactory valueFactory,//
             final IInlineURIFactory uriFactory,//
-            final boolean geoSpatial
+            final boolean geoSpatial,
+            final String geoSpatialConfig
             ) {
 
         if (blobsThreshold < 0)
@@ -352,6 +368,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.valueFactory = valueFactory;
         this.uriFactory = uriFactory;
         this.geoSpatial = geoSpatial;
+        this.geoSpatialConfig = geoSpatialConfig;
         
         /*
          * TODO Make this configurable.

@@ -153,21 +153,21 @@ public class GeoSpatialCounters implements ICounterSetAccess {
             }
         });
         
-        root.addCounter("bigMinCalculationTimeMS", new Instrument<Long>() {
+        root.addCounter("bigMinCalculationTime", new Instrument<Long>() {
            @Override 
            public void sample() {
                setValue(bigMinCalculationTime.get()/1000000);
            }
        });
         
-       root.addCounter("rangeCheckCalculationTimeMS", new Instrument<Long>() {
+       root.addCounter("rangeCheckCalculationTime", new Instrument<Long>() {
            @Override 
            public void sample() {
                setValue(rangeCheckCalculationTime.get()/1000000);
            }
        });
        
-       root.addCounter("addFilterCalculationTime", new Instrument<Long>() {
+       root.addCounter("filterCalculationTime", new Instrument<Long>() {
           @Override 
           public void sample() {
               setValue(filterCalculationTime.get()/1000000);

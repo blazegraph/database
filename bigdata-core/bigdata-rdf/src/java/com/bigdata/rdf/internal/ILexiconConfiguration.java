@@ -79,6 +79,13 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Return <code>true</code> if GeoSpatial support is enabled.
      */
     public boolean isGeoSpatial();
+    
+    
+    /**
+     * Return the configuration string for the GeoSpatial service
+     */
+    public String getGeoSpatialConfig();
+    
 
     /**
      * Return the default time zone to be used for inlining.
