@@ -1678,6 +1678,15 @@ public class QueryLog {
     static private IRunningQuery getRunningQuery(final IRunningQuery q,
             final UUID queryId) {
 
+		if (queryId == null) {
+			/**
+			 * @see <a href="https://jira.blazegraph.com/browse/BLZG-1493" > NPE
+			 *      in nested star property paths </a>. When queryId is null, it
+			 *      refers to the current query.
+			 */
+			return q;
+		}
+    	
         if (q.getQueryId().equals(queryId)) {
 
             /*

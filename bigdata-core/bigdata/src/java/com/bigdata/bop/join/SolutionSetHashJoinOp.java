@@ -226,10 +226,12 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
             final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-            // Lookup the attributes for the query on which we will hang the
-            // solution set.
-            final IQueryAttributes attrs = context
-                    .getQueryAttributes(namedSetRef.getQueryId());
+            /*
+			 * Lookup the attributes for the query on which we will hang the
+			 * solution set. See BLZG-1493 (if queryId is null, use the query
+			 * attributes for this running query).
+			 */
+			final IQueryAttributes attrs = context.getQueryAttributes(namedSetRef.getQueryId());
 
             state = (IHashJoinUtility) attrs.get(namedSetRef);
 
