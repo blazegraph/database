@@ -1272,9 +1272,17 @@ abstract public class AbstractTripleStore extends
         /**
          * Enable GeoSpatial support.
          */
-      String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
+        String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
+      
+        String DEFAULT_GEO_SPATIAL = "false";
 
-      String DEFAULT_GEO_SPATIAL = "false";
+        /**
+         * GeoSpatial configuration
+         */
+        String GEO_SPATIAL_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialConfig";
+      
+        String DEFAULT_GEO_SPATIAL_CONFIG = null;
+
     }
 
     protected Class determineAxiomClass() {

@@ -50,6 +50,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
@@ -594,18 +595,9 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
      * as input.
      */
    private static SchemaDescription defaultSchemaDescription() {
-      
-      final List<SchemaFieldDescription> sfd = 
-         new ArrayList<SchemaFieldDescription>();
 
-//      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
-//      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
-      
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
-         
-      return new SchemaDescription(sfd);      
+      // load schema desciption from config
+      return GeoSpatialConfig.getInstance().getSchemaDescription();
    }
 
    

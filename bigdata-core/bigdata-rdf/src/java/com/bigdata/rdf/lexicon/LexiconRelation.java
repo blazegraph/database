@@ -578,6 +578,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                   AbstractTripleStore.Options.GEO_SPATIAL,
                   AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
 
+            geoSpatialConfig = getProperty(
+                  AbstractTripleStore.Options.GEO_SPATIAL_CONFIG,
+                  AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_CONFIG);
+
             
             // Resolve the vocabulary.
             vocab = getContainer().getVocabulary();
@@ -631,7 +635,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
                     rejectInvalidXSDValues, xFactory, vocab, valueFactory,
-                    uriFactory, geoSpatial);
+                    uriFactory, geoSpatial, geoSpatialConfig);
 
         }
         
@@ -913,7 +917,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * When <code>true</code>, support for GeoSpatial features is turned on.
      */
     final private boolean geoSpatial;
-    
+
+    /**
+     * Configuration string for the GeoSpatial search facilities
+     */
+    final private String geoSpatialConfig;
+
     /**
      * Return <code>true</code> if datatype literals are being inlined into
      * the statement indices.
@@ -951,6 +960,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
        
        return geoSpatial;
        
+    }
+    
+    /**
+     * Return the configuration string for the GeoSpatial service.
+     */
+    final public String getGeoSpatialConfig() {
+       
+       return geoSpatialConfig;
     }
 
     /**

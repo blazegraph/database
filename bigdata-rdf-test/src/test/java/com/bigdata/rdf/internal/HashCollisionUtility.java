@@ -966,7 +966,8 @@ public class HashCollisionUtility {
 				vocab,    // predefined vocabulary
 				vf,
 				uriFactory,
-				false // GeoSpatial support
+				false, // GeoSpatial support
+				null  // GeoSpatial config string
 				);
 		
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(

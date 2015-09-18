@@ -9,6 +9,7 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.service.GeoSpatialConfig;
 
 /**
  * Default {@link IExtensionFactory}. The following extensions are supported:
@@ -44,6 +45,9 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	extensions.add(new DerivedNumericsExtension<BigdataLiteral>(resolver));
     	
     	if (config.isGeoSpatial()) {
+    	   
+    	   // initialize the GeoSpatialConfig object
+    	   GeoSpatialConfig.getInstance().init(config.getGeoSpatialConfig());
          extensions.add(new GeoSpatialLiteralExtension<BigdataLiteral>(resolver));    	
       }
     	
