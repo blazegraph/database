@@ -38,6 +38,7 @@ import org.infinispan.util.concurrent.BufferedConcurrentHashMap;
 import org.infinispan.util.concurrent.BufferedConcurrentHashMap.Eviction;
 import org.infinispan.util.concurrent.BufferedConcurrentHashMap.EvictionListener;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.cache.ConcurrentWeakValueCache;
@@ -47,7 +48,6 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * A cache based on the {@link BufferedConcurrentHashMap} from the infinispan

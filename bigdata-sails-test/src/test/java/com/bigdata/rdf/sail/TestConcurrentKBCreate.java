@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.repository.RepositoryException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -45,7 +46,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.rdf.vocab.BSBMVocabulary;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.InnerCause;
 
 /**

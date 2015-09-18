@@ -78,6 +78,7 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
+import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.PIDUtil;
 import com.bigdata.io.SerializerUtil;
@@ -89,7 +90,6 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
-import com.bigdata.util.Banner;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
 import com.bigdata.zookeeper.start.BigdataZooDefs;

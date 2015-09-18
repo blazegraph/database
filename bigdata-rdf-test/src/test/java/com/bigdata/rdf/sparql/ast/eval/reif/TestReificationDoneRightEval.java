@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval.reif;
 
 import java.util.Properties;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -47,7 +48,6 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
-import com.bigdata.util.BigdataStatics;
 
 /**
  * Reification Done Right test suite.

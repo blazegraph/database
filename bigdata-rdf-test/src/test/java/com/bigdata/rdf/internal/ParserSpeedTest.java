@@ -25,7 +25,7 @@ import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
-import com.bigdata.util.Banner;
+import com.bigdata.Banner;
 
 /**
  * Utility to measure the raw speed of the RDF parser.

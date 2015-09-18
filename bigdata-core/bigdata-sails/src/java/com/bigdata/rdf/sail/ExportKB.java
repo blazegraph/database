@@ -56,6 +56,7 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
@@ -63,7 +64,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.sparse.ITPS;
-import com.bigdata.util.Banner;
 
 /**
  * Utility class for exporting the configuration properties and data associated

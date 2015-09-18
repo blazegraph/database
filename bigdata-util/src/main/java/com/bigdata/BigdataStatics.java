@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 10, 2009
  */
 
-package com.bigdata.util;
+package com.bigdata;
 
 import java.io.IOException;
 import java.text.DateFormat;

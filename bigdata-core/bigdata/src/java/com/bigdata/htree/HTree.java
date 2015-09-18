@@ -37,6 +37,7 @@ import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
@@ -59,7 +60,6 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.util.BigdataStatics;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.BytesUtil;
 
