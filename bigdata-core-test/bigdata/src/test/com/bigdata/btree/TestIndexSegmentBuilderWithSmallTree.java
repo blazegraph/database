@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.btree.keys.TestKeyBuilder;
@@ -275,15 +274,15 @@ public class TestIndexSegmentBuilderWithSmallTree extends
          
             final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
             
-            if(LRUNexus.INSTANCE!=null)
-            assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
+//            if(LRUNexus.INSTANCE!=null)
+//            assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             assertNull(itr.prior());
 
-            if(LRUNexus.INSTANCE!=null)
-            assertTrue(lastLeaf.getDelegate() == itr.next().getDelegate()); // Note: test depends on cache!
+//            if(LRUNexus.INSTANCE!=null)
+//            assertTrue(lastLeaf.getDelegate() == itr.next().getDelegate()); // Note: test depends on cache!
 
-            if(LRUNexus.INSTANCE!=null)
-            assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
+//            if(LRUNexus.INSTANCE!=null)
+//            assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             
         }
         
@@ -297,14 +296,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends
             
             final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.Last);
             
-            if(LRUNexus.INSTANCE!=null)
-            assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
+//            if(LRUNexus.INSTANCE!=null)
+//            assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             assertNull(itr.next());
 
-            if(LRUNexus.INSTANCE!=null)
-            assertTrue(firstLeaf.getDelegate() == itr.prior().getDelegate()); // Note: test depends on cache!
-            if(LRUNexus.INSTANCE!=null)
-            assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
+//            if(LRUNexus.INSTANCE!=null)
+//            assertTrue(firstLeaf.getDelegate() == itr.prior().getDelegate()); // Note: test depends on cache!
+//            if(LRUNexus.INSTANCE!=null)
+//            assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
 
         }
         
@@ -387,8 +386,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         assertEquals("nextAddr", 0L, leaf.getNextAddr());
 
         final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
-        if(LRUNexus.INSTANCE!=null)
-        assertTrue(leaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache.
+//        if(LRUNexus.INSTANCE!=null)
+//        assertTrue(leaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache.
         assertNull(itr.prior());
         assertNull(itr.next());
         
@@ -655,17 +654,18 @@ public class TestIndexSegmentBuilderWithSmallTree extends
                         commitTime, true/* compactingMerge */, bufferNodes)
                 .call();
 
-        if (LRUNexus.INSTANCE != null) {
-
-            /*
-             * Clear the records for the index segment from the cache so we will
-             * read directly from the file. This is necessary to ensure that the
-             * data on the file is good rather than just the data in the cache.
-             */
-            
-            LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
-
-        }
+//      @see BLZG-1501 (remove LRUNexus)
+//        if (LRUNexus.INSTANCE != null) {
+//
+//            /*
+//             * Clear the records for the index segment from the cache so we will
+//             * read directly from the file. This is necessary to ensure that the
+//             * data on the file is good rather than just the data in the cache.
+//             */
+//            
+//            LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+//
+//        }
         
         return checkpoint;
 

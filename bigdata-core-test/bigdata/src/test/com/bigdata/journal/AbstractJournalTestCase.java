@@ -30,8 +30,6 @@ package com.bigdata.journal;
 import java.io.File;
 import java.util.Properties;
 
-import com.bigdata.LRUNexus;
-
 import junit.framework.TestCase;
 
 /**
@@ -222,14 +220,14 @@ abstract public class AbstractJournalTestCase
     @Override
     protected Journal reopenStore(final Journal store) {
 
-        if (LRUNexus.INSTANCE != null) {
-            /*
-             * Drop the record cache for this store on reopen. This makes it
-             * easier to find errors related to a difference in the bytes on the
-             * disk versus the bytes in the record cache.
-             */
-            LRUNexus.INSTANCE.deleteCache(store.getUUID());
-        }
+//        if (LRUNexus.INSTANCE != null) {
+//            /*
+//             * Drop the record cache for this store on reopen. This makes it
+//             * easier to find errors related to a difference in the bytes on the
+//             * disk versus the bytes in the record cache.
+//             */
+//            LRUNexus.INSTANCE.deleteCache(store.getUUID());
+//        }
         
         // close the store.
         store.close();

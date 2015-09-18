@@ -45,7 +45,6 @@ import org.apache.system.SystemUtil;
 
 import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
-import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.osx.StatisticsCollectorForOSX;
@@ -331,19 +330,20 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                             + "DirectBufferPool").attach(
                     DirectBufferPool.getCounters());
 
-            if (LRUNexus.INSTANCE != null) {
-
-                /*
-                 * Add counters reporting on the global LRU and the per-store
-                 * caches.
-                 */
-
-                serviceRoot.makePath(
-                        IProcessCounters.Memory + ICounterSet.pathSeparator
-                                + "LRUNexus").attach(
-                        LRUNexus.INSTANCE.getCounterSet());
-
-            }
+//          @see BLZG-1501 (remove LRUNexus)
+//            if (LRUNexus.INSTANCE != null) {
+//
+//                /*
+//                 * Add counters reporting on the global LRU and the per-store
+//                 * caches.
+//                 */
+//
+//                serviceRoot.makePath(
+//                        IProcessCounters.Memory + ICounterSet.pathSeparator
+//                                + "LRUNexus").attach(
+//                        LRUNexus.INSTANCE.getCounterSet());
+//
+//            }
             
         }
         

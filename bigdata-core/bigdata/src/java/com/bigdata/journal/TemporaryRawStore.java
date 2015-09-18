@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.mdi.AbstractResourceMetadata;
@@ -392,19 +391,20 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 //
 //                }
 
-                if (LRUNexus.INSTANCE != null) {
-
-                    try {
-
-                        LRUNexus.INSTANCE.deleteCache(getUUID());
-
-                    } catch (Throwable t) {
-
-                        log.error(t, t);
-
-                    }
-
-                }
+//              @see BLZG-1501 (remove LRUNexus)
+//                if (LRUNexus.INSTANCE != null) {
+//
+//                    try {
+//
+//                        LRUNexus.INSTANCE.deleteCache(getUUID());
+//
+//                    } catch (Throwable t) {
+//
+//                        log.error(t, t);
+//
+//                    }
+//
+//                }
 
             }
 
