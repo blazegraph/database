@@ -1244,6 +1244,16 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();       
     }
     
+    
+    public void test_ticket_blzg_1493() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1493",// testURI,
+          "ticket_blzg_1493.rq",// queryFileURL
+          "ticket_blzg_1493.trig",// dataFileURL
+          "ticket_blzg_1493.srx"// resultFileURL
+       ).runTest();       
+    }
+    
     public void test_ticket_blzg_1494a() throws Exception {
         new TestHelper(
            "ticket_blzg_1494a",// testURI,
@@ -1271,6 +1281,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_blzg_1495.srx"// resultFileURL
         ).runTest();       
      }
-    
-    
+
+
 }

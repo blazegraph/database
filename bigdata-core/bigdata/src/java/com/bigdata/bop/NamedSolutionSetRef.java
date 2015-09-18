@@ -54,8 +54,6 @@ import com.bigdata.journal.ITx;
  * of a query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: NamedSolutionSetRef.java 5716 2011-11-21 20:47:10Z thompsonbry
- *          $
  */
 public class NamedSolutionSetRef implements INamedSolutionSetRef {
 
@@ -65,9 +63,32 @@ public class NamedSolutionSetRef implements INamedSolutionSetRef {
     private static final long serialVersionUID = 1L;
 
     /**
-     * The {@link UUID} of the {@link IRunningQuery} which generated the named
-     * solution set. This is where you need to look to find the data.
-     */
+	 * The {@link UUID} of the {@link IRunningQuery} which generated the named
+	 * solution set. This is where you need to look to find the data.
+	 * <p>
+	 * Note: The value <code>null</code> has two different interpretations
+	 * depending on which constructor form was used.  
+	 * <p>
+	 * <dl>
+	 * <dt>new NamedSolutionSetRef(queryId, namedSet, joinVars);</dt>
+	 * <dd>This form is used to refer to an
+	 * {@link com.bigdata.bop.IQueryAttributes}. When queryId is
+	 * <code>null</code>, the code will look at the
+	 * {@link com.bigdata.bop.IQueryAttributes} for the current running query
+	 * (this form is the new usage and makes it possible to scope an attribute
+	 * to an instance of a query when the same query plan is executed more than
+	 * once, as it is for the sub-queries issued by the property path operator).
+	 * Otherwise it will resolve the identified query and use its
+	 * {@link com.bigdata.bop.IQueryAttributes} (this 2nd form is the historical
+	 * usage and makes it possible to reference an attribute on a parent query).
+	 * </dd>
+	 * <dt>NamedSolutionSetRef(namespace, timestamp, localName, joinVars);</dt>
+	 * <dd>This form is used to refer to a named solution set.</dd>
+	 * </dl>
+	 * 
+	 * @see <a href="https://jira.blazegraph.com/browse/BLZG-1493" > NPE in
+	 *      nested star property paths </a>
+	 */
     private final UUID queryId;
 
     /**
@@ -136,7 +157,7 @@ public class NamedSolutionSetRef implements INamedSolutionSetRef {
      * 
      * @param queryId
      *            The {@link UUID} of the {@link IRunningQuery} where you need
-     *            to look to find the data (required).
+     *            to look to find the data (optional - see BLZG-1493).
      * @param namedSet
      *            The application level name for the named solution set
      *            (required).
@@ -150,8 +171,9 @@ public class NamedSolutionSetRef implements INamedSolutionSetRef {
             final IVariable[] joinVars//
             ) {
 
-        if (queryId == null)
-            throw new IllegalArgumentException();
+//    	See BLZG-1493
+//        if (queryId == null)
+//            throw new IllegalArgumentException();
 
         if (namedSet == null)
             throw new IllegalArgumentException();
@@ -215,6 +237,7 @@ public class NamedSolutionSetRef implements INamedSolutionSetRef {
 
     private transient volatile String fqn;
 
+    @Override
     public String getFQN() {
 
         if (fqn == null) {
@@ -244,7 +267,8 @@ public class NamedSolutionSetRef implements INamedSolutionSetRef {
     public int hashCode() {
         if (h == 0) {
             // TODO Review this for effectiveness.
-            h = (queryId == null ? namespace.hashCode() + (int) timestamp
+        	// See BLZG-1493 for queryId == null
+            h = (queryId == null ? namespace==null?0:namespace.hashCode() + (int) timestamp
                     : queryId.hashCode())
                     + localName.hashCode()
                     + Arrays.hashCode(joinVars);

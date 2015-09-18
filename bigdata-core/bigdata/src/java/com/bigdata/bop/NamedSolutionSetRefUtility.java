@@ -53,18 +53,23 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 public class NamedSolutionSetRefUtility {
 
     /**
-     * Factory for {@link INamedSolutionSetRef}s that will be resolved against
-     * the {@link IRunningQuery} identified by the specified <i>queryId</i>.
-     * 
-     * @param queryId
-     *            The {@link UUID} of the {@link IRunningQuery} where you need
-     *            to look to find the data (required).
-     * @param namedSet
-     *            The application level name for the named solution set
-     *            (required).
-     * @param joinVars
-     *            The join variables (required, but may be an empty array).
-     */
+	 * Factory for {@link INamedSolutionSetRef}s that will be resolved against
+	 * the {@link IRunningQuery} identified by the specified <i>queryId</i>.
+	 * 
+	 * @param queryId
+	 *            The {@link UUID} of the {@link IRunningQuery} where you need
+	 *            to look to find the data (optional). When <code>null</code>,
+	 *            you must look at the current query. When non-<code>null</code>
+	 *            you must look at the specified query. See BLZG-1493.
+	 * @param namedSet
+	 *            The application level name for the named solution set
+	 *            (required).
+	 * @param joinVars
+	 *            The join variables (required, but may be an empty array).
+	 *            
+	 * @see <a href="https://jira.blazegraph.com/browse/BLZG-1493" > NPE in
+	 *      nested star property paths </a>
+	 */
     @SuppressWarnings("rawtypes")
     public static INamedSolutionSetRef newInstance(//
             final UUID queryId, //
