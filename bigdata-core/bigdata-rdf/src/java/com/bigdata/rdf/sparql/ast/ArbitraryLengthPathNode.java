@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -147,7 +148,7 @@ public class ArbitraryLengthPathNode
     			new NV(Annotations.RIGHT_TERM, right),
     			new NV(Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
     			new NV(Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
-                new NV(Annotations.DROP_VARS, Arrays.asList(tVarLeft, tVarRight)),
+                new NV(Annotations.DROP_VARS, new ArrayList<VarNode>()),
     			new NV(Annotations.LOWER_BOUND, mod == PathMod.ONE_OR_MORE ? 1L : 0L),
     			new NV(Annotations.UPPER_BOUND, mod == PathMod.ZERO_OR_ONE ? 1L : Long.MAX_VALUE)
     			));    			
@@ -165,7 +166,7 @@ public class ArbitraryLengthPathNode
                 new NV(Annotations.RIGHT_TERM, right),
                 new NV(Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
                 new NV(Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
-                new NV(Annotations.DROP_VARS, Arrays.asList(tVarLeft, tVarRight)),
+                new NV(Annotations.DROP_VARS, new ArrayList<VarNode>()),
                 new NV(Annotations.LOWER_BOUND, lowerBound),
                 new NV(Annotations.UPPER_BOUND, upperBound)
                 ));             
@@ -243,6 +244,15 @@ public class ArbitraryLengthPathNode
      */
     public void setDropVars(final List<VarNode> dropVars) {
         super.setProperty(Annotations.DROP_VARS, dropVars);
+    }
+    
+    /**
+     * Add a var that should be dropped after each round.
+     * 
+     * @see Annotations#DROP_VARS
+     */
+    public void addDropVar(final VarNode dropVar) {
+        dropVars().add(dropVar);
     }
     
     /**
