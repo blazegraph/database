@@ -139,6 +139,7 @@ public interface GeoSpatial {
    // TODO: documentation of vocabulary once finalized
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
    final URI PREDICATE = new URIImpl(NAMESPACE + "predicate");
+   final URI CONTEXT = new URIImpl(NAMESPACE + "context");
    final URI SPATIAL_CIRCLE_CENTER = new URIImpl(NAMESPACE + "spatialCircleCenter");
    final URI SPATIAL_CIRCLE_RADIUS = new URIImpl(NAMESPACE + "spatialCircleRadius");
    final URI SPATIAL_RECTANGLE_UPPER_LEFT = new URIImpl(NAMESPACE + "spatialRectangleUpperLeft");

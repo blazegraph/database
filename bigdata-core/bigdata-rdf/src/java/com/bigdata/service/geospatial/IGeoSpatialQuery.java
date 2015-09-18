@@ -64,6 +64,7 @@ public interface IGeoSpatialQuery {
 
       final GeoFunction searchFunction;
       final TermNode predicate;
+      final TermNode context;
       final PointLatLon spatialCircleCenter;
       final Double spatialCircleRadius;
       final PointLatLon spatialRectangleUpperLeft;
@@ -78,7 +79,8 @@ public interface IGeoSpatialQuery {
        * Constructor
        */
       public GeoSpatialSearchQuery(final GeoFunction searchFunction, 
-            final TermNode predicate, final PointLatLon spatialCircleCenter, 
+            final TermNode predicate, final TermNode context,
+            final PointLatLon spatialCircleCenter, 
             final Double spatialCircleRadius,
             PointLatLon spatialRectangleUpperLeft,
             PointLatLon spatialRectangleLowerRight,
@@ -87,6 +89,7 @@ public interface IGeoSpatialQuery {
 
          this.searchFunction = searchFunction;
          this.predicate = predicate;
+         this.context = context;
          this.spatialCircleCenter = spatialCircleCenter;
          this.spatialCircleRadius = spatialCircleRadius;
          this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
@@ -105,6 +108,10 @@ public interface IGeoSpatialQuery {
       public TermNode getPredicate() {
          return predicate;
       }
+
+      public TermNode getContext() {
+          return context;
+       }
 
       public PointLatLon getSpatialCircleCenter() {
          return spatialCircleCenter;
@@ -155,7 +162,10 @@ public interface IGeoSpatialQuery {
          
          result = prime * result +
             ((predicate == null) ? 0 : predicate.hashCode());
-         
+
+         result = prime * result +
+                 ((context == null) ? 0 : context.hashCode());
+
          result = prime * result + 
             ((spatialCircleCenter == null) ? 0 : spatialCircleCenter.hashCode());
          
@@ -205,6 +215,11 @@ public interface IGeoSpatialQuery {
                || (predicate != null && other.predicate == null)
                || !predicate.equals(other.predicate))
             return false;
+
+         if ((context == null && other.context != null)
+                 || (context != null && other.context == null)
+                 || !context.equals(other.context))
+              return false;
 
          if ((spatialCircleCenter == null && other.spatialCircleCenter != null)
                || (spatialCircleCenter != null && other.spatialCircleCenter == null)

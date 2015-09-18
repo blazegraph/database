@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on September 10, 2015
+ * Created on September 18, 2015
  */
 package com.bigdata.rdf.sparql.ast.eval.service;
 
@@ -35,8 +35,8 @@ import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Data driven test suite for GeoSpatial service feature, GeoSpatial in
- * triples vs. quads mode, testing of different service configurations,
+ * Data driven test suite for GeoSpatial service feature in quads mode,
+ * testing of different service configurations,
  * as well as correctness of the GeoSpatial service itself.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
@@ -627,7 +627,6 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
         final Properties properties = (Properties) super.getProperties().clone();
 
         // turn on quads.
-        // TODO: enable quads at some point
         properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
 
         // TM not available with quads.
