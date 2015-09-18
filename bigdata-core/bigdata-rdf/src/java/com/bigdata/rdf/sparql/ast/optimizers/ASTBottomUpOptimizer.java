@@ -44,6 +44,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -710,6 +711,14 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                  * 
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/414
                  * (SPARQL 1.1 EXISTS, NOT EXISTS, and MINUS)
+                 */
+                continue;
+            }
+            
+            if (sa.findParent(group) instanceof ArbitraryLengthPathNode) {
+                /*
+                 * Skip the filters in an ALP subgroup.  Although evaluated
+                 * as a subgroup, an ALP node is logically not really a subgroup.
                  */
                 continue;
             }
