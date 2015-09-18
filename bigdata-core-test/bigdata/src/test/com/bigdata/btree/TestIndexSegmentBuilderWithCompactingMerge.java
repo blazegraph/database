@@ -31,7 +31,6 @@ package com.bigdata.btree;
 import java.io.File;
 import java.util.UUID;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -144,19 +143,21 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             IndexSegmentStore segmentStore = null;
             try {
 
-                final IndexSegmentCheckpoint checkpoint = builder.call();
+                @SuppressWarnings("unused")
+				final IndexSegmentCheckpoint checkpoint = builder.call();
 
-                if (LRUNexus.INSTANCE != null) {
-
-                    /*
-                     * Clear the records for the index segment from the cache so we will
-                     * read directly from the file. This is necessary to ensure that the
-                     * data on the file is good rather than just the data in the cache.
-                     */
-                    
-                    LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
-
-                }
+//              @see BLZG-1501 (remove LRUNexus)
+//                if (LRUNexus.INSTANCE != null) {
+//
+//                    /*
+//                     * Clear the records for the index segment from the cache so we will
+//                     * read directly from the file. This is necessary to ensure that the
+//                     * data on the file is good rather than just the data in the cache.
+//                     */
+//                    
+//                    LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+//
+//                }
 
                 segmentStore = new IndexSegmentStore(outFile);
 
@@ -219,19 +220,21 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             IndexSegmentStore segmentStore = null;
             try {
 
-                final IndexSegmentCheckpoint checkpoint = builder.call();
+                @SuppressWarnings("unused")
+				final IndexSegmentCheckpoint checkpoint = builder.call();
 
-                if (LRUNexus.INSTANCE != null) {
-
-                    /*
-                     * Clear the records for the index segment from the cache so we will
-                     * read directly from the file. This is necessary to ensure that the
-                     * data on the file is good rather than just the data in the cache.
-                     */
-                    
-                    LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
-
-                }
+//              @see BLZG-1501 (remove LRUNexus)
+//                if (LRUNexus.INSTANCE != null) {
+//
+//                    /*
+//                     * Clear the records for the index segment from the cache so we will
+//                     * read directly from the file. This is necessary to ensure that the
+//                     * data on the file is good rather than just the data in the cache.
+//                     */
+//                    
+//                    LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+//
+//                }
 
                 segmentStore = new IndexSegmentStore(outFile);
 
@@ -298,19 +301,21 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             IndexSegmentStore segmentStore = null;
             try {
 
-                final IndexSegmentCheckpoint checkpoint = builder.call();
+                @SuppressWarnings("unused")
+				final IndexSegmentCheckpoint checkpoint = builder.call();
 
-                if (LRUNexus.INSTANCE != null) {
-
-                    /*
-                     * Clear the records for the index segment from the cache so we will
-                     * read directly from the file. This is necessary to ensure that the
-                     * data on the file is good rather than just the data in the cache.
-                     */
-                    
-                    LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
-
-                }
+//              @see BLZG-1501 (remove LRUNexus)
+//                if (LRUNexus.INSTANCE != null) {
+//
+//                    /*
+//                     * Clear the records for the index segment from the cache so we will
+//                     * read directly from the file. This is necessary to ensure that the
+//                     * data on the file is good rather than just the data in the cache.
+//                     */
+//                    
+//                    LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+//
+//                }
 
                 segmentStore = new IndexSegmentStore(outFile);
 
