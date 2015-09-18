@@ -41,7 +41,6 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
@@ -68,7 +67,6 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
-import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -95,6 +93,7 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
+import com.bigdata.service.geospatial.GeoSpatialCounters;
 import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
@@ -357,7 +356,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private IVariable<?>[] vars;
       private final GeoSpatialDefaults defaults;
       private final AbstractTripleStore kb;
-
+      private final GeoSpatialCounters geoSpatialCounters;
+      
       public GeoSpatialServiceCall(final IVariable<?> searchVar,
             final Map<URI, StatementPatternNode> statementPatterns,
             final IServiceOptions serviceOptions,
@@ -373,7 +373,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             throw new IllegalArgumentException();
 
          if (kb == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException();         
 
          this.serviceOptions = serviceOptions;
 
@@ -438,6 +438,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
          this.kb = kb;
+         
+         geoSpatialCounters =
+            QueryEngineFactory.getQueryController(
+               kb.getIndexManager()).getGeoSpatialCounters();
+            
 
       }
 
@@ -476,8 +481,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final GeoSpatialSearchQuery query, final AbstractTripleStore kb) {
 
          final BOpContextBase context = new BOpContextBase(
-               QueryEngineFactory.getQueryController(kb.getIndexManager()));
-
+            QueryEngineFactory.getQueryController(kb.getIndexManager()));
+         
+         geoSpatialCounters.registerGeoSpatialSearchRequest();
+         
          final GlobalAnnotations globals = new GlobalAnnotations(kb
                .getLexiconRelation().getNamespace(), kb.getSPORelation()
                .getTimestamp());
@@ -532,7 +539,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             // set up the filter
             filter = new GeoSpatialInCircleFilter(
-               centerPoint, distance, spatialUnit, timeStart, timeEnd, litExt);
+               centerPoint, distance, spatialUnit, timeStart,
+               timeEnd, litExt, geoSpatialCounters);
          }
             break;
 
@@ -553,7 +561,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   .toComponentString(lowerRightWithTime);
 
             filter = new GeoSpatialInRectangleFilter(
-               upperLeftWithTime, lowerRightWithTime, litExt);
+               upperLeftWithTime, lowerRightWithTime, litExt, geoSpatialCounters);
          }
             break;
 
@@ -661,7 +669,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           */
          final Advancer<SPO> bigMinAdvancer = 
             new ZOrderIndexBigMinAdvancer(
-               lowerZOrderKey, upperZOrderKey, litExt, objectPos, vf);
+               lowerZOrderKey, upperZOrderKey, litExt, objectPos, vf, geoSpatialCounters);
          
          final Var var = Var.var(vars[0].getName());
          final IBindingSet incomingBindingSet = query.getIncomingBindings();
@@ -1093,10 +1101,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       // geo:context predicate is used)
       BigdataURI context = null;
       
+      // counters objects
+      GeoSpatialCounters geoSpatialCounters;
+      
       public GeoSpatialFilterBase(
-         final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         final GeoSpatialLiteralExtension<BigdataValue> litExt,
+         final GeoSpatialCounters geoSpatialCounters) {
          
          this.litExt = litExt;
+         this.geoSpatialCounters = geoSpatialCounters;
       }      
       
       // sets member variables that imply an additional context check
@@ -1128,13 +1141,20 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       @Override
       final protected boolean isValid(final ITuple tuple) {
 
+         final long filterStartTime = System.nanoTime();
+         
          // check that the context constraint is satisfied, if any
          if (!contextIsValid(tuple)) {
             return false;
          }
          
          // delegate to subclass
-         return isValidInternal(tuple);
+         boolean isValid = isValidInternal(tuple);
+         
+         final long filterEndTime = System.nanoTime();
+         geoSpatialCounters.addFilterCalculationTime(filterEndTime-filterStartTime);
+         
+         return isValid;
       }
       
       
@@ -1182,9 +1202,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       public GeoSpatialInCircleFilter(
          final PointLatLon spatialPoint, Double distance,
          final UNITS unit, final Long timeMin, final Long timeMax, 
-         final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         final GeoSpatialLiteralExtension<BigdataValue> litExt,
+         final GeoSpatialCounters geoSpatialCounters) {
          
-         super(litExt);
+         super(litExt, geoSpatialCounters);
 
          this.spatialPointAsCoordinateDD = spatialPoint.asCoordinateDD();
          this.distance = distance;
@@ -1261,9 +1282,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       
       public GeoSpatialInRectangleFilter(
          final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
-         final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         final GeoSpatialLiteralExtension<BigdataValue> litExt,
+         final GeoSpatialCounters geoSpatialCounters) {
          
-         super(litExt);
+         super(litExt, geoSpatialCounters);
          
          this.lowerBorder = lowerBorder;
          this.upperBorder = upperBorder;

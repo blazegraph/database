@@ -76,6 +76,7 @@ import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.geospatial.GeoSpatialCounters;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.IHaltable;
@@ -272,6 +273,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         // global counters.
         root.attach(counters.getCounters());
 
+        // geospatial counters
+        final CounterSet geoSpatial = root.makePath("GeoSpatial");
+        geoSpatial.attach(geoSpatialCounters.getCounters());
+        
 //        // counters per tagged query group.
 //        {
 //
@@ -304,6 +309,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * Counters at the global level.
      */
     final protected QueryEngineCounters counters = newCounters();
+    
+    /**
+     * GeoSpatial counters
+     */
+    final protected GeoSpatialCounters geoSpatialCounters = newGeoSpatialCounters();
 
 //    /**
 //     * Statistics for queries which are "tagged" so we can recognize their
@@ -361,11 +371,28 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     }
     
     /**
+     * Extension hook for new {@link GeoSpatialCounters} instances.
+     */
+    protected GeoSpatialCounters newGeoSpatialCounters() {
+       
+       return new GeoSpatialCounters();
+    }
+    
+    /**
      * The {@link QueryEngineCounters} object for this {@link QueryEngine}.
      */
     protected QueryEngineCounters getQueryEngineCounters() {
         
         return counters;
+        
+    }
+    
+    /**
+     * The {@link QueryEngineCounters} object for this {@link QueryEngine}.
+     */
+    public GeoSpatialCounters getGeoSpatialCounters() {
+        
+        return geoSpatialCounters;
         
     }
     
