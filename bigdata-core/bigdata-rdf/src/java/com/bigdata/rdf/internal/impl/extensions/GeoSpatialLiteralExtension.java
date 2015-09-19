@@ -28,7 +28,6 @@ package com.bigdata.rdf.internal.impl.extensions;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,7 +42,6 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription.Datatype;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
@@ -230,30 +228,15 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
          
          final BigDecimal precisionAdjustment = 
-               BigDecimal.valueOf(10).pow(sfd.getDoublePrecision());
+               BigDecimal.valueOf(10).pow(sfd.getPrecision());
 
-         switch (sfd.getDatatype()) {
-         case DOUBLE:
-         {
-            final BigDecimal componentAsBigInteger =
-                  component instanceof BigDecimal ?
-                  (BigDecimal)component : new BigDecimal(component.toString());
-                  
-            final BigDecimal x = precisionAdjustment.multiply(componentAsBigInteger);
-            ret[i] = x.longValue();
-                  
-            break;
-         }
-         case LONG:
-         {
-            ret[i] = 
-               component instanceof Long ? 
-               (Long)component : Long.valueOf(component.toString());
-            break;
-         }
-         default:
-            throw new RuntimeException("Uncovered encoding case. Please fix code.");
-         }
+         final BigDecimal componentAsBigInteger =
+               component instanceof BigDecimal ?
+               (BigDecimal)component : new BigDecimal(component.toString());
+               
+         final BigDecimal x = precisionAdjustment.multiply(componentAsBigInteger);
+
+         ret[i] = x.longValue();
 
       }
       
@@ -491,7 +474,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       for (int i=0; i<arr.length; i++) {
 
          final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
-         final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
+         final double precisionAdjustment = Math.pow(10, sfd.getPrecision());
          
          if (i>0)
             buf.append(COMPONENT_SEPARATOR);
@@ -501,7 +484,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
             componentArr[i] = (double)arr[i]/precisionAdjustment;
             break;
          case LONG:
-            componentArr[i] = arr[i];
+            componentArr[i] = arr[i]/(long)precisionAdjustment;
             break;
          default:
             throw new RuntimeException("Uncovered decoding case. Please fix code.");
@@ -647,7 +630,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
        * 
        * The range supported is the full range.
        */
-      private final int doublePrecision;
+      private final int precision;
       
       public SchemaFieldDescription(
          final Datatype datatype, final int doublePrecision) {
@@ -666,11 +649,11 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
        * adjustments and may help to get better performance.
        */
       public SchemaFieldDescription(
-            final Datatype datatype, final int doublePrecision,
+            final Datatype datatype, final int precision,
             final Long minValue) {
          
             this.datatype = datatype;
-            this.doublePrecision = doublePrecision;
+            this.precision = precision;
             this.minValue = minValue;
                   
          }
@@ -679,8 +662,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          return datatype;
       }
 
-      public int getDoublePrecision() {
-         return doublePrecision;
+      public int getPrecision() {
+         return precision;
       }
       
       public Long getMinValue() {
