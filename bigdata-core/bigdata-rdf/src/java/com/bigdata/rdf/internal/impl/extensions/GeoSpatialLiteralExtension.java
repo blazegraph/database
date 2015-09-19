@@ -198,6 +198,25 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    }
    
    /**
+    * Create an IV from a two's complement byte array
+    * 
+    * Implements transformation E->F
+    */
+   @SuppressWarnings({ "rawtypes", "unchecked" })
+   public LiteralExtensionIV createIVFromZOrderByteArray(final byte[] zOrderByteArray) {
+      
+      // convert into a valid two's complement byte array (D->E)
+      final byte[] zOrderByteArrayTwoCompl = padLeadingZero(zOrderByteArray);
+
+      // we now can safely call the BigInteger constructor (E->F)
+      final BigInteger bi = new BigInteger(zOrderByteArrayTwoCompl);
+
+      // finally, wrap the big integer into an xsd:integer (F->G)
+      final AbstractLiteralIV delegate = new XSDIntegerIV(bi);
+      return new LiteralExtensionIV(delegate, datatype.getIV());
+   }
+   
+   /**
     * Convert the components into a long array. The array is passed as an
     * Object[], in order to allow for unparsed strings as well as Long or
     * Double's (or any convertable) as input. The array must have the same
@@ -542,22 +561,6 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return padLeadingZero(zOrderByteArray);
 
    }
-   
-   
-   // NEW (TODO: should go via IVs numerical value, no string manip)
-   @SuppressWarnings("unchecked")
-   public V asValue(byte[] key, final BigdataValueFactory vf) {
-    
-      byte[] bigIntAsByteArrUnsigned = unpadLeadingZero(key);
-      
-      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned);
-
-      final String litStr = longArrAsComponentString(componentsAsLongArr);
-      
-      return (V) vf.createLiteral(litStr, datatype);
-
-   }
-   
 
 
    /****************************************************************************

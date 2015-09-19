@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
@@ -239,9 +240,9 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
     public String toString() {
         
-        return "Cursor{fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
-                + BytesUtil.toString(toKey) + ", currentKey="
-                + BytesUtil.toString(currentKey()) + ", visitDeleted="
+        return "Cursor{fromKey=" + Arrays.toString(fromKey) + ", toKey="
+                + Arrays.toString(toKey) + ", currentKey="
+                + Arrays.toString(currentKey()) + ", visitDeleted="
                 + visitDeleted + "}";
         
     }

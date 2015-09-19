@@ -621,11 +621,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final byte[] lowerZOrderKey = litExt.toZOrderByteArray(lowerBorderComponents);
          final byte[] upperZOrderKey = litExt.toZOrderByteArray(upperBorderComponents);
          
-         final BigdataValueFactory vf = kb.getValueFactory();
-
          if (log.isInfoEnabled()) {
-            log.info("Scanning from key " + litExt.asValue(lowerZOrderKey, vf) );
-            log.info("Scanning to   key: " + litExt.asValue(upperZOrderKey, vf) );           
+            log.info("Scanning from " + litExt);
+            log.info("Scanning to   " + litExt);           
          }
 
 
@@ -670,7 +668,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           */
          final Advancer<SPO> bigMinAdvancer = 
             new ZOrderIndexBigMinAdvancer(
-               lowerZOrderKey, upperZOrderKey, litExt, objectPos, vf, geoSpatialCounters);
+               lowerZOrderKey, upperZOrderKey, litExt, objectPos, geoSpatialCounters);
          
          final Var var = Var.var(vars[0].getName());
          final IBindingSet incomingBindingSet = query.getIncomingBindings();
