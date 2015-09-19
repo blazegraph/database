@@ -246,8 +246,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          final Object component = components[i];
          final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
          
-         final BigDecimal precisionAdjustment = 
-               BigDecimal.valueOf(10).pow(sfd.getPrecision());
+         final BigDecimal precisionAdjustment = BigDecimal.valueOf(sfd.getPrecision());
 
          final BigDecimal componentAsBigInteger =
                component instanceof BigDecimal ?
@@ -493,7 +492,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       for (int i=0; i<arr.length; i++) {
 
          final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
-         final double precisionAdjustment = Math.pow(10, sfd.getPrecision());
+         final double precisionAdjustment = sfd.getPrecision();
          
          if (i>0)
             buf.append(COMPONENT_SEPARATOR);
@@ -626,19 +625,18 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       private final Datatype datatype;
 
       /**
-       * Precision of float value. Based on the precision, we convert the
-       * double into a long value. E.g., if the precision is 8 (meaning
-       * 8 positions after decimal point), we multiply the double by 8
-       * and convert into a long value (ignoring additional positions).
-       * 
-       * The range supported is the full range.
+       * Precision of the value, given as a multiplicator applied on top
+       * of a given value. Typically precisions are 1000, meaning for instance
+       * that we consider 3 after decimal positions for doubles. The precision
+       * field can be used as well to shift long values, e.g. to align them
+       * more closely in the index.
        */
-      private final int precision;
+      private final long precision;
       
       public SchemaFieldDescription(
-         final Datatype datatype, final int doublePrecision) {
+         final Datatype datatype, final long precision) {
          
-         this(datatype, doublePrecision, null);
+         this(datatype, precision, null);
       }
       
       /**
@@ -652,7 +650,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
        * adjustments and may help to get better performance.
        */
       public SchemaFieldDescription(
-            final Datatype datatype, final int precision,
+            final Datatype datatype, final long precision,
             final Long minValue) {
          
             this.datatype = datatype;
@@ -665,7 +663,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          return datatype;
       }
 
-      public int getPrecision() {
+      public long getPrecision() {
          return precision;
       }
       

@@ -218,7 +218,7 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
         // actually do not harm the evaluation process)
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_CONFIG, 
-           "DOUBLE#6#0;DOUBLE#5#0;LONG#0#0");
+           "DOUBLE#1000000#0;DOUBLE#100000#0;LONG#1#0");
 
 
         return properties;
