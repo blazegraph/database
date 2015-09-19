@@ -568,12 +568,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          default:
             throw new RuntimeException("Unknown geospatial search function.");
          }
-         
-//         lowerBorderComponents = new Object[]{ 
-//            (long)(double)lowerBorderComponents[0], (long)(double)lowerBorderComponents[1] };
-//         upperBorderComponents = 
-//           new Object[]{ (long)(double)upperBorderComponents[0], (long)(double)upperBorderComponents[1] };
-         
+
          // set up range scan
          final Var oVar = Var.var(); // object position variable
          final RangeNode range = new RangeNode(new VarNode(oVar),
@@ -585,26 +580,27 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          // set up the predicate
          final VarNode s = new VarNode(vars[0].getName());
+         final TermNode p = query.getPredicate();
          final VarNode o = new VarNode(oVar);
 
-         
-         // TODO: take SPORelation and call SPORelation.getPredicate() and remove pred==null check
+
+         /**
+          * We call kb.getPredicate(), which has the nice feature that it
+          * returns null if the predicate is unsatisfiable (i.e., if the
+          * predicate does not appear in the data). This gives us an early
+          * exit point for the service (see null check below).
+          */
          IPredicate<ISPO> pred = (IPredicate<ISPO>) kb.getPredicate(
                (URI) s.getValue(), /* subject */
-               (URI) query.getPredicate().getValue(), /* predicate */
+               p==null ? null : (URI)p.getValue(), /* predicate */
                o.getValue(), /* object */
                null, /* context */
                null, /* filter */
                rangeBop); /* rangeBop */
-
-         
-         /**
-          * The predicate is null if the p we pass in does not appear in the
-          * database. In that case, return null to indicate there aren't
-          * matches.
-          */
+        
+         // early exit: predicate unsatisfiable
          if (pred == null) {
-            return null;
+            return null; 
          }
 
          pred = (IPredicate<ISPO>) pred.setProperty(
