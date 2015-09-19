@@ -45,6 +45,7 @@ import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -72,6 +73,7 @@ import com.bigdata.service.geospatial.GeoSpatial;
  * 
  * TODO:
  * - push logics into object where we don't need to re-allocate arrays
+ * - document toZOrderByteArray methods -> which do return a trailing zero, which don't
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
@@ -197,6 +199,23 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return new LiteralExtensionIV(delegate, datatype.getIV());
    }
    
+
+   /**
+    * Create a two-components byte[] from a component array.
+    * Implements transformation B->E
+    */
+   public byte[] toZOrderByteArray(Object[] components) {
+      
+      // convert component array into long's (B->C)
+      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
+
+      // convert the long array into a byte[] (C->D)
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
+
+      // convert into a valid two's complement byte array (D->E)
+      return padLeadingZero(zOrderByteArray);
+   }
+   
    /**
     * Create an IV from a two's complement byte array
     * 
@@ -234,7 +253,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
       final long[] ret = new long[sd.getNumDimensions()];
 
-      int numDimensions = sd.getNumDimensions();
+      final int numDimensions = sd.getNumDimensions();
       if (numDimensions != components.length) {
          throw new IllegalArgumentException(
             "Literal value has wrong format. Expected " + numDimensions 
@@ -270,7 +289,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public byte[] toZOrderByteArray(
          final long[] componentsAsLongArr, final SchemaDescription sd) {
       
-      IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
+      final IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
       for (int i=0; i<componentsAsLongArr.length; i++) {
          
          // get current component
@@ -320,7 +339,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * Implements step D->E.
     */
    public byte[] padLeadingZero(byte[] arr) {
-      byte[] ret = new byte[arr.length+1];
+      final byte[] ret = new byte[arr.length+1];
       
       for (int i=0; i<arr.length; i++) {
          ret[i+1] = arr[i];
@@ -376,11 +395,27 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       if (!datatype.getIV().equals(iv.getExtensionIV())) {
          throw new IllegalArgumentException("unrecognized datatype");
       }
-      
-      final int numDimensions = sd.getNumDimensions();
-      
+            
       final BigInteger bigInt = iv.getDelegate().integerValue();
    
+      // big integer to zOrder byte[] (F>D2)
+      final byte[] bigIntAsByteArrUnsigned = toZOrderByteArray(bigInt);
+
+      // retrieve the original long values from z-order byte[] (D2 -> C)
+      final long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned);
+      
+      return componentsAsLongArr;
+   }
+   
+   /**
+    * Decodes a BigInteger into a zOrder byte[] (without leading zero).
+    * 
+    * Implements transformation F->E.
+    */
+   public byte[] toZOrderByteArray(final BigInteger bigInt) {
+
+      final int numDimensions = sd.getNumDimensions();
+
       // convert BigInteger back to byte array (F->E)
       final byte[] bigIntAsByteArr = bigInt.toByteArray();
       
@@ -397,15 +432,24 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          bigIntAsByteArrPad[idx++] = bigIntAsByteArr[i];   // copy of bytes
       }
 
-      // removed the padded zero (E->D2)
-      byte[] bigIntAsByteArrUnsigned = unpadLeadingZero(bigIntAsByteArrPad);
-
-      // retrieve the original long values from z-order byte[] (D2 -> C)
-      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned);
+      final byte[] bigIntAsByteArrUnsigned = unpadLeadingZero(bigIntAsByteArrPad);
       
-      return componentsAsLongArr;
+      return bigIntAsByteArrUnsigned;
    }
 
+   /**
+    * Converts an IV to a zOrderByte array (without leading zero).
+    * Entry point for query service, somewhat outside the pipeline described above.
+    */
+   public byte[] toZOrderByteArray(AbstractLiteralIV<BigdataLiteral, ?> literalIV) {
+
+      if (!(literalIV instanceof XSDIntegerIV)) {
+         throw new RuntimeException("zOrder value IV must be XSDInteger");
+      }
+
+      return toZOrderByteArray(literalIV.integerValue());
+
+   }
    
    /**
     * Converts a z-order byte array to a long array representing the components.
@@ -415,7 +459,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     */
    public long[] fromZOrderByteArray(final byte[] byteArr) {
       
-      IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
+      final IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
       for (int i=0; i<byteArr.length; i++) {
          kb.append(byteArr[i]);
       }
@@ -480,7 +524,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     */
    final public Object[] longArrAsComponentArr(final long[] arr) {
       
-      int numDimensions = sd.getNumDimensions();
+      final int numDimensions = sd.getNumDimensions();
       if (arr.length!=numDimensions) {
          throw new IllegalArgumentException(
                "Encoding has wrong format. Expected " + numDimensions 
@@ -521,7 +565,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     */
    public byte[] unpadLeadingZero(byte[] arr) {
       
-      byte[] ret = new byte[arr.length-1];
+      final byte[] ret = new byte[arr.length-1];
       
       for (int i=0; i<ret.length; i++) {
          ret[i] = arr[i+1];
@@ -530,37 +574,6 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return ret;
       
    }
-
-      
-   ///////////   ///////////   ///////////   ///////////   ///////////
-   ///////////   ///////////   ///////////   ///////////   ///////////
-   ///////////   ///////////   ///////////   ///////////   ///////////
-   // TODO: how do these methods fit in? The could/should probably be optimized
-   //       in terms of performance
-   
-   // NEW (TODO: should go via IVs numerical value, no string manip)
-   @SuppressWarnings("rawtypes")
-   public byte[] toZOrderByteArray(final LiteralExtensionIV iv) {
-      
-      final long[] componentsAsLongArr = asLongArray(iv);
-
-      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
-
-      return padLeadingZero(zOrderByteArray);
-
-   }
-   
-   // NEW (TODO: should go via IVs numerical value, no string manip)
-   public byte[] toZOrderByteArray(Object[] components) {
-      
-      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
-
-      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
-
-      return padLeadingZero(zOrderByteArray);
-
-   }
-
 
    /****************************************************************************
     ***************               SCHEMA MANAGEMENT              ***************
@@ -575,9 +588,6 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    /**
      * For now, we're using a fixed, three-dimensional datatype for
      * latitued, longitude and time.
-     * 
-     * TODO: this is fixed for now, we may want to make this take a datatype
-     * as input.
      */
    private static SchemaDescription defaultSchemaDescription() {
 

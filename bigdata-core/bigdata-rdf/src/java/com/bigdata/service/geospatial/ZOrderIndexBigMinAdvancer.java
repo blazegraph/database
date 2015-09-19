@@ -138,7 +138,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          
          // current record (aka dividing record) as unsigned
          final byte[] dividingRecord = 
-            litExt.unpadLeadingZero(litExt.toZOrderByteArray(zOrderIv));
+            litExt.toZOrderByteArray(zOrderIv.getDelegate());
+         
          
          long[] divRecordComponents = litExt.fromZOrderByteArray(dividingRecord);
          
