@@ -301,6 +301,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          throw new RuntimeException("Required search predicate not found: "
                + GeoSpatial.SEARCH + " for searchVar=" + searchVar);
       }
+      
+      if (!uris.contains(GeoSpatial.PREDICATE)) {
+         throw new RuntimeException(
+               "GeoSpatial search with unbound predicate is currenly not supported.");
+      }
 
    }
 
