@@ -777,8 +777,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       
       final List<SchemaFieldDescription> latLonSfd = 
             new ArrayList<SchemaFieldDescription>();
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1)); /* lat */
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1)); /* lon */
+      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 0)); /* lat */
+      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 0)); /* lon */
             
       return getGSLiteralExtension(vf, new SchemaDescription(latLonSfd));
       
@@ -794,8 +794,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       
       final List<SchemaFieldDescription> latLonSfd = 
             new ArrayList<SchemaFieldDescription>();
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1, min)); /* lat */
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1, min)); /* lon */
+      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 0, min)); /* lat */
+      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 0, min)); /* lon */
             
       return getGSLiteralExtension(vf, new SchemaDescription(latLonSfd));
       

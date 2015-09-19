@@ -158,7 +158,7 @@ public class GeoSpatialConfig {
 
       sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
       sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, 0));  /* time */
       
       return new SchemaDescription(sfd);
    }
