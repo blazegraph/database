@@ -78,9 +78,9 @@ public class GeoSpatialConfig {
     * A schema string such as DOUBLE#5;DOUBLE;5;0#LONG;2;0 describes
     * three dimensions:
     * 
-    * - DOUBLE#5   -> type=DOUBLE, precision=5, no range shift
-    * - DOUBLE#5#0 -> type=DOUBLE, precision=5, range shift according to min value 0
-    * - LONG#0#0   -> type=LONG, precision=0, range shift according to min value 0
+    * - DOUBLE#100000   -> type=DOUBLE, precision=5, no range shift
+    * - DOUBLE#100000#0 -> type=DOUBLE, precision=5, range shift according to min value 0
+    * - LONG#1#0   -> type=LONG, precision=0 (leave value unmodified), range shift according to min value 0
     * 
     * If no schema description string is given (or the given string is empty), 
     * the default schema description is returned.
