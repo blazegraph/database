@@ -122,9 +122,9 @@ public class GeoSpatialConfig {
                      "First field must be DOUBLE or LONG, but is: " + field0Str);
             }
 
-            final Integer precision;
+            final Long precision;
             try {
-               precision = Integer.valueOf(field1Str);
+               precision = Long.valueOf(field1Str);
             } catch (NumberFormatException e) {
                throw new IllegalArgumentException(
                      "Second field must be an integer value, but is: " + field1Str);               
@@ -156,9 +156,9 @@ public class GeoSpatialConfig {
       final List<SchemaFieldDescription> sfd = 
             new ArrayList<SchemaFieldDescription>();
 
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, 0));  /* time */
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* latitude */
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* longitude */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
       
       return new SchemaDescription(sfd);
    }
