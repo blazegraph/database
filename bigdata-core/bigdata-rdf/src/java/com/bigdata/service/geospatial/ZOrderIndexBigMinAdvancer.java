@@ -42,7 +42,6 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.util.BytesUtil;
 
@@ -80,9 +79,6 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
    
    // counters object for statistics
    final GeoSpatialCounters geoSpatialCounters;
-   
-   // value factory
-   private final BigdataValueFactory vf;
       
    private transient IKeyBuilder keyBuilder;
 
@@ -91,7 +87,6 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       final byte[] searchMaxZOrder, /* the maximum search key (bottom right) */
       final GeoSpatialLiteralExtension<BigdataValue> litExt,
       final int zOrderComponentPos /* position of the zOrder in the index */,
-      final BigdataValueFactory vf,
       final GeoSpatialCounters geoSpatialCounters) {
 
       this.litExt = litExt;
@@ -102,134 +97,112 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       this.seachMaxLong = litExt.fromZOrderByteArray(this.searchMaxZOrder);
       
       this.zOrderComponentPos = zOrderComponentPos;
-      this.vf = vf;
       this.geoSpatialCounters = geoSpatialCounters;
            
    }
-
+   
+   @SuppressWarnings("rawtypes")
    @Override
    protected void advance(final ITuple<SPO> tuple) {
-      
-      if (log.isDebugEnabled()) {
-         log.debug("Advancor visiting tuple:    " + tuple);
-      }
-      
-      // if we're beyond the end, nothing to do
-      if (tuple==null) {
-         return;
-      }
-      
+
       if (keyBuilder == null) {
-
-         /*
-          * Note: It appears that you can not set this either implicitly or
-          * explicitly during ctor initialization if you want it to exist during
-          * de-serialization. Hence it is initialized lazily here. This is Ok
-          * since the iterator pattern is single threaded.
-          */
-
-         // assert arity == 3 || arity == 4;
-
          keyBuilder = KeyBuilder.newInstance();
-
       }
       
-      final long rangeCheckCalStart = System.nanoTime();
-      
-      final byte[] key = tuple.getKey();
-
-      keyBuilder.reset();
-
-      // decode components up to (and including) the z-order string
-      @SuppressWarnings("rawtypes")
-      IV[] ivs = IVUtility.decode(key,zOrderComponentPos+1);
-      
-      // encode everything up to (and excluding) the z-order component "as is"
-      for (int i=0; i<ivs.length-1; i++) {
-         IVUtility.encode(keyBuilder, ivs[i]);
-      }
-
-      // this is the z-order literal
-      @SuppressWarnings("unchecked")
-      final LiteralExtensionIV<BigdataLiteral> zOrderIv = 
-         (LiteralExtensionIV<BigdataLiteral>)ivs[ivs.length-1];
-      
-      // current record (aka dividing record) as unsigned
-      final byte[] dividingRecord = 
-         litExt.unpadLeadingZero(litExt.toZOrderByteArray(zOrderIv));
-      
-      long[] divRecordComponents = litExt.fromZOrderByteArray(dividingRecord);
-      
-      
-      boolean inRange = true;
-      for (int i=0; i<divRecordComponents.length && inRange; i++) {
-         inRange &= seachMinLong[i]<=divRecordComponents[i];
-         inRange &= seachMaxLong[i]>=divRecordComponents[i];
-      }
-      
-      final long rangeCheckCalEnd = System.nanoTime();
-      geoSpatialCounters.addRangeCheckCalculationTime(rangeCheckCalEnd-rangeCheckCalStart);
-
-      if (!inRange) {
-
-         // this is a miss
-         geoSpatialCounters.registerZOrderIndexMiss();
-         
-         long bigMinCalStart = System.nanoTime();
+      // iterate unless tuple in range is found or we reached the end
+      ITuple<SPO> curTuple = tuple; 
+      while(curTuple!=null) {
          
          if (log.isDebugEnabled()) {
-            log.debug("-> tuple " + tuple + " not in range");
+            log.debug("Advancor visiting tuple:    " + curTuple);
          }
          
-         // calculate bigmin over the z-order component
-         final byte[] bigMin = calculateBigMin(dividingRecord);
+         final long rangeCheckCalStart = System.nanoTime();
          
-         // pad a zero
-         final byte[] bigMinAsUnsigned = litExt.padLeadingZero(bigMin);
-         
-         final BigdataValue value = litExt.asValue(bigMinAsUnsigned, vf);
-         
-         // TODO: can this be done more efficiently?
-         @SuppressWarnings("rawtypes")
-         LiteralExtensionIV bigMinIv = litExt.createIV(value);
-         IVUtility.encode(keyBuilder, bigMinIv);
-
-         final long bigMinCalEnd = System.nanoTime();
-         geoSpatialCounters.addBigMinCalculationTime(bigMinCalEnd-bigMinCalStart);
-         
-         // advance to the specified key ...
-         try {
-            if (log.isDebugEnabled()) {
-               log.debug("-> advancing to bigmin: " + value);
-            }
-            
-            ITuple<SPO> next = src.seek(keyBuilder.getKey());
-                  
-            // ... or the next higher one
-            if (next==null) {
-               next = src.next(); 
-            }
+         final byte[] key = curTuple.getKey();
    
-
-            
-            // go into recursion (if the next value is fine, this call will have
-            // no effect, otherwise it will advance the cursor once more)
-            advance(next);
-            
-         }  catch (NoSuchElementException e) {
-  
-            throw new KeyOutOfRangeException("Advancer out of search range");
-            
+         keyBuilder.reset();
+   
+         // decode components up to (and including) the z-order string
+         IV[] ivs = IVUtility.decode(key,zOrderComponentPos+1);
+         
+         // encode everything up to (and excluding) the z-order component "as is"
+         for (int i=0; i<ivs.length-1; i++) {
+            IVUtility.encode(keyBuilder, ivs[i]);
+         }
+   
+         // this is the z-order literal
+         @SuppressWarnings("unchecked")
+         final LiteralExtensionIV<BigdataLiteral> zOrderIv = 
+            (LiteralExtensionIV<BigdataLiteral>)ivs[ivs.length-1];
+         
+         // current record (aka dividing record) as unsigned
+         final byte[] dividingRecord = 
+            litExt.unpadLeadingZero(litExt.toZOrderByteArray(zOrderIv));
+         
+         long[] divRecordComponents = litExt.fromZOrderByteArray(dividingRecord);
+         
+         boolean inRange = true;
+         for (int i=0; i<divRecordComponents.length && inRange; i++) {
+            inRange &= seachMinLong[i]<=divRecordComponents[i];
+            inRange &= seachMaxLong[i]>=divRecordComponents[i];
          }
          
-      } else {
-         
-         geoSpatialCounters.registerZOrderIndexHit();
-         
+         final long rangeCheckCalEnd = System.nanoTime();
+         geoSpatialCounters.addRangeCheckCalculationTime(rangeCheckCalEnd-rangeCheckCalStart);
+   
+         if (!inRange) {
+   
+            // this is a miss
+            geoSpatialCounters.registerZOrderIndexMiss();
+            
+            long bigMinCalStart = System.nanoTime();
+            
+            if (log.isDebugEnabled()) {
+               log.debug("-> tuple " + curTuple + " not in range");
+            }
+            
+            // calculate bigmin over the z-order component
+            final byte[] bigMin = calculateBigMin(dividingRecord);
+            
+            // pad a zero
+            final LiteralExtensionIV bigMinIv = litExt.createIVFromZOrderByteArray(bigMin);
+            IVUtility.encode(keyBuilder, bigMinIv);
+   
+            final long bigMinCalEnd = System.nanoTime();
+            geoSpatialCounters.addBigMinCalculationTime(bigMinCalEnd-bigMinCalStart);
+            
+            // advance to the specified key ...
+            try {
+               if (log.isDebugEnabled()) {
+                  log.debug("-> advancing to bigmin: " + bigMinIv);
+               }
+               
+               ITuple<SPO> next = src.seek(keyBuilder.getKey());
+                     
+               // ... or the next higher one
+               if (next==null) {
+                  next = src.next(); 
+               }
+      
+               // continue iterate
+               curTuple = next;
+               
+            }  catch (NoSuchElementException e) {
+     
+               throw new KeyOutOfRangeException("Advancer out of search range");
+               
+            }
+            
+         } else {
+            
+            geoSpatialCounters.registerZOrderIndexHit();
+            return;
+         }
       }
 
    }
-
+   
    /** 
     * Returns the BIGMIN, i.e. the next relevant value in the search range.
     * The value is returned as unsigned, which needs to be converted into
@@ -247,7 +220,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
             
       if (dividingRecord.length!=searchMinZOrder.length ||
           dividingRecord.length!=searchMaxZOrder.length) {
-         // TODO: proper error handling
+         
+         // this should never happen, assuming correct configuration
          throw new RuntimeException("Key dimenisions differs");
       } 
       
@@ -352,5 +326,5 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          BytesUtil.setBit(arr, i, i==position ? setFirst : !setFirst );
       }      
    }
-
+   
 }
