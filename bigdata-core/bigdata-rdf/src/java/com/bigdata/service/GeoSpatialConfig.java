@@ -110,7 +110,7 @@ public class GeoSpatialConfig {
             
             final String field0Str = fields[0].trim();
             final String field1Str = fields[1].trim();
-            final String field2Str = fields.length==3? fields[3] : null;
+            final String field2Str = fields.length==3? fields[2] : null;
             
             final Datatype datatype;
             if (field0Str.equalsIgnoreCase("DOUBLE")) {
