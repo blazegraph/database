@@ -79,7 +79,14 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
    
    // counters object for statistics
    final GeoSpatialCounters geoSpatialCounters;
-      
+   
+   // pre-allocated, reusable byte[] for bigmin calculation
+   final int zOrderArrayLength;
+   final byte[] min;
+   final byte[] max;
+   byte[] bigmin;
+   
+   
    private transient IKeyBuilder keyBuilder;
 
    public ZOrderIndexBigMinAdvancer(
@@ -98,7 +105,12 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       
       this.zOrderComponentPos = zOrderComponentPos;
       this.geoSpatialCounters = geoSpatialCounters;
-           
+      
+      zOrderArrayLength = this.searchMinZOrder.length;
+      min = new byte[zOrderArrayLength];
+      max = new byte[zOrderArrayLength];
+      bigmin = new byte[zOrderArrayLength];
+      
    }
    
    @SuppressWarnings("rawtypes")
@@ -124,7 +136,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          keyBuilder.reset();
    
          // decode components up to (and including) the z-order string
-         IV[] ivs = IVUtility.decode(key,zOrderComponentPos+1);
+         final IV[] ivs = IVUtility.decode(key,zOrderComponentPos+1);
          
          // encode everything up to (and excluding) the z-order component "as is"
          for (int i=0; i<ivs.length-1; i++) {
@@ -139,7 +151,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          // current record (aka dividing record) as unsigned
          final byte[] dividingRecord = 
             litExt.toZOrderByteArray(zOrderIv.getDelegate());
-         
+
          
          long[] divRecordComponents = litExt.fromZOrderByteArray(dividingRecord);
          
@@ -148,12 +160,14 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
             inRange &= seachMinLong[i]<=divRecordComponents[i];
             inRange &= seachMaxLong[i]>=divRecordComponents[i];
          }
+
          
          final long rangeCheckCalEnd = System.nanoTime();
          geoSpatialCounters.addRangeCheckCalculationTime(rangeCheckCalEnd-rangeCheckCalStart);
    
          if (!inRange) {
-   
+
+
             // this is a miss
             geoSpatialCounters.registerZOrderIndexMiss();
             
@@ -162,7 +176,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
             if (log.isDebugEnabled()) {
                log.debug("-> tuple " + curTuple + " not in range");
             }
-            
+
             // calculate bigmin over the z-order component
             final byte[] bigMin = calculateBigMin(dividingRecord);
             
@@ -178,7 +192,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                if (log.isDebugEnabled()) {
                   log.debug("-> advancing to bigmin: " + bigMinIv);
                }
-               
+
                ITuple<SPO> next = src.seek(keyBuilder.getKey());
                      
                // ... or the next higher one
@@ -188,7 +202,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       
                // continue iterate
                curTuple = next;
-               
+
             }  catch (NoSuchElementException e) {
      
                throw new KeyOutOfRangeException("Advancer out of search range");
@@ -229,9 +243,10 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       final int numBytes = dividingRecord.length;
       final int numDimensions = litExt.getNumDimensions();
 
-      final byte[] min = searchMinZOrder.clone(); 
-      final byte[] max = searchMaxZOrder.clone();
-      byte[] bigmin = new byte[numBytes];
+      System.arraycopy(searchMinZOrder, 0, min, 0, zOrderArrayLength);
+      System.arraycopy(searchMaxZOrder, 0, max, 0, zOrderArrayLength);
+      java.util.Arrays.fill(bigmin,(byte)0); // reset bigmin
+      
       boolean finished = false;
       for (int i = 0; i < numBytes * Byte.SIZE && !finished; i++) { 
 
@@ -250,7 +265,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                } else {
                   
                   // case 0 - 0 - 1
-                  bigmin = min.clone();
+                  System.arraycopy(min, 0, bigmin, 0, zOrderArrayLength);
                   load(true /* setFirst */, i, bigmin, numDimensions);
                   load(false, i, max, numDimensions);
                   
@@ -266,7 +281,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                } else {
                   
                   // case 0 - 1 - 1
-                  bigmin = min.clone();
+                  System.arraycopy(min, 0, bigmin, 0, zOrderArrayLength);
                   finished = true; 
                   
                }               
@@ -318,14 +333,36 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
     * bits of the dimension to 1). The method has no return value, but instead
     * as a side effect the passed array arr will be modified.
     */
-   private static void load(
+   private void load(
       final boolean setFirst, final int position,
       final byte[] arr, final int numDimensions) {
       
-      // iterate over bits associated with the current dimension
-      for (int i=position; i<arr.length * Byte.SIZE; i+=numDimensions) {
-         BytesUtil.setBit(arr, i, i==position ? setFirst : !setFirst );
-      }      
+      // set the trailing bit
+      if (setFirst)
+         arr[(int)(position / 8)] |= 1<<7-(position%8);
+      else
+         arr[(int)(position / 8)] &= ~(1<<7-(position%8));
+
+      // set the remaining bits (inverted)
+      for (int i=position+numDimensions; i<arr.length * Byte.SIZE; i+=numDimensions) {
+         
+         final int posInByte = i%8;
+
+         // for performance reasons, we aggregate all changes to the current byte
+         int posInByteInv = 7 - posInByte;
+         int mask = 1 << posInByteInv;
+         for (posInByteInv-=numDimensions; posInByteInv>=0; posInByteInv-=numDimensions) {
+            mask |= 1 << posInByteInv;
+            i+=numDimensions; // corresponds to one time skip of outer loop
+         }
+         
+         if (setFirst)
+            arr[(int) (i / 8)] &= ~mask;
+         else
+            arr[(int) (i / 8)] |= mask;
+         
+      }
+
    }
    
 }
