@@ -80,6 +80,37 @@ public class GeoSpatialCounters implements ICounterSetAccess {
      */
     protected final CAT filterCalculationTime = new CAT();
 
+//    protected final CAT ctr0 = new CAT();
+//    public void addToCtr0(final long timeInNanoSec) { ctr0.add(timeInNanoSec); }
+//    
+//    protected final CAT ctr1 = new CAT();
+//    public void addToCtr1(final long timeInNanoSec) { ctr1.add(timeInNanoSec); }
+//    
+//    protected final CAT ctr2 = new CAT();
+//    public void addToCtr2(final long timeInNanoSec) { ctr2.add(timeInNanoSec); }
+//
+//    protected final CAT ctr3 = new CAT();
+//    public void addToCtr3(final long timeInNanoSec) { ctr3.add(timeInNanoSec); }
+//
+//    protected final CAT ctr4 = new CAT();
+//    public void addToCtr4(final long timeInNanoSec) { ctr4.add(timeInNanoSec); }
+//
+//    protected final CAT ctr5 = new CAT();
+//    public void addToCtr5(final long timeInNanoSec) { ctr5.add(timeInNanoSec); }
+//
+//    protected final CAT ctr6 = new CAT();
+//    public void addToCtr6(final long timeInNanoSec) { ctr6.add(timeInNanoSec); }
+//
+//    protected final CAT ctr7 = new CAT();
+//    public void addToCtr7(final long timeInNanoSec) { ctr7.add(timeInNanoSec); }
+//
+//    protected final CAT ctr8 = new CAT();
+//    public void addToCtr8(final long timeInNanoSec) { ctr8.add(timeInNanoSec); }
+//
+//    protected final CAT ctr9 = new CAT();
+//    public void addToCtr9(final long timeInNanoSec) { ctr9.add(timeInNanoSec); }
+
+
     public void registerGeoSpatialSearchRequest() {
        geoSpatialSearchRequests.increment();
     }
@@ -173,6 +204,77 @@ public class GeoSpatialCounters implements ICounterSetAccess {
               setValue(filterCalculationTime.get()/1000000);
           }
        });
+//       
+//       root.addCounter("ctr0", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr0.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr1", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr1.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr2", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr2.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr3", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr3.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr4", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr4.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr5", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr5.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr6", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr6.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr7", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr7.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr8", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr8.get()/1000000);
+//          }
+//       });
+//       
+//       root.addCounter("ctr9", new Instrument<Long>() {
+//          @Override 
+//          public void sample() {
+//              setValue(ctr9.get()/1000000);
+//          }
+//       });
+//       
        
        return root;
 

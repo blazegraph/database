@@ -93,6 +93,9 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    private SchemaDescription sd;
    
+   // re-usable key builder, initialized once in the beginning
+   final IKeyBuilder kb;
+   
    /**
     * Constructor setting up an instance with a default schema description.
     * 
@@ -113,6 +116,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
       this.datatype = resolver.resolve(datatypeURI);
       this.sd = sd;
+      this.kb = KeyBuilder.newInstance();
    }
    
    @Override
@@ -289,7 +293,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public byte[] toZOrderByteArray(
          final long[] componentsAsLongArr, final SchemaDescription sd) {
       
-      final IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
+      kb.reset();
+      
       for (int i=0; i<componentsAsLongArr.length; i++) {
          
          // get current component
@@ -459,7 +464,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     */
    public long[] fromZOrderByteArray(final byte[] byteArr) {
       
-      final IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
+      kb.reset();
+      
       for (int i=0; i<byteArr.length; i++) {
          kb.append(byteArr[i]);
       }
