@@ -62,14 +62,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
    // Search min (upper left) byte array as z-order string (as unsigned)
    private final byte[] searchMinZOrder;
 
-   // the long values representing search min's values in the dimensions
-   private final long[] seachMinLong;
-   
    // Search max (lower right) byte array as z-order string (as unsigned)
    private final byte[] searchMaxZOrder;
-   
-   // the long values representing search max's values in the dimensions
-   private final long[] seachMaxLong;
 
    // the position within the index in which we find the zOrderComponent
    private final int zOrderComponentPos;
@@ -98,10 +92,10 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
 
       this.litExt = litExt;
       this.searchMinZOrder = litExt.unpadLeadingZero(searchMinZOrder);
-      this.seachMinLong = litExt.fromZOrderByteArray(this.searchMinZOrder);
+      // this.seachMinLong = litExt.fromZOrderByteArray(this.searchMinZOrder);
       
       this.searchMaxZOrder = litExt.unpadLeadingZero(searchMaxZOrder);
-      this.seachMaxLong = litExt.fromZOrderByteArray(this.searchMaxZOrder);
+      // this.seachMaxLong = litExt.fromZOrderByteArray(this.searchMaxZOrder);
       
       this.zOrderComponentPos = zOrderComponentPos;
       this.geoSpatialCounters = geoSpatialCounters;
@@ -152,16 +146,75 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          final byte[] dividingRecord = 
             litExt.toZOrderByteArray(zOrderIv.getDelegate());
 
+         final int numDimensions = litExt.getNumDimensions();
+         final boolean dimShownToBeLargerThanMin[] = new boolean[numDimensions]; 
+         final boolean dimShownToBeSmallerThanMax[] = new boolean[numDimensions]; 
          
-         long[] divRecordComponents = litExt.fromZOrderByteArray(dividingRecord);
-         
-         boolean inRange = true;
-         for (int i=0; i<divRecordComponents.length && inRange; i++) {
-            inRange &= seachMinLong[i]<=divRecordComponents[i];
-            inRange &= seachMaxLong[i]>=divRecordComponents[i];
+         // get first byte in which the values differ
+         int firstDifferingByte=0;
+         for (;firstDifferingByte<dividingRecord.length; firstDifferingByte++) {
+            if (dividingRecord[firstDifferingByte]!=searchMinZOrder[firstDifferingByte] ||
+                dividingRecord[firstDifferingByte]!=searchMaxZOrder[firstDifferingByte]) {
+               break;
+            }
+         }
+                  
+         /**
+          * We now scan sequentially over the bit array, starting with firstDifferingByte.
+          * Thereby, we notice whenever we detect a smaller or greater situation (and
+          * make sure that, for the dimension under investigation, we do not check again
+          * in future). Note that this operation operates on top of the zOrder string, in
+          * which bits are interleaved.
+          * 
+          * The unsatisfiedConstraintsCtr is for performance optimizations. It is initialized
+          * with numDimensions*2, and when its count reaches zero we know that all
+          * dimensions have to be shown larger than min and smaller than max, i.e. that all 
+          * constraints have been satisfied.
+          */
+         int unsatisfiedConstraintsCtr = numDimensions*2; 
+         boolean inRange = true; // unless proven otherwise
+         for (int i=firstDifferingByte*Byte.SIZE; 
+               i<dividingRecord.length*Byte.SIZE && inRange && unsatisfiedConstraintsCtr>0; i++) {
+            
+            final int dimension = i%numDimensions;
+            final boolean divRecordBitSet = BytesUtil.getBit(dividingRecord, i);
+
+            if (!dimShownToBeLargerThanMin[dimension]) {
+               
+               final boolean searchMinBitSet = BytesUtil.getBit(searchMinZOrder, i);
+
+               if (divRecordBitSet && !searchMinBitSet) {
+                  
+                  dimShownToBeLargerThanMin[dimension] = true;
+                  unsatisfiedConstraintsCtr--;
+                  
+               } else if (!divRecordBitSet && searchMinBitSet) {
+                  
+                  inRange = false; // abort
+                  
+               } // else: skip
+               
+            }
+            
+            if (!dimShownToBeSmallerThanMax[dimension]) {
+               
+               final boolean searchMaxBitSet = BytesUtil.getBit(searchMaxZOrder, i);
+               
+               if (!divRecordBitSet && searchMaxBitSet) {
+                  
+                  dimShownToBeSmallerThanMax[dimension] = true;
+                  unsatisfiedConstraintsCtr--;
+                  
+               } else if (divRecordBitSet && !searchMaxBitSet) {
+                  
+                  inRange = false; // abort
+                  
+               } // else: skip
+               
+            }
+            
          }
 
-         
          final long rangeCheckCalEnd = System.nanoTime();
          geoSpatialCounters.addRangeCheckCalculationTime(rangeCheckCalEnd-rangeCheckCalStart);
    
@@ -339,14 +392,14 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       
       // set the trailing bit
       if (setFirst)
-         arr[(int)(position / 8)] |= 1<<7-(position%8);
+         arr[(int)(position / Byte.SIZE)] |= 1<<7-(position%8);
       else
-         arr[(int)(position / 8)] &= ~(1<<7-(position%8));
+         arr[(int)(position / Byte.SIZE)] &= ~(1<<7-(position%8));
 
       // set the remaining bits (inverted)
       for (int i=position+numDimensions; i<arr.length * Byte.SIZE; i+=numDimensions) {
          
-         final int posInByte = i%8;
+         final int posInByte = i%Byte.SIZE;
 
          // for performance reasons, we aggregate all changes to the current byte
          int posInByteInv = 7 - posInByte;
@@ -357,9 +410,9 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          }
          
          if (setFirst)
-            arr[(int) (i / 8)] &= ~mask;
+            arr[(int) (i / Byte.SIZE)] &= ~mask;
          else
-            arr[(int) (i / 8)] |= mask;
+            arr[(int) (i / Byte.SIZE)] |= mask;
          
       }
 
