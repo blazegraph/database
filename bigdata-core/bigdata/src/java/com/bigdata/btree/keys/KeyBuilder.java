@@ -1916,11 +1916,11 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
              // this check is not required for correctness)
              if (buf[(bufIt + offset) / Byte.SIZE] != 0) {
 
-                BytesUtil.setBit(
-                   zOrderArr,                            // target array
-                   bufIt * numDimensions + ((numDimensions-1)-dimIt),        // position
-                   BytesUtil.getBit(buf, bufIt + offset)    // value
-                );
+               BytesUtil.setBit(
+                  zOrderArr, // target array
+                  bufIt * numDimensions + ((numDimensions - 1) - dimIt), // position
+                  BytesUtil.getBit(buf, bufIt + offset) // value
+               );           
 
                 bufIt++;
 
@@ -1946,13 +1946,13 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
       // we compose the original components into the the z-order bit array
       for (int bufIt=0; bufIt< Long.SIZE * numDimensions; ) {
          
-         // first Long.SIZE bits belong to dim=0, next Long.SIZE to dim=1, etc.
-         int dimension = bufIt % numDimensions;
-         int bitPos = bufIt/numDimensions + dimension*Long.SIZE;
-         
          // skip byte if no bit is set here (for performance only,
          // this check is not required for correctness)
          if (buf[bufIt / Byte.SIZE] != 0) {
+
+            // first Long.SIZE bits belong to dim=0, next Long.SIZE to dim=1, etc.
+            final int dimension = bufIt % numDimensions;
+            final int bitPos = bufIt/numDimensions + dimension*Long.SIZE;
 
             BytesUtil.setBit(
                componentArr,                 // target array
@@ -1976,5 +1976,5 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
       }
       return ret;
    }
-    
+
 }
