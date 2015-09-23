@@ -216,9 +216,7 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
 	 * @see https://jira.blazegraph.com/browse/BLZG-1176
      */
     public void setDatasetClauses(final List<ASTDatasetClause> uc) {
-        if (uc!=null && !uc.isEmpty()) {
-            setProperty(Annotations.DATASET_CLAUSES, uc);
-        }
+        setProperty(Annotations.DATASET_CLAUSES, uc);
     }
 
     /**
