@@ -70,16 +70,6 @@ public class ASTDeferredIVResolution {
 
         final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context2, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
-        try {
-
-            BigdataExprBuilder.verifyAggregate(queryRoot2);
-
-        } catch (final VisitorException e) {
-
-            throw new MalformedQueryException(e.getMessage(), e);
-
-        }
-        
         final ASTUnresolvedTermsOptimizer termsResolver = new ASTUnresolvedTermsOptimizer();
         final QueryRoot queryRoot3 = (QueryRoot) termsResolver.optimize(context2, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
         
