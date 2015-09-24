@@ -35,6 +35,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.util.DaemonThreadFactory;
+
 import junit.framework.TestCase2;
 
 /**

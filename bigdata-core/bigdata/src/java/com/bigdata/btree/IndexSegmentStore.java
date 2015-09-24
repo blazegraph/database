@@ -34,14 +34,12 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.LRUNexus;
-import com.bigdata.cache.IGlobalLRU;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -108,7 +106,9 @@ public class IndexSegmentStore extends AbstractRawStore {
      * Optional store cache for the bloom filter, index metadata, and the B+Tree
      * nodes and leaves (MAY be <code>null</code>).
      */
-    private final ILRUCache<Long, Object> storeCache;
+    //  @see BLZG-1501 (remove LRUNexus)
+    @Deprecated
+    private final ConcurrentMap<Long, Object> storeCache;
     
     /**
      * An optional <strong>direct</strong> {@link ByteBuffer} containing a disk
@@ -342,7 +342,9 @@ public class IndexSegmentStore extends AbstractRawStore {
             this.addressManager = new IndexSegmentAddressManager(checkpoint);
 
             // optional store cache (set before reading metadata/bloomfilter).
-            this.storeCache = LRUNexus.getCache(this);
+            // @see BLZG-1501 (remove LRUNexus)
+            this.storeCache = null;
+//            this.storeCache = LRUNexus.getCache(this);
             
             // Read the metadata record.
             this.indexMetadata = readMetadata();
@@ -757,11 +759,12 @@ public class IndexSegmentStore extends AbstractRawStore {
 
             try {
                 
-                if (LRUNexus.INSTANCE != null) {
-
-                    LRUNexus.INSTANCE.deleteCache(getUUID());
-
-                }
+//              @see BLZG-1501 (remove LRUNexus)
+//                if (LRUNexus.INSTANCE != null) {
+//
+//                    LRUNexus.INSTANCE.deleteCache(getUUID());
+//
+//                }
                 
             } catch (Throwable t) {
                 
@@ -786,7 +789,6 @@ public class IndexSegmentStore extends AbstractRawStore {
 
     /**
      * Atomically closes the store (iff open) and then deletes the backing file.
-     * Any records for the store are cleared from the {@link IGlobalLRU}.
      */
     public void destroy() {
 

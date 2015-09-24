@@ -63,8 +63,8 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**

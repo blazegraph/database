@@ -45,7 +45,7 @@ import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.EventReceiver.EventBTree;
 import com.bigdata.util.Bytes;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 

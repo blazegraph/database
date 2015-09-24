@@ -51,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
@@ -226,6 +227,19 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
                 * other FILTERs.
                 */
                continue;
+            }
+            
+            if (aJoinNode instanceof UnionNode) {
+            	
+            	/*
+            	 * Note: the translation for union nodes currently does not
+            	 * support inlined filters. This is an edge case anyway, since
+            	 * FILTERs are typically pushed inside UNION nodes (wherever
+            	 * possible).
+            	 * 
+            	 * See https://jira.blazegraph.com/browse/BLZG-1494.
+            	 */
+            	continue;
             }
 
             requiredJoins.add(aJoinNode);

@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.AbstractBTreeTestCase;
@@ -123,14 +122,16 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      * Data files are placed into a directory named by the test. If the
      * directory exists, then it is removed before the federation is set up.
      */
+    @Override
     public void setUp() throws Exception {
       
         super.setUp();
         
-        if (LRUNexus.INSTANCE != null) {
-            // flush everything before/after a unit test.
-            LRUNexus.INSTANCE.discardAllCaches();
-        }
+		// @see BLZG-1501 (remove LRUNexus)
+//        if (LRUNexus.INSTANCE != null) {
+//            // flush everything before/after a unit test.
+//            LRUNexus.INSTANCE.discardAllCaches();
+//        }
 
         dataDir = new File( getName() );
         
@@ -162,7 +163,8 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         
 
     }
-    
+
+    @Override
     public void tearDown() throws Exception {
 
         client.disconnect(true/*immediateShutdown*/);
@@ -185,14 +187,15 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
             
         }
         
-        if (LRUNexus.INSTANCE != null) {
-            // flush everything before/after a unit test.
-            try {
-                LRUNexus.INSTANCE.discardAllCaches();
-            } catch (Throwable t) {
-                log.error(t, t);
-            }
-        }
+		// @see BLZG-1501 (remove LRUNexus)
+//        if (LRUNexus.INSTANCE != null) {
+//            // flush everything before/after a unit test.
+//            try {
+//                LRUNexus.INSTANCE.discardAllCaches();
+//            } catch (Throwable t) {
+//                log.error(t, t);
+//            }
+//        }
 
         super.tearDown();
 

@@ -79,7 +79,7 @@ import com.bigdata.service.IService;
 import com.bigdata.service.Session;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 import cutthecrap.utils.striterators.IFilter;

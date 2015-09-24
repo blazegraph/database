@@ -199,7 +199,9 @@ dependencies.
     <module>../lgpl-utils</module>
     <module>../dsi-utils</module>
     <module>../rdf-properties</module>
+    <module>../sparql-grammar</module>
     <module>../bigdata-util</module>
+    <module>../bigdata-cache</module>
     <module>../bigdata-client</module>
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>

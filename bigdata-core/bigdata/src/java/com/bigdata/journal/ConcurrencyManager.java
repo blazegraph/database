@@ -59,7 +59,7 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.WriteTaskCounters;

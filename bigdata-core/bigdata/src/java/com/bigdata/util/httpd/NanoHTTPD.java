@@ -34,7 +34,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.CaseInsensitiveStringComparator;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * A simple, tiny, nicely embeddable HTTP 1.0 server in Java

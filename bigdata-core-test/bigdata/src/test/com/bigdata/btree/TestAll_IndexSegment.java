@@ -78,8 +78,6 @@ public class TestAll_IndexSegment extends TestCase {
         suite.addTestSuite(TestIndexSegmentBuilderWithSmallTree.class);
         // and add in a stress test suite for those small examples.
         suite.addTest(TestAll_IndexSegmentBuilderWithSmallTrees.suite());
-        // test ability to pre-populate the cache with records for the generated index segment.
-        suite.addTestSuite(TestIndexSegmentBuilderCacheInteraction.class);
         // test fence posts for incremental builds with deleted index entries.
         suite.addTestSuite(TestIndexSegmentBuilderWithIncrementalBuild.class);
         // test fence posts for compacting merges with deleted index entries.

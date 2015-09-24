@@ -58,8 +58,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import info.aduna.iteration.Iterations;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -93,7 +91,6 @@ import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 
-import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
@@ -101,12 +98,14 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
+import info.aduna.iteration.Iterations;
+
 /**
  * Abstract base class for data driven test suites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class AbstractDataDrivenSPARQLTestCase extends
+abstract public class AbstractDataDrivenSPARQLTestCase extends
         AbstractDataAndSPARQLTestCase {
 
     private static final Logger log = Logger

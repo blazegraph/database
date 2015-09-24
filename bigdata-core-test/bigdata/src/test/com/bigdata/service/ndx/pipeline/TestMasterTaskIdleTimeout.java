@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * Unit tests of the idle timeout behavior for {@link AbstractMasterTask} and

@@ -249,10 +249,12 @@ abstract public class HashIndexOpBase extends PipelineOp implements ISingleThrea
                  * to use a putIfAbsent pattern here.
                  */
                 
-                // Lookup the attributes for the query on which we will hang the
-                // solution set.
-                final IQueryAttributes attrs = context
-                        .getQueryAttributes(namedSetRef.getQueryId());
+                /*
+    			 * Lookup the attributes for the query on which we will hang the
+    			 * solution set. See BLZG-1493 (if queryId is null, use the query
+    			 * attributes for this running query).
+    			 */
+    			final IQueryAttributes attrs = context.getQueryAttributes(namedSetRef.getQueryId());
 
                 IHashJoinUtility state = (IHashJoinUtility) attrs
                         .get(namedSetRef);
