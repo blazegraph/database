@@ -3699,7 +3699,28 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
     final int cDefaultFreeBitsThreshold;
     
-	final int cSmallSlotThreshold = 4096; // debug test
+    /**
+     * The smallSlotThreshold, when activated, is intended to ensure improve the
+     * opportunity for write elissions (to mechanical disks) whilst also reducing 
+     * the read-backs on current generation (2014-15) SSDs that can impact 
+     * write throughput.
+     * Given that the objective is to statistically improve write elission,
+     * the number of required free bits needs to be large - around 50%.
+     * However, this can result in a large amount of store waste for certain
+     * patterns of data - for example when small slots are used to store large
+     * literals that will not be recycled.  In this scenario it is possible
+     * that allocators are not recycled.
+     * Some further thoughts:
+     * 1) The more efficient elission of small slots for the allocation of large literals
+     * is probably the major throughput benefit
+     * 2) OTOH, at a lower level, small sparse but localised writes (eg 16 64 byte writes to a 4k
+     * sector) may only incur a single read-back with good firmware.
+     * To address the concern for high waste, when a statistically large number of allocators have
+     * been created, and the waste is beyond some threshold, then a lower small slot threshold
+     * is used.  The logic for this is implemented in {@link FixedAllocator#meetsSmallSlotThreshold()}
+     */
+	final int cSmallSlotThreshold = 4096; // 50%
+	final int cSmallSlotThresholdHighWaste = 2048; // 25%
 	
 	int cSmallSlot = 1024; // @see from Options#SMALL_SLOT_TYPE
     
