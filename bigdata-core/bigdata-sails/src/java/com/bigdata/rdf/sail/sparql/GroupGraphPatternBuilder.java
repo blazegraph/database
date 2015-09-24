@@ -381,7 +381,8 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         final TermNode newContext = (TermNode) node.jjtGetChild(0).jjtAccept(
                 this, null);
 
-        // TODO: move to evaluate
+        // @see https://jira.blazegraph.com/browse/BLZG-1176
+        // moved to ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
 //        if (!context.tripleStore.isQuads()) {
 //           if (newContext!=null) {
 //               throw new QuadsOperationInTriplesModeException(
