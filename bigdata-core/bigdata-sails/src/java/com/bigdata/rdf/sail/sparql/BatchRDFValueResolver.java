@@ -110,7 +110,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
     
     private BigdataValueFactory valueFactory;
 
-    private final LinkedHashMap<ASTRDFValue, Value> nodes;
+    private final LinkedHashMap<ASTRDFValue, BigdataValue> nodes;
 
     private Map<Value, BigdataValue> vocab;
 
@@ -123,6 +123,9 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
         this.readOnly = readOnly;
         
+        // Unnamed BigdataValueFactory is used to provide instances
+        // of BigdataValue, which are required by existing test suite.
+        // See also task ...
         this.valueFactory = BigdataValueFactoryImpl.getInstance("");
         
         this.nodes = new LinkedHashMap<>();
@@ -131,139 +134,8 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
     }
     
-    public Map<ASTRDFValue, Value> getNodes() {
+    public Map<ASTRDFValue, BigdataValue> getNodes() {
         return nodes;
-    }
-
-    /**
-     * Visit the parse tree, locating and collecting references to all
-     * {@link ASTRDFValue} nodes (including blank nodes iff we are in a told
-     * bnodes mode). The {@link ASTRDFValue}s are collected in a {@link Map}
-     * which associates each one with a {@link BigdataValue} object which is set
-     * using {@link ASTRDFValue#setRDFValue(org.openrdf.model.Value)}. The
-     * {@link BigdataValue}s are then resolved in a batch against the database,
-     * obtaining their {@link IVs}.  This has the side-effect of making their
-     * {@link IV}s available in the parse tree.
-     * 
-     * @param qc
-     * 
-     * @throws MalformedQueryException
-     */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void processOnPrepareEvaluate(final QueryRoot qc, final BigdataASTContext context)
-            throws MalformedQueryException {
-        
-        valueFactory = context.valueFactory;
-        
-
-        /*
-         * Build up the vocabulary. This is everything in the parse tree plus
-         * some key vocabulary items which correspond to syntactic sugar in
-         * SPARQL.
-         */
-        {
-            
-            final BigdataValueFactory f = context.valueFactory;
-
-            final Map<Value, BigdataValue> vocab = context.vocab;
-            this.vocab = vocab;
-
-            // RDF Collection syntactic sugar vocabulary items.
-            vocab.put(RDF.FIRST, f.asValue(RDF.FIRST));
-            vocab.put(RDF.REST, f.asValue(RDF.REST));
-            vocab.put(RDF.NIL, f.asValue(RDF.NIL));
-            vocab.put(BD.VIRTUAL_GRAPH, f.asValue(BD.VIRTUAL_GRAPH));
-
-            /*
-             * RDF Values actually appearing in the parse tree.
-             */
-            final Iterator<Value> itr = nodes.values().iterator();
-            
-            while (itr.hasNext()) {
-            
-                final Value value = itr.next();
-                
-                vocab.put(value, (BigdataValue)value);
-                
-            }
-            
-        }
-
-        /*
-         * Batch resolve the BigdataValue objects against the database. This
-         * sets their IVs as a side-effect.
-         */
-        {
-
-            final BigdataValue[] values = context.vocab.values().toArray(
-                    new BigdataValue[context.vocab.values().size()]);
-
-            context.lexicon.addTerms(values, values.length, readOnly);
-
-            // Cache the BigdataValues on the IVs for later
-            for (BigdataValue value : context.vocab.values()) {
-
-                final IV iv = value.getIV();
-
-                if (iv == null) {
-
-                    /*
-                     * Since the term identifier is NULL this value is not known
-                     * to the kb.
-                     */
-
-                    if (log.isInfoEnabled())
-                        log.info("Not in knowledge base: " + value);
-
-                    /*
-                     * Create a dummy iv and cache the unknown value on it so
-                     * that it can be used during query evaluation.
-                     */
-                    final IV dummyIV = TermId.mockIV(VTE.valueOf(value));
-
-                    value.setIV(dummyIV);
-
-                    dummyIV.setValue(value);
-
-                } else {
-
-                    iv.setValue(value);
-
-                }
-
-            }
-
-        }
-
-        /*
-         * Set the BigdataValue object on each ASTRDFValue node.
-         * 
-         * Note: This resolves each Value against the vocabulary cache. This is
-         * necessary in case more than one ASTRDFValue instance exists for the
-         * same BigdataValue. Otherwise we would fail to have a side-effect on
-         * some ASTRDFValue nodes.
-         */
-        {
-            
-            final Iterator<Map.Entry<ASTRDFValue, Value>> itr = nodes
-                    .entrySet().iterator();
-
-            while (itr.hasNext()) {
-
-                final Map.Entry<ASTRDFValue, Value> e = itr.next();
-
-                final ASTRDFValue node = e.getKey();
-
-                final Value value = e.getValue();
-
-                final BigdataValue resolvedValue = context.vocab.get(value);
-                
-                node.setRDFValue(resolvedValue);
-
-            }
-            
-        }
-
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -299,11 +171,11 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             /*
              * RDF Values actually appearing in the parse tree.
              */
-            final Iterator<Entry<ASTRDFValue, Value>> itr = nodes.entrySet().iterator();
+            final Iterator<Entry<ASTRDFValue, BigdataValue>> itr = nodes.entrySet().iterator();
 
             while (itr.hasNext()) {
             
-                final Entry<ASTRDFValue, Value> entry = itr.next();
+                final Entry<ASTRDFValue, BigdataValue> entry = itr.next();
                 ASTRDFValue value = entry.getKey();
                 
                 IV iv;
@@ -565,7 +437,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
             final ASTIRI datatypeNode = node.getDatatype();
 
-            final Literal literal;
+            final BigdataLiteral literal;
 
             if (datatypeNode != null) {
 
