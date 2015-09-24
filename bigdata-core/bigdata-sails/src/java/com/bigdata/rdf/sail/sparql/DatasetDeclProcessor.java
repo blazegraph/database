@@ -51,6 +51,9 @@ public class DatasetDeclProcessor {
     
     private Set<IV<?,?>> namedGraphs = null;
 
+    /*
+     * IV for BD.VIRTUAL_GRAPH resolved in a batch while running ASTDeferredIVResolution.resolveIVs
+     */
     private IV virtualGraph;
 
     /**
@@ -126,6 +129,11 @@ public class DatasetDeclProcessor {
                      * Note: This is the URI with the IV already resolved.
                      */
 //                  URI uri = new URIImpl(astIri.getValue());
+                    /*
+                     * While implementing postponed IVs resolution (https://jira.blazegraph.com/browse/BLZG-1176)
+                     * this code left behind as a separate code.
+                     * TODO: move graph URIs resolution to ASTDeferredIVResolution, which is executed prior to DatasetDeclProcessor 
+                     */
                     BigdataURI uri = context.getAbstractTripleStore().getValueFactory().asValue((BigdataURI) astIri.getRDFValue());
                     if (uri!=null && uri.getIV()==null) {
                         IV resolvedIV = context.getAbstractTripleStore().getIV(uri);

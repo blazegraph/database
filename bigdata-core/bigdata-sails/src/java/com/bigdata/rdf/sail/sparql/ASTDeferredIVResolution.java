@@ -16,6 +16,8 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -51,6 +53,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.PathNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
@@ -85,6 +88,28 @@ public class ASTDeferredIVResolution {
     private final static Logger log = Logger
             .getLogger(BatchRDFValueResolver.class);
 
+    /**
+     * Anonymous instances of Handler interface are used as a deferred code,
+     * which should be run after particular IV is available in batch resolution results 
+     */
+    private interface Handler {
+        void handle(IV newIV);
+    }
+    
+    /*
+     * Deferred handlers, linked to particular BigdataValue resolution
+     */
+    private final Map<BigdataValue, List<Handler>> deferred = new LinkedHashMap<>();
+    /*
+     * Deferred handlers, NOT linked to particular BigdataValue resolution,
+     * used to provide  sets of resolved default and named graphs into DataSetSummary constructor
+     */
+    private final List<Runnable> deferredRunnables = new ArrayList<>();
+    /*
+     * IV of BD.VIRTUAL_GRAPH, which will be later passed to DatasetDeclProcessor 
+     */
+    private IV virtualGraphIV;
+    
     public static void preEvaluate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
         final QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
@@ -174,15 +199,6 @@ public class ASTDeferredIVResolution {
 
     }
 
-    private interface Handler {
-        void handle(IV newIV);
-    }
-    
-    private final Map<BigdataValue, List<Handler>> deferred = new LinkedHashMap<>();
-    private final List<Runnable> deferredRunnables = new ArrayList<>();
-    private IV virtualGraphIV;
-    private int addTermsCount = 0;
-    
     private void defer(final BigdataValue value, final Handler handler) {
         if (value!=null) {
             List<Handler> handlers = deferred.get(value);
@@ -345,9 +361,6 @@ public class ASTDeferredIVResolution {
             
         }
         
-        /*
-         * Recursion, but only into group nodes (including within subqueries).
-         */
         for (int i = 0; i < op.arity(); i++) {
 
             final BOp child = op.get(i);
@@ -581,19 +594,23 @@ public class ASTDeferredIVResolution {
             resolveGroupsWithUnknownTerms(context, (GroupNodeBase) bop);
         } else if (bop instanceof QueryNodeBase) {
             resolveGroupsWithUnknownTerms(context, ((QueryNodeBase)bop));
+        } else if (bop instanceof StatementPattern) {
+            StatementPattern sp = (StatementPattern)bop;
+            // @see https://jira.blazegraph.com/browse/BLZG-1176
+            // Check for using GRAPH keyword with triple store not supporting quads
+            // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
+            if (!context.isQuads() && Scope.NAMED_CONTEXTS.equals(sp.getScope())) {
+                throw new QuadsOperationInTriplesModeException(
+                    "Use of GRAPH construct in query body is not supported "
+                    + "in triples mode.");
+            }
         }
     }
 
     private void resolveIVs(final AST2BOpContext context) {
-        addTermsCount++;
-        if (addTermsCount>1) {
-            throw new RuntimeException("Excessive addTerms");
-        }
-        
+
         /*
-         * Build up the vocabulary. This is everything in the parse tree plus
-         * some key vocabulary items which correspond to syntactic sugar in
-         * SPARQL.
+         * Build up the vocabulary (some key vocabulary items which correspond to syntactic sugar in SPARQL.)
          */
         final List<BigdataValue> vocab = new LinkedList<>();
         {
@@ -701,7 +718,7 @@ public class ASTDeferredIVResolution {
                     }
     
                     final List<Handler> deferredHandlers = deferred.get(v);
-                    if (deferredHandlers!=null) {
+                    if (deferredHandlers!=null) { // No handlers are usually defined for vocab values (see above)
                         for(final Handler handler: deferredHandlers) {
                             handler.handle(iv);
                         }

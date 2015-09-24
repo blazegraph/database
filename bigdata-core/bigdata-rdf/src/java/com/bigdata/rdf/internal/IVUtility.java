@@ -846,6 +846,17 @@ public class IVUtility {
         }
     }
 
+    /**
+     * Decode an IV from its string representation and type, provided in as ASTRDFLiteral node in AST model
+     * 
+     * @param val
+     *            the string representation
+     * @param type
+     *            value type
+     * @return the IV
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1176
+     */
     public static IV decode(final String val, final String type) {
             final DTE dte = Enum.valueOf(DTE.class, type);
             switch (dte) {

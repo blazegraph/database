@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -47,7 +46,6 @@ import com.bigdata.bop.IValueExpressionConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
-import com.bigdata.bop.solutions.GroupByState;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
@@ -156,11 +154,6 @@ public class VerifyAggregates {
         if (projection.arity() == 0)
             throw new IllegalArgumentException();
 
-//        // normalize an empty[] to a null.
-//        this.having = having != null && having.arity() == 0 ? null : having;
-//        this.having = having == null || having.arity() == 0 ? null : having.getConstraints();
-
-
         if (having!=null) {
             final IConstraint[] exprs2 = new IConstraint[having.arity()];
             int i = 0;
@@ -189,7 +182,7 @@ public class VerifyAggregates {
                     exprs2[i] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(new BOp[]{
                             expr}, null);
                     
-                    System.out.println("Unknown node "+node);
+                    log.debug("Unknown node "+node);
                 }
                 i++;
     
@@ -551,9 +544,6 @@ public class VerifyAggregates {
     public static void verifyAggregate(final QueryBase queryBase)
             throws VisitorException {
 
-//        if(true)
-//            return;
-        
         /*
          * The following code has some dependencies on whether or not the
          * value expressions have been cached. That is not done until we get
@@ -600,33 +590,6 @@ public class VerifyAggregates {
                 throw new VisitorException(
                         "Wildcard not allowed with aggregate.");
 
-//            final IValueExpression<?>[] projectExprs = projection
-//                    .getValueExpressions();
-//
-//            final IValueExpression<?>[] groupByExprs = groupBy == null ? null
-//                    : groupBy.getValueExpressions();
-//
-//            final IConstraint[] havingExprs;
-//            if (having == null) {
-//                havingExprs = null;
-//            } else {
-//                havingExprs = new IConstraint[having.arity()];
-//
-//                int i = 0;
-//
-//                for (IValueExpressionNode node : having) {
-//    
-//                    IValueExpression<? extends IV> ve = node.getValueExpression();
-//                    if (ve==null) {
-//                        System.out.println("No ValueExpression in Having" + node);
-//                    } else {
-//                        havingExprs[i++] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-//                                ve);
-//                    }
-//                }
-//    
-//            }
-
             try {
 
                 /*
@@ -642,76 +605,6 @@ public class VerifyAggregates {
             }
 
         }
-
-//        /*
-//         * Note: The following code is modeled after the openrdf code that
-//         * checks the constraints on legal aggregations.
-//         */
-//
-//        final ProjectionNode projection = queryBase.getProjection() == null ? null
-//                : queryBase.getProjection().isEmpty() ? null : queryBase
-//                        .getProjection();
-//
-//        final GroupByNode groupBy = queryBase.getGroupBy() == null ? null
-//                : queryBase.getGroupBy().isEmpty() ? null : queryBase
-//                        .getGroupBy();
-//
-//        final HavingNode having = queryBase.getHaving() == null ? null
-//                : queryBase.getHaving().isEmpty() ? null : queryBase
-//                        .getHaving();
-//
-//        if (groupBy != null) {
-//
-//            if (projection.isWildcard())
-//                throw new VisitorException(
-//                        "Wildcard not permitted with GROUP BY");
-//
-//            /*
-//             * TODO Recursive search of a ValueExpression for anything that
-//             * would be mapped onto an IAggregate.
-//             */
-////            AggregateCollector collector = new AggregateCollector();
-////            valueExpr.visit(collector);
-////
-////            if (collector.getOperators().size() > 0) {
-////                elem.setAggregateOperatorInExpression(true);
-//                
-//            for (AssignmentNode elem : projection) {
-//            
-////                if (!elem.hasAggregateOperatorInExpression()) {
-////                
-////                    final Set<String> groupNames = group.getBindingNames();
-////
-////                    ExtensionElem extElem = elem.getSourceExpression();
-////                    if (extElem != null) {
-////                        ValueExpr expr = extElem.getExpr();
-////
-////                        VarCollector collector = new VarCollector();
-////                        expr.visit(collector);
-////
-////                        for (Var var : collector.getCollectedVars()) {
-////                            if (!groupNames.contains(var.getName())) {
-////                                throw new VisitorException("variable '" + var.getName()
-////                                        + "' in projection not present in GROUP BY.");
-////
-////                            }
-////                        }
-////                    }
-////                    else {
-////                        if (!groupNames.contains(elem.getTargetName())) {
-////                            throw new VisitorException("variable '" + elem.getTargetName()
-////                                    + "' in projection not present in GROUP BY.");
-////                        }
-////                        else if (!groupNames.contains(elem.getSourceName())) {
-////                            throw new VisitorException("variable '" + elem.getSourceName()
-////                                    + "' in projection not present in GROUP BY.");
-////
-////                        }
-////                    }
-////                }
-//            }
-//            
-//        }
 
     }
 }

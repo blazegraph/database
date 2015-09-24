@@ -113,6 +113,7 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
     public Update(final UpdateType updateType) {
 
         setProperty(Annotations.UPDATE_TYPE, updateType);
+
         setProperty(Annotations.DATASET_CLAUSES, Collections.emptyList());
 
     }
@@ -206,7 +207,9 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
 
     @Override
     public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
-       return new HashSet<IVariable<?>>();
+
+        return new HashSet<IVariable<?>>();
+
     }
 
     /**
@@ -216,7 +219,9 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
 	 * @see https://jira.blazegraph.com/browse/BLZG-1176
      */
     public void setDatasetClauses(final List<ASTDatasetClause> uc) {
+
         setProperty(Annotations.DATASET_CLAUSES, uc);
+
     }
 
     /**
@@ -227,7 +232,9 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
 	 */
     @SuppressWarnings("unchecked")
     public List<ASTDatasetClause> getDatasetClauses() {
+
         return (List<ASTDatasetClause>) getProperty(Annotations.DATASET_CLAUSES);
+
     }
     
 }

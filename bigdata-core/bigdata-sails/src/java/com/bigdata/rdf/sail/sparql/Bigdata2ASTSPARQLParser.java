@@ -424,7 +424,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @param qc
      *            The root of the parse tree.
      * @param values
-     *            Previously resolved RDF values
+     *            Previously cached RDF values
      * @param context
      *            The context used to interpret that parse tree.
      * 
@@ -512,7 +512,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         }
 
     }
-
+    
 //    public static void main(String[] args)
 //        throws java.io.IOException
 //    {
