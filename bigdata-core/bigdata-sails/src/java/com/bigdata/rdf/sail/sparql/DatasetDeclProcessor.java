@@ -8,8 +8,10 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import org.openrdf.model.Value;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
 
@@ -23,6 +25,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -38,7 +41,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
  */
 public class DatasetDeclProcessor {
 
-    private final BigdataASTContext context;
+    private final AST2BOpContext context;
 
     /*
      * Lazily instantiated sets for the default and named graphs.
@@ -47,6 +50,8 @@ public class DatasetDeclProcessor {
     private Set<IV<?,?>> defaultGraphs = null;
     
     private Set<IV<?,?>> namedGraphs = null;
+
+    private IV virtualGraph;
 
     /**
      * Add a graph to the set of default or named graphs.
@@ -81,9 +86,10 @@ public class DatasetDeclProcessor {
 
     }
 
-    public DatasetDeclProcessor(final BigdataASTContext context) {
+    public DatasetDeclProcessor(final AST2BOpContext context, final IV virtualGraph) {
         
         this.context = context;
+        this.virtualGraph = virtualGraph;
         
     }
     
@@ -100,14 +106,11 @@ public class DatasetDeclProcessor {
     public DatasetNode process(final List<ASTDatasetClause> datasetClauses, boolean update)
             throws MalformedQueryException {
 
-        // Lazily resolved.
-        BigdataURI virtualGraph = null;
-
         if (datasetClauses!=null && !datasetClauses.isEmpty()) {
 
 //          dataset = new DatasetImpl();
             
-            if (!context.tripleStore.isQuads()) {
+            if (!context.getAbstractTripleStore().isQuads()) {
                 throw new QuadsOperationInTriplesModeException(
                     "NAMED clauses in queries are not supported in"
                     + " triples mode.");
@@ -123,9 +126,9 @@ public class DatasetDeclProcessor {
                      * Note: This is the URI with the IV already resolved.
                      */
 //                  URI uri = new URIImpl(astIri.getValue());
-                    BigdataURI uri = context.tripleStore.getValueFactory().asValue((BigdataURI) astIri.getRDFValue());
+                    BigdataURI uri = context.getAbstractTripleStore().getValueFactory().asValue((BigdataURI) astIri.getRDFValue());
                     if (uri!=null && uri.getIV()==null) {
-                        IV resolvedIV = context.tripleStore.getIV(uri);
+                        IV resolvedIV = context.getAbstractTripleStore().getIV(uri);
                         if (resolvedIV!=null) {
                             uri.setIV(resolvedIV);
                             resolvedIV.setValue(uri);
@@ -148,37 +151,24 @@ public class DatasetDeclProcessor {
                         }
 
                         if (virtualGraph == null) {
-                        
-                            /*
-                             * Resolve the IV for the virtual graph membership
-                             * relation.
-                             */
-                            
-                            virtualGraph = (BigdataURI) context.vocab
-                                    .get(BD.VIRTUAL_GRAPH);
 
-                            if (virtualGraph == null
-                                    || virtualGraph.getIV() == null) {
-
-                                throw new RuntimeException("Not declared: "
-                                        + BD.VIRTUAL_GRAPH);
-                                
-                            }
+                            throw new RuntimeException("Not declared: "
+                                    + BD.VIRTUAL_GRAPH);
                             
                         }
 
-                        final IAccessPath<ISPO> ap = context.tripleStore
+                        final IAccessPath<ISPO> ap = context.getAbstractTripleStore()
                                 .getSPORelation()
                                 .getAccessPath(//
                                         uri.getIV(),// the virtual graph "name"
-                                        virtualGraph.getIV(), null/* o */, null/* c */);
+                                        virtualGraph, null/* o */, null/* c */);
                         
                         final Iterator<ISPO> itr = ap.iterator();
                         
                         while(itr.hasNext()) {
 
                             final IV memberGraph = itr.next().o();
-                            BigdataValue value = context.lexicon.getTerm(memberGraph);
+                            BigdataValue value = context.getAbstractTripleStore().getLexiconRelation().getTerm(memberGraph);
                             memberGraph.setValue(value);
                             addGraph(memberGraph, dc.isNamed());
 
