@@ -467,6 +467,16 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 
                 }
 
+            } else if (child instanceof ArbitraryLengthPathNode) {
+
+                final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;
+                
+                if (alpNode.subgroup() == theGroup) {
+                    
+                    return alpNode;
+                    
+                }
+                
             }
 
         }

@@ -224,6 +224,9 @@ public class TestPathConstraints extends TestCase {
                 final String queryStr =
                         "select * " +
                         "where { " +
+                        "  values (?max) { " +
+                        "    (3) " + 
+                        "  } " +
                         "  service bd:alp { " +
                         "    <id:0> ?eid ?to . " +
                         "    hint:Prior hint:alp.pathExpr \"true\" . " +
@@ -233,12 +236,9 @@ public class TestPathConstraints extends TestCase {
                         "    hint:Group hint:alp.lowerBound 0 . " +
                         "    hint:Group hint:alp.upperBound 100 . " + 
                         "  } " +
-                        "  values (?max) { " +
-                        "    (3) " + 
-                        "  } " +
                         "}";
                 
-//              showOptimizedAST(graph, queryStr);
+                showOptimizedAST(graph, queryStr);
                 
                 final ICloseableIterator<BigdataBindingSet> selection = graph.select(queryStr);
                 try {

@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -37,10 +39,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
-import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
-import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
@@ -166,6 +165,8 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     throw new RuntimeException("Complex groups not allowed in alp service");
                 }
             }
+
+            final Set<VarNode> dropVars = new LinkedHashSet<>();
             
             final int lowerBound = Integer.valueOf(subgroup.getQueryHint(LOWER_BOUND));
             final int upperBound = Integer.valueOf(subgroup.getQueryHint(UPPER_BOUND));
@@ -173,6 +174,9 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
             tVarLeft.setAnonymous(true);
             final VarNode tVarRight = new VarNode("-tVarRight-"+UUID.randomUUID().toString());
             tVarRight.setAnonymous(true);
+            
+            dropVars.add(tVarLeft);
+            dropVars.add(tVarRight);
 
             final boolean bidirectional = 
                     subgroup.getQueryHintAsBoolean(BIDIRECTIONAL, false);
@@ -203,7 +207,9 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     middle = child.p();
                     
                     if (child.p() instanceof VarNode) {
-                        ((VarNode) child.p()).setAnonymous(true);
+                        final VarNode v = (VarNode) child.p();
+                        v.setAnonymous(true);
+                        dropVars.add(v);
                     }
                     
                     if (bidirectional) {
@@ -325,7 +331,9 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     while (it.hasNext()) {
                         final BOp bop = it.next();
                         if (bop instanceof VarNode) {
-                            ((VarNode) bop).setAnonymous(true);
+                            final VarNode v = (VarNode) bop;
+                            v.setAnonymous(true);
+                            dropVars.add(v);
                         }
                     }
                     child.setQueryHints(new Properties());
@@ -338,6 +346,8 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     }
                 }
             }
+            
+            alpNode.setDropVars(dropVars);
             
             if (log.isDebugEnabled()) {
                 log.debug("optimized alpNode:\n"+alpNode);

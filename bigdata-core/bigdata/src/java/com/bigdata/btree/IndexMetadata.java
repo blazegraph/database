@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.isolation.IConflictResolver;
@@ -535,9 +534,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * nodes and leaves from being coded and flushed to disk too soon, which
          * decreases disk IO and keeps things in their mutable form in memory
          * longer, which improves search performance and keeps down the costs of
-         * mutation operations. Systems with less RAM may need to reduce the
-         * size of the {@link LRUNexus} global LRU to avoid
-         * {@link OutOfMemoryError}s. [Dropped back to 32/500 on 9/15/09 since
+         * mutation operations. [Dropped back to 32/500 on 9/15/09 since
          * this does not do so well at scale on machines with less RAM.]
          */
         String DEFAULT_BTREE_BRANCHING_FACTOR = "32"; //"256"

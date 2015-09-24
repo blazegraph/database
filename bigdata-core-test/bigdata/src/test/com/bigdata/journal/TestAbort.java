@@ -30,10 +30,8 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 
@@ -99,28 +97,31 @@ public class TestAbort extends ProxyTestCase<Journal> {
             
             final ByteBuffer a = getRandomData();
             
-            final long addr_a = journal.write(a);
+            @SuppressWarnings("unused")
+			final long addr_a = journal.write(a);
             
-            final ILRUCache<Long, Object> cache = LRUNexus.getCache(journal);
-
-            if (cache != null) {
-
-                assertNull(cache.putIfAbsent(addr_a, a));
-
-                assertTrue(a == cache.get(addr_a));
-
-            }
+			// @see BLZG-1501 (remove LRUNexus)
+//            final ILRUCache<Long, Object> cache = LRUNexus.getCache(journal);
+//
+//            if (cache != null) {
+//
+//                assertNull(cache.putIfAbsent(addr_a, a));
+//
+//                assertTrue(a == cache.get(addr_a));
+//
+//            }
 
             // abort the journal (discard the write set, reload the current root
             // block)
             journal.abort();
-
-            if(cache != null) {
-
-                // the record is gone from the cache.
-                assertNull(cache.get(addr_a));
-                
-            }
+            
+			// @see BLZG-1501 (remove LRUNexus)
+//            if(cache != null) {
+//
+//                // the record is gone from the cache.
+//                assertNull(cache.get(addr_a));
+//                
+//            }
 
             if (log.isInfoEnabled())
                 log.info("After commit   =" + journal.getRootBlockView());

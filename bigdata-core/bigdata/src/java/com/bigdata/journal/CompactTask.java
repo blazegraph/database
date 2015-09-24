@@ -43,7 +43,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.resources.OverflowManager;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
 
 /**

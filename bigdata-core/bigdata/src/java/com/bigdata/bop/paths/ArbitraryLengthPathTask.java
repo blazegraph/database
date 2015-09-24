@@ -27,10 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.paths;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -122,6 +124,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
     private Set<IVariable<?>> projectInVars;
     private final IVariableOrConstant<?> middleTerm;
     private final IVariable<?> edgeVar;
+    private final List<IVariable<?>> dropVars;
 
     public ArbitraryLengthPathTask(
             final ArbitraryLengthPathOp controllerOp,
@@ -232,6 +235,13 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                         Annotations.DEFAULT_LOAD_FACTOR),//
                 ConcurrentHashMapAnnotations.DEFAULT_CONCURRENCY_LEVEL);
         
+        this.dropVars = (List<IVariable<?>>) controllerOp.getProperty(
+                Annotations.DROP_VARS, new ArrayList<IVariable<?>>());
+        
+        if (log.isDebugEnabled()) {
+            log.debug("vars to drop: " + dropVars);
+        }
+
     }
   
     @Override
@@ -549,35 +559,47 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                                     bs.get(gearing.tVarOut));
                             input.clear(gearing.tVarOut);
 
+//                            /*
+//                             * We also have to filter out anonymous
+//                             * variables introduced in this run, taking care
+//                             * we do not remove potential anonymous
+//                             * variables driving the evaluation.
+//                             */
+//                            @SuppressWarnings("rawtypes")
+//                            final Iterator<IVariable> vit = input.vars();
+//                            Set<IVariable<?>> anonymousVars = new LinkedHashSet<IVariable<?>>();
+//                            while (vit.hasNext()) {
+//
+//                                final IVariable<?> var = vit.next();
+//                                if (var.isAnonymous()
+//                                        && !var.equals(gearing.inVar)
+//                                        && !var.equals(gearing.tVarIn)) {
+//                                    anonymousVars.add(var);
+//                                }
+//                            }
+//
+//                            if (log.isDebugEnabled()) {
+//                                log.debug("anonymous vars: "
+//                                        + anonymousVars);
+//                            }
+//
+//                            for (IVariable<?> anonymousVar : anonymousVars) {
+//                                if (!projectInVars.contains(anonymousVar)
+//                                        && !varsToRetain
+//                                                .contains(anonymousVar)) {
+//                                    input.clear(anonymousVar);
+//                                }
+//                            }
+
                             /*
-                             * We also have to filter out anonymous
-                             * variables introduced in this run, taking care
-                             * we do not remove potential anonymous
-                             * variables driving the evaluation.
+                             * Drop intermediate variables.
                              */
-                            @SuppressWarnings("rawtypes")
-                            final Iterator<IVariable> vit = input.vars();
-                            Set<IVariable<?>> anonymousVars = new LinkedHashSet<IVariable<?>>();
-                            while (vit.hasNext()) {
-
-                                final IVariable<?> var = vit.next();
-                                if (var.isAnonymous()
-                                        && !var.equals(gearing.inVar)
-                                        && !var.equals(gearing.tVarIn)) {
-                                    anonymousVars.add(var);
-                                }
-                            }
-
-                            if (log.isDebugEnabled()) {
-                                log.debug("anonymous vars: "
-                                        + anonymousVars);
-                            }
-
-                            for (IVariable<?> anonymousVar : anonymousVars) {
-                                if (!projectInVars.contains(anonymousVar)
-                                        && !varsToRetain
-                                                .contains(anonymousVar)) {
-                                    input.clear(anonymousVar);
+                            for (IVariable<?> var : dropVars) {
+                                if (!projectInVars.contains(var)
+                                     && !varsToRetain.contains(var)
+                                     && !var.equals(gearing.inVar)
+                                     && !var.equals(gearing.tVarIn)) {
+                                    input.clear(var);
                                 }
                             }
 

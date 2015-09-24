@@ -48,7 +48,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver.Result;
 
 /**
  * Stress tests for concurrent processing of operations on named unisolated

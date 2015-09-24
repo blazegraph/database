@@ -64,8 +64,8 @@ import com.bigdata.quorum.QuorumEventEnum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumWatcher;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**

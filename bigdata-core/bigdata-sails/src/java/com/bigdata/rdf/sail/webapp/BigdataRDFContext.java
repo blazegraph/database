@@ -114,7 +114,7 @@ import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 
 /**

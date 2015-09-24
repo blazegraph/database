@@ -29,7 +29,7 @@ package com.bigdata.concurrent;
 
 import java.util.Properties;
 
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver.Result;
 
 /**
  * Stress tests where we predeclare locks and sort the lock requests. Under

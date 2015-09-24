@@ -72,10 +72,10 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.relation.accesspath.BufferClosedException;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver.Result;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Proxied test suite.

@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -2662,9 +2663,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
          */
         final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
               
+		// See BLZG-1493 (queryId is null to use the then running query rather
+		// than the parent to resolve the IHashJoinUtility instance for the
+        // sub-queries evaluated by the property path operator.
         final INamedSolutionSetRef namedSolutionSet = 
-              NamedSolutionSetRefUtility.newInstance(
-              ctx.queryId, solutionSetName, joinVars);
+              NamedSolutionSetRefUtility.newInstance( 
+              null/*ctx.queryId*/, solutionSetName, joinVars);
 
         left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
               joinVars, null, projectInVarsArr, namedSolutionSet);       
@@ -2725,6 +2729,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
            	
         final IVariableOrConstant<?> middleTerm = alpNode.middle() != null ? 
                 alpNode.middle().getValueExpression() : null;
+                
+        final List<IVariable<?>> dropVars = new ArrayList<>();
+        for (VarNode v : alpNode.dropVars()) {
+            dropVars.add(v.getValueExpression());
+        }
                     
         left = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(left),//
     			new NV(ArbitraryLengthPathOp.Annotations.SUBQUERY, subquery),
@@ -2737,6 +2746,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
     			new NV(ArbitraryLengthPathOp.Annotations.LOWER_BOUND, alpNode.lowerBound()),
     			new NV(ArbitraryLengthPathOp.Annotations.UPPER_BOUND, alpNode.upperBound()),
                 new NV(ArbitraryLengthPathOp.Annotations.PROJECT_IN_VARS, projectInVarsArr),
+                new NV(ArbitraryLengthPathOp.Annotations.DROP_VARS, dropVars),
     			new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
     			new NV(BOp.Annotations.EVALUATION_CONTEXT,
     			       BOpEvaluationContext.CONTROLLER)//

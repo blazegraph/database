@@ -1,4 +1,4 @@
-<project name="bigdata-jini" default="bundleJar" basedir=".">
+<project name="bigdata-jini-test" default="bundleJar" basedir=".">
 
     <property file="testServices.properties" />
     <property environment="env"/>
@@ -31,12 +31,16 @@
   	</dirset>
     </path>
 
+    <target name="zookeeperAvailable">
+	<available file="${test.zookeeper.installDir}/bin/zkServer.sh" property="zookeeper.present"/>
+    </target>
+
     <!-- Note: It appears to be necessary to spawn the script which starts -->
     <!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
     <!-- though it will start without being spawned under others (OSX).    -->
     <!-- However, this change appears to result in zookeeper not running   -->
     <!-- so I have backed it out for now.                                  -->
-    <target name="startZookeeper">
+    <target name="startZookeeper" depends="zookeeperAvailable" if="zookeeper.present">
 
         <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
         <echo>bin/zkServer.(sh|cmd) start</echo>
@@ -66,7 +70,7 @@
     </target>
 
 
-    <target name="stopZookeeper">
+    <target name="stopZookeeper" depends="zookeeperAvailable" if="zookeeper.present">
     <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
     <echo>bin/zkServer.(sh|cmd) stop</echo>
     <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
