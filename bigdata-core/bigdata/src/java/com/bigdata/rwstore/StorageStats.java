@@ -437,6 +437,15 @@ public class StorageStats {
 		findBlobBucket(sze).delete(sze);
 	}
 	
+	public Bucket findBucket(final int sze) {
+		for (Bucket b : m_buckets) {
+			if (sze < b.m_size)
+				return b;
+		}
+		
+		throw new IllegalStateException("Buckets have not been correctly set");
+	}
+	
 	private BlobBucket findBlobBucket(final int sze) {
 		for (BlobBucket b : m_blobBuckets) {
 			if (sze < b.m_size)
