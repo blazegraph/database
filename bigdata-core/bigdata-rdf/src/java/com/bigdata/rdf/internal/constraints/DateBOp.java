@@ -25,11 +25,14 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Map;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.Literal;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
 import org.openrdf.query.algebra.evaluation.function.datetime.Timezone;
 import org.openrdf.query.algebra.evaluation.function.datetime.Tz;
@@ -43,6 +46,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -50,6 +54,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
+import com.ibm.icu.text.DateFormat;
 
 /**
  * A date expression involving a left IValueExpression operand. The operation to be applied to the operands is specified by the {@link Annotations#OP}
@@ -74,7 +79,7 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
     }
 
     public enum DateOp {
-        YEAR, MONTH, DAY, HOURS, MINUTES, SECONDS, TZ, TIMEZONE
+        YEAR, MONTH, DAY, HOURS, MINUTES, SECONDS, TZ, TIMEZONE, DATE
 
     }
 
@@ -166,6 +171,16 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
                     return tz(bl);
                 case TIMEZONE:
                     return timezone(bl);
+                case DATE:
+                	/*
+                	 * @see https://jira.blazegraph.com/browse/BLZG-1388
+                	 * FullyInlineTypedLiteralIV is used to keep exact string representation of newDate in literal,
+                	 * that results in different internal representation in contrast to xsd:dateTime values,
+                	 * which represented as LiteralExtensionIV with delegate of XSDLong 
+                	 */
+                	Date d = cal.toGregorianCalendar().getTime();
+                	String newDate = new SimpleDateFormat("yyyy-MM-dd").format(d);
+                    return new FullyInlineTypedLiteralIV<>(newDate, null, XSD.DATE);
                 default:
                     throw new UnsupportedOperationException();
                 }
@@ -234,5 +249,5 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
         }
         
     }
-
+    
 }

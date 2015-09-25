@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import org.apache.log4j.Logger;
-
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
@@ -42,6 +41,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
+import com.bigdata.util.ClassPathUtil;
 
 /**
  * Pre-populated list of the default optimizers.
@@ -412,6 +412,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 //        add(new ASTUnknownTermOptimizer());
         
         /**
+         * Convert an ALP service call into an ArbitraryLengthPathNode
+         */
+        add(new ASTALPServiceOptimizer());
+
+        /**
          * Rewrites aspects of queries where bottom-up evaluation would produce
          * different results.
          * 
@@ -434,11 +439,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * JoinGroupNode, eliminating unnecessary hash joins.
          */
         add(new ASTFlattenJoinGroupsOptimizer());
-
-        /**
-         * Convert an ALP service call into an ArbitraryLengthPathNode
-         */
-        add(new ASTALPServiceOptimizer());
 
         /**
          * Rewrites the WHERE clause of each query by lifting out any
@@ -712,7 +712,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      */
     protected void addGPUAccelerationOptimizer() {
 
-       IASTOptimizer o = initGPUAccelerationOptimizer();
+       final IASTOptimizer o = initGPUAccelerationOptimizer();
        if (o != null ) {
           add(o);
        }
@@ -724,24 +724,33 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      */
     protected IASTOptimizer initGPUAccelerationOptimizer() {
 
-       try {
-          final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer" );
-
-          if (IASTOptimizer.class.isAssignableFrom(cls)) {
-             log.info( "Found Blazegraph-Mapgraph connector: "
-                       + cls.getCanonicalName() );
-             return (IASTOptimizer) cls.newInstance();
-          }
-          else {
-             log.warn( cls.getCanonicalName()
-                       + " does not extend "
-                       + IASTOptimizer.class.getCanonicalName() );
-             return null;
-          }
-       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-          log.warn( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
-          return null;
-       }
+    	return ClassPathUtil.classForName(//
+    			"com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer", // preferredClassName,
+				null, // defaultClass,
+				IASTOptimizer.class, // sharedInterface,
+				getClass().getClassLoader() // classLoader
+		);
+    	
+//       try {
+//          final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer" );
+//
+//          if (IASTOptimizer.class.isAssignableFrom(cls)) {
+//        	  if(log.isInfoEnabled())
+//        		  log.info( "Found Blazegraph-Mapgraph connector: "
+//                       + cls.getCanonicalName() );
+//             return (IASTOptimizer) cls.newInstance();
+//          }
+//          else {
+//        	  // Note: Please do not log @ WARN here. It appears for every non-GPU accelerated query!
+////             log.warn( cls.getCanonicalName()
+////                       + " does not extend "
+////                       + IASTOptimizer.class.getCanonicalName() );
+//             return null;
+//          }
+//       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+//          if(log.isInfoEnabled()) log.info( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
+//          return null;
+//       }
     }
 
 }

@@ -42,8 +42,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for {@link BlockingBuffer} and its {@link IAsynchronousIterator}.

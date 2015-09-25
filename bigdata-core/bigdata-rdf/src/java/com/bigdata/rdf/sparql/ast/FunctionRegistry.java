@@ -153,7 +153,7 @@ public class FunctionRegistry {
     public static final URI SECONDS = new URIImpl(XPATH_FUNCTIONS+"seconds-from-dateTime");
     public static final URI TZ = new URIImpl(XPATH_FUNCTIONS+"tz");
     public static final URI TIMEZONE = new URIImpl(XPATH_FUNCTIONS+"timezone-from-dateTime");
-
+    
     public static final URI MD5 = new URIImpl(SPARQL_FUNCTIONS+"md5");
     public static final URI SHA1 = new URIImpl(SPARQL_FUNCTIONS+"sha1");
     public static final URI SHA224 = new URIImpl(SPARQL_FUNCTIONS+"sha224");
@@ -242,6 +242,7 @@ public class FunctionRegistry {
     public static final URI XSD_FLT = XMLSchema.FLOAT;
     public static final URI XSD_INT = XMLSchema.INTEGER;
     public static final URI XSD_STR = XMLSchema.STRING;
+    public static final URI XSD_DATE = XMLSchema.DATE;
 
     static {
         add(AVERAGE, new AggregateFactory() {
@@ -930,6 +931,8 @@ public class FunctionRegistry {
 	    add(SECONDS,new DateFactory(DateOp.SECONDS));
 
 	    add(TIMEZONE,new DateFactory(DateOp.TIMEZONE));
+	    
+	    add(XSD_DATE, new DateFactory(DateOp.DATE));
 
         add(TZ,new DateFactory(DateOp.TZ));
 

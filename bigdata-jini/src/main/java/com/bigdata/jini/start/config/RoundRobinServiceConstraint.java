@@ -32,6 +32,7 @@ import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.ServicesManagerServer;
 import com.bigdata.zookeeper.ZLock;
+import com.bigdata.zookeeper.start.config.IServiceConstraint;
 
 /**
  * Imposes a round-robin constraint on new service allocation using a well known

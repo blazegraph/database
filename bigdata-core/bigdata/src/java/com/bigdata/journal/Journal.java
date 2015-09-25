@@ -102,8 +102,8 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
@@ -2595,7 +2595,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         }
         
         // Lookup an existing query engine, but do not cause one to be created.
-        final QueryEngine queryEngine = QueryEngineFactory
+        final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                 .getExistingQueryController(this);
 
         if (queryEngine != null) {

@@ -172,12 +172,11 @@ public class BuildInfo {
 </echo>
     			<loadfile property="buildinfo" srcFile="${buildinfo.file}" />
     			<echo message="${buildinfo}" />
-                 </target>
-               </configuration>
-             </execution>
-            </executions>
-          </plugin>
-
+                </target>
+             </configuration>
+           </execution>
+         </executions>
+      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
@@ -200,7 +199,7 @@ public class BuildInfo {
           </execution>
         </executions>
       </plugin>
-        </plugins>
+    </plugins>
     <extensions>
       <!-- Enabling the use of SSH. -->
       <extension>
@@ -389,42 +388,14 @@ public class BuildInfo {
       <artifactId>sesame-queryresultio-sparqljson</artifactId>
       <version>${sesame.version}</version>
     </dependency>
-     <dependency>
-      <groupId>org.openrdf.sesame</groupId>
-      <artifactId>sesame-rio-testsuite</artifactId>
-      <version>${sesame.version}</version>
-    </dependency>
-    <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-sparql-testsuite</artifactId>
-	<version>${sesame.version}</version>
-    </dependency>
-    <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-store-testsuite</artifactId>
-	<version>${sesame.version}</version>
-    </dependency>
-<!--
-    <dependency>
-        <groupId>net.jini</groupId>
-        <artifactId>jini-ext</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
--->
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
-      <version>3.4.5</version>
+      <version>${zookeeper.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-ganglia</artifactId>
-       <version>${project.version}</version>
-     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-util</artifactId>
        <version>${project.version}</version>
      </dependency>
      <dependency>
@@ -438,22 +409,9 @@ public class BuildInfo {
        <version>${project.version}</version>
      </dependency>
      <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
-      <scope>test</scope>
-     </dependency>
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit4.version}</version>
-      <scope>test</scope>
-     </dependency>
-     <dependency>
        <groupId>com.blazegraph</groupId>
-       <artifactId>junit-ext</artifactId>
-       <version>${junit-ext.version}</version>
-       <scope>test</scope>
+       <artifactId>sparql-grammar</artifactId>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
@@ -470,6 +428,11 @@ public class BuildInfo {
        <artifactId>bigdata-util</artifactId>
        <version>${project.version}</version>
     </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-cache</artifactId>
+       <version>${project.version}</version>
+     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>

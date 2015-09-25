@@ -33,8 +33,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 
-import com.bigdata.LRUNexus;
-
 /**
  * Abstract base class for {@link IRawStore} implementations. This class uses a
  * delegation pattern for the {@link IStoreSerializer} interface and does not

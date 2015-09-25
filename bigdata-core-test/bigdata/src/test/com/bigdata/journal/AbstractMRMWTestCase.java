@@ -53,13 +53,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.test.ExperimentDriver;
-import com.bigdata.test.ExperimentDriver.IComparisonTest;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver;
+import com.bigdata.testutil.ExperimentDriver.IComparisonTest;
+import com.bigdata.testutil.ExperimentDriver.Result;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.NV;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for MRMW (Multiple Readers, Multiple Writers) support.

@@ -44,6 +44,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -51,7 +52,6 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
-import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -67,12 +67,14 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
+import com.bigdata.rdf.sparql.ast.explainhints.BottomUpSemanticsExplainHint;
+import com.bigdata.rdf.sparql.ast.explainhints.IExplainHint;
+import com.bigdata.rdf.sparql.ast.explainhints.UnsatisfiableMinusExplainHint;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IStriterator;
@@ -713,6 +715,14 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 continue;
             }
             
+            if (sa.findParent(group) instanceof ArbitraryLengthPathNode) {
+                /*
+                 * Skip the filters in an ALP subgroup.  Although evaluated
+                 * as a subgroup, an ALP node is logically not really a subgroup.
+                 */
+                continue;
+            }
+            
             /*
              * All variables potentially bound by joins in this group or a
              * subgroup. 
@@ -937,6 +947,15 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     nvar = Var.var(context.createVar("-unbound-var-"
                             + ovar.getName() + "-")));
 
+            /*
+             * This indicates a potential problem with the query, so we
+             * set an explain hint for it.
+             */
+            final IExplainHint explainHint =
+               new BottomUpSemanticsExplainHint(ovar, nvar, (BOp)node);
+            if (parent!=null) {
+               ((ASTBase) parent).addExplainHint(explainHint);
+            } // nowhere to append
         }
 
         if (parent != null)
@@ -1010,6 +1029,13 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 //                        + incomingBound + ", produced=" + maybeProduced);
                 
                 if (intersection.isEmpty()) {
+                   
+                    // this indicates an ill-designed query, as it is most
+                    // likely not what the author envisioned, therefore we
+                    // attach an explaing hint
+                    final IExplainHint explainHint =
+                       new UnsatisfiableMinusExplainHint(childGroup);
+                    group.addExplainHint(explainHint);
 
                     // Remove the MINUS operator. It can not have any effect.
                     

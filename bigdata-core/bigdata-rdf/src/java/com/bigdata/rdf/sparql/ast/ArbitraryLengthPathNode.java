@@ -23,9 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -107,6 +110,12 @@ public class ArbitraryLengthPathNode
          */
         String EDGE_VAR = Annotations.class.getName() + ".edgeVar";
         
+        /**
+         * A set of intermediate variables (VarNodes) used by the ALP node
+         * that should be dropped from the solutions after each round.
+         */
+        String DROP_VARS = Annotations.class.getName() + ".dropVars";
+        
     }
 	
     /**
@@ -132,16 +141,21 @@ public class ArbitraryLengthPathNode
      * annotations.
      */
     public ArbitraryLengthPathNode(final TermNode left, final TermNode right, 
-    		final VarNode transitivityVarLeft, final VarNode transitivityVarRight,
+    		final VarNode tVarLeft, final VarNode tVarRight,
     		final PathMod mod) {
     	this(new BOp[] { new JoinGroupNode() }, NV.asMap(
     			new NV(Annotations.LEFT_TERM, left),
     			new NV(Annotations.RIGHT_TERM, right),
-    			new NV(Annotations.TRANSITIVITY_VAR_LEFT, transitivityVarLeft),
-    			new NV(Annotations.TRANSITIVITY_VAR_RIGHT, transitivityVarRight),
+    			new NV(Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
+    			new NV(Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
     			new NV(Annotations.LOWER_BOUND, mod == PathMod.ONE_OR_MORE ? 1L : 0L),
     			new NV(Annotations.UPPER_BOUND, mod == PathMod.ZERO_OR_ONE ? 1L : Long.MAX_VALUE)
-    			));    			
+    			));
+    	
+    	final Set<VarNode> dropVars = new LinkedHashSet<>();
+    	dropVars.add(tVarLeft);
+        dropVars.add(tVarRight);
+    	setProperty(Annotations.DROP_VARS, dropVars);
     }
     
     /**
@@ -149,16 +163,22 @@ public class ArbitraryLengthPathNode
      * annotations.
      */
     public ArbitraryLengthPathNode(final TermNode left, final TermNode right, 
-            final VarNode transitivityVarLeft, final VarNode transitivityVarRight,
+            final VarNode tVarLeft, final VarNode tVarRight,
             final long lowerBound, final long upperBound) {
         this(new BOp[] { new JoinGroupNode() }, NV.asMap(
                 new NV(Annotations.LEFT_TERM, left),
                 new NV(Annotations.RIGHT_TERM, right),
-                new NV(Annotations.TRANSITIVITY_VAR_LEFT, transitivityVarLeft),
-                new NV(Annotations.TRANSITIVITY_VAR_RIGHT, transitivityVarRight),
+                new NV(Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
+                new NV(Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
+                new NV(Annotations.DROP_VARS, new ArrayList<VarNode>()),
                 new NV(Annotations.LOWER_BOUND, lowerBound),
                 new NV(Annotations.UPPER_BOUND, upperBound)
                 ));             
+        
+        final Set<VarNode> dropVars = new LinkedHashSet<>();
+        dropVars.add(tVarLeft);
+        dropVars.add(tVarRight);
+        setProperty(Annotations.DROP_VARS, dropVars);
     }
     
     /**
@@ -225,6 +245,34 @@ public class ArbitraryLengthPathNode
         setProperty(Annotations.MIDDLE_TERM, middle);
         setProperty(Annotations.EDGE_VAR, edgeVar);
     }
+    
+    /**
+     * Set the vars that should be dropped after each round.
+     * 
+     * @see Annotations#DROP_VARS
+     */
+    public void setDropVars(final Set<VarNode> dropVars) {
+        super.setProperty(Annotations.DROP_VARS, dropVars);
+    }
+    
+    /**
+     * Add a var that should be dropped after each round.
+     * 
+     * @see Annotations#DROP_VARS
+     */
+    public void addDropVar(final VarNode dropVar) {
+        dropVars().add(dropVar);
+    }
+    
+    /**
+     * Get the vars that should be dropped after each round.
+     * 
+     * @see Annotations#DROP_VARS
+     */
+    @SuppressWarnings("unchecked")
+    public Set<VarNode> dropVars() {
+        return (Set<VarNode>) super.getProperty(Annotations.DROP_VARS);
+    }
 
     /**
      * Return the subgroup.
@@ -260,8 +308,8 @@ public class ArbitraryLengthPathNode
 
         final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
 
-        addProducedBinding(left(), producedBindings);
-        addProducedBinding(right(), producedBindings);
+        addVar(left(), producedBindings, true);
+        addVar(right(), producedBindings, true);
         
         final VarNode edgeVar = edgeVar();
         if (edgeVar != null) {

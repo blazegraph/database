@@ -40,6 +40,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode.Annotations;
 
 /**
  * @see {@link ArbitraryLengthPathTask}
@@ -139,6 +140,12 @@ public class ArbitraryLengthPathOp extends PipelineOp {
          */
         String EDGE_VAR = Annotations.class.getName() + ".edgeVar";
         
+        /**
+         * A list of intermediate variables (IVariables) used by the ALP op
+         * that should be dropped from the solutions after each round.
+         */
+        String DROP_VARS = Annotations.class.getName() + ".dropVars";
+        
     }
 
     /**
@@ -174,6 +181,8 @@ public class ArbitraryLengthPathOp extends PipelineOp {
         getRequiredProperty(Annotations.UPPER_BOUND);
 
         getRequiredProperty(Annotations.PROJECT_IN_VARS);
+
+        getRequiredProperty(Annotations.DROP_VARS);
 
     }
     

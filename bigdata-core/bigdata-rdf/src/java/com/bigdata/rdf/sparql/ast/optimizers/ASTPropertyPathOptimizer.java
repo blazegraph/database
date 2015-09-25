@@ -72,7 +72,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 
     	for (PropertyPathNode node : group.getChildren(PropertyPathNode.class)) {
     		
-    		optimize(ctx, sa, group, node);
+    		optimize(ctx, sa, group, node, null);
     		
     	}
     	
@@ -82,13 +82,14 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
      * Optimize a single PropertyPathNode.
      */
 	protected void optimize(final AST2BOpContext ctx, final StaticAnalysis sa, 
-			final JoinGroupNode group, final PropertyPathNode ppNode) {
+			final JoinGroupNode group, final PropertyPathNode ppNode,
+			final ArbitraryLengthPathNode alpNode) {
 
     	final PathAlternative pathRoot = ppNode.p().getPathAlternative();
     	
     	final PropertyPathInfo sp = new PropertyPathInfo(ppNode.s(), ppNode.o(), ppNode.c(), ppNode.getScope());
 
-    	optimize(ctx, sa, group, sp, pathRoot);
+    	optimize(ctx, sa, group, sp, pathRoot, alpNode);
     	
     	/*
     	 * We always remove the PropertyPathNode.  It has been replaced with
@@ -103,13 +104,13 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
      */
 	protected void optimize(final AST2BOpContext ctx, final StaticAnalysis sa, 
 			final GraphPatternGroup<? extends IGroupMemberNode> group, final PropertyPathInfo ppInfo,
-			final PathAlternative pathAlt) {
+			final PathAlternative pathAlt, final ArbitraryLengthPathNode alpNode) {
 
     	if (pathAlt.arity() == 1) {
     		
     		final PathSequence pathSeq = (PathSequence) pathAlt.get(0);
     		
-    		optimize(ctx, sa, group, ppInfo, pathSeq);
+    		optimize(ctx, sa, group, ppInfo, pathSeq, alpNode);
     		
     	} else {
     		
@@ -127,7 +128,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
     			
     			final PathSequence pathSeq = (PathSequence) it.next();
     			
-    			optimize(ctx, sa, subgroup, ppInfo, pathSeq);
+    			optimize(ctx, sa, subgroup, ppInfo, pathSeq, alpNode);
     			
     		}
     		
@@ -140,8 +141,8 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
      */
 	protected void optimize(final AST2BOpContext ctx, final StaticAnalysis sa, 
 			final GraphPatternGroup<? extends IGroupMemberNode> group, 
-			final PropertyPathInfo ppInfo,
-			final PathSequence pathSeq) {
+			final PropertyPathInfo ppInfo, final PathSequence pathSeq,
+			final ArbitraryLengthPathNode alpNode) {
 
 		if (pathSeq.arity() == 0) {
 			
@@ -188,7 +189,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 //    			
 //    		} else {
 
-    			optimize(ctx, sa, group, ppInfo, pathElt);
+    			optimize(ctx, sa, group, ppInfo, pathElt, alpNode);
     			
 //    		}
     		
@@ -300,7 +301,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
         			final PathSequence pathSeq2 = 
         					new PathSequence(newSeq.toArray(new PathElt[newSeq.size()]));
         			
-        			optimize(ctx, sa, group, ppInfo, pathSeq2);
+        			optimize(ctx, sa, group, ppInfo, pathSeq2, alpNode);
         			
         			return;
             		
@@ -312,13 +313,23 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
     		
             for (int i = 0; i < pathSeq.arity(); i++) {
             	
-            	TermNode next = (i == (pathSeq.arity()-1)) ? ppInfo.o : anonVar();
+//            	TermNode next = (i == (pathSeq.arity()-1)) ? ppInfo.o : anonVar();
+            	TermNode next;
+            	if (i == (pathSeq.arity()-1)) {
+            	    next = ppInfo.o;
+            	} else {
+            	    final VarNode anon = anonVar();
+            	    if (alpNode != null) {
+            	        alpNode.addDropVar(anon);
+            	    }
+            	    next = anon;
+            	}
             	
             	final PropertyPathInfo _ppInfo = new PropertyPathInfo(last, next, ppInfo);
             	
         		final PathElt pathElt = (PathElt) pathSeq.get(i);
         		
-    			optimize(ctx, sa, group, _ppInfo, pathElt);
+    			optimize(ctx, sa, group, _ppInfo, pathElt, alpNode);
             	
             	last = next;
             	
@@ -353,8 +364,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
      */
 	protected void optimize(final AST2BOpContext ctx, final StaticAnalysis sa, 
 			GraphPatternGroup<? extends IGroupMemberNode> group, 
-			PropertyPathInfo ppInfo,
-			PathElt pathElt) {
+			PropertyPathInfo ppInfo, PathElt pathElt, ArbitraryLengthPathNode alpNode) {
 
     	ppInfo = pathElt.inverse() ? ppInfo.inverse() : ppInfo;
     	
@@ -372,8 +382,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 //			final VarNode tVarRight = new VarNode(Var.var("tVarRight" + i++));
 			final VarNode tVarRight = new VarNode(anonVar("-tVarRight-"));
 			
-			final ArbitraryLengthPathNode alpNode = 
-					new ArbitraryLengthPathNode(ppInfo.s, ppInfo.o, tVarLeft, tVarRight, mod);
+			alpNode = new ArbitraryLengthPathNode(ppInfo.s, ppInfo.o, tVarLeft, tVarRight, mod);
 			
 			group.addArg(alpNode);
 			
@@ -387,13 +396,13 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 
 			final PathAlternative pathAlt = (PathAlternative) pathElt.get(0);
 			
-			optimize(ctx, sa, group, ppInfo, pathAlt);
+			optimize(ctx, sa, group, ppInfo, pathAlt, alpNode);
 			
 		} else if (pathElt.isNegatedPropertySet()) {
 			
 			final PathNegatedPropertySet pathNPS = (PathNegatedPropertySet) pathElt.get(0);
 			
-			optimize(ctx, sa, group, ppInfo, pathNPS);
+			optimize(ctx, sa, group, ppInfo, pathNPS, alpNode);
 			
 		} else if (pathElt.isZeroLengthPath()) {
 			
@@ -456,7 +465,7 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
      */
 	protected void optimize(final AST2BOpContext ctx, final StaticAnalysis sa, 
 			final GraphPatternGroup<? extends IGroupMemberNode> group, final PropertyPathInfo ppInfo,
-			final PathNegatedPropertySet pathNPS) {
+			final PathNegatedPropertySet pathNPS, final ArbitraryLengthPathNode alpNode) {
 
 		ArrayList<ConstantNode> forward = null;
 		ArrayList<ConstantNode> back = null;
@@ -499,17 +508,17 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 			
 			group.addArg(union);
 			
-			addNegateds(forwardGroup, forward, ppInfo);
+			addNegateds(forwardGroup, forward, ppInfo, alpNode);
 			
-			addNegateds(backGroup, back, ppInfo.inverse());
+			addNegateds(backGroup, back, ppInfo.inverse(), alpNode);
 			
 		} else if (forward != null) {
 			
-			addNegateds(group, forward, ppInfo);
+			addNegateds(group, forward, ppInfo, alpNode);
 			
 		} else {
 			
-			addNegateds(group, back, ppInfo.inverse());
+			addNegateds(group, back, ppInfo.inverse(), alpNode);
 			
 		}
 
@@ -518,9 +527,13 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 	protected void addNegateds( 
 			final GraphPatternGroup<? extends IGroupMemberNode> group,
 			final ArrayList<ConstantNode> constants,
-			final PropertyPathInfo ppInfo) {
+			final PropertyPathInfo ppInfo, final ArbitraryLengthPathNode alpNode) {
     	
     	final VarNode p = anonVar();
+    	
+    	if (alpNode != null) {
+    	    alpNode.addDropVar(p);
+    	}
     	
     	final StatementPatternNode sp = ppInfo.toStatementPattern(p);
     	

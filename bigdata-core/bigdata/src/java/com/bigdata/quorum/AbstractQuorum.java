@@ -55,12 +55,11 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.FutureTaskMon;
-import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadGuard;
 import com.bigdata.util.concurrent.ThreadGuard.Guard;
 
@@ -2392,7 +2391,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          * 
          * @return <code>true</code> if the pipeline order was modified.
          * 
-         * @see HAGlue#moveToEndOfPipeline()
+         * @see com.bigdata.ha.HAGlue#moveToEndOfPipeline()
          * 
          * @todo Provide hooks to optimize the write pipeline for the network
          *       topology.

@@ -15,7 +15,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTree.IBTreeCounters;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
@@ -1374,9 +1373,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      * evicted node or leaf is dirty, then a data record will be coded for the
      * evicted node or leaf and written onto the backing store. A subsequent
      * attempt to modify the node or leaf will force copy-on-write for that node
-     * or leaf. Regardless of whether or not the node or leaf is dirty, it is
-     * touched on the {@link LRUNexus#getGlobalLRU()} when it is evicted from
-     * the write retention queue.
+     * or leaf. 
      * </p>
      * <p>
      * For the mutable B+Tree we also track the #of references to the node/leaf

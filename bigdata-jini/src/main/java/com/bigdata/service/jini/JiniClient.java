@@ -44,11 +44,11 @@ import net.jini.config.ConfigurationProvider;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
-import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.jini.lookup.DataServicesClient;
 import com.bigdata.util.NV;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
+import com.bigdata.zookeeper.util.ConfigMath;
 import com.sun.jini.start.ServiceDescriptor;
 
 /**
@@ -153,7 +153,7 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
         
         try {
 
-            final JiniFederation<T> fed = this.fed.get();
+            final JiniFederation fed = this.fed.get();
 
             if (fed != null) {
 
@@ -180,7 +180,7 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
     }
 
 //    synchronized 
-    public JiniFederation<T> connect() {
+    public JiniFederation connect() {
 
         connectLock.lock();
 

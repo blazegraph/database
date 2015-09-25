@@ -24,6 +24,7 @@ import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Used to start up the server and to handle SIGHUP. This DOES NOT start the

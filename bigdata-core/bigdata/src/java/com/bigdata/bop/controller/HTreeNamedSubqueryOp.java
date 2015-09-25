@@ -229,9 +229,12 @@ public class HTreeNamedSubqueryOp extends PipelineOp implements
                  * to use a putIfAbsent pattern here.
                  */
                 
-                // Lookup the attributes for the query on which we will hang the
-                // solution set.
-                attrs = context.getQueryAttributes(namedSetRef.getQueryId());
+                /*
+    			 * Lookup the attributes for the query on which we will hang the
+    			 * solution set. See BLZG-1493 (if queryId is null, use the query
+    			 * attributes for this running query).
+    			 */
+				attrs = context.getQueryAttributes(namedSetRef.getQueryId());
 
                 HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
                         .get(namedSetRef);

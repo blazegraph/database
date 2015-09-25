@@ -48,9 +48,9 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.test.ExperimentDriver;
-import com.bigdata.test.ExperimentDriver.IComparisonTest;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver;
+import com.bigdata.testutil.ExperimentDriver.IComparisonTest;
+import com.bigdata.testutil.ExperimentDriver.Result;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.NV;
 

@@ -27,8 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.util;
 
+import java.net.MalformedURLException;
 import java.util.UUID;
 
+import javax.net.SocketFactory;
+
+import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceID;
 
 /**
@@ -75,5 +79,60 @@ public class JiniUtil {
                 .getLeastSignificantBits());
 
     }
+
+	/**
+	 * Parse a comma delimited list of zero or more unicast URIs of the form
+	 * <code>jini://host/</code> or <code>jini://host:port/</code>.
+	 * <p>
+	 * This MAY be an empty array if you want to use multicast discovery
+	 * <strong>and</strong> you have specified the groups as
+	 * {@link net.jini.discovery.LookupDiscovery#ALL_GROUPS} (a <code>null</code>).
+	 * <p>
+	 * Note: This method is intended for overrides expressed from scripts using
+	 * environment variables where we need to parse an interpret the value
+	 * rather than given the value directly in a {@link net.jini.config.Configuration} file. As
+	 * a consequence, you can not specify the optional {@link SocketFactory} for
+	 * the {@link net.jini.core.discovery.LookupLocator} with this method.
+	 * 
+	 * @param locators
+	 *            The locators, expressed as a comma delimited list of URIs.
+	 * 
+	 * @return An array of zero or more {@link net.jini.core.discovery.LookupLocator}s.
+	 * 
+	 * @throws MalformedURLException
+	 *             if any of the parse URLs is invalid.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the <i>locators</i> is <code>null</code>.
+	 */
+	public static LookupLocator[] getLocators(final String locators)
+	        throws MalformedURLException {
+	
+	    if (locators == null)
+	        throw new IllegalArgumentException();
+	
+	    final String[] a = locators.split(",");
+	
+	    final LookupLocator[] b = new LookupLocator[a.length];
+	
+	    if (a.length == 1 && a[0].trim().length() == 0) {
+	
+	        return new LookupLocator[0];
+	
+	    }
+	    
+	    for (int i = 0; i < a.length; i++) {
+	
+	        final String urlStr = a[i];
+	
+	        final LookupLocator locator = new LookupLocator(urlStr);
+	
+	        b[i] = locator;
+	        
+	    }
+	    
+	    return b;
+	
+	}
     
 }

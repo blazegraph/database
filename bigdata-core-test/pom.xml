@@ -121,7 +121,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <version>2.18.1</version>
         <configuration>
           <includes>
-     	    <include>com/bigdata/cache/TestAll.java</include>
+     	    <include>com/bigdata/cache/lru/TestAll.java</include>
             <include>com/bigdata/io/TestAll.java</include>
             <include>com/bigdata/net/TestAll.java</include>
             <include>com/bigdata/config/TestAll.java</include>
@@ -170,6 +170,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
           <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
       <plugin>
@@ -513,6 +514,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-util</artifactId>
+       <version>${project.version}</version>
+       <type>test-jar</type>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
        <version>${project.version}</version>
        <type>test-jar</type>
@@ -526,11 +533,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <groupId>com.blazegraph</groupId>
        <artifactId>dsi-utils</artifactId>
        <version>${project.version}</version>
-     </dependency>
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
      </dependency>
      <dependency>
       <groupId>junit</groupId>
@@ -559,15 +561,21 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-util</artifactId>
-       <version>${project.version}</version>
-    </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
        <version>${project.version}</version>
+    </dependency> 
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-cache</artifactId>
+       <version>${project.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-cache</artifactId>
+       <version>${project.version}</version>
+       <type>test-jar</type>
+    </dependency>
+    <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
        <version>${project.version}</version>

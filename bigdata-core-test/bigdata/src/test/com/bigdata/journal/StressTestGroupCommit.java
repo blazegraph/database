@@ -52,9 +52,9 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.test.ExperimentDriver;
-import com.bigdata.test.ExperimentDriver.IComparisonTest;
-import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.testutil.ExperimentDriver;
+import com.bigdata.testutil.ExperimentDriver.IComparisonTest;
+import com.bigdata.testutil.ExperimentDriver.Result;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.NV;
 

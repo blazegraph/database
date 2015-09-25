@@ -45,7 +45,6 @@ import org.apache.system.SystemUtil;
 
 import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
-import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.osx.StatisticsCollectorForOSX;
@@ -84,38 +83,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     /** The path prefix under which all counters for this host are found. */
     static final public String hostPathPrefix;
 
-    /**
-     * This static code block is responsible obtaining the canonical hostname.
-     * 
-     * @see <a href="http://trac.blazegraph.com/ticket/886" >Provide workaround for
-     *      bad reverse DNS setups</a>
-     */
     static {
     
-		String s = System.getProperty(BigdataStatics.HOSTNAME);
-        if (s != null) {
-            // Trim whitespace.
-            s = s.trim();
-        }
-        if (s != null && s.length() != 0) {
-            log.warn("Hostname override: hostname=" + s);
-        } else {
-		try {
-			/*
-			 * Note: This should be the host *name* NOT an IP address of a
-			 * preferred Ethernet adaptor.
-			 */
-			s = InetAddress.getLocalHost().getCanonicalHostName();
-			// s = NicUtil.getIpAddress("default.nic", "default", false);
-		} catch (Throwable t) {
-			// fall back
-			log.error("Could not resolve name for host: " + t);
-			s = NicUtil.getIpAddressByLocalHost();
-			log.warn("Falling back to " + s);
-		}
-		}
-        
-        fullyQualifiedHostName = s;
+        fullyQualifiedHostName = Banner.getFullyqualifiedhostname();
 
         hostPathPrefix = ICounterSet.pathSeparator + fullyQualifiedHostName
                 + ICounterSet.pathSeparator;
@@ -360,19 +330,20 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                             + "DirectBufferPool").attach(
                     DirectBufferPool.getCounters());
 
-            if (LRUNexus.INSTANCE != null) {
-
-                /*
-                 * Add counters reporting on the global LRU and the per-store
-                 * caches.
-                 */
-
-                serviceRoot.makePath(
-                        IProcessCounters.Memory + ICounterSet.pathSeparator
-                                + "LRUNexus").attach(
-                        LRUNexus.INSTANCE.getCounterSet());
-
-            }
+//          @see BLZG-1501 (remove LRUNexus)
+//            if (LRUNexus.INSTANCE != null) {
+//
+//                /*
+//                 * Add counters reporting on the global LRU and the per-store
+//                 * caches.
+//                 */
+//
+//                serviceRoot.makePath(
+//                        IProcessCounters.Memory + ICounterSet.pathSeparator
+//                                + "LRUNexus").attach(
+//                        LRUNexus.INSTANCE.getCounterSet());
+//
+//            }
             
         }
         

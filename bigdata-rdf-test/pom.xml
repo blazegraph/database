@@ -102,6 +102,7 @@ dependencies.
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
           <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:src/test/resources/log4j.properties</argLine>
+	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
       <plugin>
@@ -424,7 +425,18 @@ dependencies.
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-util</artifactId>
+       <version>${project.version}</version>
+       <type>test-jar</type>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
+       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-cache</artifactId>
        <version>${project.version}</version>
     </dependency>
     <dependency>
