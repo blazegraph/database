@@ -498,6 +498,15 @@ public class ASTDeferredIVResolution {
         if (bop instanceof CreateGraph) {
             fillInIV(context,((CreateGraph)bop).getTargetGraph());
         } if (bop instanceof DeleteInsertGraph) {
+            // @see https://jira.blazegraph.com/browse/BLZG-1176
+            // Check for using WITH keyword with triple store not supporting quads
+            // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.visit(ASTModify, Object)
+            // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
+            if (context.isQuads() && ((DeleteInsertGraph)bop).getContext()!=null) {
+                throw new QuadsOperationInTriplesModeException(
+                    "Using named graph referenced through WITH clause " +
+                    "is not supported in triples mode.");
+            }
             fillInIV(context, ((DeleteInsertGraph)bop).getDataset());
             fillInIV(context, ((DeleteInsertGraph)bop).getDeleteClause());
             fillInIV(context, ((DeleteInsertGraph)bop).getInsertClause());
@@ -596,13 +605,25 @@ public class ASTDeferredIVResolution {
             resolveGroupsWithUnknownTerms(context, ((QueryNodeBase)bop));
         } else if (bop instanceof StatementPattern) {
             StatementPattern sp = (StatementPattern)bop;
-            // @see https://jira.blazegraph.com/browse/BLZG-1176
-            // Check for using GRAPH keyword with triple store not supporting quads
-            // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
-            if (!context.isQuads() && Scope.NAMED_CONTEXTS.equals(sp.getScope())) {
-                throw new QuadsOperationInTriplesModeException(
-                    "Use of GRAPH construct in query body is not supported "
-                    + "in triples mode.");
+            if (!context.isQuads()) {
+                // @see https://jira.blazegraph.com/browse/BLZG-1176
+                // Check for using GRAPH keyword with triple store not supporting quads
+                // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
+                // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
+                if (Scope.NAMED_CONTEXTS.equals(sp.getScope())) {
+                    throw new QuadsOperationInTriplesModeException(
+                            "Use of GRAPH construct in query body is not supported " +
+                            "in triples mode.");
+                }
+                // @see https://jira.blazegraph.com/browse/BLZG-1176
+                // Check for using context value in DATA block with triple store not supporting quads
+                // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.doUnparsedQuadsDataBlock(ASTUpdate, Object, boolean, boolean)
+                // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
+                if (sp.getContextVar()!=null) {
+                    throw new QuadsOperationInTriplesModeException(
+                            "Quads in SPARQL update data block are not supported " +
+                            "in triples mode.");
+                }
             }
         }
     }
