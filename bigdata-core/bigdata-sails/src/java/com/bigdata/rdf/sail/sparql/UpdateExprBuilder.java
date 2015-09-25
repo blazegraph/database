@@ -635,7 +635,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             if (withNode != null) {
 
                 // @see https://jira.blazegraph.com/browse/BLZG-1176
-                // TODO: should to be moved to ASTDeferredIVResolution
+                // moved to com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
 //                if (!context.tripleStore.isQuads()) {
 //                    throw new QuadsOperationInTriplesModeException(
 //                         "Using named graph referenced through WITH clause " +
@@ -781,7 +781,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
          * Reject real quads in triple mode
          */
         // @see https://jira.blazegraph.com/browse/BLZG-1176
-        // TODO: should to be moved to ASTDeferredIVResolution
+        // moved to com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
 //        if (!context.tripleStore.isQuads()) {
 //           for (Statement stmt : stmts) {
 //              if (stmt!=null && stmt.getContext()!=null) {
