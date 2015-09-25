@@ -58,7 +58,7 @@ public class FixedAllocator implements Allocator {
     private final int cModAllocation = 1 << RWStore.ALLOCATION_SCALEUP;
     private final int cMinAllocation = cModAllocation * 1; // must be multiple of cModAllocation
 
-	volatile private int m_freeBits;
+	volatile int m_freeBits;
 	volatile private int m_freeTransients;
 
     /**
@@ -847,7 +847,7 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 	
-	private void addToFreeList() {
+	void addToFreeList() {
 		assert m_freeWaiting;
 		
 		m_freeWaiting = false;
@@ -873,11 +873,12 @@ public class FixedAllocator implements Allocator {
 			 * on a metric to consider free slots through all allocators of this
 			 * size and test against a reduced threshold.
 			 */
-			if (!ret && m_statsBucket != null && m_statsBucket.m_allocators > 100) {
-				if (m_statsBucket.slotsUnused() > 0.20f) {
-					return m_freeBits < m_store.cSmallSlotThresholdHighWaste;
-				}
-			}
+			// Do not check on free, check lazily when finding next free allocator
+//			if (!ret && m_statsBucket != null && m_statsBucket.m_allocators > 100) {
+//				if (m_statsBucket.slotsUnused() > 0.20f) {
+//					return m_freeBits < m_store.cSmallSlotThresholdHighWaste;
+//				}
+//			}
 			return ret;
 		} else {
 			return true;
