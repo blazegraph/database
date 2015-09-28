@@ -43,9 +43,10 @@ import java.util.zip.ZipInputStream;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
@@ -72,8 +73,13 @@ public class VocabBuilder {
 	
     private final IRDFParserOptions parserOptions;
 	
-	private final Map<URI, P> preds = new LinkedHashMap<URI, P>();
+    // map reporting predicate frequency
+	private final Map<URI, UriFrequency> preds = new LinkedHashMap<URI, UriFrequency>();
 
+	// map reporting type frequency
+	private final Map<URI, UriFrequency> types = new LinkedHashMap<URI, UriFrequency>();
+	
+	
 	private VocabBuilder() {
 
 		parserOptions = new RDFParserOptions();
@@ -84,6 +90,7 @@ public class VocabBuilder {
 		
 	}
 	
+	@SuppressWarnings("deprecation")
 	protected void loadFiles(final int depth, final File file,
 			final String baseURI, final RDFFormat rdfFormat,
 			final FilenameFilter filter) throws IOException {
@@ -134,7 +141,6 @@ public class VocabBuilder {
 		}
 
 		final RDFParser rdfParser = rdfParserFactory.getParser();
-		// rdfParser.setValueFactory(database.getValueFactory());
 		rdfParser.setVerifyData(parserOptions.getVerifyData());
 		rdfParser.setStopAtFirstError(parserOptions.getStopAtFirstError());
 		rdfParser.setDatatypeHandling(parserOptions.getDatatypeHandling());
@@ -177,7 +183,7 @@ public class VocabBuilder {
 
             } catch (Exception ex) {
 
-                throw new RuntimeException("While loading: " + file, ex);
+            	log.warn("Could not process file " + file + ": " + ex.getStackTrace());
 
             } finally {
 
@@ -205,21 +211,43 @@ public class VocabBuilder {
 
 			final URI p = stmt.getPredicate();
 
-			P i = preds.get(p);
+			// A. Count number of occurrences for predicate at hand
+			UriFrequency predFrequency = preds.get(p);
 
-			if (i == null) {
+			if (predFrequency == null) {
 
-				preds.put(p, i = new P(p));
+				preds.put(p, predFrequency = new UriFrequency(p));
 
 				if (log.isDebugEnabled())
 					log.debug("New " + p + " : total=" + preds.size());
 
 			}
 
-			i.cnt++;
+			predFrequency.cnt++;
 
+			
+			// B. For typing statements, also count occurrence of the type
+			if (stmt.getPredicate().equals(RDF.TYPE)) {
+				
+				final Value o = stmt.getObject();
+
+				if (o instanceof URI) {
+				
+					UriFrequency typeFrequency = types.get((URI)o);
+	
+					if (typeFrequency == null) {
+	
+						types.put((URI)o, typeFrequency = new UriFrequency((URI)o));
+	
+						if (log.isDebugEnabled())
+							log.debug("New " + (URI)o + " : total=" + types.size());
+	
+					}
+					
+					typeFrequency.cnt++;
+				}
+			}
 		}
-
 	}
 
 	/**
@@ -258,31 +286,54 @@ public class VocabBuilder {
 
 		}
 		
-		final int size = v.preds.size();
-		
-		final P[] a = v.preds.values().toArray(new P[size]);
+		// sort predicates
+		final int predsFrequencySize = v.preds.size();
+		final UriFrequency[] predsFrequency = v.preds.values().toArray(new UriFrequency[predsFrequencySize]);
 
 		if (log.isInfoEnabled())
-			log.info("Sorting " + a.length + " vocabulary items from "
+			log.info("Sorting " + predsFrequency.length + " predicate items from "
 					+ args.length + " files");
+
+		Arrays.sort(predsFrequency);
+
+		// sort types
+		final int typesFrequencySize = v.types.size();
+		final UriFrequency[] typesFrequency = v.types.values().toArray(new UriFrequency[typesFrequencySize]);
+
+		if (log.isInfoEnabled())
+			log.info("Sorting " + typesFrequency.length + " types items from " + args.length + " files");
 		
-		Arrays.sort(a);
+		Arrays.sort(typesFrequency);
+		
 
 		if (!generate) {
-			/*
-			 * Show on the console.
-			 */
-			for (int i = 0; i < size; i++) {
+			
+			// show predicates on the console
+			for (int i = 0; i < predsFrequencySize; i++) {
 
-				final P p = a[i];
+				final UriFrequency prefFrequency = predsFrequency[i];
 
-				if (p.cnt < minFreq)
+				if (prefFrequency.cnt < minFreq)
 					break;
 
-				System.out.println("" + i + "\t" + p.cnt + "\t" + p.uri);
+				System.out.println("" + i + "\t" + prefFrequency.cnt + "\t" + prefFrequency.uri);
 
 			}
+			
+			// show types on the console
+			for (int i = 0; i < typesFrequencySize; i++) {
+
+				final UriFrequency typeFrequency = typesFrequency[i];
+
+				if (typeFrequency.cnt < minFreq)
+					break;
+
+				System.out.println("" + i + "\t" + typeFrequency.cnt + "\t" + typeFrequency.uri);
+
+			}
+			
 		} else {
+			
 			/*
 			 * Generate VocabularyDecl file.
 			 */
@@ -299,17 +350,32 @@ public class VocabBuilder {
 			
 			System.out.println("static private final URI[] uris = new URI[] {");
 			
-			for (int i = 0; i < size; i++) {
+			System.out.println("// frequencies of predicates in dataset");
+			for (int i = 0; i < predsFrequencySize; i++) {
 
-				final P p = a[i];
+				final UriFrequency predFrequency = predsFrequency[i];
 
-				if (p.cnt < minFreq)
+				if (predFrequency.cnt < minFreq)
 					break;
 
-				System.out.println("new URIImpl(\"" + p.uri + "\"), // rank="
-						+ i + ", count=" + p.cnt);
+				System.out.println("new URIImpl(\"" + predFrequency.uri + "\"), // rank="
+						+ i + ", count=" + predFrequency.cnt);
 
 			}
+
+			System.out.println("// frequencies of types in dataset");
+			for (int i = 0; i < typesFrequencySize; i++) {
+
+				final UriFrequency typeFrequency = typesFrequency[i];
+
+				if (typeFrequency.cnt < minFreq)
+					break;
+
+				System.out.println("new URIImpl(\"" + typeFrequency.uri + "\"), // rank="
+						+ i + ", count=" + typeFrequency.cnt);
+
+			}
+
 
 			System.out.println("};"); // end uris.
 
@@ -330,17 +396,19 @@ public class VocabBuilder {
 	/**
 	 * A vocabulary item together with its frequency count.
 	 */
-	private static class P implements Comparable<P> {
+	private static class UriFrequency implements Comparable<UriFrequency> {
+		
 		/**
-		 * The predicate.
+		 * The uri.
 		 */
 		final URI uri;
+		
 		/**
 		 * The #of instances of that predicate.
 		 */
 		int cnt;
 		
-		public P(final URI uri) {
+		public UriFrequency(final URI uri) {
 
 			this.uri = uri;
 			
@@ -350,7 +418,7 @@ public class VocabBuilder {
 		 * Place into descending order by count.
 		 */
 		@Override
-		public int compareTo(final P arg0) {
+		public int compareTo(final UriFrequency arg0) {
 
 			return arg0.cnt - cnt;
 			
