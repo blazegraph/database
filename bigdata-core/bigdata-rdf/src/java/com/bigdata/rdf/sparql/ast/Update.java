@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,7 +38,6 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
-import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 
 /**
  * A SPARQL Update operation.
@@ -201,21 +200,24 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
     }
     
     @Override
-    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
-       return new HashSet<IVariable<?>>();
+    public Set<IVariable<?>> getRequiredBound(final StaticAnalysis sa) {
+       
+    	return new LinkedHashSet<IVariable<?>>();
+    	
     }
 
     @Override
-    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+    public Set<IVariable<?>> getDesiredBound(final StaticAnalysis sa) {
 
-        return new HashSet<IVariable<?>>();
+        return new LinkedHashSet<IVariable<?>>();
 
     }
 
     /**
 	 * Return the {@link ASTDatasetClause} list for operations deferred until
 	 * evaluation stage.
-	 * 
+	 *
+	 * @see Annotations#DATASET_CLAUSES
 	 * @see https://jira.blazegraph.com/browse/BLZG-1176
      */
     public void setDatasetClauses(final List<ASTDatasetClause> uc) {
@@ -228,6 +230,7 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
 	 * Return the {@link ASTDatasetClause} list for operations deferred until
 	 * evaluation stage.
 	 * 
+	 * @see Annotations#DATASET_CLAUSES
 	 * @see https://jira.blazegraph.com/browse/BLZG-1176
 	 */
     @SuppressWarnings("unchecked")

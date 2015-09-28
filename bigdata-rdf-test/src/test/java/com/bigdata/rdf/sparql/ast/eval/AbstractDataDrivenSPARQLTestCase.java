@@ -92,7 +92,6 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
-import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -263,8 +262,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
              * the triple/sids/quads mode distinction and even other
              * configuration properties for the KB instance.
              */
-            astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(
-                    queryStr, baseURI);
+			astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
 
             // Many tests rely on complete query parsing (including IVs and expressions),
             // even without running method runTest, so we need to also run deferred operations

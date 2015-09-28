@@ -8,10 +8,8 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.openrdf.model.Value;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
 
@@ -20,9 +18,6 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
-import com.bigdata.rdf.sail.sparql.ast.ASTOperation;
-import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
-import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -96,7 +91,7 @@ public class DatasetDeclProcessor {
         
     }
     
-        /**
+    /**
      * Extracts a SPARQL {@link Dataset} from an ASTQueryContainer, if one is
      * contained. Returns null otherwise.
      * 

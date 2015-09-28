@@ -1,4 +1,4 @@
-package com.bigdata.rdf.sail.sparql;
+package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +34,7 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.sparql.DatasetDeclProcessor;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
@@ -66,32 +67,30 @@ import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 
 /**
- * This class provides batch resolution of internal values, which were left unresolved during query/update preparation.
- * Values, which are processed: any BOp arguments, ValueExpressions, and specific values stored in annotations
- * (for example, SERVICE_REF in ServiceNode). 
+ * This class provides batch resolution of internal values, which were left
+ * unresolved during query/update preparation. Values, which are processed: any
+ * BOp arguments, ValueExpressions, and specific values stored in annotations
+ * (for example, SERVICE_REF in ServiceNode).
+ * <p>
+ * Class performs efficient batch resolution of RDF Values against the database
+ * during query preparation. This efficiency is important on a cluster and when
+ * a SPARQL query or update contains a large number of RDF Values.
  * 
  * @author igor.kim
  * 
- * @see https://jira.blazegraph.com/browse/BLZG-1176 *
- *  
- */
-/**
- * @author kim
- *
+ * @see https://jira.blazegraph.com/browse/BLZG-1176
  */
 @SuppressWarnings( { "rawtypes", "unchecked" } )
 public class ASTDeferredIVResolution {
     
     private final static Logger log = Logger
-            .getLogger(BatchRDFValueResolver.class);
+            .getLogger(ASTDeferredIVResolution.class);
 
     /**
      * Anonymous instances of Handler interface are used as a deferred code,
@@ -135,9 +134,11 @@ public class ASTDeferredIVResolution {
         final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
         final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
+        
         termsResolver.resolve(context, queryRoot2);
         
         queryRoot2.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
+        
         /*
          * Handle dataset declaration
          * 
@@ -257,17 +258,27 @@ public class ASTDeferredIVResolution {
 
     }
     
+    /**
+     * prepare deferred handlers for batch IVs resolution. the handlers will go back
+     * and put the IVs into place afterwards.
+	 *
+     * @param context
+     * @param queryNode
+     */
     private void prepare(
         final AST2BOpContext context, final QueryNodeBase queryNode) {
 
         if (queryNode instanceof QueryRoot) {
-            fillInIV(context, ((QueryRoot)queryNode).getDataset());
+
+        	fillInIV(context, ((QueryRoot)queryNode).getDataset());
             
         }
 
         if (queryNode instanceof UpdateRoot) {
-            final UpdateRoot updateRoot = (UpdateRoot) queryNode;
-            fillInIV(context, updateRoot);
+            
+        	final UpdateRoot updateRoot = (UpdateRoot) queryNode;
+            
+        	fillInIV(context, updateRoot);
             
         } else if (queryNode instanceof QueryBase) {
     
@@ -558,7 +569,7 @@ public class ASTDeferredIVResolution {
         } else if (bop instanceof GroupNodeBase) {
             fillInIV(context, ((GroupNodeBase) bop).getContext());
         } else if (bop instanceof StatementPatternNode) {
-            StatementPatternNode sp = (StatementPatternNode)bop;
+            final StatementPatternNode sp = (StatementPatternNode)bop;
             // @see https://jira.blazegraph.com/browse/BLZG-1176
             // Check for using GRAPH keyword with triple store not supporting quads
             // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
@@ -577,7 +588,6 @@ public class ASTDeferredIVResolution {
                 }
             });
             fillInIV(context, node.getGraphPattern());
-///////////////////////////////////////////////////////////////////////
 
         } else if (bop instanceof QueryBase) {
 
@@ -609,6 +619,15 @@ public class ASTDeferredIVResolution {
 
     }
 
+	/**
+	 * Does the batch resolution of IVs against the database and applies the
+	 * handlers to set those IVs on the AST.
+	 * <p>
+	 * Note: This is also adding some RDF vocabulary items for RDF syntactic
+	 * sugar (rdf:first, rdf:rest, etc.).
+	 * 
+	 * @param context
+	 */
     private void resolveIVs(final AST2BOpContext context) {
 
         /*

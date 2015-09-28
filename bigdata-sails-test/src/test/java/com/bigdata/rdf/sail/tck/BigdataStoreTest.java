@@ -287,8 +287,7 @@ public class BigdataStoreTest extends RDFStoreTest {
 		// new pattern
 		((BigdataSailConnection) con).flush();
 		final AbstractTripleStore db = ((BigdataSailConnection) con).getTripleStore();
-		final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-		        db).parseQuery2(query, null);
+		final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(query, null);
 		final QueryRoot originalQuery = astContainer.getOriginalAST();
 		originalQuery.setIncludeInferred(false);
 		final TupleQueryResult queryResult = ASTEvalHelper.evaluateTupleQuery(

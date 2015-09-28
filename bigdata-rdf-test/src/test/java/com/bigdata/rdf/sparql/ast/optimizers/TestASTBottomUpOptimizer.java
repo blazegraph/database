@@ -52,7 +52,6 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
@@ -77,6 +76,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
 
 /**
@@ -154,7 +154,7 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         ASTDeferredIVResolution.resolveQuery(store, astContainer);

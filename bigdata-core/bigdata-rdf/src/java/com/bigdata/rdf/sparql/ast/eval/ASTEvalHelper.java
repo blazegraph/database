@@ -75,7 +75,6 @@ import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
-import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
@@ -164,6 +163,7 @@ public class ASTEvalHelper {
             throws QueryEvaluationException {
 
         try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
             ASTDeferredIVResolution.resolveQuery(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
@@ -231,6 +231,7 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
             ASTDeferredIVResolution.resolveQuery(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
@@ -489,6 +490,7 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
             ASTDeferredIVResolution.resolveQuery(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
@@ -1064,18 +1066,19 @@ public class ASTEvalHelper {
             final QueryBindingSet bs
             ) throws UpdateExecutionException {
 
-        try {
-            ASTDeferredIVResolution.resolveUpdate(conn.getTripleStore(), astContainer);
-        } catch (MalformedQueryException e) {
-            throw new UpdateExecutionException(e.getMessage(), e);
-        }
-
         if(conn == null)
             throw new IllegalArgumentException();
 
         if(astContainer == null)
             throw new IllegalArgumentException();
         
+        try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
+            ASTDeferredIVResolution.resolveUpdate(conn.getTripleStore(), astContainer);
+        } catch (MalformedQueryException e) {
+            throw new UpdateExecutionException(e.getMessage(), e);
+        }
+
         try {
 
             if (dataset != null) {

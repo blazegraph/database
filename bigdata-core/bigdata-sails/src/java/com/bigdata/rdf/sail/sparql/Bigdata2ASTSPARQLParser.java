@@ -33,7 +33,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -90,17 +89,12 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     static private final URI queryIdHint = new URIImpl(QueryHints.NAMESPACE
             + QueryHints.QUERYID);
 
-	private final Properties updateProperties;
-
+	@Deprecated // @igorkim : remove me.
 	public Bigdata2ASTSPARQLParser(AbstractTripleStore store) {
-        
-        this(store.getProperties());
-        
+        this();
     }
 
-    public Bigdata2ASTSPARQLParser(Properties updateProperties) {
-        
-    	this.updateProperties = updateProperties;
+    public Bigdata2ASTSPARQLParser() {
       
     }
 
@@ -178,7 +172,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ASTContainer parseUpdate2(final String updateStr,
             final String baseURI) throws MalformedQueryException {
 
-        long startTime = System.nanoTime();
+    	final long startTime = System.nanoTime();
 
         if (log.isInfoEnabled())
             log.info(updateStr);
@@ -209,7 +203,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
             // Class builds bigdata Update operators from SPARQL UPDATE ops.
             final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(
-                    new BigdataASTContext(new LinkedHashMap<Value, BigdataValue>(), updateProperties));
+                    new BigdataASTContext(new LinkedHashMap<Value, BigdataValue>()));
 
             // The sequence of UPDATE operations to be processed.
             final List<ASTUpdateContainer> updateOperations = updateSequence
@@ -310,6 +304,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             } // foreach
 
             astContainer.setQueryParseTime(System.nanoTime() - startTime);
+            
             return astContainer;
             
         } catch (ParseException e) {
@@ -360,7 +355,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              * Batch resolve ASTRDFValue to BigdataValues with their associated
              * IVs.
              */
-            BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
+            final BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
             
             resolver.process(qc);
 
@@ -395,6 +390,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             VerifyAggregates.verifyAggregate(queryRoot);
 
             ast.setQueryParseTime(System.nanoTime() - startTime);
+            
             return ast;
 
         } catch (IllegalArgumentException e) {
@@ -436,7 +432,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     private QueryRoot buildQueryModel(final ASTQueryContainer qc,
             final Map<Value, BigdataValue> values) throws MalformedQueryException {
 
-        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(new BigdataASTContext(values, updateProperties));
+        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(new BigdataASTContext(values));
 
         try {
 

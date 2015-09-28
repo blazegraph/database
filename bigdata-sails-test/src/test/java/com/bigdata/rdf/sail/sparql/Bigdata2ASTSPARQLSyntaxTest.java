@@ -29,12 +29,8 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.Properties;
 
-import junit.framework.Test;
-import junit.framework.TestSuite;
-
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.sparql.manifest.SPARQLSyntaxTest;
-import org.openrdf.query.parser.sparql.manifest.SPARQLSyntaxTest.Factory;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -42,6 +38,9 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
+
+import junit.framework.Test;
+import junit.framework.TestSuite;
 
 /**
  * Bigdata integration for the {@link SPARQLSyntaxTest}. This appears to be a
@@ -140,7 +139,7 @@ public class Bigdata2ASTSPARQLSyntaxTest extends SPARQLSyntaxTest {
     protected void parseQuery(String query, String queryFileURL)
             throws MalformedQueryException {
 
-        new Bigdata2ASTSPARQLParser(tripleStore).parseQuery(query, queryFileURL);
+        new Bigdata2ASTSPARQLParser().parseQuery(query, queryFileURL);
 
     }
 
