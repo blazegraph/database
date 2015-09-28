@@ -254,7 +254,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
         Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(tripleStore);
         ASTContainer astContainer = parser.parseQuery2(queryStr, baseURI);
-        ASTDeferredIVResolution.preEvaluate(tripleStore, astContainer);
+        ASTDeferredIVResolution.resolveQuery(tripleStore, astContainer);
         final QueryRoot ast = astContainer.getOriginalAST();
 
         
@@ -287,7 +287,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
         Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(tripleStore);
         ASTContainer ast = parser.parseUpdate2(updateStr, baseURI);
-        ASTDeferredIVResolution.preUpdate(tripleStore, ast);
+        ASTDeferredIVResolution.resolveUpdate(tripleStore, ast);
         return ast.getOriginalUpdateAST();
 
     }

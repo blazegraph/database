@@ -164,7 +164,7 @@ public class ASTEvalHelper {
             throws QueryEvaluationException {
 
         try {
-            ASTDeferredIVResolution.preEvaluate(store, astContainer);
+            ASTDeferredIVResolution.resolveQuery(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -231,7 +231,7 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         try {
-            ASTDeferredIVResolution.preEvaluate(store, astContainer);
+            ASTDeferredIVResolution.resolveQuery(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -489,7 +489,7 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         try {
-            ASTDeferredIVResolution.preEvaluate(store, astContainer);
+            ASTDeferredIVResolution.resolveQuery(store, astContainer);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -1065,7 +1065,7 @@ public class ASTEvalHelper {
             ) throws UpdateExecutionException {
 
         try {
-            ASTDeferredIVResolution.preUpdate(conn.getTripleStore(), astContainer);
+            ASTDeferredIVResolution.resolveUpdate(conn.getTripleStore(), astContainer);
         } catch (MalformedQueryException e) {
             throw new UpdateExecutionException(e.getMessage(), e);
         }

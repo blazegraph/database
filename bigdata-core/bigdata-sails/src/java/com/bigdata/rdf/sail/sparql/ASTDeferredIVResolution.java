@@ -48,7 +48,6 @@ import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.PathNode;
@@ -84,6 +83,10 @@ import com.bigdata.rdf.store.BD;
  * @see https://jira.blazegraph.com/browse/BLZG-1176 *
  *  
  */
+/**
+ * @author kim
+ *
+ */
 @SuppressWarnings( { "rawtypes", "unchecked" } )
 public class ASTDeferredIVResolution {
     
@@ -112,7 +115,13 @@ public class ASTDeferredIVResolution {
      */
     private IV virtualGraphIV;
     
-    public static void preEvaluate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
+    /**
+     * Do deferred resolution of IVs, which were left unresolved while preparing the query
+     * @param store - triple store, which will be used for values resolution
+     * @param ast - AST model of the query, which should be resolved
+     * @throws MalformedQueryException
+     */
+    public static void resolveQuery(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
         final QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         
@@ -165,7 +174,13 @@ public class ASTDeferredIVResolution {
         ast.setOriginalAST(queryRoot2);
     }
 
-    public static void preUpdate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
+    /**
+     * Do deferred resolution of IVs, which were left unresolved while preparing the update
+     * @param store - triple store, which will be used for values resolution
+     * @param ast - AST model of the update, which should be resolved
+     * @throws MalformedQueryException
+     */
+    public static void resolveUpdate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
         final UpdateRoot qc = (UpdateRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         
@@ -201,6 +216,12 @@ public class ASTDeferredIVResolution {
 
     }
 
+    /**
+     * Schedule resolution if IV in provided value, provided handler
+     * will be used to process resolved IV 
+     * @param value
+     * @param handler
+     */
     private void defer(final BigdataValue value, final Handler handler) {
         if (value!=null) {
             List<Handler> handlers = deferred.get(value);
@@ -212,12 +233,20 @@ public class ASTDeferredIVResolution {
         }
     }
 
+    /**
+     * Schedule execution of runnable after batch resulution if IVs
+     * (to handle creation of DataSetSummary instances for default
+     * and named graphs collections)
+     * @param runnable
+     */
     private void deferRunnable(final Runnable runnable) {
         deferredRunnables.add(runnable);
     }
 
-    private void resolve(
-            final AST2BOpContext context, final QueryNodeBase queryNode) {
+    /**
+     * Prepare and execute batch resolution of IVs in provided queryNode
+     */
+    private void resolve(final AST2BOpContext context, final QueryNodeBase queryNode) {
 
         // prepare deferred handlers for batch IVs resolution
         prepare(context, queryNode);
@@ -238,7 +267,7 @@ public class ASTDeferredIVResolution {
 
         if (queryNode instanceof UpdateRoot) {
             final UpdateRoot updateRoot = (UpdateRoot) queryNode;
-            resolveGroupsWithUnknownTerms(context, updateRoot);
+            fillInIV(context, updateRoot);
             
         } else if (queryNode instanceof QueryBase) {
     
@@ -259,7 +288,7 @@ public class ASTDeferredIVResolution {
     
                 if (constructClause != null) {
     
-                    resolveGroupsWithUnknownTerms(context, constructClause);
+                    fillInIV(context, constructClause);
                     
                 }
     
@@ -273,7 +302,7 @@ public class ASTDeferredIVResolution {
     
                 if (whereClause != null) {
     
-                    resolveGroupsWithUnknownTerms(context, whereClause);
+                    fillInIV(context, whereClause);
                     
                 }
     
@@ -322,7 +351,7 @@ public class ASTDeferredIVResolution {
     
                     if (whereClause != null) {
     
-                        resolveGroupsWithUnknownTerms(context, whereClause);
+                        fillInIV(context, whereClause);
                         
                     }
     
@@ -358,94 +387,13 @@ public class ASTDeferredIVResolution {
     }
 
     /**
-     * If the group has an unknown term, resolve it.
-     * @param context 
-     * 
-     * @param op
+     * Transitively handles all unresolved IVs inside provided bop
      */
-    private void resolveGroupsWithUnknownTerms(final AST2BOpContext context, final QueryNodeBase op) {
-
-        if (op==null) return;
-        /*
-         * Check the statement patterns.
-         */
-        for (int i = 0; i < op.arity(); i++) {
-            
-            final BOp sp = op.get(i);
-
-            if (sp!=null) {
-                
-                fillInIV(context, sp);
-                
-                for (int j = 0; j < sp.arity(); j++) {
-                    
-                    final BOp bop = sp.get(j);
-                    
-                    fillInIV(context, bop);
-                    
-                }
-            }
-            
+    private void fillInIV(final AST2BOpContext context, final BOp bop) {
+        if (bop==null) {
+            return;
         }
         
-        for (int i = 0; i < op.arity(); i++) {
-
-            final BOp child = op.get(i);
-            
-            if (child!=null)
-
-            if (child instanceof GroupNodeBase<?>) {
-
-                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
-
-                resolveGroupsWithUnknownTerms(context, childGroup);
-
-            } else if (child instanceof QueryBase) {
-
-                final QueryBase subquery = (QueryBase) child;
-
-                prepare(context, subquery);
-
-            } else if (child instanceof BindingsClause) {
-
-                final BindingsClause bindings = (BindingsClause) child;
-
-                final List<IBindingSet> childs = bindings
-                        .getBindingSets();
-                
-                for (final IBindingSet s: childs) {
-                    handleBindingSet(context, s);
-                }
-
-            } else if(child instanceof FilterNode) {
-                final FilterNode node = (FilterNode)child;
-                fillInIV(context,node.getValueExpression());
-            } else if(child instanceof ServiceNode) {
-                final ServiceNode node = (ServiceNode) child;
-                final TermNode serviceRef = node.getServiceRef();
-                defer(serviceRef.getValue(), new Handler(){
-                    @Override
-                    public void handle(final IV newIV) {
-                        node.setServiceRef(new ConstantNode(new Constant(newIV)));
-                    }
-                });
-            } else if(child instanceof FunctionNode) {
-                fillInIV(context, child);
-            } else if (child instanceof BindingsClause) {
-                final List<IBindingSet> bsList = ((BindingsClause)child).getBindingSets();
-                if (bsList!=null) {
-                    for (final IBindingSet bs: bsList) {
-                        handleBindingSet(context, bs);
-                    }
-                }
-                
-            }
-
-        }
-
-    }
-
-    private void fillInIV(final AST2BOpContext context, final BOp bop) {
         if (bop instanceof ConstantNode) {
             
             final BigdataValue value = ((ConstantNode) bop).getValue();
@@ -462,32 +410,30 @@ public class ASTDeferredIVResolution {
             return;
         }
 
-        if (bop!=null) {
-            for (int k = 0; k < bop.arity(); k++) {
-                final BOp pathBop = bop.get(k);
-                if (pathBop instanceof Constant) {
-                    final Object v = ((Constant)pathBop).get();
-                    final int fk = k;
-                    if (v instanceof BigdataValue) {
-                        defer((BigdataValue)v, new Handler(){
-                            @Override
-                            public void handle(final IV newIV) {
+        for (int k = 0; k < bop.arity(); k++) {
+            final BOp pathBop = bop.get(k);
+            if (pathBop instanceof Constant) {
+                final Object v = ((Constant)pathBop).get();
+                final int fk = k;
+                if (v instanceof BigdataValue) {
+                    defer((BigdataValue)v, new Handler(){
+                        @Override
+                        public void handle(final IV newIV) {
+                            bop.args().set(fk, new Constant(newIV));
+                        }
+                    });
+                } else if (v instanceof TermId) {
+                    defer(((TermId)v).getValue(), new Handler(){
+                        @Override
+                        public void handle(final IV newIV) {
+                            if (bop.args() instanceof ArrayList) {
                                 bop.args().set(fk, new Constant(newIV));
                             }
-                        });
-                    } else if (v instanceof TermId) {
-                        defer(((TermId)v).getValue(), new Handler(){
-                            @Override
-                            public void handle(final IV newIV) {
-                                if (bop.args() instanceof ArrayList) {
-                                    bop.args().set(fk, new Constant(newIV));
-                                }
-                            }
-                        });
-                    }
-                } else {
-                    fillInIV(context,pathBop);
+                        }
+                    });
                 }
+            } else {
+                fillInIV(context,pathBop);
             }
         }
 
@@ -523,7 +469,7 @@ public class ASTDeferredIVResolution {
             fillInIV(context, ((DeleteInsertGraph)bop).getWhereClause());
 
         } else if (bop instanceof QuadsDataOrNamedSolutionSet) {
-            resolveGroupsWithUnknownTerms(context, ((QuadsDataOrNamedSolutionSet)bop).getQuadData());
+            fillInIV(context, ((QuadsDataOrNamedSolutionSet)bop).getQuadData());
         } else if (bop instanceof DatasetNode) {
             final DatasetNode dataset = ((DatasetNode) bop);
             final Set<IV> newDefaultGraphs = new LinkedHashSet<IV>();
@@ -567,7 +513,7 @@ public class ASTDeferredIVResolution {
             }
         } else if (bop instanceof FunctionNode) {
             if (bop instanceof SubqueryFunctionNodeBase) {
-                resolveGroupsWithUnknownTerms(context, ((SubqueryFunctionNodeBase)bop).getGraphPattern());
+                fillInIV(context, ((SubqueryFunctionNodeBase)bop).getGraphPattern());
             }
             final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
             if (fve instanceof IVValueExpression) {
@@ -610,7 +556,6 @@ public class ASTDeferredIVResolution {
                 fillInIV(context,pathBop);
             }
         } else if (bop instanceof GroupNodeBase) {
-            resolveGroupsWithUnknownTerms(context, (GroupNodeBase) bop);
             fillInIV(context, ((GroupNodeBase) bop).getContext());
         } else if (bop instanceof StatementPatternNode) {
             StatementPatternNode sp = (StatementPatternNode)bop;
@@ -632,9 +577,36 @@ public class ASTDeferredIVResolution {
                 }
             });
             fillInIV(context, node.getGraphPattern());
-        } else if (bop instanceof QueryNodeBase) {
-            resolveGroupsWithUnknownTerms(context, ((QueryNodeBase)bop));
+///////////////////////////////////////////////////////////////////////
+
+        } else if (bop instanceof QueryBase) {
+
+            final QueryBase subquery = (QueryBase) bop;
+
+            prepare(context, subquery);
+
+        } else if (bop instanceof BindingsClause) {
+
+            final List<IBindingSet> bsList = ((BindingsClause)bop).getBindingSets();
+
+            if (bsList!=null) {
+
+                for (final IBindingSet bs: bsList) {
+
+                    handleBindingSet(context, bs);
+
+                }
+
+            }
+
+        } else if(bop instanceof FilterNode) {
+
+            final FilterNode node = (FilterNode)bop;
+
+            fillInIV(context,node.getValueExpression());
+
         }
+
     }
 
     private void resolveIVs(final AST2BOpContext context) {
