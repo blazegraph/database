@@ -2,9 +2,9 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +16,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
@@ -32,10 +31,12 @@ import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
@@ -58,6 +59,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.Update;
@@ -124,9 +126,9 @@ public class ASTDeferredIVResolution {
         final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
         final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
-        final QueryRoot queryRoot3 = (QueryRoot) termsResolver.resolve(context, new QueryNodeWithBindingSet(queryRoot2, null)).getQueryNode();
+        termsResolver.resolve(context, queryRoot2);
         
-        queryRoot3.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
+        queryRoot2.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
         /*
          * Handle dataset declaration
          * 
@@ -152,7 +154,7 @@ public class ASTDeferredIVResolution {
 
 				if (dataSetNode != null) {
 
-					queryRoot3.setDataset(dataSetNode);
+					queryRoot2.setDataset(dataSetNode);
 
 				}
 
@@ -160,7 +162,7 @@ public class ASTDeferredIVResolution {
 			
         }
         
-        ast.setOriginalAST(queryRoot3);
+        ast.setOriginalAST(queryRoot2);
     }
 
     public static void preUpdate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
@@ -191,11 +193,11 @@ public class ASTDeferredIVResolution {
         }
         final AST2BOpContext context2 = new AST2BOpContext(ast, store);
         final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
-        final UpdateRoot queryRoot3 = (UpdateRoot) termsResolver.resolve(context2, new QueryNodeWithBindingSet(qc, null)).getQueryNode();
+        termsResolver.resolve(context2, qc);
         if (ast.getOriginalUpdateAST().getPrefixDecls()!=null && !ast.getOriginalUpdateAST().getPrefixDecls().isEmpty()) {
-            queryRoot3.setPrefixDecls(ast.getOriginalUpdateAST().getPrefixDecls());
+            qc.setPrefixDecls(ast.getOriginalUpdateAST().getPrefixDecls());
         }
-        ast.setOriginalUpdateAST(queryRoot3);
+        ast.setOriginalUpdateAST(qc);
 
     }
 
@@ -214,20 +216,20 @@ public class ASTDeferredIVResolution {
         deferredRunnables.add(runnable);
     }
 
-    public QueryNodeWithBindingSet resolve(
-            final AST2BOpContext context, final QueryNodeWithBindingSet input) {
-        optimize(context, input);
-        
-        resolveIVs(context);
-        
-        final IQueryNode queryNode = input.getQueryNode();
-        final IBindingSet[] bindingSets = input.getBindingSets();     
-        return new QueryNodeWithBindingSet(queryNode, bindingSets);
-    }
-    public void optimize(
-        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+    private void resolve(
+            final AST2BOpContext context, final QueryNodeBase queryNode) {
 
-        final IQueryNode queryNode = input.getQueryNode();
+        // prepare deferred handlers for batch IVs resolution
+        prepare(context, queryNode);
+        
+        // execute batch resolution and run all deferred handlers,
+        // which will update unresolved values across AST model 
+        resolveIVs(context);
+
+    }
+    
+    private void prepare(
+        final AST2BOpContext context, final QueryNodeBase queryNode) {
 
         if (queryNode instanceof QueryRoot) {
             fillInIV(context, ((QueryRoot)queryNode).getDataset());
@@ -282,7 +284,9 @@ public class ASTDeferredIVResolution {
                 final HavingNode having = queryRoot.getHaving();
                 if (having!=null) {
                     for (final IConstraint c: having.getConstraints()) {
-                        handleHaving(context, c);
+                        for (final BOp bop: c.args()) {
+                            fillInIV(context, bop);
+                        }
                     }
                 }
             }
@@ -328,6 +332,29 @@ public class ASTDeferredIVResolution {
     
         }
         
+    }
+
+    private void handleBindingSet(final AST2BOpContext context, final IBindingSet s) {
+        final Iterator<Entry<IVariable, IConstant>> itr = s.iterator();
+        while (itr.hasNext()) {
+            final Entry<IVariable, IConstant> entry = itr.next();
+            final Object value = entry.getValue().get();
+            if (value instanceof BigdataValue) {
+                defer((BigdataValue)value, new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        entry.setValue(new Constant(newIV));
+                    }
+                });
+            } else if (value instanceof TermId) {
+                defer(((TermId)value).getValue(), new Handler(){
+                    @Override
+                    public void handle(final IV newIV) {
+                        entry.setValue(new Constant(newIV));
+                    }
+                });
+            }
+        }
     }
 
     /**
@@ -377,7 +404,7 @@ public class ASTDeferredIVResolution {
 
                 final QueryBase subquery = (QueryBase) child;
 
-                optimize(context, new QueryNodeWithBindingSet(subquery, null));
+                prepare(context, subquery);
 
             } else if (child instanceof BindingsClause) {
 
@@ -416,37 +443,6 @@ public class ASTDeferredIVResolution {
 
         }
 
-    }
-
-    private void handleHaving(final AST2BOpContext context, final IConstraint s) {
-        final Iterator<BOp> itr = s.argIterator();
-        while (itr.hasNext()) {
-            final BOp bop = itr.next();
-            fillInIV(context, bop);
-        }
-    }
-
-    private void handleBindingSet(final AST2BOpContext context, final IBindingSet s) {
-        final Iterator<Entry<IVariable, IConstant>> itr = s.iterator();
-        while (itr.hasNext()) {
-            final Entry<IVariable, IConstant> entry = itr.next();
-            final Object value = entry.getValue().get();
-            if (value instanceof BigdataValue) {
-                defer((BigdataValue)value, new Handler(){
-                    @Override
-                    public void handle(final IV newIV) {
-                        entry.setValue(new Constant(newIV));
-                    }
-                });
-            } else if (value instanceof TermId) {
-                defer(((TermId)value).getValue(), new Handler(){
-                    @Override
-                    public void handle(final IV newIV) {
-                        entry.setValue(new Constant(newIV));
-                    }
-                });
-            }
-        }
     }
 
     private void fillInIV(final AST2BOpContext context, final BOp bop) {
@@ -497,12 +493,26 @@ public class ASTDeferredIVResolution {
 
         if (bop instanceof CreateGraph) {
             fillInIV(context,((CreateGraph)bop).getTargetGraph());
+        } if (bop instanceof AbstractGraphDataUpdate) {
+            AbstractGraphDataUpdate update = ((AbstractGraphDataUpdate)bop);
+            // @see https://jira.blazegraph.com/browse/BLZG-1176
+            // Check for using context value in DATA block with triple store not supporting quads
+            // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.doUnparsedQuadsDataBlock(ASTUpdate, Object, boolean, boolean)
+            if (!context.isQuads()) {
+                for (BigdataStatement sp: update.getData()) {
+                    if (sp.getContext()!=null) {
+                        throw new QuadsOperationInTriplesModeException(
+                                "Quads in SPARQL update data block are not supported " +
+                                "in triples mode.");
+                    }
+                }
+            }
         } if (bop instanceof DeleteInsertGraph) {
             // @see https://jira.blazegraph.com/browse/BLZG-1176
             // Check for using WITH keyword with triple store not supporting quads
             // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.visit(ASTModify, Object)
             // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
-            if (context.isQuads() && ((DeleteInsertGraph)bop).getContext()!=null) {
+            if (!context.isQuads() && ((DeleteInsertGraph)bop).getContext()!=null) {
                 throw new QuadsOperationInTriplesModeException(
                     "Using named graph referenced through WITH clause " +
                     "is not supported in triples mode.");
@@ -516,7 +526,7 @@ public class ASTDeferredIVResolution {
             resolveGroupsWithUnknownTerms(context, ((QuadsDataOrNamedSolutionSet)bop).getQuadData());
         } else if (bop instanceof DatasetNode) {
             final DatasetNode dataset = ((DatasetNode) bop);
-            final Set<IV> newDefaultGraphs = new HashSet<IV>();
+            final Set<IV> newDefaultGraphs = new LinkedHashSet<IV>();
             for(final IV iv: dataset.getDefaultGraphs().getGraphs()) {
                 defer(iv.getValue(), new Handler(){
                     @Override
@@ -532,7 +542,7 @@ public class ASTDeferredIVResolution {
                 }
             });
             
-            final Set<IV> newNamedGraphs = new HashSet<IV>();
+            final Set<IV> newNamedGraphs = new LinkedHashSet<IV>();
             final Iterator<IV> namedGraphs = dataset.getNamedGraphs().getGraphs().iterator();
             while(namedGraphs.hasNext()) {
                 final IV iv = namedGraphs.next();
@@ -601,30 +611,29 @@ public class ASTDeferredIVResolution {
             }
         } else if (bop instanceof GroupNodeBase) {
             resolveGroupsWithUnknownTerms(context, (GroupNodeBase) bop);
+            fillInIV(context, ((GroupNodeBase) bop).getContext());
+        } else if (bop instanceof StatementPatternNode) {
+            StatementPatternNode sp = (StatementPatternNode)bop;
+            // @see https://jira.blazegraph.com/browse/BLZG-1176
+            // Check for using GRAPH keyword with triple store not supporting quads
+            // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
+            if (!context.isQuads() && Scope.NAMED_CONTEXTS.equals(sp.getScope())) {
+                throw new QuadsOperationInTriplesModeException(
+                        "Use of GRAPH construct in query body is not supported " +
+                        "in triples mode.");
+            }
+        } else if(bop instanceof ServiceNode) {
+            final ServiceNode node = (ServiceNode) bop;
+            final TermNode serviceRef = node.getServiceRef();
+            defer(serviceRef.getValue(), new Handler(){
+                @Override
+                public void handle(final IV newIV) {
+                    node.setServiceRef(new ConstantNode(new Constant(newIV)));
+                }
+            });
+            fillInIV(context, node.getGraphPattern());
         } else if (bop instanceof QueryNodeBase) {
             resolveGroupsWithUnknownTerms(context, ((QueryNodeBase)bop));
-        } else if (bop instanceof StatementPattern) {
-            StatementPattern sp = (StatementPattern)bop;
-            if (!context.isQuads()) {
-                // @see https://jira.blazegraph.com/browse/BLZG-1176
-                // Check for using GRAPH keyword with triple store not supporting quads
-                // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
-                // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
-                if (Scope.NAMED_CONTEXTS.equals(sp.getScope())) {
-                    throw new QuadsOperationInTriplesModeException(
-                            "Use of GRAPH construct in query body is not supported " +
-                            "in triples mode.");
-                }
-                // @see https://jira.blazegraph.com/browse/BLZG-1176
-                // Check for using context value in DATA block with triple store not supporting quads
-                // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.doUnparsedQuadsDataBlock(ASTUpdate, Object, boolean, boolean)
-                // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
-                if (sp.getContextVar()!=null) {
-                    throw new QuadsOperationInTriplesModeException(
-                            "Quads in SPARQL update data block are not supported " +
-                            "in triples mode.");
-                }
-            }
         }
     }
 

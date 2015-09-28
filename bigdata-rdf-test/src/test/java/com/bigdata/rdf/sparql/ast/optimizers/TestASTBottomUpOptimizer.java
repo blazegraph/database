@@ -52,6 +52,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
@@ -155,6 +156,8 @@ public class TestASTBottomUpOptimizer extends
 
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.preEvaluate(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -435,6 +438,8 @@ public class TestASTBottomUpOptimizer extends
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
 
+        ASTDeferredIVResolution.preEvaluate(store, astContainer);
+
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
         QueryRoot queryRoot = astContainer.getOriginalAST();
@@ -625,6 +630,8 @@ public class TestASTBottomUpOptimizer extends
 
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.preEvaluate(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -992,6 +999,8 @@ public class TestASTBottomUpOptimizer extends
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
 
+        ASTDeferredIVResolution.preEvaluate(store, astContainer);
+
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
         QueryRoot queryRoot = astContainer.getOriginalAST();
@@ -1148,6 +1157,8 @@ public class TestASTBottomUpOptimizer extends
 
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.preEvaluate(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
