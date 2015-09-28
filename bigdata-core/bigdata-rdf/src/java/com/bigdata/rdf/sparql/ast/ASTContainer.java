@@ -29,12 +29,13 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
 
-
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.rdf.lexicon.BigdataValueCentricFullTextIndex;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
@@ -94,9 +95,15 @@ public class ASTContainer extends ASTBase {
         String OPTIMIZED_AST_BINDING_SETS = "optimizedASTBindingSets";
 
         /**
-         * The parsing time for the query.
+         * The parsing time for the query (nanoseconds).
          */
         String QUERY_PARSE_TIME = "queryParseTime";
+        
+        /**
+		 * The time to batch resolve RDF {@link Value}s in the query to
+		 * {@link BigdataValue}s in the database (nanoseconds).
+		 */
+        String RESOLVE_VALUES_TIME = "resolveValuesTime";
     }
 
     /**
@@ -264,7 +271,7 @@ public class ASTContainer extends ASTBase {
     }
 
     /**
-     * Set the query parse time in nano seconds.
+     * Set the query parse time in nanoseconds.
      */
     public void setQueryParseTime(final Long parseTime) {
         
@@ -273,11 +280,29 @@ public class ASTContainer extends ASTBase {
     }
     
     /**
-     * Get the query parse time in nano seconds.
+     * Get the query parse time in nanoseconds.
      */
     public Long getQueryParseTime() {
 
         return (Long) getProperty(Annotations.QUERY_PARSE_TIME);
+
+    }
+
+    /**
+     * Set the RDF value resolution time in nanoseconds.
+     */
+    public void setResolveValuesTime(final Long nanos) {
+        
+        setProperty(Annotations.RESOLVE_VALUES_TIME, nanos);
+
+    }
+    
+    /**
+     * Get the resolve values time in nanoseconds.
+     */
+    public Long getResolveValuesTime() {
+
+        return (Long) getProperty(Annotations.RESOLVE_VALUES_TIME);
 
     }
 

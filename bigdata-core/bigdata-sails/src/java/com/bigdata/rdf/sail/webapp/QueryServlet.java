@@ -1102,52 +1102,72 @@ public class QueryServlet extends BigdataRDFServlet {
                      current.node("th").text("elapsed [us]").close();
                      current.node("th").text("numCalls").close();
                      current = current.close(); // tr
-                        
-                     // parser stats
-                     final StaticAnalysisStat pStat = saStats.getParserStat();
-                     if (pStat!=null) {
-                        current = current.node("tr");
-                        current.node("td").text(pStat.getStatName()).close();
-                        current.node("td").text("Parser").close();
-                        current.node("td").text(String.valueOf(pStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(pStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(pStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
-                        
-                     final StaticAnalysisStat lStat = saStats.getOptimizerLoopStat();
-                     if (lStat!=null) {
-                        current = current.node("tr");
-                        current.node("td").text(lStat.getStatName()).close();
-                        current.node("td").text("Optimizers (all)").close();                        
-                        current.node("td").text(String.valueOf(lStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(lStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(lStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
+                   
+                     {
+							// parser stats
+							final StaticAnalysisStat pStat = saStats.getParserStat();
+							if (pStat != null) {
+								current = current.node("tr");
+								current.node("td").text(pStat.getStatName()).close();
+								current.node("td").text("Parser").close();
+								current.node("td").text(String.valueOf(pStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(pStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(pStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
+						{
+							// batch resolve Value => IV stats
+							final StaticAnalysisStat rStat = saStats.getResolveValuesStat();
+							if (rStat != null) {
+								current = current.node("tr");
+								current.node("td").text(rStat.getStatName()).close();
+								current.node("td").text("Resolve Values").close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(rStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
 
-                     final Collection<StaticAnalysisStat> optimizerStats = 
-                        saStats.getOptimizerStats();
-                     for (StaticAnalysisStat oStat : optimizerStats) {
-                        current = current.node("tr");
-                        current.node("td").text(oStat.getStatName()).close();
-                        current.node("td").text("Optimizer").close();
-                        current.node("td").text(String.valueOf(oStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(oStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(oStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
-                        
-                     final StaticAnalysisStat rStat = saStats.getRangeCountStat();
-                     if (rStat!=null) {
-                        current = current.node("tr");
-                        current.node("td").text(rStat.getStatName()).close();
-                        current.node("td").text("Range Count").close();                        
-                        current.node("td").text(String.valueOf(rStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(rStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(rStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
+						{
+							final StaticAnalysisStat lStat = saStats.getOptimizerLoopStat();
+							if (lStat != null) {
+								current = current.node("tr");
+								current.node("td").text(lStat.getStatName()).close();
+								current.node("td").text("Optimizers (all)").close();
+								current.node("td").text(String.valueOf(lStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(lStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(lStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
+
+						{
+							final Collection<StaticAnalysisStat> optimizerStats = saStats.getOptimizerStats();
+							for (StaticAnalysisStat oStat : optimizerStats) {
+								current = current.node("tr");
+								current.node("td").text(oStat.getStatName()).close();
+								current.node("td").text("Optimizer").close();
+								current.node("td").text(String.valueOf(oStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(oStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(oStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
+
+						{
+							final StaticAnalysisStat rStat = saStats.getRangeCountStat();
+							if (rStat != null) {
+								current = current.node("tr");
+								current.node("td").text(rStat.getStatName()).close();
+								current.node("td").text("Range Count").close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(rStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
                         
                      current = current.close(); // table
                         
