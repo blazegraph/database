@@ -122,6 +122,8 @@ public class ASTDeferredIVResolution {
      */
     public static void resolveQuery(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
+    	final long beginNanos = System.nanoTime();
+    	
         final QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         
         final AST2BOpContext context = new AST2BOpContext(ast, store);
@@ -173,6 +175,9 @@ public class ASTDeferredIVResolution {
         }
         
         ast.setOriginalAST(queryRoot2);
+
+        ast.setResolveValuesTime(System.nanoTime() - beginNanos);
+
     }
 
     /**
@@ -183,6 +188,8 @@ public class ASTDeferredIVResolution {
      */
     public static void resolveUpdate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
+    	final long beginNanos = System.nanoTime();
+    	
         final UpdateRoot qc = (UpdateRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         
         /*
@@ -213,7 +220,10 @@ public class ASTDeferredIVResolution {
         if (ast.getOriginalUpdateAST().getPrefixDecls()!=null && !ast.getOriginalUpdateAST().getPrefixDecls().isEmpty()) {
             qc.setPrefixDecls(ast.getOriginalUpdateAST().getPrefixDecls());
         }
+
         ast.setOriginalUpdateAST(qc);
+
+        ast.setResolveValuesTime(System.nanoTime() - beginNanos);
 
     }
 
