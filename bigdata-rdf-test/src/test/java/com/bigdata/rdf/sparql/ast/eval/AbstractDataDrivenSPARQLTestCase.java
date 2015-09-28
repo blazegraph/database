@@ -269,7 +269,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
             // Many tests rely on complete query parsing (including IVs and expressions),
             // even without running method runTest, so we need to also run deferred operations
             // (these will be run twice in some tests, which also execute parsed queries (at runTest))
-            ASTDeferredIVResolution.preEvaluate(store, astContainer);
+            ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
 //            queryPlan = AST2BOpUtility.convert(context = new AST2BOpContext(
 //                    astContainer, store));
@@ -648,7 +648,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
 
             Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(store);
             astContainer = parser.parseUpdate2(queryStr, baseURI);
-            ASTDeferredIVResolution.preUpdate(store, astContainer);
+            ASTDeferredIVResolution.resolveUpdate(store, astContainer);
 
 
         }

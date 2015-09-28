@@ -121,7 +121,7 @@ public class TestASTGraphGroupOptimizer extends
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
 
-        ASTDeferredIVResolution.preEvaluate(store, astContainer);
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -220,7 +220,7 @@ public class TestASTGraphGroupOptimizer extends
        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                .parseQuery2(queryStr, baseURI);
 
-       ASTDeferredIVResolution.preEvaluate(store, astContainer);
+       ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
