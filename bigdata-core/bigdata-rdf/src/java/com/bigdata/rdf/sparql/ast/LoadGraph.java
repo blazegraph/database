@@ -47,7 +47,6 @@ import com.bigdata.rdf.rio.RDFParserOptions;
  * 
  * @see http://www.w3.org/TR/sparql11-update/#load
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class LoadGraph extends GraphUpdate {
 
@@ -65,11 +64,20 @@ public class LoadGraph extends GraphUpdate {
      */
     public interface Annotations extends GraphUpdate.Annotations{
 
-        /**
-         * {@link RDFParserOptions} (optional).
-         */
-        String OPTIONS = "options";
-        
+//        /**
+//         * {@link RDFParserOptions} (optional).
+//         */
+//        String OPTIONS = "options";
+
+		/*
+		 * Options for RDF data parser that can be specified by SPARQL UPDATE
+		 * "LOAD" extension syntax.
+		 */
+		String VERIFY_DATA = "verifyData";
+		String PRESERVE_BLANK_NODE_IDS = "preserveBlankNodeIDs";
+		String STOP_AT_FIRST_ERROR = "stopAtFirstError";
+		String DATA_TYPE_HANDLING = "dataTypeHandling";
+    	
     }
     
     public LoadGraph() {
@@ -151,31 +159,33 @@ public class LoadGraph extends GraphUpdate {
 
     }
 
-    /**
-     * Return the {@link RDFParserOptions}.
-     * 
-     * @return The {@link RDFParserOptions} -or- <code>null</code> if the
-     *         options were not configured.
-     */
-    public IRDFParserOptions getRDFParserOptions() {
-
-        return (IRDFParserOptions) getProperty(Annotations.OPTIONS);
-
-    }
-
-    /**
-     * Set the {@link RDFParserOptions}.
-     * 
-     * @param options
-     *            The options (may be <code>null</code>).
-     */
+//    /**
+//     * Return the {@link RDFParserOptions}.
+//     * 
+//     * @return The {@link RDFParserOptions} -or- <code>null</code> if the
+//     *         options were not configured.
+//     */
+//    public IRDFParserOptions getRDFParserOptions() {
+//
+//        return (IRDFParserOptions) getProperty(Annotations.OPTIONS);
+//
+//    }
+//
+//    /**
+//     * Set the {@link RDFParserOptions}.
+//     * 
+//     * @param options
+//     *            The options (may be <code>null</code>).
+//     */
+    @Deprecated
     public void setRDFParserOptions(final IRDFParserOptions options) {
 
-        setProperty(Annotations.OPTIONS, options);
+        throw new UnsupportedOperationException();
 
     }
     
 //    LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+    @Override
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder();
@@ -190,16 +200,28 @@ public class LoadGraph extends GraphUpdate {
         
         final ConstantNode targetGraph = getTargetGraph();        
 
-        final IRDFParserOptions rdfParserOptions = getRDFParserOptions();        
+//        final IRDFParserOptions rdfParserOptions = getRDFParserOptions();        
 
         if(silent)
             sb.append(" SILENT");
 
-        if (rdfParserOptions != null) {
-            sb.append(" OPTIONS=" + rdfParserOptions);
-        }
+		if (getProperty(Annotations.VERIFY_DATA) != null) {
+			sb.append(" " + Annotations.VERIFY_DATA + "=" + getProperty(Annotations.VERIFY_DATA));
+		}
         
-        if (sourceGraph != null) {
+		if (getProperty(Annotations.PRESERVE_BLANK_NODE_IDS) != null) {
+			sb.append(" " + Annotations.PRESERVE_BLANK_NODE_IDS + "=" + getProperty(Annotations.PRESERVE_BLANK_NODE_IDS));
+		}
+		
+		if (getProperty(Annotations.STOP_AT_FIRST_ERROR) != null) {
+			sb.append(" " + Annotations.STOP_AT_FIRST_ERROR + "=" + getProperty(Annotations.STOP_AT_FIRST_ERROR));
+		}
+		
+		if (getProperty(Annotations.DATA_TYPE_HANDLING) != null) {
+			sb.append(" " + Annotations.DATA_TYPE_HANDLING + "=" + getProperty(Annotations.DATA_TYPE_HANDLING));
+		}
+
+		if (sourceGraph != null) {
             sb.append("\n");
             sb.append(indent(indent + 1));
             sb.append("source=" + sourceGraph);

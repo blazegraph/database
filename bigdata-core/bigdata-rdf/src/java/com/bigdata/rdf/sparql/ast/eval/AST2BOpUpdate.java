@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -60,6 +61,7 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
@@ -90,6 +92,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.rio.IRDFParserOptions;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
@@ -1306,7 +1309,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     private static PipelineOp convertLoadGraph(PipelineOp left,
             final LoadGraph op, final AST2BOpUpdateContext context)
             throws Exception {
-
+        
         if (!runOnQueryEngine) {
 
             final AtomicLong nmodified = new AtomicLong();
@@ -1324,9 +1327,38 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 if (log.isDebugEnabled())
                     log.debug("sourceURI=" + urlStr + ", defaultContext="
                             + defaultContext);
+
+                // Take overrides from LOAD request, defaults from triple store and fall back to static defaults.
+                final Properties defaults = context.getAbstractTripleStore().getProperties();
+                
+				final boolean verifyData = Boolean
+						.parseBoolean(op.getProperty(LoadGraph.Annotations.VERIFY_DATA, p.getProperty(
+								RDFParserOptions.Options.VERIFY_DATA, RDFParserOptions.Options.DEFAULT_VERIFY_DATA)));
+
+				final boolean preserveBlankNodeIDs = Boolean
+						.parseBoolean(op.getProperty(LoadGraph.Annotations.PRESERVE_BLANK_NODE_IDS,
+								p.getProperty(RDFParserOptions.Options.PRESERVE_BNODE_IDS,
+										RDFParserOptions.Options.DEFAULT_PRESERVE_BNODE_IDS)));
+
+				final boolean stopAtFirstError = Boolean
+						.parseBoolean(op.getProperty(LoadGraph.Annotations.STOP_AT_FIRST_ERROR,
+								p.getProperty(RDFParserOptions.Options.STOP_AT_FIRST_ERROR,
+										RDFParserOptions.Options.DEFAULT_STOP_AT_FIRST_ERROR)));
+
+				final DatatypeHandling dataTypeHandling = DatatypeHandling
+						.valueOf(op.getProperty(LoadGraph.Annotations.DATA_TYPE_HANDLING,
+								p.getProperty(RDFParserOptions.Options.DATATYPE_HANDLING,
+										RDFParserOptions.Options.DEFAULT_DATATYPE_HANDLING)));
+
+				final RDFParserOptions parserOptions = new RDFParserOptions(//
+                		verifyData,//
+                		preserveBlankNodeIDs,//
+                		stopAtFirstError,//
+                		dataTypeHandling//
+                		);
                 
                 doLoad(context.conn.getSailConnection(), sourceURL,
-                        defaultContext, op.getRDFParserOptions(), nmodified,
+                        defaultContext, parserOptions, nmodified,
                         op);
 
             } catch (Throwable t) {

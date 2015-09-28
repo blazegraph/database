@@ -33,14 +33,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
@@ -59,7 +57,6 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -76,13 +73,11 @@ import com.bigdata.rdf.sail.sparql.ast.ASTRDFValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTString;
 import com.bigdata.rdf.sail.sparql.ast.ASTTrue;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.BD;
 
 /**
- * Class performs efficient batch resolution of RDF Values against the database.
- * This efficiency is important on a cluster and when a SPARQL query or update
- * contains a large number of RDF Values.
+ * Visits the AST model and builds a map from each RDF {@link Value} to
+ * {@link BigdataValue} objects that have mock IVs assigned to them.
  * <p>
  * Note: The {@link PrefixDeclProcessor} will rewrite {@link ASTQName} nodes as
  * {@link ASTIRI} nodes. It MUST run before this processor.
@@ -98,14 +93,20 @@ import com.bigdata.rdf.store.BD;
  * allowed to use values not actually in the database. MP
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @openrdf
+ * 
+ * 			FIXME This class should go away per BLZG-1519
+ * 
+ * @see https://jira.blazegraph.com/browse/BLZG-1176 (decouple SPARQL parser
+ *      from DB)
+ * @see https://jira.blazegraph.com/browse/BLZG-1519 (Refactor test suite to
+ *      remove tight coupling with IVs while checking up parsed queries)
  */
+@Deprecated
 public class BatchRDFValueResolver extends ASTVisitorBase {
 
     private final static Logger log = Logger
             .getLogger(BatchRDFValueResolver.class);
-
 
     private final Map<Value, BigdataValue> vocab;
 
@@ -115,6 +116,17 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
     private final LinkedHashMap<ASTRDFValue, BigdataValue> nodes;
     
+    /**
+	 * Return a map from openrdf {@link Value} objects to the corresponding
+	 * {@link BigdataValue} objects for all {@link Value}s that appear in the
+	 * parse tree.
+	 */
+    public Map<Value, BigdataValue> getValues() {
+
+    	return vocab;
+    	
+    }
+
     /**
      * @param readOnly
      *            When <code>true</code>, unknown RDF {@link Value}s are not
@@ -135,9 +147,9 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
     }
     
-    public Map<ASTRDFValue, BigdataValue> getNodes() {
-        return nodes;
-    }
+//    public Map<ASTRDFValue, BigdataValue> getNodes() {
+//        return nodes;
+//    }
 
     /**
      * Visit the parse tree, locating and collecting references to all
@@ -149,7 +161,6 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
      * in a batch against the database, obtaining their {@link IVs}.
      * Until then {@link BigdataValue}s in the parse tree have unresolved
      * {@link IV}s (TermID(0)).  
-     * 
      * 
      * @param qc
      * 
@@ -184,7 +195,8 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             while (itr.hasNext()) {
             
                 final Entry<ASTRDFValue, BigdataValue> entry = itr.next();
-                ASTRDFValue value = entry.getKey();
+
+                final ASTRDFValue value = entry.getKey();
                 
                 IV iv = null;
                 BigdataValue bigdataValue = null;
@@ -271,9 +283,10 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         vocab.put(BD.VIRTUAL_GRAPH, valueFactory.asValue(BD.VIRTUAL_GRAPH));
 
         /*
-         * Batch resolution the BigdataValue objects against the database will be done in
-         * ASTDeferredIVResolution. Mock IVs used until then.
-         */
+		 * Note: Batch resolution the BigdataValue objects against the database
+		 * DOES NOT happen here. It will be done in ASTDeferredIVResolution.
+		 * Mock IVs used until then.
+		 */
         {
 
             // Cache the BigdataValues on the IVs for later
@@ -506,10 +519,6 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
         }
 
-    }
-
-    public Map<Value, BigdataValue> getValues() {
-        return vocab;
     }
 
 }

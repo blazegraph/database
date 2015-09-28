@@ -55,7 +55,6 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
@@ -95,7 +94,6 @@ import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
-import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -288,34 +286,34 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         if (node.isSilent())
             op.setSilent(true);
 
-        final RDFParserOptions options = new RDFParserOptions(
-                context.getUpdateProperties());
-
-        if (node.verifyData != null) {
-
-            options.setVerifyData(node.verifyData);
-
-        }
-
-        if (node.stopAtFirstError != null) {
-
-            options.setStopAtFirstError(node.stopAtFirstError);
-
-        }
-
-        if (node.preserveBNodeIDs != null) {
-
-            options.setPreserveBNodeIDs(node.preserveBNodeIDs);
-
-        }
-
-        if (node.datatypeHandling != null) {
-
-            options.setDatatypeHandling(node.datatypeHandling);
-
-        }
-
-        op.setRDFParserOptions(options);
+//        final RDFParserOptions options = new RDFParserOptions(
+//                context.getUpdateProperties());
+//
+//        if (node.verifyData != null) {
+//
+//            options.setVerifyData(node.verifyData);
+//
+//        }
+//
+//        if (node.stopAtFirstError != null) {
+//
+//            options.setStopAtFirstError(node.stopAtFirstError);
+//
+//        }
+//
+//        if (node.preserveBNodeIDs != null) {
+//
+//            options.setPreserveBNodeIDs(node.preserveBNodeIDs);
+//
+//        }
+//
+//        if (node.datatypeHandling != null) {
+//
+//            options.setDatatypeHandling(node.datatypeHandling);
+//
+//        }
+//
+//        op.setRDFParserOptions(options);
         
         if (node.jjtGetNumChildren() > 1) {
 

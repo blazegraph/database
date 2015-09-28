@@ -70,9 +70,14 @@ import cutthecrap.utils.striterators.Striterator;
  * optional HAVING clause. The SELECT expressions MUST be aggregates (if the
  * SELECT expressions do not involve aggregates then you should not be using an
  * aggregation operator to compute the select expressions).
+ * <p>
+ * Note: This is a port of {@link com.bigdata.bop.solutions.GroupByState} that
+ * does not depend on the blazegraph operator model. It was developed as part of
+ * BLZG-1176 to decouple the SPARQL parser from the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ *
+ * @see https://jira.blazegraph.com/browse/BLZG-1176
  */
 public class VerifyAggregates {
 
