@@ -439,7 +439,7 @@ public class StorageStats {
 	
 	public Bucket findBucket(final int sze) {
 		for (Bucket b : m_buckets) {
-			if (sze < b.m_size)
+			if (sze == b.m_size)
 				return b;
 		}
 		

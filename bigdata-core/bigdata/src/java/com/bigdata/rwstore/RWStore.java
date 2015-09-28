@@ -2799,6 +2799,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     	}
     	
     	final Bucket stats = m_storageStats.findBucket(block);
+    	if (stats == null) {
+    		return null;
+    	}
     	
     	// only check waste if number of allocators is greater than some configurable
     	//	amount
@@ -2807,7 +2810,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     	}
     	
     	// only check small slots if total waste is larger than some configurable amount
-    	if (stats.slotWaste() < cSmallSlotHighWaste) {
+    	final float slotWaste = stats.slotWaste();
+    	if (slotWaste < cSmallSlotHighWaste) {
     		return null;
     	}
     	
@@ -2822,6 +2826,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     				candidateFreeBits = candidate.m_freeBits;
     			}
      		}
+    	}
+    	
+    	if (candidate != null && log.isDebugEnabled()) {
+    		log.debug("Found candidate small slot allocator");
     	}
     	
     	return candidate;   	
