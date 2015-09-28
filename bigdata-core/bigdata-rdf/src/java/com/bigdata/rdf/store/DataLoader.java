@@ -155,7 +155,8 @@ public class DataLoader {
      *       where the appropriate factory is required for TM vs non-TM
      *       scenarios (or where the factory is parameterize for tm vs non-TM).
      */
-    synchronized protected StatementBuffer<?> getAssertionBuffer() {
+    @SuppressWarnings("rawtypes")
+   synchronized protected StatementBuffer<?> getAssertionBuffer() {
 
         if (buffer == null) {
 
@@ -181,6 +182,8 @@ public class DataLoader {
     private final ClosureEnum closureEnum;
     
     private final boolean flush;
+    
+    private final boolean ignoreInvalidFiles;
     
 //    public boolean setFlush(boolean newValue) {
 //        
@@ -420,6 +423,22 @@ public class DataLoader {
          */
         String DEFAULT_FLUSH = "true";
         
+        /**
+         * When <code>true</code>, the loader will not break on unresolvable
+         * parse errors, but instead skip the file containing the error. This
+         * option is useful when loading large input that may contain invalid
+         * RDF, in order to make sure that the loading process does not fully
+         * fail when malicious files are detected. Note that an error will
+         * still be logged in case files cannot be loaded, so one is able to
+         * track the files that failed.
+         */
+        String IGNORE_INVALID_FILES = DataLoader.class.getName()+".ignoreInvalidFiles";
+        
+        /**
+         * The default value (<code>false</code>) for {@link #IGNORE_INVALID_FILES)
+         */
+        String DEFAULT_IGNORE_INVALID_FILES = "false";
+        
     }
 
     /**
@@ -518,7 +537,12 @@ public class DataLoader {
 
         flush = Boolean.parseBoolean(properties.getProperty(Options.FLUSH,
                 Options.DEFAULT_FLUSH));
-
+        
+        ignoreInvalidFiles =
+            Boolean.parseBoolean(properties.getProperty(
+                Options.IGNORE_INVALID_FILES,
+                Options.DEFAULT_IGNORE_INVALID_FILES));   
+        
         if (log.isInfoEnabled())
             log.info(Options.FLUSH + "=" + flush);
 
@@ -565,7 +589,8 @@ public class DataLoader {
      * 
      * @throws IOException
      */
-    final public LoadStats loadData(final String[] resource,
+   @SuppressWarnings("unused")
+   final public LoadStats loadData(final String[] resource,
             final String[] baseURL, final RDFFormat[] rdfFormat)
             throws IOException {
 
@@ -909,6 +934,9 @@ public class DataLoader {
                 
         InputStream is = null;
 
+        
+    	log.info("Loading next file: " + file + "now...");
+
         try {
 
             is = new FileInputStream(file);
@@ -944,8 +972,18 @@ public class DataLoader {
 
             } catch (Exception ex) {
 
-                throw new RuntimeException("While loading: " + file, ex);
-
+               if (ignoreInvalidFiles) {
+                  
+                  // just log the warning
+                  log.error("File " + file + " could not be loaded... Skipped!");
+                  
+               } else {
+                  
+                  // throw a runtime exception, causing an abort
+                  throw new RuntimeException("While loading: " + file, ex);
+                  
+               }
+               
             } finally {
 
                 reader.close();
@@ -984,7 +1022,8 @@ public class DataLoader {
      * @param endOfBatch
      *            Signal indicates the end of a batch.
      */
-    public void loadData3(final LoadStats totals, final Object source,
+   @SuppressWarnings("unused")
+   public void loadData3(final LoadStats totals, final Object source,
             final String baseURL, final RDFFormat rdfFormat,
             final String defaultGraph, final boolean endOfBatch) throws IOException {
 
@@ -1090,7 +1129,7 @@ public class DataLoader {
                     log.info("commit: latency=" + stats.commitTime + "ms");
 
                 if (log.isInfoEnabled() && false)
-    				logCounters(database);
+                   logCounters(database);
     			
             }
 
