@@ -935,7 +935,8 @@ public class DataLoader {
         InputStream is = null;
 
         
-    	log.info("Loading next file: " + file + "now...");
+        if(log.isInfoEnabled())
+        	log.info("Loading next file: " + file + " now...");
 
         try {
 
