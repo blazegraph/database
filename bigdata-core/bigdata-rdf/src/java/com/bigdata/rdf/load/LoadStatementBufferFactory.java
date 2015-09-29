@@ -39,7 +39,7 @@ public class LoadStatementBufferFactory<S extends Statement> implements
     public StatementBuffer<S> newStatementBuffer() {
 
         return new StatementBuffer<S>(null/* statementStore */, db,
-                bufferCapacity);
+                bufferCapacity, 10/*queueCapacity*/);
 
     }
     
