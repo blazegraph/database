@@ -88,6 +88,12 @@ public class DataLoader {
     private final int bufferCapacity;
     
     /**
+	 * The capacity of the blocking queue for the backing
+	 * {@link StatementBuffer}.
+	 */
+    private final int queueCapacity;
+    
+    /**
      * The target database.
      */
     private final AbstractTripleStore database;
@@ -163,7 +169,7 @@ public class DataLoader {
             if (tm != null) {
 
                 buffer = new StatementBuffer(tm.newTempTripleStore(),
-                        database, bufferCapacity);
+                        database, bufferCapacity, queueCapacity);
 
             } else {
 
@@ -365,6 +371,21 @@ public class DataLoader {
         
         String DEFAULT_BUFFER_CAPACITY = "100000";
 
+		/**
+		 * Optional property specifying the capacity of blocking queue used by
+		 * the {@link StatementBuffer} -or- ZERO (0) to disable the blocking
+		 * queue and perform synchronous writes (default is
+		 * {@value #DEFAULT_QUEUE_CAPACITY} statements). The blocking queue
+		 * holds parsed data pending writes onto the backing store and makes it
+		 * possible for the parser to race ahead while writer is blocked writing
+		 * onto the database indices.
+		 * 
+		 * @see BLZG-1552
+		 */
+		String QUEUE_CAPACITY = DataLoader.class.getName() + ".queueCapacity";
+
+		String DEFAULT_QUEUE_CAPACITY = "10";
+
         /**
          * Optional property controls whether and when the RDFS(+) closure is
          * maintained on the database as documents are loaded (default
@@ -508,6 +529,9 @@ public class DataLoader {
 
         bufferCapacity = Integer.parseInt(properties.getProperty(
                 Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
+
+        queueCapacity = Integer.parseInt(properties.getProperty(
+                Options.QUEUE_CAPACITY, Options.DEFAULT_QUEUE_CAPACITY));
 
         this.database = database;
 
@@ -1454,6 +1478,7 @@ public class DataLoader {
                     RDFParserOptions.Options.VERIFY_DATA,
                     // DataLoader options.
                     DataLoader.Options.BUFFER_CAPACITY,
+                    DataLoader.Options.QUEUE_CAPACITY,
                     DataLoader.Options.CLOSURE,
                     DataLoader.Options.COMMIT,
                     DataLoader.Options.FLUSH,
