@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -265,7 +266,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	 * current task (if any) that is writing the current {@link Batch} onto the
 	 * database.
 	 */
-	private final Future<Long> ft;
+	private final Future<Void> ft;
     
     @Override
     public boolean isEmpty() {
@@ -303,8 +304,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * When invoked, the {@link StatementBuffer} will resolve terms against the
      * lexicon, but not enter new terms into the lexicon. This mode can be used
      * to efficiently resolve terms to {@link SPO}s.
-     * 
-     * FIXME REFACTOR
      * 
      * @todo Use an {@link IBuffer} pattern can be used to make the statement
      *       buffer chunk-at-a-time. The buffer has a readOnly argument and will
@@ -345,6 +344,34 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	 */
     private IChangeLog changeLog;
 
+    /**
+	 * Note: The use of this interface is NOT encouraged. It is used to hook the
+	 * axioms in {@link com.bigdata.rdf.axioms.BaseAxioms}. Ideally this could
+	 * be backed out in favor of using the {@link IChangeLog} but I was not able
+	 * to make that work out very easily.
+	 * 
+	 * @author bryan
+	 *
+	 * @param <S>
+	 * 
+	 * @see BLZG-1552
+	 */
+	public interface IWrittenSPOArray {
+		
+	    /**
+		 * A callback that is invoked with the statements actually written onto the
+		 * backing store. The default implementation is a NOP.
+		 * 
+		 * @param stmts
+		 *            An array of the statements written onto the backing store.
+		 * @param numStmts
+		 *            The number of entries in that array that were written.
+		 */
+		void didWriteSPOs(final SPO[] stmts, final int numStmts);
+
+	}
+	protected IWrittenSPOArray didWriteCallback = null;
+	
     /**
      * Create a buffer that converts Sesame {@link Value} objects to {@link SPO}
      * s and writes on the <i>database</i> when it is {@link #flush()}ed. This
@@ -448,7 +475,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	getDistinctTerm(RDF_STATEMENT, true);
     	getDistinctTerm(RDF_TYPE, true);
     
-    	if(true) {
+		if (false) {
+			
 			/*
 			 * Setup a deque that will be used allow the parser to race ahead.
 			 * Once the writes on the statement indices are done, the queue can
@@ -470,19 +498,26 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			 */
 			executor = new LatchedExecutor(database.getExecutorService(), 1/* nparallel */);
 
-			ft = new FutureTask<Long>(new Callable<Long>() {
+			ft = new FutureTask<Void>(new Callable<Void>() {
 				
 				@Override
-				public Long call() throws Exception {
-					
+				public Void call() throws Exception {
+
 					/**
-					 * FIXME Modify this to merge multiple batches using drainTo() and then
-					 * batch the combined result.
+					 * FIXME BLZG-1522 Modify this to merge multiple batches
+					 * using drainTo() and then batch the combined result.
 					 */
-					final Batch<S> batch = queue.take();
-					
-					return batch.writeNow();
-					
+					while (true) {
+						final Batch<S> batch = queue.take();
+
+						if (batch == Batch.POISON_PILL) {
+							// Done.
+							return null;
+						}
+
+						batch.writeNow();
+					}
+
 				}
 			});
 			
@@ -518,6 +553,25 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
         // flush anything left in the buffer.
         incrementalWrite();
+        
+		if (queue != null) {
+			// FIXME Debug poison pill approach.
+			// Drop a poison pill on the queue.
+			queue.add((Batch) Batch.POISON_PILL);
+			
+			// block and wait until the flush is done.
+			try {
+				ft.get();
+			} catch (InterruptedException e) {
+				// Cancel task and propagate interrupt.
+				ft.cancel(true/* mayInterruptIfRunning */);
+				Thread.currentThread().interrupt();
+			} catch (ExecutionException e) {
+				// Wrap and throw.
+				throw new RuntimeException(e);
+			}
+			
+        }
         
         // discard all buffer state (including bnodes and deferred statements).
         reset();
@@ -890,100 +944,105 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected void incrementalWrite() {
 
-    	// FIXME Buffer a batch and then incrementally flush.
-//		if (queue == null) {
-//			new Batch().writeNow();
-//		} else {
-//			queue.add(new Batch(/* copyData */));
+    	// Buffer a batch and then incrementally flush.
+		if (queue == null) {
+
+			new Batch<S>(this, false/* clone */).writeNow();
+			
+		} else {
+			
+			queue.add(new Batch<S>(this, true/* clone */));
+			
+		}
+		
+//    	/*
+//    	 * Look for non-sid bnodes and add them to the values to be written
+//    	 * to the database (if they haven't already been written).
+//    	 */
+//    	if (bnodes != null) {
+//    		
+//	    	for (BigdataBNode bnode : bnodes.values()) {
+//	    		
+//	    		// sid, skip
+//	    		if (bnode.isStatementIdentifier())
+//	    			continue;
+//	    		
+//	    		// already written, skip
+//	    		if (bnode.getIV() != null)
+//	    			continue;
+//	    		
+//	    		values[numValues++] = bnode;
+//	    		
+//	    		numBNodes++;
+//	    		
+//	    	}
+//	    	
 //    	}
-    	/*
-    	 * Look for non-sid bnodes and add them to the values to be written
-    	 * to the database (if they haven't already been written).
-    	 */
-    	if (bnodes != null) {
-    		
-	    	for (BigdataBNode bnode : bnodes.values()) {
-	    		
-	    		// sid, skip
-	    		if (bnode.isStatementIdentifier())
-	    			continue;
-	    		
-	    		// already written, skip
-	    		if (bnode.getIV() != null)
-	    			continue;
-	    		
-	    		values[numValues++] = bnode;
-	    		
-	    		numBNodes++;
-	    		
-	    	}
-	    	
-    	}
-    	
-        final long begin = System.currentTimeMillis();
-
-        if (log.isInfoEnabled()) {
-        
-            log.info("numValues=" + numValues + " (uris=" + numURIs + ", lits="
-                    + numLiterals + ", bnodes=" + numBNodes + ")"
-                    + ", numStmts=" + numStmts);
-            
-        }
-
-        // Insert terms (batch operation).
-        if (numValues > 0) {
-            if (log.isDebugEnabled()) {
-                for (int i = 0; i < numValues; i++) {
-                    log
-                            .debug("adding term: "
-                                    + values[i]
-                                    + " (iv="
-                                    + values[i].getIV()
-                                    + ")"
-                                    + ((values[i] instanceof BNode) ? "sid="
-                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
-                                            : ""));
-                }
-            }
-			Batch.addTerms(database, values, numValues, readOnly);
-            if (log.isDebugEnabled()) {
-                for (int i = 0; i < numValues; i++) {
-                    log
-                            .debug(" added term: "
-                                    + values[i]
-                                    + " (iv="
-                                    + values[i].getIV()
-                                    + ")"
-                                    + ((values[i] instanceof BNode) ? "sid="
-                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
-                                            : ""));
-                }
-            }
-        }
-
-        // Insert statements (batch operation).
-        if (numStmts > 0) {
-            if (log.isDebugEnabled()) {
-                for(int i=0; i<numStmts; i++) {
-                    log.debug("adding stmt: "+stmts[i]);
-                }
-            }
-            Batch.addStatements(database, statementStore, stmts, numStmts, changeLog, didWriteCallback);
-            if (log.isDebugEnabled()) {
-                for(int i=0; i<numStmts; i++) {
-                    log.debug(" added stmt: "+stmts[i]);
-                }
-            }
-        }
-        
-        if (log.isInfoEnabled()) {
-            
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            log.info("numValues=" + numValues + ", numStmts=" + numStmts
-                    + ", elapsed=" + elapsed + "ms");
-            
-        }
+//    	
+//        final long begin = System.currentTimeMillis();
+//
+//        if (log.isInfoEnabled()) {
+//        
+//            log.info("numValues=" + numValues + " (uris=" + numURIs + ", lits="
+//                    + numLiterals + ", bnodes=" + numBNodes + ")"
+//                    + ", numStmts=" + numStmts);
+//            
+//        }
+//
+//        // Insert terms (batch operation).
+//        if (numValues > 0) {
+//            if (log.isDebugEnabled()) {
+//                for (int i = 0; i < numValues; i++) {
+//                    log
+//                            .debug("adding term: "
+//                                    + values[i]
+//                                    + " (iv="
+//                                    + values[i].getIV()
+//                                    + ")"
+//                                    + ((values[i] instanceof BNode) ? "sid="
+//                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
+//                                            : ""));
+//                }
+//            }
+//			Batch.addTerms(database, values, numValues, readOnly);
+//            if (log.isDebugEnabled()) {
+//                for (int i = 0; i < numValues; i++) {
+//                    log
+//                            .debug(" added term: "
+//                                    + values[i]
+//                                    + " (iv="
+//                                    + values[i].getIV()
+//                                    + ")"
+//                                    + ((values[i] instanceof BNode) ? "sid="
+//                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
+//                                            : ""));
+//                }
+//            }
+//        }
+//
+//        // Insert statements (batch operation).
+//        if (numStmts > 0) {
+//            if (log.isDebugEnabled()) {
+//                for(int i=0; i<numStmts; i++) {
+//                    log.debug("adding stmt: "+stmts[i]);
+//                }
+//            }
+//            Batch.addStatements(database, statementStore, stmts, numStmts, changeLog, didWriteCallback);
+//            if (log.isDebugEnabled()) {
+//                for(int i=0; i<numStmts; i++) {
+//                    log.debug(" added stmt: "+stmts[i]);
+//                }
+//            }
+//        }
+//        
+//        if (log.isInfoEnabled()) {
+//            
+//            final long elapsed = System.currentTimeMillis() - begin;
+//            
+//            log.info("numValues=" + numValues + ", numStmts=" + numStmts
+//                    + ", elapsed=" + elapsed + "ms");
+//            
+//        }
     	
         // Reset the state of the buffer (but not the bnodes nor deferred stmts).
         _clear();
@@ -991,43 +1050,211 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     }
 
     /**
-	 * Note: The use of this interface is NOT encouraged. It is used to hook the
-	 * axioms.
 	 * 
 	 * @author bryan
-	 *
-	 * @param <S>
+	 * 
+	 * @see BLZG-1522
+	 * 
+	 *      FIXME BLZG-1522 The 10k value used by the
+	 *      BigdataSail.Options.BUFFER_CAPACITY is probably good in combination
+	 *      with a queue capacity of 10 since that would allow as many as 100k
+	 *      statements to be buffered. But larger values might also be ok as
+	 *      well as large queue capacities. Allow the latter to be parameterized
+	 *      and do some performance tests.
+	 * 
+	 *      FIXME BLZG-1522 Test with queue enabled.
 	 */
-	public interface IWrittenSPOArray {
-		
-	    /**
-		 * A callback that is invoked with the statements actually written onto the
-		 * backing store. The default implementation is a NOP.
-		 * 
-		 * @param stmts
-		 *            An array of the statements written onto the backing store.
-		 * @param numStmts
-		 *            The number of entries in that array that were written.
-		 */
-		void didWriteSPOs(final SPO[] stmts, final int numStmts);
-
-	}
-	protected IWrittenSPOArray didWriteCallback = null;
-	
-    /**
-     * 
-     * @author bryan
-     */
     private static class Batch<S extends Statement> {
-    	
-    	Batch(final StatementBuffer<S> sb) {
 
+    	@SuppressWarnings("rawtypes")
+		public static final Batch<?> POISON_PILL = new Batch();
+
+		/*
+		 * All of these are fields from the outer class. They have either been
+		 * copied by reference or cloned depending on the constructor call. I
+		 * have explicitly replicated them here to provide a boundary around the
+		 * state that can be dropped into the queue and the state that is being
+		 * used to absorb statements from the parser. This is why Batch is a
+		 * *static* class.
+		 */
+    	
+    	private final AbstractTripleStore database;
+    	
+    	private final AbstractTripleStore statementStore;
+    	
+    	private final boolean readOnly;
+    	
+    	private final IChangeLog changeLog;
+    	
+    	private final IWrittenSPOArray didWriteCallback;
+
+    	private final int numValues;
+    	
+    	private final BigdataValue[] values;
+    	
+    	private final int numStmts;
+    	
+    	private final BigdataStatement[] stmts;
+    	
+    	private Batch() {
+			database = null;
+			statementStore = null;
+			readOnly = true;
+			changeLog = null;
+			didWriteCallback = null;
+			numValues = 0;
+			values = null;
+			numStmts = 0;
+			stmts = null;
     	}
     	
+    	/**
+		 * 
+		 * @param sb
+		 * @param clone
+		 *            When true, the backing arrays are cloned in order to allow
+		 *            them to be cleared by the caller. When false, the caller
+		 *            MUST invoke {@link #writeNow()} synchronously. (This is used
+		 *            to make it easier to compare the two approaches without 
+		 *            introducing any new overhead).
+		 */
+    	Batch(final StatementBuffer<S> sb, final boolean clone) {
+
+			if (sb == null)
+				throw new IllegalArgumentException();
+
+			/*
+			 * All of these fields can be copied by reference. They are not
+			 * carrying any interesting state information from the parser.
+			 */
+			this.database = sb.database;
+			this.statementStore = sb.statementStore;
+			this.readOnly = sb.readOnly;
+			this.changeLog = sb.changeLog;
+			this.didWriteCallback = sb.didWriteCallback;
+
+        	/*
+        	 * Look for non-sid bnodes and add them to the values to be written
+        	 * to the database (if they haven't already been written).
+        	 */
+        	if (sb.bnodes != null) {
+        		
+    	    	for (BigdataBNode bnode : sb.bnodes.values()) {
+    	    		
+    	    		// sid, skip
+    	    		if (bnode.isStatementIdentifier())
+    	    			continue;
+    	    		
+    	    		// already written, skip
+    	    		if (bnode.getIV() != null)
+    	    			continue;
+    	    		
+    	    		sb.values[sb.numValues++] = bnode;
+    	    		
+    	    		sb.numBNodes++;
+    	    		
+    	    	}
+    	    	
+        	}
+        	    
+			if (!clone) {
+
+				// Copy array references.
+				
+				this.numValues = sb.numValues;
+				this.values = sb.values;
+
+				this.numStmts = sb.numStmts;
+				this.stmts = sb.stmts;
+
+			} else {
+
+				// Clone array data.
+				
+				this.numValues = sb.numValues;
+				this.values = new BigdataValue[sb.numValues];
+				System.arraycopy(sb.values/* src */, 0/* srcPos */, this.values/* dest */, 0/* destPos */,
+						sb.numValues/* length */);
+
+				this.numStmts = sb.numStmts;
+				this.stmts = new BigdataStatement[sb.numStmts];
+				System.arraycopy(sb.stmts/* src */, 0/* srcPos */, this.stmts/* dest */, 0/* destPos */,
+						sb.numStmts/* length */);
+
+			}
+			
+    	}
+
+		/**
+		 * Flush the batch.
+		 * 
+		 * @return The #of statements actually written.
+		 */
 		private long writeNow() {
 
-			throw new UnsupportedOperationException();
-			
+            final long begin = System.currentTimeMillis();
+
+            if (log.isInfoEnabled())
+				log.info("numValues=" + numValues + ", numStmts=" + numStmts);
+
+            // Insert terms (batch operation).
+            if (numValues > 0) {
+                if (log.isDebugEnabled()) {
+                    for (int i = 0; i < numValues; i++) {
+                        log
+                                .debug("adding term: "
+                                        + values[i]
+                                        + " (iv="
+                                        + values[i].getIV()
+                                        + ")"
+                                        + ((values[i] instanceof BNode) ? "sid="
+                                                + ((BigdataBNode) values[i]).isStatementIdentifier()
+                                                : ""));
+                    }
+                }
+    			addTerms(database, values, numValues, readOnly);
+                if (log.isDebugEnabled()) {
+                    for (int i = 0; i < numValues; i++) {
+                        log
+                                .debug(" added term: "
+                                        + values[i]
+                                        + " (iv="
+                                        + values[i].getIV()
+                                        + ")"
+                                        + ((values[i] instanceof BNode) ? "sid="
+                                                + ((BigdataBNode) values[i]).isStatementIdentifier()
+                                                : ""));
+                    }
+                }
+            }
+
+            // Insert statements (batch operation).
+            final long nwritten;
+			if (numStmts > 0) {
+				if (log.isDebugEnabled()) {
+					for (int i = 0; i < numStmts; i++) {
+						log.debug("adding stmt: " + stmts[i]);
+					}
+				}
+                nwritten = addStatements(database, statementStore, stmts, numStmts, changeLog, didWriteCallback);
+				if (log.isDebugEnabled()) {
+					for (int i = 0; i < numStmts; i++) {
+						log.debug(" added stmt: " + stmts[i]);
+					}
+				}
+            } else nwritten = 0;
+            
+            if (log.isInfoEnabled()) {
+                
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                log.info("numValues=" + numValues + ", numStmts=" + numStmts
+                        + ", elapsed=" + elapsed + "ms");
+                
+            }
+
+            return nwritten;
+            
     	}
     	
     	static private void addTerms(
