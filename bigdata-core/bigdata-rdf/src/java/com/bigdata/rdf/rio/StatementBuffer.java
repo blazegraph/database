@@ -31,6 +31,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -40,6 +44,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.jsr166.LinkedBlockingQueue;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
@@ -60,7 +65,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.util.Bits;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * A write buffer for absorbing the output of the RIO parser or other
@@ -82,7 +87,6 @@ import com.bigdata.util.Bits;
  * writers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class StatementBuffer<S extends Statement> implements IStatementBuffer<S> {
 
@@ -173,10 +177,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     private boolean statementIdentifiers;
     
     /**
-     * When non-<code>null</code> the statements will be written on this
-     * store. When <code>null</code> the statements are written onto the
-     * {@link #database}.
-     */
+	 * When non-<code>null</code> the statements will be written on this store.
+	 * When <code>null</code> the statements are written onto the
+	 * {@link #database}. (This is used to support incremental truth
+	 * maintenance.)
+	 */
     private final AbstractTripleStore statementStore;
 
     /**
@@ -238,6 +243,30 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 //     */
 //    protected final boolean distinct = true;
     
+    /**
+	 * When non-null, this is a deque that will be used allow the parser to race
+	 * ahead. Once the writes on the statement indices are done, the queue can
+	 * be drained to a thread that will then merge the batches and batch them
+	 * through to the database.
+	 * 
+	 * @see BLZG-641
+	 * @see BLZG-1522
+	 */
+    private final LinkedBlockingQueue<Batch<S>> queue;
+
+    /**
+	 * When non-null, this is a single threaded executor that will be used to
+	 * drain {@link #queue} and batch updates through to the database.
+	 */
+    private final Executor executor;
+
+    /**
+	 * When the {@link #queue} is being used, this is the {@link Future} of the
+	 * current task (if any) that is writing the current {@link Batch} onto the
+	 * database.
+	 */
+	private final Future<Long> ft;
+    
     @Override
     public boolean isEmpty() {
         
@@ -297,12 +326,23 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     
     private boolean readOnly = false;
     
+	/**
+	 * Set an {@link IChangeLog} listener that will be notified about each
+	 * statement actually written onto the backing store.
+	 * 
+	 * @param changeLog
+	 *            The change log listener.
+	 */
     public void setChangeLog(final IChangeLog changeLog) {
         
         this.changeLog = changeLog;
         
     }
     
+    /**
+	 * When non-null, this is an {@link IChangeLog} listener that will be
+	 * notified about each statement actually written onto the backing store.
+	 */
     private IChangeLog changeLog;
 
     /**
@@ -322,6 +362,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     public StatementBuffer(final AbstractTripleStore database,
             final int capacity) {
+    	
         this(null/* statementStore */, database, capacity);
 
     }
@@ -406,7 +447,52 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	getDistinctTerm(RDF_OBJECT, true);
     	getDistinctTerm(RDF_STATEMENT, true);
     	getDistinctTerm(RDF_TYPE, true);
-        
+    
+    	if(true) {
+			/*
+			 * Setup a deque that will be used allow the parser to race ahead.
+			 * Once the writes on the statement indices are done, the queue can
+			 * be drained to a thread that will then merge the batches and batch
+			 * them through to the database.
+			 * 
+			 * @see BLZG-641
+			 * 
+			 * @see BLZG-1522
+			 */
+			queue = new LinkedBlockingQueue<Batch<S>>(10/* capacity */);
+
+			/*
+			 * Setup executor used to drain the queue, merge the batches and
+			 * write on the database.
+			 * 
+			 * Note: executor is backed by the database executor service and has
+			 * a maximum parallelism of one.
+			 */
+			executor = new LatchedExecutor(database.getExecutorService(), 1/* nparallel */);
+
+			ft = new FutureTask<Long>(new Callable<Long>() {
+				
+				@Override
+				public Long call() throws Exception {
+					
+					/**
+					 * FIXME Modify this to merge multiple batches using drainTo() and then
+					 * batch the combined result.
+					 */
+					final Batch<S> batch = queue.take();
+					
+					return batch.writeNow();
+					
+				}
+			});
+			
+		} else {
+			queue = null;
+			executor = null;
+			ft = null;
+    	}
+		
+		
     }
 
     /**
@@ -728,6 +814,16 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         reifiedStmts = null;
         
+		if (queue != null) {
+
+			// Cancel any running task.
+			ft.cancel(true/* mayInterruptIfRunning */);
+			
+			// Clear the queue.
+			queue.clear();
+			
+		}
+        
     }
     
     /**
@@ -794,6 +890,12 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected void incrementalWrite() {
 
+    	// FIXME Buffer a batch and then incrementally flush.
+//		if (queue == null) {
+//			new Batch().writeNow();
+//		} else {
+//			queue.add(new Batch(/* copyData */));
+//    	}
     	/*
     	 * Look for non-sid bnodes and add them to the values to be written
     	 * to the database (if they haven't already been written).
@@ -843,7 +945,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                                             : ""));
                 }
             }
-            addTerms(values, numValues);
+			Batch.addTerms(database, values, numValues, readOnly);
             if (log.isDebugEnabled()) {
                 for (int i = 0; i < numValues; i++) {
                     log
@@ -866,7 +968,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                     log.debug("adding stmt: "+stmts[i]);
                 }
             }
-            addStatements(stmts, numStmts);
+            Batch.addStatements(database, statementStore, stmts, numStmts, changeLog, didWriteCallback);
             if (log.isDebugEnabled()) {
                 for(int i=0; i<numStmts; i++) {
                     log.debug(" added stmt: "+stmts[i]);
@@ -882,33 +984,309 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                     + ", elapsed=" + elapsed + "ms");
             
         }
-
+    	
         // Reset the state of the buffer (but not the bnodes nor deferred stmts).
         _clear();
 
     }
 
-    protected void addTerms(final BigdataValue[] terms, final int numTerms) {
+    /**
+	 * Note: The use of this interface is NOT encouraged. It is used to hook the
+	 * axioms.
+	 * 
+	 * @author bryan
+	 *
+	 * @param <S>
+	 */
+	public interface IWrittenSPOArray {
+		
+	    /**
+		 * A callback that is invoked with the statements actually written onto the
+		 * backing store. The default implementation is a NOP.
+		 * 
+		 * @param stmts
+		 *            An array of the statements written onto the backing store.
+		 * @param numStmts
+		 *            The number of entries in that array that were written.
+		 */
+		void didWriteSPOs(final SPO[] stmts, final int numStmts);
 
-        if (log.isInfoEnabled()) {
+	}
+	protected IWrittenSPOArray didWriteCallback = null;
+	
+    /**
+     * 
+     * @author bryan
+     */
+    private static class Batch<S extends Statement> {
+    	
+    	Batch(final StatementBuffer<S> sb) {
 
-            log.info("writing " + numTerms);
+    	}
+    	
+		private long writeNow() {
+
+			throw new UnsupportedOperationException();
+			
+    	}
+    	
+    	static private void addTerms(
+    			final AbstractTripleStore database, //
+    			final BigdataValue[] terms, //
+    			final int numTerms,//
+    			final boolean readOnly//
+    			) {
+
+            if (log.isInfoEnabled()) {
+
+                log.info("writing " + numTerms);
+                
+                for (int i = 0; i < numTerms; i++) {
+                	log.info("term: " + terms[i] + ", iv: " + terms[i].getIV());
+                }
+
+            }
             
-            for (int i = 0; i < numTerms; i++) {
-            	log.info("term: " + terms[i] + ", iv: " + terms[i].getIV());
+            final long l =
+                    database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
+            
+            if (log.isInfoEnabled()) {
+                log.info("# reported from addTerms: " + l);
+            }
+            
+        }
+        
+        /**
+         * Adds the statements to each index (batch api, NO truth maintenance).
+         * <p>
+         * Pre-conditions: The {s,p,o} term identifiers for each
+         * {@link BigdataStatement} are defined.
+         * <p>
+         * Note: If statement identifiers are enabled and the context position is
+         * non-<code>null</code> then it will be unified with the statement
+         * identifier assigned to that statement. It is an error if the context
+         * position is a URI (since it can not be unified with the assigned
+         * statement identifier). It is an error if the context position is a blank
+         * node which is already bound to a term identifier whose value is different
+         * from the statement identifier assigned/reported by the {@link #database}.
+         * 
+    	 * @param database
+    	 *            The database that will be used to resolve terms. When
+    	 *            <i>statementStore</i> is <code>null</code>, statements will be
+    	 *            written into this store as well.
+    	 * @param statementStore
+    	 *            When non-<code>null</code> the statements will be written on
+    	 *            this store. When <code>null</code> the statements are written
+    	 *            onto the <i>database</i>. (This is used to support incremental
+    	 *            truth maintenance.)
+         * @param stmts
+         *            An array of statements in any order.
+         *            @param numStmts The number of statements in that array.
+         *            @param changeLog
+         *            
+         * 
+         * @return The #of statements written on the database.
+         */
+    	final private static <S> long addStatements(final AbstractTripleStore database,
+    			final AbstractTripleStore statementStore, final BigdataStatement[] stmts, final int numStmts,
+    			final IChangeLog changeLog,
+    			final IWrittenSPOArray didWriteCallback) {
+
+            final SPO[] tmp = new SPO[numStmts];
+
+            for (int i = 0; i < tmp.length; i++) {
+
+                final BigdataStatement stmt = stmts[i];
+                
+                final SPO spo = new SPO(stmt);
+
+                if (log.isDebugEnabled()) 
+                    log.debug("adding: " + stmt.toString() + " (" + spo + ")");
+                
+                if(!spo.isFullyBound()) {
+                    
+                    throw new AssertionError("Not fully bound? : " + spo);
+                    
+                }
+                
+                tmp[i] = spo;
+
+            }
+            
+            /*
+             * Note: When handling statement identifiers, we clone tmp[] to avoid a
+             * side-effect on its order so that we can unify the assigned statement
+             * identifiers below.
+             * 
+             * Note: In order to report back the [ISPO#isModified()] flag, we also
+             * need to clone tmp[] to avoid a side effect on its order. Therefore we
+             * now always clone tmp[].
+             */
+//            final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
+            final long nwritten = writeSPOs(database, statementStore, tmp.clone(), numStmts, didWriteCallback);
+
+//            if (sids) {
+    //
+//                /*
+//                 * Unify each assigned statement identifier with the context
+//                 * position on the corresponding statement.
+//                 */
+    //
+//                for (int i = 0; i < numStmts; i++) {
+//                    
+//                    final SPO spo = tmp[i];
+//                    
+//                    final BigdataStatement stmt = stmts[i];
+    //
+//                    // verify that the BigdataStatement and SPO are the same triple.
+//                    assert stmt.s() == spo.s;
+//                    assert stmt.p() == spo.p;
+//                    assert stmt.o() == spo.o;
+//                    
+//                    final BigdataResource c = stmt.getContext();
+//                    
+//                    if (c == null)
+//                        continue;
+    //
+////                    if (c instanceof URI) {
+    ////
+////                        throw new UnificationException(
+////                                "URI not permitted in context position when statement identifiers are enabled: "
+////                                        + stmt);
+////                        
+////                    }
+//                    
+//                    if( c instanceof BNode) {
+    //
+//                        final IV sid = spo.getStatementIdentifier();
+//                        
+//                        if(c.getIV() != null) {
+//                            
+//                            if (!sid.equals(c.getIV())) {
+    //
+//                                throw new UnificationException(
+//                                        "Can not unify blankNode "
+//                                                + c
+//                                                + "("
+//                                                + c.getIV()
+//                                                + ")"
+//                                                + " in context position with statement identifier="
+//                                                + sid + ": " + stmt + " (" + spo
+//                                                + ")");
+//                                
+//                            }
+//                            
+//                        } else {
+//                            
+//                            // assign the statement identifier.
+//                            c.setIV(sid);
+//                            
+//                            if (log.isDebugEnabled()) {
+//                                
+//                                log.debug("Assigned statement identifier: " + c
+//                                        + "=" + sid);
+//                                
+//                            }
+    //
+//                        }
+//                        
+//                    }
+//                    
+//                }
+//                    
+//            }
+
+            // Copy the state of the isModified() flag
+            for (int i = 0; i < numStmts; i++) {
+
+                if (tmp[i].isModified()) {
+
+                    stmts[i].setModified(tmp[i].getModified());
+                    
+                    if (changeLog != null) {
+                        
+                        switch(stmts[i].getModified()) {
+                        case INSERTED:
+                            changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.INSERTED));
+                            break;
+                        case UPDATED:
+                            changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.UPDATED));
+                            break;
+                        case REMOVED:
+                            throw new AssertionError();
+                        default:
+                            break;
+                        }
+                        
+                    }
+
+                }
+                
+            }
+            
+            return nwritten;
+            
+        }
+
+        /**
+    	 * Adds the statements to each index (batch api, NO truth maintenance).
+    	 * 
+    	 * @param database
+    	 *            The database that will be used to resolve terms. When
+    	 *            <i>statementStore</i> is <code>null</code>, statements will be
+    	 *            written into this store as well.
+    	 * @param statementStore
+    	 *            When non-<code>null</code> the statements will be written on
+    	 *            this store. When <code>null</code> the statements are written
+    	 *            onto the <i>database</i>. (This is used to support incremental
+    	 *            truth maintenance.)
+    	 * @param stmts
+    	 *            An array of the statements to be written onto the backing
+    	 *            store.
+    	 * @param numStmts
+    	 *            The number of entries in that array to be written.
+    	 * 
+    	 * @return The #of statements written on the database.
+    	 * 
+    	 * @see AbstractTripleStore#addStatements(AbstractTripleStore, boolean,
+    	 *      IChunkedOrderedIterator, IElementFilter)
+    	 */
+		static private <S> long writeSPOs(final AbstractTripleStore database, final AbstractTripleStore statementStore,
+				final SPO[] stmts, final int numStmts, final IWrittenSPOArray callback) {
+
+            final IChunkedOrderedIterator<ISPO> itr = new ChunkedArrayIterator<ISPO>(
+                    numStmts, stmts, null/* keyOrder */);
+
+            final AbstractTripleStore sink = statementStore != null ? statementStore
+                    : database;
+
+            if (log.isInfoEnabled()) {
+
+                log.info("writing " + numStmts + " on "
+                        + (statementStore != null ? "statementStore" : "database"));
+                
+                for (int i = 0; i < numStmts; i++) {
+                	log.info("spo: " + stmts[i]);
+                }
+
             }
 
+            // synchronous write on the target.
+            final long nwritten = database
+                    .addStatements(sink, false/* copyOnly */, itr, null /* filter */);
+
+			if (callback != null) {
+
+				callback.didWriteSPOs(stmts, numStmts);
+				
+            }
+            
+            return nwritten;
+            
         }
-        
-        final long l =
-                database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
-        
-        if (log.isInfoEnabled()) {
-            log.info("# reported from addTerms: " + l);
-        }
-        
-    }
-    
+
+    } // class Batch
+
     /**
      * Add an "explicit" statement to the buffer (flushes on overflow, no
      * context).
@@ -981,200 +1359,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         add(e.getSubject(), e.getPredicate(), e.getObject(), e.getContext(),
                 (e instanceof BigdataStatement ? ((BigdataStatement) e)
                         .getStatementType() : null));
-
-    }
-
-    /**
-     * Adds the statements to each index (batch api, NO truth maintenance).
-     * <p>
-     * Pre-conditions: The {s,p,o} term identifiers for each
-     * {@link BigdataStatement} are defined.
-     * <p>
-     * Note: If statement identifiers are enabled and the context position is
-     * non-<code>null</code> then it will be unified with the statement
-     * identifier assigned to that statement. It is an error if the context
-     * position is a URI (since it can not be unified with the assigned
-     * statement identifier). It is an error if the context position is a blank
-     * node which is already bound to a term identifier whose value is different
-     * from the statement identifier assigned/reported by the {@link #database}.
-     * 
-     * @param stmts
-     *            An array of statements in any order.
-     * 
-     * @return The #of statements written on the database.
-     */
-    final protected long addStatements(final BigdataStatement[] stmts,
-            final int numStmts) {
-
-        final SPO[] tmp = new SPO[numStmts];
-
-        for (int i = 0; i < tmp.length; i++) {
-
-            final BigdataStatement stmt = stmts[i];
-            
-            final SPO spo = new SPO(stmt);
-
-            if (log.isDebugEnabled()) 
-                log.debug("adding: " + stmt.toString() + " (" + spo + ")");
-            
-            if(!spo.isFullyBound()) {
-                
-                throw new AssertionError("Not fully bound? : " + spo);
-                
-            }
-            
-            tmp[i] = spo;
-
-        }
-        
-        /*
-         * Note: When handling statement identifiers, we clone tmp[] to avoid a
-         * side-effect on its order so that we can unify the assigned statement
-         * identifiers below.
-         * 
-         * Note: In order to report back the [ISPO#isModified()] flag, we also
-         * need to clone tmp[] to avoid a side effect on its order. Therefore we
-         * now always clone tmp[].
-         */
-//        final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
-        final long nwritten = writeSPOs(tmp.clone(), numStmts);
-
-//        if (sids) {
-//
-//            /*
-//             * Unify each assigned statement identifier with the context
-//             * position on the corresponding statement.
-//             */
-//
-//            for (int i = 0; i < numStmts; i++) {
-//                
-//                final SPO spo = tmp[i];
-//                
-//                final BigdataStatement stmt = stmts[i];
-//
-//                // verify that the BigdataStatement and SPO are the same triple.
-//                assert stmt.s() == spo.s;
-//                assert stmt.p() == spo.p;
-//                assert stmt.o() == spo.o;
-//                
-//                final BigdataResource c = stmt.getContext();
-//                
-//                if (c == null)
-//                    continue;
-//
-////                if (c instanceof URI) {
-////
-////                    throw new UnificationException(
-////                            "URI not permitted in context position when statement identifiers are enabled: "
-////                                    + stmt);
-////                    
-////                }
-//                
-//                if( c instanceof BNode) {
-//
-//                    final IV sid = spo.getStatementIdentifier();
-//                    
-//                    if(c.getIV() != null) {
-//                        
-//                        if (!sid.equals(c.getIV())) {
-//
-//                            throw new UnificationException(
-//                                    "Can not unify blankNode "
-//                                            + c
-//                                            + "("
-//                                            + c.getIV()
-//                                            + ")"
-//                                            + " in context position with statement identifier="
-//                                            + sid + ": " + stmt + " (" + spo
-//                                            + ")");
-//                            
-//                        }
-//                        
-//                    } else {
-//                        
-//                        // assign the statement identifier.
-//                        c.setIV(sid);
-//                        
-//                        if (log.isDebugEnabled()) {
-//                            
-//                            log.debug("Assigned statement identifier: " + c
-//                                    + "=" + sid);
-//                            
-//                        }
-//
-//                    }
-//                    
-//                }
-//                
-//            }
-//                
-//        }
-
-        // Copy the state of the isModified() flag
-        for (int i = 0; i < numStmts; i++) {
-
-            if (tmp[i].isModified()) {
-
-                stmts[i].setModified(tmp[i].getModified());
-                
-                if (changeLog != null) {
-                    
-                    switch(stmts[i].getModified()) {
-                    case INSERTED:
-                        changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.INSERTED));
-                        break;
-                    case UPDATED:
-                        changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.UPDATED));
-                        break;
-                    case REMOVED:
-                        throw new AssertionError();
-                    default:
-                        break;
-                    }
-                    
-                }
-
-            }
-            
-        }
-        
-        return nwritten;
-        
-    }
-
-    /**
-     * Adds the statements to each index (batch api, NO truth maintenance).
-     * 
-     * @param stmts
-     *            An array of {@link SPO}s
-     * 
-     * @return The #of statements written on the database.
-     * 
-     * @see AbstractTripleStore#addStatements(AbstractTripleStore, boolean,
-     *      IChunkedOrderedIterator, IElementFilter)
-     */
-    protected long writeSPOs(final SPO[] stmts, final int numStmts) {
-
-        final IChunkedOrderedIterator<ISPO> itr = new ChunkedArrayIterator<ISPO>(
-                numStmts, stmts, null/* keyOrder */);
-
-        final AbstractTripleStore sink = statementStore != null ? statementStore
-                : database;
-
-        if (log.isInfoEnabled()) {
-
-            log.info("writing " + numStmts + " on "
-                    + (statementStore != null ? "statementStore" : "database"));
-            
-            for (int i = 0; i < numStmts; i++) {
-            	log.info("spo: " + stmts[i]);
-            }
-
-        }
-
-        // synchronous write on the target.
-        return database
-                .addStatements(sink, false/* copyOnly */, itr, null /* filter */);
 
     }
 

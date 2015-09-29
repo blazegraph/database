@@ -49,6 +49,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -96,6 +97,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
      */
     private String namespace;
 
+    @Override
     final public String getNamespace() {
         
         return namespace;
@@ -210,6 +212,44 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             final int capacity = Math.max(1, naxioms);
             
             final MyStatementBuffer buffer = new MyStatementBuffer(db, capacity);
+
+//            final StatementBuffer<SPO> buffer = new StatementBuffer<SPO>(db, capacity);
+//
+//			final IChangeLog changeLog = new IChangeLog() {
+//
+//				@Override
+//				public void changeEvent(final IChangeRecord record) {
+//
+//					final ISPO tmp = record.getStatement();
+//					
+//					final SPO spo = new SPO(tmp.s(), tmp.p(), tmp.o());
+//					
+//					ret.add( spo );
+//					
+//				}
+//
+//				@Override
+//				public void transactionBegin() {
+//				}
+//
+//				@Override
+//				public void transactionPrepare() {
+//				}
+//
+//				@Override
+//				public void transactionCommited(long commitTime) {
+//				}
+//
+//				@Override
+//				public void transactionAborted() {
+//				}
+//
+//				@Override
+//				public void close() {
+//				}
+//			};
+//
+//			buffer.setChangeLog(changeLog);
 
             final Iterator<BigdataStatement> itr = axioms.iterator();
 
@@ -350,6 +390,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
      */
     private static final transient byte currentVersion = VERSION1;
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -395,7 +436,6 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 //        }
 //    }
 
-    @SuppressWarnings("unchecked")
     private void readVersion1(final ObjectInput in) throws IOException {
 
         namespace = in.readUTF();
@@ -484,7 +524,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
         final IKeyBuilder keyBuilder = new KeyBuilder(24/*initialCapacity*/);
         
-        for (SPO spo : axioms) {
+        for (ISPO spo : axioms) {
 
             final byte[] key = SPOKeyOrder.SPO.encodeKey(keyBuilder, spo);
 
@@ -539,6 +579,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         
     }
 
+    @Override
     public final int size() {
         
         if (axioms == null)
@@ -548,6 +589,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         
     }
     
+    @Override
     final public Iterator<SPO> axioms() {
         
         if (axioms == null)
@@ -561,14 +603,14 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
      * Helper class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
-    private static class MyStatementBuffer extends StatementBuffer {
+	private static class MyStatementBuffer extends StatementBuffer<SPO>
+			implements StatementBuffer.IWrittenSPOArray {
 
         /**
          * An array of the axioms in SPO order.
          */
-        SPO[] stmts;
+    	private SPO[] stmts;
 
         /**
          * @param database
@@ -579,6 +621,8 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
             super(database, capacity);
 
+            didWriteCallback = this;
+            
         }
 
         /**
@@ -586,7 +630,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
          * {@link #stmts} where we can access them afterwards.
          */
         @Override
-        protected long writeSPOs(final SPO[] stmts, final int numStmts) {
+        public void didWriteSPOs(final SPO[] stmts, final int numStmts) {
             
             if (this.stmts == null) {
 
@@ -598,7 +642,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
                 
             }
             
-            return super.writeSPOs(stmts, numStmts);
+//            super.didWriteSPOs(stmts, numStmts);
             
         }
         
