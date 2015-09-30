@@ -1512,11 +1512,11 @@ public class DataLoader {
 							);//
 					if (log.isInfoEnabled())
 						log.info(msg);
-					else if (verbose > 0)
+					else if (verbose > 1)
 						System.out.println(msg);
 				}
 
-				if (verbose > 2) {
+				if (verbose > 1) {
 					// Show more details, especially about the assertion buffers.
 					final StatementBuffer<?> tmp = buffer;
 					if (tmp != null) {
