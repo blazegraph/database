@@ -198,6 +198,8 @@ public class DataLoader {
      * when true a durable queues pattern will be applied when loading from files.
      * 
 	 * @see BLZG-1534 (durable queues)
+	 * 
+	 * @see Options#DURABLE_QUEUES
      */
     private final boolean durableQueues;
 
@@ -744,7 +746,7 @@ public class DataLoader {
 			 * Immediately rename failures. They are failed regardless of
 			 * whether we commit.
 			 */
-			if (!file.renameTo(new File(file.getPath() + ".fail"))) {
+			if (durableQueues && !file.renameTo(new File(file.getPath() + ".fail"))) {
 			
 				log.error("File rename failed: file=" + file + " (fail)");
 				
