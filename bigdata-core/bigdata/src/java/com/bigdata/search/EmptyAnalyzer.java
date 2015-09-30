@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.search;
 
+import java.io.IOException;
 import java.io.StringReader;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -44,8 +45,13 @@ public class EmptyAnalyzer extends Analyzer {
 
 	@Override
 	protected TokenStreamComponents createComponents(String input) {
-		Tokenizer source = new StandardTokenizer();
-	     return new TokenStreamComponents(source);
+		Tokenizer source = new Tokenizer() {
+			@Override
+			public boolean incrementToken() throws IOException {
+				return false;
+			}
+		};
+	    return new TokenStreamComponents(source);
 	}
 
 }

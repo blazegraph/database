@@ -382,6 +382,12 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 			}
 			final Class<? extends Analyzer> cls = getAnalyzerClass();
             
+            if (hasConstructor(cls, CharArraySet.class)) {
+    			return new AnalyzerPair(languageRange,
+    					cls.getConstructor(CharArraySet.class).newInstance(new CharArraySet(getStopWords(), false)),
+    					cls.getConstructor(CharArraySet.class).newInstance(new CharArraySet(Collections.emptySet(), false)));
+            }
+            
             if (hasConstructor(cls, Version.class, Set.class)) {
 
             	// RussianAnalyzer is missing any way to access stop words.

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.search;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringReader;
 import java.nio.CharBuffer;
 import java.util.regex.Matcher;
@@ -34,7 +35,10 @@ import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Analyzer.TokenStreamComponents;
+import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.core.KeywordAnalyzer;
+import org.apache.lucene.analysis.standard.StandardTokenizer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 
@@ -161,7 +165,7 @@ public class TermCompletionAnalyzer extends Analyzer {
 		private String afterDiscard;
 		private CharBuffer found;
 		
-		public TermCompletionTokenStream(StringReader reader) {
+		public TermCompletionTokenStream(final Reader reader) {
 		    termAtt = addAttribute(CharTermAttribute.class);
 			words = wordBoundary.split(getStringReaderContents(reader));
 		}
@@ -229,7 +233,7 @@ public class TermCompletionAnalyzer extends Analyzer {
 
 	}
 
-	static String getStringReaderContents(StringReader reader) {
+	static String getStringReaderContents(Reader reader) {
 		try {
 			reader.mark(Integer.MAX_VALUE);
 			int length = (int) reader.skip(Integer.MAX_VALUE);
@@ -242,9 +246,22 @@ public class TermCompletionAnalyzer extends Analyzer {
 			throw new RuntimeException("Impossible",e);
 		}
 	}
+	
 	@Override
-	protected TokenStreamComponents createComponents(String arg0) {
-		// TODO Auto-generated method stub
-		return null;
+	protected TokenStreamComponents createComponents(String fieldName) {
+		Tokenizer source = new StandardTokenizer();
+	    return new TokenStreamComponents(source){
+	    	private Reader reader;
+			@Override
+	    	protected void setReader(Reader reader) throws IOException {
+	    		this.reader = reader;
+	    		super.setReader(reader);
+	    	}
+	    	@Override
+	    	public TokenStream getTokenStream() {
+	    		return new TermCompletionTokenStream(reader);
+	    	}
+	    };
 	}
+	
 }

@@ -28,6 +28,7 @@ package com.bigdata.search;
 
 import java.io.IOException;
 
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.KeywordAnalyzer;
 import org.apache.lucene.analysis.de.GermanAnalyzer;
 import org.apache.lucene.analysis.ru.RussianAnalyzer;
@@ -132,10 +133,20 @@ public class TestConfigurableAnalyzerFactory extends AbstractAnalyzerFactoryTest
 				);
 		
 	}
-	public void testCantFindRussianStopWords() {
+	
+	public static class NoStopWordsAnalyzer extends Analyzer {
+
+		@Override
+		protected TokenStreamComponents createComponents(String fieldName) {
+			throw new UnsupportedOperationException();
+		}
+		
+	}
+	
+	public void testCantFindStopWords() {
 		badCombo("find",
 				AnalyzerOptions.ANALYZER_CLASS, GermanAnalyzer.class.getName(),
-				AnalyzerOptions.STOPWORDS,RussianAnalyzer.class.getName()
+				AnalyzerOptions.STOPWORDS, NoStopWordsAnalyzer.class.getName()
 				);
 		
 	}
