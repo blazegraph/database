@@ -290,12 +290,21 @@ public class BigdataSail extends SailBase implements Sail {
 //        public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
     
         /**
-         * The capacity of the statement buffer used to absorb writes.
-         * If this capacity is exceeded, then an incremental flush will
-         * push assertions and/or retractions to the statement indices.
-         * 
-         * @see #DEFAULT_BUFFER_CAPACITY
-         */
+		 * The capacity of the statement buffer used to absorb writes. If this
+		 * capacity is exceeded, then an incremental flush will push assertions
+		 * and/or retractions to the statement indices.
+		 * <p>
+		 * Note: With BLGZ-1522, the {@link #QUEUE_CAPACITY} can increase the
+		 * effective amount of data that is being buffered quite significantly.
+		 * Caution is recommended when overriding the {@link #BUFFER_CAPACITY}
+		 * in combination with a non-zero value of the {@link #QUEUE_CAPACITY}.
+		 * The best performance will probably come from small (10k - 20k) buffer
+		 * capacity values combined with a queueCapacity of 5-20. Larger values
+		 * will increase the GC burden and could require a larger heap, but the
+		 * net throughput might also increase.
+		 * 
+		 * @see #DEFAULT_BUFFER_CAPACITY
+		 */
         public static final String BUFFER_CAPACITY = BigdataSail.class
                 .getPackage().getName()
                 + ".bufferCapacity";

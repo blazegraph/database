@@ -35,19 +35,24 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipInputStream;
 
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -67,12 +72,17 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.SPO;
 
 /**
- * A utility class to load RDF data into an {@link AbstractTripleStore} without
- * using Sesame API. This class does not parallelize the RDF parsing and writing
- * on the database. This class is not efficient for scale-out.
+ * A utility class to load RDF data into an {@link AbstractTripleStore}. This
+ * class supports a number of options, including a durable queues pattern, and
+ * can be more efficient if multiple files are batched into a single commit
+ * point. The {@link #main(String[]) main routine} will open the {@link Journal}
+ * itself and therefore this class can not be used while the {@link Journal} is
+ * open in the webapp.
+ * <p>
+ * Note: This class is not efficient for scale-out.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @see com.bigdata.rdf.load.MappedRDFDataLoadMaster
  */
 public class DataLoader {
 
@@ -184,12 +194,44 @@ public class DataLoader {
         
     }
 
+    /**
+     * when true a durable queues pattern will be applied when loading from files.
+     * 
+	 * @see BLZG-1534 (durable queues)
+     */
+    private final boolean durableQueues;
+
+    /**
+	 * When true, calls through to {@link #logCounters(AbstractTripleStore)} at
+	 * each commit point.
+	 * 
+	 * @see Options#VERBOSE
+	 */
+    private final boolean verbose;
+
+	/**
+	 * when true, run DumpJournal after each commit (only makes sense in batch
+	 * mode and even then only to gain detailed statistics on the branching
+	 * factors as they evolve in a large bulk load).
+	 * 
+	 * @see BLZG-1535 (support dump journal)
+	 * @see Options#DUMP_JOURNAL
+	 */
+    private final boolean dumpJournal;
+    
     private final CommitEnum commitEnum;
     
     private final ClosureEnum closureEnum;
     
     private final boolean flush;
     
+    /**
+	 * When true, do not stop if there is a fatal error from rio for an input
+	 * source.
+	 * 
+	 * @see BLZG-1531 (Add option to make the DataLoader robust to files that
+	 *      cause rio to throw a fatal exception)
+	 */
     private final boolean ignoreInvalidFiles;
     
 //    public boolean setFlush(boolean newValue) {
@@ -305,7 +347,6 @@ public class DataLoader {
      * {@link DataLoader}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static enum ClosureEnum {
         
@@ -347,7 +388,6 @@ public class DataLoader {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends RDFParserOptions.Options {
 
@@ -367,6 +407,15 @@ public class DataLoader {
          * Optional property specifying the capacity of the
          * {@link StatementBuffer} (default is {@value #DEFAULT_BUFFER_CAPACITY}
          * statements).
+		 * <p>
+		 * Note: With BLGZ-1522, the {@link #QUEUE_CAPACITY} can increase the
+		 * effective amount of data that is being buffered quite significantly.
+		 * Caution is recommended when overriding the {@link #BUFFER_CAPACITY}
+		 * in combination with a non-zero value of the {@link #QUEUE_CAPACITY}.
+		 * The best performance will probably come from small (20k - 50k) buffer
+		 * capacity values combined with a queueCapacity of 5-20. Larger values
+		 * will increase the GC burden and could require a larger heap, but the
+		 * net throughput might also increase.
          */
         String BUFFER_CAPACITY = DataLoader.class.getName()+".bufferCapacity";
         
@@ -446,21 +495,64 @@ public class DataLoader {
         String DEFAULT_FLUSH = "true";
         
         /**
-         * When <code>true</code>, the loader will not break on unresolvable
-         * parse errors, but instead skip the file containing the error. This
-         * option is useful when loading large input that may contain invalid
-         * RDF, in order to make sure that the loading process does not fully
-         * fail when malicious files are detected. Note that an error will
-         * still be logged in case files cannot be loaded, so one is able to
-         * track the files that failed.
-         */
+		 * When <code>true</code>, the loader will not break on unresolvable
+		 * parse errors, but instead skip the file containing the error. This
+		 * option is useful when loading large input that may contain invalid
+		 * RDF, in order to make sure that the loading process does not fully
+		 * fail when malicious files are detected. Note that an error will still
+		 * be logged in case files cannot be loaded, so one is able to track the
+		 * files that failed.
+		 * 
+		 * @see BLZG-1531 (Add option to make the DataLoader robust to files
+		 *      that cause rio to throw a fatal exception)
+		 */
         String IGNORE_INVALID_FILES = DataLoader.class.getName()+".ignoreInvalidFiles";
         
         /**
          * The default value (<code>false</code>) for {@link #IGNORE_INVALID_FILES)
          */
         String DEFAULT_IGNORE_INVALID_FILES = "false";
-        
+
+        /**
+		 * When <code>true</code>, the data loader will rename each file as it
+		 * is processed to either <code>file.good</code> or <code>file.fail</code>
+		 * to indicate success or failure. In addition, the default for
+		 * {@link #IGNORE_INVALID_FILES} will be <code>true</code> and the
+		 * default for {@link RDFParserOptions#getStopAtFirstError()} will be
+		 * <code>false</code>.
+		 * 
+		 * @see BLZG-1534 (durable queues)
+		 */
+		String DURABLE_QUEUES = DataLoader.class.getName() + ".durableQueues";
+
+		/**
+		 * The default value (<code>false</code>) for {@link #DURABLE_QUEUES)
+		 */
+		String DEFAULT_DURABLE_QUEUES = "false";
+
+		/**
+		 * When true, runs DumpJournal after each commit (with the -pages option) to obtain a distribution of the BTree index page sizes.
+		 * 
+		 * @see BLZG-1535 (support dump journal in data loader)
+		 */
+		String DUMP_JOURNAL = DataLoader.class.getName() + ".dumpJournal";
+
+		/**
+		 * The default value (<code>false</code>) for {@link #DUMP_JOURNAL)
+		 */
+		String DEFAULT_DUMP_JOURNAL = "false";
+
+		/**
+		 * When true, significant information may be reported at each commit
+		 * point.
+		 */
+		String VERBOSE = DataLoader.class.getName() + ".verbose";
+
+		/**
+		 * The default value (<code>false</code>) for {@link #VERBOSE)
+		 */
+		String DEFAULT_VERBOSE = "false";
+
     }
 
     /**
@@ -514,25 +606,54 @@ public class DataLoader {
             }
 
         }
+
+        { // durableQueues. See BLZG-1534
+
+        	durableQueues = Boolean
+					.parseBoolean(properties.getProperty(Options.DURABLE_QUEUES, Options.DEFAULT_DURABLE_QUEUES));
+
+			if (durableQueues) {
+
+				// Implied defaults when using the durable queues pattern.
+				properties.setProperty(Options.IGNORE_INVALID_FILES, "true");
+				properties.setProperty(RDFParserOptions.Options.STOP_AT_FIRST_ERROR, "false");
+			}
+
+			if (log.isInfoEnabled())
+				log.info(Options.DURABLE_QUEUES + "=" + durableQueues);
+		}
+
+        {
+			commitEnum = CommitEnum.valueOf(properties.getProperty(Options.COMMIT, Options.DEFAULT_COMMIT));
+
+			if (log.isInfoEnabled())
+				log.info(Options.COMMIT + "=" + commitEnum);
+		}
         
-        commitEnum = CommitEnum.valueOf(properties.getProperty(Options.COMMIT,
-                Options.DEFAULT_COMMIT));
+		{
+			closureEnum = database.getAxioms().isNone() ? ClosureEnum.None
+					: (ClosureEnum.valueOf(properties.getProperty(Options.CLOSURE, Options.DEFAULT_CLOSURE)));
 
-        if (log.isInfoEnabled())
-            log.info(Options.COMMIT + "=" + commitEnum);
+			if (log.isInfoEnabled())
+				log.info(Options.CLOSURE + "=" + closureEnum);
+		}
 
-        closureEnum = database.getAxioms().isNone() ? ClosureEnum.None
-                : (ClosureEnum.valueOf(properties.getProperty(Options.CLOSURE,
-                        Options.DEFAULT_CLOSURE)));
+		{
+			bufferCapacity = Integer
+					.parseInt(properties.getProperty(Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
 
-        if (log.isInfoEnabled())
-            log.info(Options.CLOSURE + "=" + closureEnum);
+			if (log.isInfoEnabled())
+				log.info(Options.BUFFER_CAPACITY+ "=" + bufferCapacity);
+		}
+		
+		{
+			queueCapacity = Integer
+					.parseInt(properties.getProperty(Options.QUEUE_CAPACITY, Options.DEFAULT_QUEUE_CAPACITY));
 
-        bufferCapacity = Integer.parseInt(properties.getProperty(
-                Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
-
-        queueCapacity = Integer.parseInt(properties.getProperty(
-                Options.QUEUE_CAPACITY, Options.DEFAULT_QUEUE_CAPACITY));
+			if (log.isInfoEnabled())
+				log.info(Options.QUEUE_CAPACITY + "=" + queueCapacity);
+			
+		}
 
         this.database = database;
 
@@ -560,30 +681,154 @@ public class DataLoader {
 
         }
 
-        flush = Boolean.parseBoolean(properties.getProperty(Options.FLUSH,
-                Options.DEFAULT_FLUSH));
-        
-        ignoreInvalidFiles =
-            Boolean.parseBoolean(properties.getProperty(
-                Options.IGNORE_INVALID_FILES,
-                Options.DEFAULT_IGNORE_INVALID_FILES));   
-        
-        if (log.isInfoEnabled())
-            log.info(Options.FLUSH + "=" + flush);
+		{
+			flush = Boolean.parseBoolean(properties.getProperty(Options.FLUSH, Options.DEFAULT_FLUSH));
+
+			if (log.isInfoEnabled())
+				log.info(Options.FLUSH + "=" + flush);
+		}
+
+        // ignoreInvalidFiles. See BLZG-1531
+		{
+			ignoreInvalidFiles = Boolean.parseBoolean(
+					properties.getProperty(Options.IGNORE_INVALID_FILES, Options.DEFAULT_IGNORE_INVALID_FILES));
+
+			if (log.isInfoEnabled())
+				log.info(Options.IGNORE_INVALID_FILES + "=" + ignoreInvalidFiles);
+
+		}
+
+		{ // verbose.
+			
+			verbose = Boolean
+					.parseBoolean(properties.getProperty(Options.VERBOSE, Options.DEFAULT_VERBOSE));
+
+			if (log.isInfoEnabled())
+				log.info(Options.VERBOSE + "=" + verbose);
+
+		}
+		
+		{ // dumpJournal. See BLZG-1535
+			
+			dumpJournal = Boolean
+					.parseBoolean(properties.getProperty(Options.DUMP_JOURNAL, Options.DEFAULT_DUMP_JOURNAL));
+
+			if (log.isInfoEnabled())
+				log.info(Options.DUMP_JOURNAL + "=" + dumpJournal);
+		}
 
     }
 
+    private class MyLoadStats extends LoadStats {
+    	
+    	/**
+    	 * The set of resources that failed during a load.
+    	 */
+		private final Set<File> failSet = new LinkedHashSet<File>();
+		
+		/**
+		 * The set of resources that were successfully loaded.
+		 */
+		private final Set<File> goodSet = new LinkedHashSet<File>();
+    	
+		/**
+		 * Method must be invoked if load of a {@link File} fails.
+		 */
+		void didFail(final File file) {
+
+			failSet.add(file);
+			
+			/*
+			 * Immediately rename failures. They are failed regardless of
+			 * whether we commit.
+			 */
+			if (!file.renameTo(new File(file.getPath() + ".fail"))) {
+			
+				log.error("File rename failed: file=" + file + " (fail)");
+				
+			}
+			
+		}
+
+		/**
+		 * Method must be invoked if load of a {@link File} succeeds.
+		 */
+		void didGood(final File file) {
+			goodSet.add(file);
+		}
+		
+		@Override
+		public String toString() {
+			
+			return super.toString() + ", {failSet=" + failSet.size() + ",goodSet=" + goodSet.size() + "}";
+			
+		}
+
+		@Override
+		public void add(final LoadStats stats) {
+
+			super.add(stats);
+			
+			if (stats instanceof MyLoadStats) {
+			
+				failSet.addAll(((MyLoadStats) stats).failSet);
+				
+				goodSet.addAll(((MyLoadStats) stats).goodSet);
+				
+			}
+			
+		}
+
+		/**
+		 * Hook used to support durable queues pattern when the rename happens
+		 * only once we actually go through a commit.
+		 * 
+		 * @see BLZG-1534 (durable queues)
+		 */
+		private void commit() {
+
+			if (durableQueues) {
+
+				// Rename the file whose contents were made restart safe on the db.
+				for (File file : goodSet) {
+					if (!file.renameTo(new File(file.getPath() + ".good"))) {
+						log.error("File rename failed: file=" + file + " (good)");
+					}
+				}
+
+			}
+
+			failSet.clear();
+			goodSet.clear();
+
+		}
+		
+    } // MyLoadStats
+    
     /**
-     * Load a resource into the database.
-     * 
-     * @param resource
-     * @param baseURL
-     * @param rdfFormat
-     * 
-     * @return
-     * 
-     * @throws IOException
+     * Factory for {@link DataLoader} specific {@link LoadStats} extension.
      */
+    private MyLoadStats newLoadStats() {
+		
+    	return new MyLoadStats();
+    	
+	}
+
+    /**
+	 * Load a resource into the associated triple store and commit.
+	 * 
+	 * @param resource
+	 *            A resource to be loaded (required).
+	 * @param baseURL
+	 *            The baseURL to use for that resource (required).
+	 * @param rdfFormat
+	 *            The {@link RDFFormat} to use as a fall back for the resource
+	 *            (required).
+	 * 
+	 * @return Statistics about the load.
+	 * 
+	 * @throws IOException
+	 */
     final public LoadStats loadData(final String resource, final String baseURL,
             final RDFFormat rdfFormat) throws IOException {
 
@@ -605,31 +850,36 @@ public class DataLoader {
     }
     
     /**
-     * Load a set of RDF resources into the database.
-     * 
-     * @param resource
-     * @param baseURL
-     * @param rdfFormat
-     * @return
-     * 
-     * @throws IOException
-     */
-   @SuppressWarnings("unused")
-   final public LoadStats loadData(final String[] resource,
-            final String[] baseURL, final RDFFormat[] rdfFormat)
-            throws IOException {
+	 * Load a set of RDF resources into the associated triple store and commit.
+	 * 
+	 * @param resource
+	 *            An array of resources to be loaded (required).
+	 * @param baseURL
+	 *            An array baseURL to use for those resources (required and must
+	 *            be 1:1 with the array of resources).
+	 * @param rdfFormat
+	 *            An array of {@link RDFFormat} values to use as a fall back for
+	 *            each resource (required and must be 1:1 with the array of
+	 *            resources).
+	 * 
+	 * @return Statistics about the load.
+	 * 
+	 * @throws IOException
+	 */
+	final public LoadStats loadData(final String[] resource, final String[] baseURL, final RDFFormat[] rdfFormat)
+			throws IOException {
 
-        if (resource.length != baseURL.length)
-            throw new IllegalArgumentException();
+		if (resource.length != baseURL.length)
+			throw new IllegalArgumentException();
 
-        if (resource.length != rdfFormat.length)
-            throw new IllegalArgumentException();
+		if (resource.length != rdfFormat.length)
+			throw new IllegalArgumentException();
 
         if (log.isInfoEnabled())
             log.info("commit=" + commitEnum + ", closure=" + closureEnum
                     + ", resource=" + Arrays.toString(resource));
 
-        final LoadStats totals = new LoadStats();
+        final MyLoadStats totals = newLoadStats();
 
         for (int i = 0; i < resource.length; i++) {
 
@@ -645,57 +895,83 @@ public class DataLoader {
             
         }
 
-        if (flush && buffer != null) {
-
-            // Flush the buffer after the document(s) have been loaded.
-            
-            buffer.flush();
-            
-        }
+        doCommit(totals);
         
-        if (commitEnum == CommitEnum.Batch) {
+		if (log.isInfoEnabled())
+			log.info("Loaded " + resource.length + " resources: " + totals);
 
-            if (log.isInfoEnabled())
-                log.info("Commit after batch of "+resource.length+" resources");
-
-            long beginCommit = System.currentTimeMillis();
-            
-            database.commit();
-            
-            totals.commitTime.add(System.currentTimeMillis() - beginCommit);
-
-            if (log.isInfoEnabled())
-                log.info("commit: latency="+totals.commitTime+"ms");
-
-			if (log.isInfoEnabled() && false)
-				logCounters(database);
-			
-        }
-
-        if (log.isInfoEnabled())
-            log.info("Loaded " + resource.length+" resources: "+totals);
-        
         return totals;
         
     }
 
+	/**
+	 * Helper method for top-level loadXXX() methods. This method flushes the
+	 * buffer and commits (if there is anything to commit).
+	 * 
+	 * @param totals
+	 */
+	private void doCommit(final MyLoadStats totals) {
+
+		if (flush && buffer != null) {
+
+			// Flush the buffer after the document(s) have been loaded.
+
+			buffer.flush();
+
+		}
+
+		if (commitEnum == CommitEnum.Batch) {
+
+			if (log.isInfoEnabled())
+				log.info("Commit after batch");
+
+			final long beginCommit = System.currentTimeMillis();
+
+			database.commit(); // database commit.
+
+			totals.commit(); // Note: durable queues pattern.
+
+			totals.commitTime.add(System.currentTimeMillis() - beginCommit);
+
+			if (log.isInfoEnabled())
+				log.info("commit: latency=" + totals.commitTime + "ms");
+
+			if (verbose)
+				logCounters(database);
+
+		}
+
+	}
+	
     /**
-     * Load from a reader.
-     * 
-     * @param reader
-     * @param baseURL
-     * @param rdfFormat
-     * @return
-     * @throws IOException
-     */
+	 * Load from a reader and commit.
+	 * 
+	 * @param reader
+	 *            The reader (required).
+	 * @param baseURL
+	 *            The base URL (required).
+	 * @param rdfFormat
+	 *            The {@link RDFFormat} to use as a fallback (required).
+	 *            
+	 * @return Statistics about the load.
+	 * 
+	 * @throws IOException
+	 */
     public LoadStats loadData(final Reader reader, final String baseURL,
             final RDFFormat rdfFormat) throws IOException {
 
-        final LoadStats totals = new LoadStats();
+        final MyLoadStats totals = newLoadStats();
 
-        loadData3(totals, reader, baseURL, rdfFormat, null/* defaultGraph */,
-                true/* endOfBatch */);
+		/*
+		 * We are not processing Files so the durable queues pattern does
+		 * not apply and we can call a method that handles the
+		 * RDFParseException for us.
+		 */
+		loadData4_ParserErrors_Trapped(totals, reader, baseURL/* label */, baseURL, rdfFormat, null/* defaultGraph */,
+				true/* endOfBatch */);
 
+		doCommit(totals);
+		
         return totals;
 
     }
@@ -715,57 +991,71 @@ public class DataLoader {
     public LoadStats loadData(final InputStream is, final String baseURL,
             final RDFFormat rdfFormat) throws IOException {
 
-        final LoadStats totals = new LoadStats();
+        final MyLoadStats totals = newLoadStats();
 
-        loadData3(totals, is, baseURL, rdfFormat, null/* defaultGraph */, true/* endOfBatch */);
+		/*
+		 * We are not processing Files so the durable queues pattern does
+		 * not apply and we can call a method that handles the
+		 * RDFParseException for us.
+		 */
+		loadData4_ParserErrors_Trapped(totals, is, baseURL/* label */, baseURL, rdfFormat, null/* defaultGraph */,
+				true/* endOfBatch */);
 
+		doCommit(totals);
+		
         return totals;
 
     }
 
     /**
-     * Load from a {@link URL}. If in quads mode, the triples in the default
-     * graph will be inserted into the named graph associate with the specified
-     * <code>url</code>.
-     * 
-     * @param url
-     *            The URL (required).
-     * @param baseURL
-     *            The base URL (required).
-     * @param rdfFormat
-     *            The {@link RDFFormat} (required).
-     * @return
-     * @throws IOException
-     */
-    public LoadStats loadData(final URL url, final String baseURL,
-            final RDFFormat rdfFormat) throws IOException {
+	 * Load from a {@link URL}. If in quads mode, the triples in the default
+	 * graph will be inserted into the named graph associate with the specified
+	 * <code>url</code>.
+	 * 
+	 * @param url
+	 *            The URL (required).
+	 * @param baseURL
+	 *            The base URL (required).
+	 * @param rdfFormat
+	 *            The {@link RDFFormat} (required).
+	 * @return
+	 * @throws IOException
+	 */
+	public LoadStats loadData(final URL url, final String baseURL, final RDFFormat rdfFormat) throws IOException {
 
-        if (url == null)
-            throw new IllegalArgumentException();
+		if (url == null)
+			throw new IllegalArgumentException();
 
-        if (log.isInfoEnabled())
-            log.info("loading: " + url);
+		if (log.isInfoEnabled())
+			log.info("loading: " + url);
 
-        final InputStream is = url.openStream();
+		final MyLoadStats totals = newLoadStats();
 
-        try {
+		final InputStream is = url.openStream();
 
-            final LoadStats totals = new LoadStats();
-            
-            loadData3(totals, is, baseURL, rdfFormat,
-                    url.toString()/* defaultGraph */, true/* endOfBatch */);
+		try {
 
-            return totals;
-        
-        } finally {
-            
-            is.close();
-            
-        }
-        
+			/*
+			 * We are not processing Files so the durable queues pattern does
+			 * not apply and we can call a method that handles the
+			 * RDFParseException for us.
+			 */
+			loadData4_ParserErrors_Trapped(totals, is, url.toString()/* label */, baseURL, rdfFormat,
+					url.toString()/* defaultGraph */, true/* endOfBatch */);
+
+		} finally {
+
+			is.close();
+
+		}
+
+		doCommit(totals);
+
+		return totals;
+    
     }
 
-    /**
+	/**
      * Load an RDF resource into the database.
      * 
      * @param resource
@@ -780,7 +1070,7 @@ public class DataLoader {
      * @throws IOException
      *             if the <i>resource</i> can not be resolved or loaded.
      */
-    protected void loadData2(final LoadStats totals, final String resource,
+    protected void loadData2(final MyLoadStats totals, final String resource,
             final String baseURL, final RDFFormat rdfFormat,
             final boolean endOfBatch) throws IOException {
 
@@ -852,10 +1142,20 @@ public class DataLoader {
 
         try {
 
-            loadData3(totals, reader, baseURL, rdfFormat, defaultGraph,
-                    endOfBatch);
+			/*
+			 * We are not processing Files so the durable queues pattern does
+			 * not apply and we can call a method that handles the
+			 * RDFParseException for us.
+			 */
+			loadData4_ParserErrors_Trapped(totals, reader, resource/* label */, baseURL, rdfFormat, defaultGraph, endOfBatch);
 
         } catch (Exception ex) {
+
+			if (ex instanceof RuntimeException)
+				throw (RuntimeException) ex;
+
+			if (ex instanceof IOException)
+				throw (IOException) ex;
 
             throw new RuntimeException("While loading: " + resource, ex);
 
@@ -901,16 +1201,31 @@ public class DataLoader {
         if (file == null)
             throw new IllegalArgumentException();
         
-        final LoadStats totals = new LoadStats();
+        final MyLoadStats totals = newLoadStats();
 
         loadFiles(totals, 0/* depth */, file, baseURI, rdfFormat, defaultGraph, filter, true/* endOfBatch */
         );
 
+        doCommit(totals);
+        
         return totals;
 
     }
 
-    protected void loadFiles(final LoadStats totals, final int depth,
+	/**
+	 * Recursive load of a file or directory.
+	 * 
+	 * @param totals
+	 * @param depth
+	 * @param file
+	 * @param baseURI
+	 * @param rdfFormat
+	 * @param defaultGraph
+	 * @param filter
+	 * @param endOfBatch
+	 * @throws IOException
+	 */
+    private void loadFiles(final MyLoadStats totals, final int depth,
             final File file, final String baseURI, final RDFFormat rdfFormat,
             final String defaultGraph, final FilenameFilter filter,
             final boolean endOfBatch)
@@ -958,7 +1273,6 @@ public class DataLoader {
             fmt = rdfFormat;
                 
         InputStream is = null;
-
         
         if(log.isInfoEnabled())
         	log.info("Loading next file: " + file + " now...");
@@ -988,30 +1302,44 @@ public class DataLoader {
 
             try {
 
-                // baseURI for this file.
-                final String s = baseURI != null ? baseURI : file.toURI()
-                        .toString();
+				// baseURI for this file.
+				final String s = baseURI != null ? baseURI : file.toURI().toString();
 
-                loadData3(totals, reader, s, fmt, defaultGraph, endOfBatch);
+				loadData4_ParserErrors_Not_Trapped(totals, reader, file.toString()/* label */,
+						file/* fileIfSourceIfFile */, s, fmt, defaultGraph, endOfBatch);
                 
                 return;
 
+			} catch (RDFParseException ex) {
+
+				if (ignoreInvalidFiles) {
+
+    				/*
+					 * Log warning and DO NOT rethrow the exception.
+					 * 
+					 * Note: The file will still be entered into the "failSet"
+					 * if durable queues are enabled.
+					 */
+					
+    				log.error("Parser error - skipping source: source=" + file, ex);
+
+				} else
+					throw new RuntimeException("Could not parse file: " + file, ex);
+
             } catch (Exception ex) {
 
-               if (ignoreInvalidFiles) {
-                  
-                  // just log the warning
-                  log.error("File " + file + " could not be loaded... Skipped!");
-                  
-               } else {
-                  
-                  // throw a runtime exception, causing an abort
-                  throw new RuntimeException("While loading: " + file, ex);
-                  
-               }
+				if (ex instanceof RuntimeException)
+					throw (RuntimeException) ex;
+
+				if (ex instanceof IOException)
+					throw (IOException) ex;
+
+				// throw a runtime exception, causing an abort
+				throw new RuntimeException("While loading: " + file, ex);
                
             } finally {
 
+            	// Note: Must close() before renameTo().
                 reader.close();
 
             }
@@ -1026,41 +1354,122 @@ public class DataLoader {
     }
 
     /**
-     * Loads data from the <i>source</i>. The caller is responsible for closing
-     * the <i>source</i> if there is an error.
-     * 
-     * @param totals
-     *            Used to report out the total {@link LoadStats}.
-     * @param source
-     *            A {@link Reader} or {@link InputStream}.
-     * @param baseURL
-     *            The baseURI (optional, when not specified the name of the each
-     *            file load is converted to a URL and used as the baseURI for
-     *            that file).
-     * @param rdfFormat
-     *            The format of the file (optional, when not specified the
-     *            format is deduced for each file in turn using the
-     *            {@link RDFFormat} static methods).
-     * @param defaultGraph
-     *            The value that will be used for the graph/context co-ordinate
-     *            when loading data represented in a triple format into a quad
-     *            store.
-     * @param endOfBatch
-     *            Signal indicates the end of a batch.
-     */
-   @SuppressWarnings("unused")
-   public void loadData3(final LoadStats totals, final Object source,
-            final String baseURL, final RDFFormat rdfFormat,
-            final String defaultGraph, final boolean endOfBatch) throws IOException {
+	 * Loads data from the <i>source</i>. The caller is responsible for closing
+	 * the <i>source</i> if there is an error.
+	 * 
+	 * @param totals
+	 *            Used to report out the total {@link LoadStats}.
+	 * @param source
+	 *            A {@link Reader} or {@link InputStream}.
+	 * @param baseURL
+	 *            The baseURI (optional, when not specified the name of the each
+	 *            file load is converted to a URL and used as the baseURI for
+	 *            that file).
+	 * @param rdfFormat
+	 *            The format of the file (optional, when not specified the
+	 *            format is deduced for each file in turn using the
+	 *            {@link RDFFormat} static methods).
+	 * @param defaultGraph
+	 *            The value that will be used for the graph/context co-ordinate
+	 *            when loading data represented in a triple format into a quad
+	 *            store.
+	 * @param endOfBatch
+	 *            Signal indicates the end of a batch.
+	 */
+    @Deprecated
+	protected void loadData3(final LoadStats totals, final Object source, final String baseURL,
+			final RDFFormat rdfFormat, final String defaultGraph, final boolean endOfBatch) throws IOException {
 
+		final MyLoadStats tmp = newLoadStats();
+
+		loadData4_ParserErrors_Trapped(tmp, source, null/* label */, baseURL, rdfFormat, defaultGraph, endOfBatch);
+
+		totals.add(tmp);
+
+	}
+
+    /*
+     * Code path for non-File loads. 
+     */
+	private void loadData4_ParserErrors_Trapped(final MyLoadStats totals, final Object source, String label,
+			final String baseURI, final RDFFormat rdfFormat, final String defaultGraph, final boolean endOfBatch)
+					throws IOException {
+
+		try {
+
+			loadData4_ParserErrors_Not_Trapped(totals, source, label, null/* fileIfSourceIsFile */, baseURI, rdfFormat,
+					defaultGraph, endOfBatch);
+
+		} catch (RDFParseException ex) {
+
+			if (ignoreInvalidFiles) {
+
+				// log warning
+				log.error("Parser error - skipping source: source=" + label, ex);
+
+				// Note: Do not throw out an exception.
+				return;
+
+			}
+
+			throw new RuntimeException(ex);
+			
+		}
+
+	}
+
+   	/**
+	 * Loads data from the <i>source</i> (core method). The caller is
+	 * responsible for closing the <i>source</i> if there is an error.
+	 * 
+	 * @param totals
+	 *            Used to report out the total {@link LoadStats}.
+	 * @param source
+	 *            A {@link Reader} or {@link InputStream}.
+	 * @param label
+	 *            A label used to report error messages (optional, defaults to
+	 *            baseURL if given and otherwise source.toString()).
+	 * @param baseURI
+	 *            The baseURI (optional, when not specified the name of the each
+	 *            file load is converted to a URL and used as the baseURI for
+	 *            that file).
+	 * @param rdfFormat
+	 *            The format of the file (optional, when not specified the
+	 *            format is deduced for each file in turn using the
+	 *            {@link RDFFormat} static methods).
+	 * @param defaultGraph
+	 *            The value that will be used for the graph/context co-ordinate
+	 *            when loading data represented in a triple format into a quad
+	 *            store.
+	 * @param endOfBatch
+	 *            Signal indicates the end of a batch.
+	 * 
+	 * @throws IOException
+	 *             if there is a problem reading the source.
+	 * @throws RDFParseException
+	 *             if there is a RIO level parser error.
+	 */
+	private void loadData4_ParserErrors_Not_Trapped(final MyLoadStats totals, final Object source, String label,
+			final File fileIfSourceIsFile, final String baseURI, final RDFFormat rdfFormat, final String defaultGraph,
+			final boolean endOfBatch) throws IOException, RDFParseException {
+
+		if (label == null) {
+			// Use baseURI
+			label = baseURI;
+			if (label == null) {
+				// Note: messages will not have a useful label in this case.
+				label = source.toString();
+			}
+		}
+	   
         final long begin = System.currentTimeMillis();
         
-        final LoadStats stats = new LoadStats();
+        final MyLoadStats stats = new MyLoadStats();
         
         // Note: allocates a new buffer iff the [buffer] is null.
         getAssertionBuffer();
         
-        if(!buffer.isEmpty()) {
+		if (!buffer.isEmpty()) {
             
             /*
              * Note: this is just paranoia. If the buffer is not empty when we
@@ -1092,7 +1501,7 @@ public class DataLoader {
 					log.info(e.getStatementsProcessed() + " stmts buffered in "
 							+ (e.getTimeElapsed() / 1000d) + " secs, rate= "
 							+ e.getInsertRate()
-							+ (baseURL != null ? ", baseURL=" + baseURL : "") + //
+							+ (baseURI != null ? ", baseURL=" + baseURI : "") + //
 							(", totalStatementsSoFar="//
 							+ (e.getStatementsProcessed()//
 							+ totals.toldTriples.get()))// 
@@ -1102,21 +1511,50 @@ public class DataLoader {
             }
             
         });
-        
+
         try {
+
+			boolean ok = false;
+			try {
+				
+				if (source instanceof Reader) {
+
+					loader.loadRdf((Reader) source, baseURI, rdfFormat, defaultGraph, parserOptions);
+
+				} else if (source instanceof InputStream) {
+
+					loader.loadRdf((InputStream) source, baseURI, rdfFormat, defaultGraph, parserOptions);
+
+				} else
+					throw new AssertionError();
+
+				ok = true;
+
+			} finally {
+
+				if (fileIfSourceIsFile != null) {
+				
+					/*
+					 * Record output in support of durable queues pattern.
+					 * 
+					 * Note: We need to defer the rename until the next
+					 * commit(). So we just make a note of the outcome here.
+					 */
+					
+					if (ok) {
+					
+						stats.didGood(fileIfSourceIsFile);
+						
+					} else {
+						
+						stats.didFail(fileIfSourceIsFile);
+						
+					}
+
+				}
+
+			}
             
-            if(source instanceof Reader) {
-                
-                loader.loadRdf((Reader) source, baseURL, rdfFormat, defaultGraph, parserOptions);
-
-            } else if (source instanceof InputStream) {
-
-                loader.loadRdf((InputStream) source, baseURL, rdfFormat,
-                        defaultGraph, parserOptions);
-
-            } else
-                throw new AssertionError();
-
             final long nstmts = loader.getStatementsAdded();
 
             stats.toldTriples.set( nstmts );
@@ -1139,7 +1577,7 @@ public class DataLoader {
 
             }
 
-            // commit the data.
+            // commit the data.  
             if (commitEnum == CommitEnum.Incremental) {
 
                 if(log.isInfoEnabled())
@@ -1147,15 +1585,17 @@ public class DataLoader {
 
                 final long beginCommit = System.currentTimeMillis();
 
-                database.commit();
+                database.commit(); // database commit.
+
+                stats.commit(); // Note: durable queues pattern.
 
                 stats.commitTime.set(System.currentTimeMillis() - beginCommit);
 
                 if (log.isInfoEnabled())
                     log.info("commit: latency=" + stats.commitTime + "ms");
 
-                if (log.isInfoEnabled() && false)
-                   logCounters(database);
+				if (verbose)
+					logCounters(database);
     			
             }
 
@@ -1166,7 +1606,7 @@ public class DataLoader {
 
             if (log.isInfoEnabled()) {
 				log.info("file:: " + stats + "; totals:: " + totals
-						+ (baseURL != null ? "; baseURL=" + baseURL : ""));
+						+ (baseURI != null ? "; baseURL=" + baseURI : ""));
                 if (buffer != null
                         && buffer.getDatabase() instanceof AbstractLocalTripleStore) {
                 	if(log.isDebugEnabled())
@@ -1178,7 +1618,7 @@ public class DataLoader {
             
             return;
             
-        } catch ( Exception ex ) {
+        } catch ( Throwable t ) {
 
         	// aggregate stats even for exceptions.
             totals.add(stats);
@@ -1191,8 +1631,8 @@ public class DataLoader {
              * (that is, by calling abort()).
              */
 
-            if(buffer != null) {
-            
+			if (buffer != null) {
+
                 // clear any buffer statements.
                 buffer.reset();
 
@@ -1206,59 +1646,86 @@ public class DataLoader {
                 buffer = null;
                 
             }
-            
-            if (ex instanceof RuntimeException)
-                throw (RuntimeException) ex;
 
-            if (ex instanceof IOException)
-                throw (IOException) ex;
+			if (t instanceof RuntimeException)
+				throw (RuntimeException) t;
+
+			if (t instanceof RDFParseException)
+				throw (RDFParseException) t;
+
+            if (t instanceof IOException)
+                throw (IOException) t;
             
             final IOException ex2 = new IOException("Problem loading data?");
             
-            ex2.initCause(ex);
+            ex2.initCause(t);
             
             throw ex2;
-            
-//        } finally {
-//            
-//            // aggregate regardless of the outcome.
-//            totals.add(stats);
             
         }
 
     }
-    
+
+   	/**
+	 * Report out a variety of interesting information on stdout and the
+	 * {@link #log}.
+	 * 
+	 * @param database
+	 * 
+	 * @see Options#VERBOSE
+	 */
     private void logCounters(final AbstractTripleStore database) {
 
-		if (!log.isInfoEnabled())
-			return;
-    	
 		final IIndexManager store = database.getIndexManager();
 		
+		final CounterSet counters = store.getCounters();
+
+		{
+			final StatementBuffer<?> tmp = buffer;
+			if (tmp != null) {
+				counters.makePath("assertionBuffer").attach(getAssertionBuffer().getCounters());
+			}
+		}
+
+		System.out.println(counters.toString());
+
+		System.out
+				.println(((AbstractLocalTripleStore) database)
+						.getLocalBTreeBytesWritten(new StringBuilder())
+						.toString());
+
     	if (!(store instanceof Journal))
 			return;
 		
-		if (!(((Journal) store).getBufferStrategy() instanceof RWStrategy))
-			return;
+    	// RWStore only. Allocators also dumped by DumpJournal.
+		if (((Journal) store).getBufferStrategy() instanceof RWStrategy && !dumpJournal) {
 
-		final StringBuilder sb = new StringBuilder("\n");
+			final StringBuilder sb = new StringBuilder("\n");
 
-		((RWStrategy) ((Journal) store).getBufferStrategy()).getStore()
-				.showAllocators(sb);
+			((RWStrategy) ((Journal) store).getBufferStrategy()).getStore().showAllocators(sb);
 
-    	log.info(sb.toString());
+			log.info(sb.toString());
+		}
 
-    	if(true) {
-			/*
-			 * FIXME Remove this. It assumes that the journal has only one
-			 * triple store.
-			 */
-			final long extent = ((Journal)store).getBufferStrategy().getExtent();
-			final long stmts = database.getStatementCount();
-			final long bytesPerStmt = stmts==0?0:(extent/stmts);
-			log.info("extent=" + extent + ", stmts=" + stmts + ", bytes/stat="
-					+ bytesPerStmt);
-    	}
+		if (dumpJournal) {
+			final PrintWriter out = new PrintWriter(System.out);
+			new DumpJournal((Journal) store).dumpJournal(out, null/* namespaces */, false/* dumpHistory */,
+					true/* dumpPages */, false/* dumpIndices */, false/* showTuples */);
+			out.flush();
+			out.close();
+		}
+
+//    	if(true) {
+//			/*
+//			 * Remove this. It assumes that the journal has only one
+//			 * triple store.
+//			 */
+//			final long extent = ((Journal)store).getBufferStrategy().getExtent();
+//			final long stmts = database.getStatementCount();
+//			final long bytesPerStmt = stmts==0?0:(extent/stmts);
+//			log.info("extent=" + extent + ", stmts=" + stmts + ", bytes/stat="
+//					+ bytesPerStmt);
+//    	}
     	
 	}
     
@@ -1330,32 +1797,44 @@ public class DataLoader {
     }
 
     /**
-     * Utility method may be used to create and/or load RDF data into a local
-     * database instance. Directories will be recursively processed. The data
-     * files may be compressed using zip or gzip, but the loader does not
-     * support multiple data files within a single archive.
-     * 
-     * @param args
-     *            <code>[-quiet][-closure][-verbose][-namespace <i>namespace</i>] propertyFile (fileOrDir)*</code>
-     *            where
-     *            <dl>
-     *            <dt>-quiet</dt>
-     *            <dd>Suppress all stdout messages.</dd>
-     *            <dt>-verbose</dt>
-     *            <dd>Show additional messages detailing the load performance.</dd>
-     *            <dt>-closure</dt>
-     *            <dd>Compute the RDF(S)+ closure.</dd>
-     *            <dt>-namespace</dt>
-     *            <dd>The namespace of the KB instance.</dd>
-     *            <dt>propertyFile</dt>
-     *            <dd>The configuration file for the database instance.</dd>
-     *            <dt>fileOrDir</dt>
-     *            <dd>Zero or more files or directories containing the data to
-     *            be loaded.</dd>
-     *            </dl>
-     * 
-     * @throws IOException
-     */
+	 * Utility method may be used to create and/or load RDF data into a local
+	 * database instance. Directories will be recursively processed. The data
+	 * files may be compressed using zip or gzip, but the loader does not
+	 * support multiple data files within a single archive.
+	 * 
+	 * @param args
+	 *            <code>[-quiet][-closure][-verbose][-queues][-namespace <i>namespace</i>] propertyFile (fileOrDir)*</code>
+	 *            where
+	 *            <dl>
+	 *            <dt>-quiet</dt>
+	 *            <dd>Suppress all stdout messages.</dd>
+	 *            <dt>-verbose</dt>
+	 *            <dd>Show additional messages detailing the load performance.
+	 *            </dd>
+	 *            <dt>-closure</dt>
+	 *            <dd>Compute the RDF(S)+ closure.</dd>
+	 *            <dt>-durableQueues</dt>
+	 *            <dd>Files will be renamed to either <code>.good</code> or
+	 *            <code>.fail</code> as they are processed. The files will
+	 *            remain in the same directory. The changes the default for
+	 *            {@link Options#IGNORE_INVALID_FILES} to <code>true</code> and
+	 *            the default for
+	 *            {@link RDFParserOptions.Options#STOP_AT_FIRST_ERROR} to
+	 *            <code>false</code>. Failures can be detected by looking for
+	 *            ".fail" files. (This is a shorthand for
+	 *            {@link Options#DURABLE_QUEUES}.)</dd>
+	 *            <dt>-namespace</dt>
+	 *            <dd>The namespace of the KB instance.</dd>
+	 *            <dt>propertyFile</dt>
+	 *            <dd>The configuration file for the database instance.</dd>
+	 *            <dt>fileOrDir</dt>
+	 *            <dd>Zero or more files or directories containing the data to
+	 *            be loaded.</dd>
+	 *            </dl>
+	 * 
+	 * @throws IOException
+	 * @see BLZG-1534 (durable queues)
+	 */
     public static void main(final String[] args) throws IOException {
 
         // default namespace.
@@ -1363,6 +1842,7 @@ public class DataLoader {
         boolean doClosure = false;
         boolean verbose = false;
         boolean quiet = false;
+        boolean durableQueues = false;
         RDFFormat rdfFormat = null;
         String defaultGraph = null;
         String baseURI = null;
@@ -1397,6 +1877,10 @@ public class DataLoader {
 
                     doClosure = true;
 
+                } else if (arg.equals("-durableQueues")) {
+
+                    durableQueues = true;
+                    
                 } else if (arg.equals("-verbose")) {
 
                     verbose = true;
@@ -1464,7 +1948,13 @@ public class DataLoader {
 //                properties.setProperty(com.bigdata.journal.Options.FILE, file);
 //            }
         }
-
+		if (durableQueues) {
+			// @see BLZG-1534 (durable queues)
+			properties.setProperty(Options.DURABLE_QUEUES, "true");
+		}
+		if (verbose) {
+			properties.setProperty(Options.VERBOSE, "true");
+		}
         /*
          * Allow override of select options.
          */
@@ -1484,6 +1974,9 @@ public class DataLoader {
                     DataLoader.Options.COMMIT,
                     DataLoader.Options.FLUSH,
                     DataLoader.Options.IGNORE_INVALID_FILES,
+                    DataLoader.Options.DURABLE_QUEUES,
+                    DataLoader.Options.DUMP_JOURNAL,
+                    DataLoader.Options.VERBOSE,
             };
             for (String s : overrides) {
                 if (System.getProperty(s) != null) {
@@ -1496,9 +1989,10 @@ public class DataLoader {
             }
         }
         
-        final List<File> files = new LinkedList<File>();
-        while(i<args.length) {
-            
+		final List<File> files = new LinkedList<File>();
+		
+		while (i < args.length) {
+
             final File fileOrDir = new File(args[i++]);
             
             if(!fileOrDir.exists()) {
@@ -1521,11 +2015,11 @@ public class DataLoader {
         	
             jnl = new Journal(properties);
             
-            // #of bytes on the journal before (user extent).
-//            final long firstOffset = jnl.getRootBlockView().getNextOffset();
-            final long userData0 = jnl.getBufferStrategy().size();
+//            // #of bytes on the journal before (user extent).
+////            final long firstOffset = jnl.getRootBlockView().getNextOffset();
+//            final long userData0 = jnl.getBufferStrategy().size();
 
-            if(!quiet)
+			if (!quiet)
                 System.out.println("Journal file: "+jnl.getFile());
 
             AbstractTripleStore kb = (AbstractTripleStore) jnl
@@ -1540,9 +2034,10 @@ public class DataLoader {
                 
             }
 
-            final LoadStats totals = new LoadStats();
             final DataLoader dataLoader = //kb.getDataLoader();
             	new DataLoader(properties,kb); // use the override properties.
+            
+            final MyLoadStats totals = dataLoader.newLoadStats();
             
             for (File fileOrDir : files) {
 
@@ -1562,71 +2057,42 @@ public class DataLoader {
 			
         	if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
 
-				if (verbose) {
-
-					final CounterSet counters = jnl.getCounters();
-
-					counters.makePath("assertionBuffer").attach(dataLoader.getAssertionBuffer().getCounters());
-
-					System.out.println(counters.toString());
-					
-					System.out
-							.println(((AbstractLocalTripleStore) dataLoader.database)
-									.getLocalBTreeBytesWritten(
-											new StringBuilder()).toString());
-				}
-
-                if (!quiet)
-                    System.out.println("Computing closure.");
-                log.info("Computing closure.");
-
-                final ClosureStats stats = dataLoader.doClosure();
-                
-                if(!quiet)
-                    System.out.println("Closure: "+stats.toString());
-                if (log.isInfoEnabled())
-                    log.info("Closure: " + stats.toString());
-
-			}
-
-			jnl.commit();
-
-			if (verbose) {
-
-				final CounterSet counters = jnl.getCounters();
-
-				counters.makePath("assertionBuffer").attach(dataLoader.getAssertionBuffer().getCounters());
-
-				System.out.println(counters.toString());
-
-				System.out
-						.println(((AbstractLocalTripleStore) dataLoader.database)
-								.getLocalBTreeBytesWritten(new StringBuilder())
-								.toString());
-
-				if(log.isInfoEnabled())
+				if (verbose)
 					dataLoader.logCounters(dataLoader.database);
-//				if (jnl.getBufferStrategy() instanceof RWStrategy) {
-//
-//					final StringBuilder sb = new StringBuilder();
-//
-//					((RWStrategy) jnl.getBufferStrategy()).getRWStore()
-//							.showAllocators(sb);
-//
-//					System.out.println(sb);
-//
-//				}
+
+				if (!quiet)
+					System.out.println("Computing closure.");
+				log.info("Computing closure.");
+
+				final ClosureStats stats = dataLoader.doClosure();
+
+				if (!quiet)
+					System.out.println("Closure: " + stats.toString());
+
+				if (log.isInfoEnabled())
+					log.info("Closure: " + stats.toString());
 
 			}
 
-            // #of bytes on the journal (user data only).
-            final long userData1 = jnl.getBufferStrategy().size();
-            
-            // #of bytes written (user data only)
-            final long bytesWritten = (userData1 - userData0);
+            jnl.commit(); // database commit.
 
-            if (!quiet)
-                System.out.println("Wrote: " + bytesWritten + " bytes.");
+            totals.commit(); // Note: durable queues pattern.
+			
+			if (verbose)
+				dataLoader.logCounters(dataLoader.database);
+
+			/*
+			 * Note: This value is not correct for the RWStore. It is the
+			 * difference in the extents, not the bytes actually written.
+			 */
+			//            // #of bytes on the journal (user data only).
+//            final long userData1 = jnl.getBufferStrategy().size();
+//            
+//            // #of bytes written (user data only)
+//            final long bytesWritten = (userData1 - userData0);
+//
+//            if (!quiet)
+//                System.out.println("Wrote: " + bytesWritten + " bytes.");
 
             final long elapsedTotal = System.currentTimeMillis() - begin;
 
@@ -1662,6 +2128,7 @@ public class DataLoader {
      */
     final private static FilenameFilter filter = new FilenameFilter() {
 
+    	@Override
         public boolean accept(final File dir, final String name) {
 
             if (new File(dir, name).isDirectory()) {
