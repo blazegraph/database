@@ -1803,7 +1803,7 @@ public class DataLoader {
 	 * support multiple data files within a single archive.
 	 * 
 	 * @param args
-	 *            <code>[-quiet][-closure][-verbose][-queues][-namespace <i>namespace</i>] propertyFile (fileOrDir)*</code>
+	 *            <code>[-quiet][-closure][-verbose][-durableQueues][-namespace <i>namespace</i>] propertyFile (fileOrDir)*</code>
 	 *            where
 	 *            <dl>
 	 *            <dt>-quiet</dt>
@@ -2115,7 +2115,7 @@ public class DataLoader {
 
     private static void usage() {
         
-        System.err.println("usage: [-closure][-verbose][-namespace namespace] propertyFile (fileOrDir)+");
+        System.err.println("usage: [-closure][-verbose][-durableQueues][-namespace namespace] propertyFile (fileOrDir)+");
 
         System.exit(1);
         
