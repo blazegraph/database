@@ -29,6 +29,8 @@ package com.bigdata.rdf.rio;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -45,6 +47,10 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.jsr166.LinkedBlockingQueue;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
@@ -89,7 +95,7 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class StatementBuffer<S extends Statement> implements IStatementBuffer<S> {
+public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>, ICounterSetAccess {
 
     final private static Logger log = Logger.getLogger(StatementBuffer.class);
    
@@ -116,6 +122,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected int numStmts;
 
+	/**
+	 * The total number of statements accepted by the {@link StatementBuffer}.
+	 * This can include statements that are currently buffered as well as those
+	 * that have already been queued or written. This is a running total and
+	 * does not attempt to avoid counting duplicates.
+	 */
+    private long numTotalStmts;
+    
     /**
      * @todo consider tossing out these counters - they only add complexity to
      * the code in {@link #handleStatement(Resource, URI, Value, StatementEnum)}.
@@ -132,7 +146,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * Map used to filter out duplicate terms.  The use of this map provides
      * a ~40% performance gain.
      */
-    final private Map<Value, BigdataValue> distinctTermMap;
+	final private Map<Value, BigdataValue> distinctTermMap;
 
     /**
      * A canonicalizing map for blank nodes. This map MUST be cleared before you
@@ -236,14 +250,53 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * hold. The minimum capacity is three (3) since that corresponds to a
      * single triple where all terms are URIs.
      */
-    protected final int capacity;
+	private final int bufferCapacity;
 
+    /**
+     * The maximum #of Statements, URIs, Literals, or BNodes that the buffer can
+     * hold. The minimum capacity is three (3) since that corresponds to a
+     * single triple where all terms are URIs.
+     */
+	public int getCapacity() {
+		
+		return bufferCapacity;
+		
+	}
+	
 //    /**
 //     * When true only distinct terms are stored in the buffer (this is always
 //     * true since this condition always outperforms the alternative).
 //     */
 //    protected final boolean distinct = true;
     
+    /**
+	 * The capacity of the optional {@link #queue} used to overlap the parser
+	 * with the index writer -or- ZERO (0) iff the queue is disabled and index
+	 * writes will be synchronous and alternate with the parser (the historical
+	 * behavior).
+	 */
+	private final int queueCapacity;
+
+	/**
+	 * The #of batches added to the {@link #queue}.
+	 */
+	private int batchAddCount;
+	
+	/**
+	 * The #of batches taken from the {@link #queue}.
+	 */
+	private int batchTakeCount;
+
+	/**
+	 * The number of batches merged.
+	 */
+	private int batchMergeCount;
+
+	/**
+	 * The #of batches written onto the database.
+	 */
+	private int batchWriteCount;
+	
     /**
 	 * When non-null, this is a deque that will be used allow the parser to race
 	 * ahead. Once the writes on the statement indices are done, the queue can
@@ -270,7 +323,21 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	 * semantics of "close()" and the {@link StatementBuffer} MIGHT be reused.
 	 */
 	private volatile FutureTask<Void> ft;
-    
+
+	/**
+	 * The capacity of the optional queue used to overlap the parser with the
+	 * index writer -or- ZERO (0) iff the queue is disabled and index writes
+	 * will be synchronous and alternate with the parser (the historical
+	 * behavior).
+	 * 
+	 * @see BLZG-1552
+	 */
+	public int getQueueCapacity() {
+		
+		return queueCapacity;
+		
+	}
+	
     @Override
     public boolean isEmpty() {
         
@@ -304,6 +371,84 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     			;
     	
     }
+
+	@Override
+	public CounterSet getCounters() {
+
+		final CounterSet counters = new CounterSet();
+
+		counters.addCounter("readOnly", new OneShotInstrument<Boolean>(readOnly));
+
+		counters.addCounter("bnodesSize", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				final Map<String, BigdataBNode> t = bnodes;
+				if (t != null)
+					setValue(t.size());
+			}
+		});
+		
+		counters.addCounter("distinctTermMapSize", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				final Map<Value, BigdataValue> t = distinctTermMap;
+				if (t != null)
+					setValue(t.size());
+			}
+		});
+		
+		counters.addCounter("bufferCapacity", new OneShotInstrument<Integer>(bufferCapacity));
+
+		// Note: tracked even when the queue is not enabled.
+		counters.addCounter("batchAddCount", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				setValue(batchAddCount);
+			}
+		});
+
+		// Note: tracked even when the queue is not enabled.
+		counters.addCounter("batchWriteCount", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				setValue(batchWriteCount);
+			}
+		});
+
+		if (queue != null) {
+
+			// Only defined when the queue is enabled.
+			
+			counters.addCounter("queueCapacity", new OneShotInstrument<Integer>(queueCapacity));
+
+			counters.addCounter("queueSize", new Instrument<Integer>() {
+				@Override
+				public void sample() {
+					final LinkedBlockingQueue<Batch<S>> t = queue;
+					if (t != null)
+						setValue(t.size());
+				}
+			});
+
+			counters.addCounter("batchTakeCount", new Instrument<Integer>() {
+				@Override
+				public void sample() {
+					setValue(batchTakeCount);
+				}
+			});
+
+			counters.addCounter("batchMergeCount", new Instrument<Integer>() {
+				@Override
+				public void sample() {
+					setValue(batchMergeCount);
+				}
+			});
+
+		}
+
+		return counters;
+		
+	}
 
     /**
      * When invoked, the {@link StatementBuffer} will resolve terms against the
@@ -457,7 +602,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         this.valueFactory = database.getValueFactory();
         
-        this.capacity = capacity;
+        this.bufferCapacity = capacity;
+
+        this.queueCapacity = queueCapacity;
         
         values = new BigdataValue[capacity * arity + 5];
         
@@ -501,9 +648,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	getDistinctTerm(RDF_TYPE, true);
     
 		/**
-		 * TODO There is some odd interaction with SIDS that causes a thrown
-		 * exception from BigdataBNodeImpl.getIV() when the queue is used with
-		 * sids....
+		 * TODO BLZG-1522. There is some odd interaction with SIDS that causes a
+		 * thrown exception from BigdataBNodeImpl.getIV() when the queue is used
+		 * with sids....
 		 * 
 		 * <pre>
 		 * throw new UnificationException("illegal self-referential sid");
@@ -554,29 +701,118 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	 * @see BLZG-1522
 	 * 
 	 *      FIXME BLZG-1522 Modify this to merge multiple batches using
-	 *      drainTo() and then batch the combined result.
+	 *      drainTo() and then batch the combined result. Then do performance
+	 *      testing. The 10k value used by the bufferCapacity is probably good
+	 *      in combination with a queue capacity of 10 since that would allow as
+	 *      many as 100k statements to be buffered. But larger values might also
+	 *      be ok as well as large queue capacities. Allow the latter to be
+	 *      parameterized and do some performance tests.
 	 */
 	private class DrainQueueCallable implements Callable<Void> {
 
+		private boolean exhausted = false;
+		
 		@Override
 		public Void call() throws Exception {
 
-			while (true) {
+			while (!exhausted) {
 
+				// Block and wait for a batch.
 				final Batch<S> batch = queue.take();
 
 				if (batch == Batch.POISON_PILL) {
 
 					// Done.
-					return null;
+					exhausted = true;
+					
+					continue;
+
+				} else batchTakeCount++;
+
+				if (queue.isEmpty()) {
+
+					// Nothing else in the queue. Write out the batch immediately.
+					batch.writeNow();
+					batchWriteCount++;
+					
+					continue;
 
 				}
 
-				batch.writeNow();
-
+				drainQueueAndMergeBatches(batch);
+				
 			} // block and wait for the next batch.
+			
+			// done.
+			return null;
 
 		} // call()
+
+		/**
+		 * There is more in the queue. Drain it. Watch out for that poison pill!
+		 * 
+		 * Note: Maximum from drainTo() is queueCapacity. Plus 1 since we
+		 * already have one batch on hand.
+		 */
+		private void drainQueueAndMergeBatches(final Batch<S> batch) {
+
+			if (batch == null)
+				throw new IllegalArgumentException();
+			
+			if (batch == Batch.POISON_PILL) // DO NOT pass the poisen pill!
+				throw new IllegalArgumentException();
+			
+			final List<Batch<S>> avail = new LinkedList<Batch<S>>();
+
+			// add the batch already on hand (from caller)
+			avail.add(batch);
+
+			// drain the queue while queue is *known* to contain something.
+			while (!exhausted && !queue.isEmpty()) {
+
+				// non-blocking take. should be available immediately. but
+				// there *might* have been a clear() call.
+				final Batch<S> anotherBatch = queue.poll();
+
+				if (anotherBatch == null) {
+
+					// Note: This could arise through a concurrent clear of
+					// the queue.
+					exhausted = true;
+
+				} else if (anotherBatch == Batch.POISON_PILL) {
+
+					// Done.
+					exhausted = true;
+
+				} else {
+
+					// Add to the set that we will merge together.
+					avail.add(anotherBatch);
+					batchTakeCount++;
+					
+				}
+
+			}
+
+			if (avail.size() == 1) {
+
+				/*
+				 * Safety check. Do not merge a single batch.
+				 */
+				avail.get(0).writeNow();
+				batchWriteCount++;
+
+			} else {
+
+				// Merge the batches together and then write them out.
+				new MergeUtility<S>().merge(avail).writeNow();
+				batchMergeCount += avail.size();
+				batchWriteCount++;
+
+			}
+			
+		}
 		
 	} // DrainQueueCallable
 
@@ -591,7 +827,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * 
      * @todo this implementation always returns ZERO (0).
      */
-    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
     public long flush() {
        
 //        log.warn("");
@@ -1041,7 +1278,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		if (queue == null) {
 
 			new Batch<S>(this, false/* clone */).writeNow();
-			
+			batchWriteCount++;
+
 	        // Reset the state of the buffer (but not the bnodes nor deferred stmts).
 	        _clear();
 
@@ -1064,6 +1302,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
 				// Blocking put.
 				queue.put(new Batch<S>(this, true/* clone */));
+				batchAddCount++;
 				
 			} catch (InterruptedException e) {
 				
@@ -1074,19 +1313,180 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		}
     	
     }
-
+    
     /**
+	 * A utility class to merge {@link Batch}es together while maintaining their
+	 * distinct {@link Value}[]s.
+	 * 
+	 * @author bryan
+	 * @see BLZG-1522
+	 * @param <S>
+	 */
+    private static class MergeUtility<S extends Statement> {
+
+		/*
+		 * used by merge(). single threaded access.
+		 */
+		private int numValues;
+		private BigdataValue[] values;
+    	private Map<BigdataValue, BigdataValue> distinctTermMap;
+    	
+    	MergeUtility() {
+    		
+    	}
+    	
+    	/**
+		 * Merge a set of batches together.
+		 * 
+		 * @param avail
+		 *            The available batches.
+		 *            
+		 * @throws IllegalArgumentException
+		 *             if the argument is null.
+		 * @throws IllegalArgumentException
+		 *             if the argument is an empty list.
+		 * @throws IllegalArgumentException
+		 *             if the argument does not contain at least two batches.
+		 */
+		public Batch<S> merge(final List<Batch<S>> avail) {
+			
+			if (avail == null)
+				throw new IllegalArgumentException();
+			if (avail.isEmpty())
+				throw new IllegalArgumentException();
+			if (avail.size() < 2)
+				throw new IllegalArgumentException();
+
+			if (distinctTermMap != null) {
+				// An attempt to reuse a MergeUtility object.
+				throw new IllegalStateException();				
+			}
+			
+			/*
+			 * We need to create a new combined Statement[] containing only the
+			 * distinct Values and a new Value[] in which those distinct values
+			 * are entered. This removes duplicates from the Value[] which is
+			 * quite important for throughput. It is not as critical to de-dup
+			 * the Statement[] as duplicate statements are uncommon and do not
+			 * incur much overhead since we will sort the statements before
+			 * writing on the indices.
+			 * 
+			 * TODO We could potentially run into problems with a very large
+			 * capacity since the combined size of the values[] (without
+			 * duplicate removal) could exceed an int32 value. But this is not
+			 * likely.
+			 */
+
+			// find maximum size for arrays.
+			int maxValues = 0;
+			int maxStmts = 0;
+			{
+				for (Batch<S> sb : avail) {
+					maxValues += sb.numValues;
+					maxStmts += sb.numStmts;
+				}
+
+				// we will de-dup the values below.
+				values = new BigdataValue[maxValues];
+
+				// set map to find the distinct Values.
+				distinctTermMap = new HashMap<BigdataValue, BigdataValue>(maxValues);
+
+			}
+
+			// copy statements, finding distinct Values.
+			final int numStmts;
+			final BigdataStatement[] stmts;
+			{
+				// we will not de-dup the statements.
+				stmts = new BigdataStatement[maxStmts];
+
+				int n = 0;
+				for (Batch<S> sb : avail) {
+					for (int i = 0; i < sb.numStmts; i++, n++) {
+						// Create new statement using distinct values.
+						final BigdataStatement stmt = (BigdataStatement) sb.stmts[i];
+						final BigdataResource s = (BigdataResource) getDistinctTerm(stmt.getSubject());
+						final BigdataURI p = (BigdataURI) getDistinctTerm(stmt.getPredicate());
+						final BigdataValue o = getDistinctTerm(stmt.getObject());
+						final BigdataResource c = stmt.getContext() == null ? null
+								: (BigdataResource) getDistinctTerm(stmt.getContext());
+						stmts[n] = s.getValueFactory().createStatement(s, p, o, c, stmt.getStatementType());
+					}
+				}
+				numStmts = n;
+			}
+
+			final Batch<S> sb = avail.get(0);
+			return new Batch<S>(sb.database, // copy by reference
+					sb.statementStore, // copy by reference
+					sb.readOnly, // copy by reference
+					sb.changeLog, // copy by reference
+					sb.didWriteCallback, // copy by reference
+					numValues, // copied the data.
+					values, // copied the data.
+					numStmts, // copied the data.
+					stmts // copied the data.
+			);
+
+		} // merge()
+
+	    /**
+		 * Canonicalizing mapping for a term when merging {@link Batch}es
+		 * together. This is simpler than the general case since we have already
+		 * handled blank nodes, SIDs, etc. in the outer context.
+		 * 
+		 * @param term
+		 *            A term.
+		 * 
+		 * @return Either the term or the pre-existing term in the {@link Batch}
+		 *         with the same data.
+		 * 
+		 * @throws IllegalArgumentException
+		 *             if the argument is null (so do not pass a null context in
+		 *             here!)
+		 */
+		private BigdataValue getDistinctTerm(final BigdataValue term) {
+
+			if (term == null)
+				throw new IllegalArgumentException();
+
+			// TODO BLZG-1532 (JAVA8) replace with putIfAbsent()
+			final BigdataValue existingTerm = distinctTermMap.get(term);
+
+			if (existingTerm != null) {
+
+				/*
+				 * Term already exists, do not add.
+				 */
+				return existingTerm;
+
+			}
+
+			// put the new term in the map.
+			if (distinctTermMap.put(term, term) != null) {
+
+				throw new AssertionError();
+
+			}
+
+			values[numValues++] = term;
+
+			// return the new term.
+			return term;
+
+	    }
+	    
+
+    }
+
+	/**
+	 * A batch of statements together with their distinct values to be written
+	 * onto the database.
 	 * 
 	 * @author bryan
 	 * 
 	 * @see BLZG-1522
-	 * 
-	 *      FIXME BLZG-1522 Performance testing. The 10k value used by the
-	 *      BigdataSail.Options.BUFFER_CAPACITY is probably good in combination
-	 *      with a queue capacity of 10 since that would allow as many as 100k
-	 *      statements to be buffered. But larger values might also be ok as
-	 *      well as large queue capacities. Allow the latter to be parameterized
-	 *      and do some performance tests.
 	 */
     private static class Batch<S extends Statement> {
 
@@ -1143,6 +1543,30 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			numStmts = 0;
 			stmts = null;
     	}
+
+    	/**
+    	 * Constructor used when merging multiple batches.
+    	 */
+    	private Batch(  final AbstractTripleStore database, //
+				final AbstractTripleStore statementStore, //
+				final boolean readOnly, //
+				final IChangeLog changeLog, //
+				final IWrittenSPOArray didWriteCallback, //
+				final int numValues, //
+				final BigdataValue[] values, //
+				final int numStmts, //
+				final BigdataStatement[] stmts//
+		) {
+			this.database = database;
+			this.statementStore = statementStore;
+			this.readOnly = readOnly;
+			this.changeLog = changeLog;
+			this.didWriteCallback = didWriteCallback;
+			this.numValues = numValues;
+			this.values = values;
+			this.numStmts = numStmts;
+			this.stmts = stmts;
+    	}
     	
     	/**
 		 * 
@@ -1191,7 +1615,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				this.numStmts = sb.numStmts;
 				this.stmts = new BigdataStatement[sb.numStmts];
 				System.arraycopy(sb.stmts/* src */, 0/* srcPos */, this.stmts/* dest */, 0/* destPos */,
-						sb.numStmts/* length */);
+						sb.numStmts);
 				
 				/*
 				 * The data was cloned, so reset the statement of the buffer in
@@ -1203,7 +1627,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			
     	}
 
-		/**
+	    /**
 		 * Flush the batch.
 		 * 
 		 * @return The #of statements actually written.
@@ -1270,7 +1694,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                         + ", elapsed=" + elapsed + "ms");
                 
             }
-
+            
             return nwritten;
             
     	}
@@ -1588,7 +2012,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                  * reset()).
                  */
                 flush();
-                bnodes = new HashMap<String, BigdataBNode>(capacity);
+                bnodes = new HashMap<String, BigdataBNode>(bufferCapacity);
                 deferredStmts = new HashSet<BigdataStatement>(stmts.length);
             }
         }
@@ -1618,7 +2042,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     public boolean nearCapacity() {
 
-        if (numStmts + 1 > capacity)
+        if (numStmts + 1 > bufferCapacity)
             return true;
 
         if (numValues + arity > values.length)
@@ -1643,7 +2067,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @return Either the term or the pre-existing term in the buffer with the
      *         same data.
      */
-    protected BigdataValue getDistinctTerm(final BigdataValue term, final boolean addIfAbsent) {
+    private BigdataValue getDistinctTerm(final BigdataValue term, final boolean addIfAbsent) {
 
         if (term == null)
         	return null;
@@ -1684,7 +2108,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	            if (bnodes == null) {
 	
 	                // allocating canonicalizing map for blank nodes.
-	                bnodes = new HashMap<String, BigdataBNode>(capacity);
+	                bnodes = new HashMap<String, BigdataBNode>(bufferCapacity);
 	
 	                // insert this blank node into the map.
 	                bnodes.put(id, bnode);
@@ -1721,6 +2145,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	         * when reading very large documents.
 	         */
 	        
+			// TODO BLZG-1532 (JAVA8) replace with putIfAbsent()
 	        final BigdataValue existingTerm = distinctTermMap.get(term);
 	        
 	        if (existingTerm != null) {
@@ -1776,7 +2201,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
     }
     
-    protected void addTerm(final BigdataValue term) {
+    private void addTerm(final BigdataValue term) {
     	
     	if (term == null)
     		return;
@@ -1831,7 +2256,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @see #nearCapacity()
      */
     protected void handleStatement(Resource _s, URI _p, Value _o, Resource _c,
-            StatementEnum type) {
+            final StatementEnum type) {
         
     	// silently strip context in quads mode. See #1086.
     	_c = database.isQuads() ? _c : null;
@@ -1932,6 +2357,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         // add to the buffer.
         stmts[numStmts++] = stmt;
 
+        numTotalStmts++;
+        
 //        if (c != null && statementIdentifiers && c instanceof BNode) {
 //        	
 //        	((BigdataBNodeImpl) c).setStatement(stmt);
@@ -2068,9 +2495,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			this.o = o;
 		}
 
-		public void setContext(final BigdataResource c) {
-			this.c = c;
-		}
+//		public void setContext(final BigdataResource c) {
+//			this.c = c;
+//		}
 		
 	    @Override
 	    public String toString() {
@@ -2085,6 +2512,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	    	
 	    }
     	
-    }
+	}
 
 }

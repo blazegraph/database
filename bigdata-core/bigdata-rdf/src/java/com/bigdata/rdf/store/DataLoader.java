@@ -47,6 +47,7 @@ import java.util.zip.ZipInputStream;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -1563,8 +1564,12 @@ public class DataLoader {
 
 				if (verbose) {
 
-					System.out.println(jnl.getCounters().toString());
+					final CounterSet counters = jnl.getCounters();
 
+					counters.makePath("assertionBuffer").attach(dataLoader.getAssertionBuffer().getCounters());
+
+					System.out.println(counters.toString());
+					
 					System.out
 							.println(((AbstractLocalTripleStore) dataLoader.database)
 									.getLocalBTreeBytesWritten(
@@ -1588,7 +1593,11 @@ public class DataLoader {
 
 			if (verbose) {
 
-				System.out.println(jnl.getCounters().toString());
+				final CounterSet counters = jnl.getCounters();
+
+				counters.makePath("assertionBuffer").attach(dataLoader.getAssertionBuffer().getCounters());
+
+				System.out.println(counters.toString());
 
 				System.out
 						.println(((AbstractLocalTripleStore) dataLoader.database)
