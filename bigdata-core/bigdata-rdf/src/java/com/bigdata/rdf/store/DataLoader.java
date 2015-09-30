@@ -207,7 +207,7 @@ public class DataLoader {
 	 * 
 	 * @see Options#VERBOSE
 	 */
-    private final boolean verbose;
+    private final int verbose;
 
 	/**
 	 * when true, run DumpJournal after each commit (only makes sense in batch
@@ -543,15 +543,17 @@ public class DataLoader {
 		String DEFAULT_DUMP_JOURNAL = "false";
 
 		/**
-		 * When true, significant information may be reported at each commit
-		 * point.
+		 * When greater than ZERO (0), significant information may be reported
+		 * at each commit point. At ONE (1) it provides information at each
+		 * commit. At TWO (2), it provides that information each time it logs
+		 * the status of the ongoing load.
 		 */
 		String VERBOSE = DataLoader.class.getName() + ".verbose";
 
 		/**
-		 * The default value (<code>false</code>) for {@link #VERBOSE)
+		 * The default value (<code>0</code>) for {@link #VERBOSE)
 		 */
-		String DEFAULT_VERBOSE = "false";
+		String DEFAULT_VERBOSE = "0";
 
     }
 
@@ -700,8 +702,8 @@ public class DataLoader {
 
 		{ // verbose.
 			
-			verbose = Boolean
-					.parseBoolean(properties.getProperty(Options.VERBOSE, Options.DEFAULT_VERBOSE));
+			verbose = Integer
+					.parseInt(properties.getProperty(Options.VERBOSE, Options.DEFAULT_VERBOSE));
 
 			if (log.isInfoEnabled())
 				log.info(Options.VERBOSE + "=" + verbose);
@@ -936,7 +938,7 @@ public class DataLoader {
 			if (log.isInfoEnabled())
 				log.info("commit: latency=" + totals.commitTime + "ms");
 
-			if (verbose)
+			if (verbose > 0)
 				logCounters(database);
 
 		}
@@ -1497,15 +1499,28 @@ public class DataLoader {
 				 * things are buffered, the parser can run ahead of the index
 				 * writes.
 				 */
-				if (log.isInfoEnabled()) {
-					log.info(e.getStatementsProcessed() + " stmts buffered in "
+				if (log.isInfoEnabled() || verbose > 1) {
+					final String msg = e.getStatementsProcessed() + " stmts buffered in "
 							+ (e.getTimeElapsed() / 1000d) + " secs, rate= "
 							+ e.getInsertRate()
 							+ (baseURI != null ? ", baseURL=" + baseURI : "") + //
 							(", totalStatementsSoFar="//
 							+ (e.getStatementsProcessed()//
-							+ totals.toldTriples.get()))// 
-					);
+							+ totals.toldTriples.get())//
+							);//
+					if (log.isInfoEnabled())
+						log.info(msg);
+					else if (verbose > 0)
+						System.out.println(msg);
+				}
+
+				if (verbose > 2) {
+					// Show more details, especially about the assertion buffers.
+					final StatementBuffer<?> tmp = buffer;
+					if (tmp != null) {
+						System.out.println(tmp.toString());
+						System.out.println(tmp.getCounters().toString());
+					}
 				}
                 
             }
@@ -1594,7 +1609,7 @@ public class DataLoader {
                 if (log.isInfoEnabled())
                     log.info("commit: latency=" + stats.commitTime + "ms");
 
-				if (verbose)
+				if (verbose > 0)
 					logCounters(database);
     			
             }
@@ -1810,7 +1825,9 @@ public class DataLoader {
 	 *            <dd>Suppress all stdout messages.</dd>
 	 *            <dt>-verbose</dt>
 	 *            <dd>Show additional messages detailing the load performance.
-	 *            </dd>
+	 *            This may be specified more than once to increase the amount of
+	 *            information reported. This is a shorthand for
+	 *            {@link Options#VERBOSE}.</dd>
 	 *            <dt>-closure</dt>
 	 *            <dd>Compute the RDF(S)+ closure.</dd>
 	 *            <dt>-durableQueues</dt>
@@ -1840,7 +1857,7 @@ public class DataLoader {
         // default namespace.
         String namespace = "kb";
         boolean doClosure = false;
-        boolean verbose = false;
+        int verbose = 0;
         boolean quiet = false;
         boolean durableQueues = false;
         RDFFormat rdfFormat = null;
@@ -1883,13 +1900,13 @@ public class DataLoader {
                     
                 } else if (arg.equals("-verbose")) {
 
-                    verbose = true;
+                    verbose++;
                     quiet = false;
 
                 } else if (arg.equals("-quiet")) {
 
                     quiet = true;
-                    verbose = false;
+                    verbose = 0;
 
                 } else {
 
@@ -1952,8 +1969,8 @@ public class DataLoader {
 			// @see BLZG-1534 (durable queues)
 			properties.setProperty(Options.DURABLE_QUEUES, "true");
 		}
-		if (verbose) {
-			properties.setProperty(Options.VERBOSE, "true");
+		if (verbose > 0) {
+			properties.setProperty(Options.VERBOSE, Integer.toString(verbose));
 		}
         /*
          * Allow override of select options.
@@ -2057,7 +2074,7 @@ public class DataLoader {
 			
         	if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
 
-				if (verbose)
+				if (verbose > 0)
 					dataLoader.logCounters(dataLoader.database);
 
 				if (!quiet)
@@ -2078,7 +2095,7 @@ public class DataLoader {
 
             totals.commit(); // Note: durable queues pattern.
 			
-			if (verbose)
+			if (verbose > 0)
 				dataLoader.logCounters(dataLoader.database);
 
 			/*
