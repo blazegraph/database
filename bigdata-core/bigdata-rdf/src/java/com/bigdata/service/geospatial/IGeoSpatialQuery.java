@@ -29,6 +29,8 @@ package com.bigdata.service.geospatial;
 import java.io.Serializable;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -63,6 +65,7 @@ public interface IGeoSpatialQuery {
       private static final long serialVersionUID = -2509557655519603130L;
 
       final GeoFunction searchFunction;
+      final IConstant<?> subject;
       final TermNode predicate;
       final TermNode context;
       final PointLatLon spatialCircleCenter;
@@ -72,6 +75,9 @@ public interface IGeoSpatialQuery {
       final UNITS spatialUnit;
       final Long timeStart;
       final Long timeEnd;
+      final IVariable<?> locationVar;
+      final IVariable<?> timeVar;
+      final IVariable<?> locationAndTimeVar;
       final IBindingSet incomingBindings;
 
 
@@ -79,15 +85,18 @@ public interface IGeoSpatialQuery {
        * Constructor
        */
       public GeoSpatialSearchQuery(final GeoFunction searchFunction, 
-            final TermNode predicate, final TermNode context,
-            final PointLatLon spatialCircleCenter, 
+            final IConstant<?> subject, final TermNode predicate, 
+            final TermNode context, final PointLatLon spatialCircleCenter, 
             final Double spatialCircleRadius,
             PointLatLon spatialRectangleUpperLeft,
             PointLatLon spatialRectangleLowerRight,
             final UNITS spatialUnit, final Long timeStart,
-            final Long timeEnd, final IBindingSet incomingBindings) {
+            final Long timeEnd, final IVariable<?> locationVar,
+            final IVariable<?> timeVar, final IVariable<?> locationAndTimeVar, 
+            final IBindingSet incomingBindings) {
 
          this.searchFunction = searchFunction;
+         this.subject = subject;
          this.predicate = predicate;
          this.context = context;
          this.spatialCircleCenter = spatialCircleCenter;
@@ -97,12 +106,19 @@ public interface IGeoSpatialQuery {
          this.spatialUnit = spatialUnit;
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
+         this.locationVar = locationVar;
+         this.timeVar = timeVar;
+         this.locationAndTimeVar = locationAndTimeVar;
          this.incomingBindings = incomingBindings;
 
       }
       
       public GeoFunction getSearchFunction() {
          return searchFunction;
+      }
+      
+      public IConstant<?> getSubject() {
+         return subject;
       }
 
       public TermNode getPredicate() {
@@ -141,125 +157,23 @@ public interface IGeoSpatialQuery {
          return timeEnd;
       }
       
+      public IVariable<?> getLocationVar() {
+         return locationVar;
+      }
+
+      public IVariable<?> getTimeVar() {
+         return timeVar;
+      }
+
+      public IVariable<?> getLocationAndTimeVar() {
+         return locationAndTimeVar;
+      }
+
+      
       public IBindingSet getIncomingBindings() {
          return incomingBindings;
       }
-      
-      // TODO: remove if unneeded
-      /*
-       * (non-Javadoc)
-       * 
-       * @see java.lang.Object#hashCode()
-       */
-      @Override
-      public int hashCode() {
-         final int prime = 31;
-
-         int result = 1;
-         
-         result = prime * result + 
-            ((searchFunction == null) ? 0 : searchFunction.hashCode());
-         
-         result = prime * result +
-            ((predicate == null) ? 0 : predicate.hashCode());
-
-         result = prime * result +
-                 ((context == null) ? 0 : context.hashCode());
-
-         result = prime * result + 
-            ((spatialCircleCenter == null) ? 0 : spatialCircleCenter.hashCode());
-         
-         result = prime * result + 
-            ((spatialCircleRadius == null) ? 0 : spatialCircleRadius.hashCode());
-
-         result = prime * result + 
-            ((spatialRectangleUpperLeft == null) ? 0 : spatialRectangleUpperLeft.hashCode());
-
-         result = prime * result + 
-            ((spatialRectangleLowerRight == null) ? 0 : spatialRectangleLowerRight.hashCode());
-
-         result = prime * result + 
-            ((spatialUnit == null) ? 0 : spatialUnit.hashCode());
-
-         result = prime * result + 
-               ((timeStart == null) ? 0 : timeStart.hashCode());
-
-         result = prime * result + 
-               ((timeEnd == null) ? 0 : timeEnd.hashCode());
-
-         return result;
-      }
-
-      // TODO: remove if unneeded
-      /*
-       * (non-Javadoc)
-       * 
-       * @see java.lang.Object#equals(java.lang.Object)
-       */
-      @Override
-      public boolean equals(Object obj) {
-         if (this == obj)
-            return true;
-         if (obj == null)
-            return false;
-         if (getClass() != obj.getClass())
-            return false;
-         GeoSpatialSearchQuery other = (GeoSpatialSearchQuery) obj;
-
-         if ((searchFunction == null && other.searchFunction != null)
-               || (searchFunction != null && other.searchFunction == null)
-               || !searchFunction.equals(other.searchFunction))
-            return false;
-         
-         if ((predicate == null && other.predicate != null)
-               || (predicate != null && other.predicate == null)
-               || !predicate.equals(other.predicate))
-            return false;
-
-         if ((context == null && other.context != null)
-                 || (context != null && other.context == null)
-                 || !context.equals(other.context))
-              return false;
-
-         if ((spatialCircleCenter == null && other.spatialCircleCenter != null)
-               || (spatialCircleCenter != null && other.spatialCircleCenter == null)
-               || !spatialCircleCenter.equals(other.spatialCircleCenter))
-            return false;
-
-         if ((spatialCircleRadius == null && other.spatialCircleRadius != null)
-               || (spatialCircleRadius != null && other.spatialCircleRadius == null)
-               || !spatialCircleRadius.equals(other.spatialCircleRadius))
-            return false;
-
-         if ((spatialRectangleUpperLeft == null && other.spatialRectangleUpperLeft != null)
-               || (spatialRectangleUpperLeft != null && other.spatialRectangleUpperLeft == null)
-               || !spatialRectangleUpperLeft.equals(other.spatialRectangleUpperLeft))
-            return false;
-
-         if ((spatialRectangleLowerRight == null && other.spatialRectangleLowerRight != null)
-               || (spatialRectangleLowerRight != null && other.spatialRectangleLowerRight == null)
-               || !spatialRectangleLowerRight.equals(other.spatialRectangleLowerRight))
-            return false;
-
-         if ((spatialUnit == null && other.spatialUnit != null)
-               || (spatialUnit != null && other.spatialUnit == null)
-               || !spatialUnit.equals(other.spatialUnit))
-            return false;
-
-         if ((timeStart == null && other.timeStart != null)
-               || (timeStart != null && other.timeStart == null)
-               || !timeStart.equals(other.timeStart))
-            return false;
-
-         if ((timeEnd == null && other.timeEnd != null)
-               || (timeEnd != null && other.timeEnd == null)
-               || !timeEnd.equals(other.timeEnd))
-            return false;
-
-         return true;
-      }
 
    }
-
 
 }
