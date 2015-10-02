@@ -222,6 +222,35 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
        
     }
     
+    /**
+     * Test extraction of index dimensions in quads mode:
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "1" . #km
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "7" .
+     *     ?res geo:locationValue ?location .
+     *     ?res geo:timeValue ?time .
+     *     ?res geo:locationAndTimeValue ?locationAndTime .    
+     *   }
+     * } 
+     * @throws Exception
+     */
+    public void testValueExtraction() throws Exception {
+       
+       new TestHelper(
+          "geo-quads-valueextr",
+          "geo-quads-valueextr.rq", 
+          "geo-quads-grid101010.nq",
+          "geo-quads-valueextr.srx").runTest();
+       
+    }
+
+    
     @Override
     public Properties getProperties() {
 

@@ -618,7 +618,117 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
 
+    /**
+     * Verify that location value is properly extracted.
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "2#2" .
+     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:timeStart "4" .
+     *     ?res geo:timeEnd "4" .
+     *     ?res geo:locationValue ?location .
+     *   }
+     * } 
+     */    
+    public void testDimensionValueExtracion01() throws Exception {
+       
+       new TestHelper(
+          "geo-valueextr",
+          "geo-valueextr01.rq", 
+          "geo-grid101010.nt",
+          "geo-valueextr01.srx").runTest();
+       
+    }
     
+    /**
+     * Verify that time value is properly extracted.
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "2#2" .
+     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:timeStart "4" .
+     *     ?res geo:timeEnd "4" .
+     *     ?res geo:timeValue ?time .
+     *   }
+     * } 
+     */    
+    public void testDimensionValueExtracion02() throws Exception {
+       
+       new TestHelper(
+          "geo-valueextr",
+          "geo-valueextr02.rq", 
+          "geo-grid101010.nt",
+          "geo-valueextr02.srx").runTest();
+       
+    }
+    
+    /**
+     * Verify that location + time value is properly extracted.
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "2#2" .
+     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:timeStart "4" .
+     *     ?res geo:timeEnd "4" .
+     *     ?res geo:locationAndTimeValue ?locationAndTime .    
+     *   }
+     * } 
+     */    
+    public void testDimensionValueExtracion03() throws Exception {
+       
+       new TestHelper(
+          "geo-valueextr",
+          "geo-valueextr03.rq", 
+          "geo-grid101010.nt",
+          "geo-valueextr03.srx").runTest();
+       
+    }
+    
+    
+    /**
+     * Verify that all dimension values are extracted properly
+     * when respective output variables are present
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "2#2" .
+     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:timeStart "4" .
+     *     ?res geo:timeEnd "4" .
+     *     ?res geo:locationValue ?location .
+     *     ?res geo:timeValue ?time .
+     *     ?res geo:locationAndTimeValue ?locationAndTime .    
+     *   }
+     * } 
+     */    
+    public void testDimensionValueExtracion04() throws Exception {
+       
+       new TestHelper(
+          "geo-valueextr",
+          "geo-valueextr04.rq", 
+          "geo-grid101010.nt",
+          "geo-valueextr04.srx").runTest();
+       
+    }
     
     @Override
     public Properties getProperties() {

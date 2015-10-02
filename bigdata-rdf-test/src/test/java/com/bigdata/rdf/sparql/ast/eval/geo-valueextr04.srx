@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="res"/>
+    <variable name="location"/>
+    <variable name="time"/>
+    <variable name="locationAndTime"/>
+  </head>
+  <results>
+     <result>
+      <binding name="res"><uri>http://s.2#2#4</uri></binding>
+      <binding name="location"><literal>2.0#2.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#2.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.2#3#4</uri></binding>
+      <binding name="location"><literal>2.0#3.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#3.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.2#4#4</uri></binding>
+      <binding name="location"><literal>2.0#4.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#4.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.2#5#4</uri></binding>
+      <binding name="location"><literal>2.0#5.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#5.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.2#6#4</uri></binding>
+      <binding name="location"><literal>2.0#6.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#6.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.3#2#4</uri></binding>
+      <binding name="location"><literal>3.0#2.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#2.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.3#3#4</uri></binding>
+      <binding name="location"><literal>3.0#3.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#3.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.3#4#4</uri></binding>
+      <binding name="location"><literal>3.0#4.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#4.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.3#5#4</uri></binding>
+      <binding name="location"><literal>3.0#5.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#5.0#4</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.3#6#4</uri></binding>
+      <binding name="location"><literal>3.0#6.0</literal></binding>
+      <binding name="time"><literal datatype="http://www.w3.org/2001/XMLSchema#long">4</literal></binding>
+      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#6.0#4</literal></binding>
+     </result>
+  </results>
+</sparql>
