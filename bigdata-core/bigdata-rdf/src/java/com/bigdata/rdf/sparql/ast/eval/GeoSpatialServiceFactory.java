@@ -67,10 +67,12 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -292,8 +294,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          if (uri.equals(GeoSpatial.PREDICATE) || uri.equals(GeoSpatial.CONTEXT)) {
             assertObjectIsURI(sp);
+         } else if (uri.equals(GeoSpatial.LOCATION_VALUE) ||  uri.equals(GeoSpatial.TIME_VALUE) 
+                  || uri.equals(GeoSpatial.LOCATION_AND_TIME_VALUE)) {
+            
+            assertObjectIsVariable(sp);
+            
          } else {
+            
             assertObjectIsLiteralOrVariable(sp);
+            
          }
       }
 
@@ -339,6 +348,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
    }
 
+   private void assertObjectIsVariable(final StatementPatternNode sp) {
+
+      final TermNode o = sp.o();
+      
+      if (!o.isVariable()) {
+         throw new IllegalArgumentException(
+               "Object is not a variable: " + sp);
+      }
+
+   }
+   
    /**
     * 
     * Note: This has the {@link AbstractTripleStore} reference attached. This is
@@ -348,15 +368,19 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       private final IServiceOptions serviceOptions;
       private final TermNode searchFunction;
-      private TermNode predicate = null;
-      private TermNode context = null;
-      private TermNode spatialCircleCenter = null;
-      private TermNode spatialCircleRadius = null;
-      private TermNode spatialRectangleUpperLeft = null;
-      private TermNode spatialRectangleLowerRight = null;
-      private TermNode spatialUnit = null;
-      private TermNode timeStart = null;
-      private TermNode timeEnd = null;
+      private final IVariable<?> searchVar;
+      private final IVariable<?> locationVar;
+      private final IVariable<?> timeVar;
+      private final IVariable<?> locationAndTimeVar;
+      private final TermNode predicate;
+      private final TermNode context;
+      private final TermNode spatialCircleCenter;
+      private final TermNode spatialCircleRadius;
+      private final TermNode spatialRectangleUpperLeft;
+      private final TermNode spatialRectangleLowerRight;
+      private final TermNode spatialUnit;
+      private final TermNode timeStart;
+      private final TermNode timeEnd;
 
       private IVariable<?>[] vars;
       private final GeoSpatialDefaults defaults;
@@ -383,6 +407,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.serviceOptions = serviceOptions;
 
          this.defaults = dflts;
+         
+         this.searchVar = searchVar;
 
          /*
           * Unpack the "search" magic predicate:
@@ -403,10 +429,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          TermNode spatialUnit = null;
          TermNode timeStart = null;
          TermNode timeEnd = null;
+         IVariable<?> locationVar = null;
+         IVariable<?> timeVar = null;
+         IVariable<?> locationAndTimeVar = null;
 
          for (StatementPatternNode meta : statementPatterns.values()) {
 
             final URI p = (URI) meta.p().getValue();
+            
+            final IVariable<?> oVar = 
+               meta.o().isVariable() ? 
+               (IVariable<?>) meta.o().getValueExpression() : null;
 
             if (GeoSpatial.PREDICATE.equals(p)) {
                predicate = meta.o();
@@ -426,7 +459,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                timeStart = meta.o();
             } else if (GeoSpatial.TIME_END.equals(p)) {
                timeEnd = meta.o();
-            }
+            } else if (GeoSpatial.LOCATION_VALUE.equals(p)) {
+               locationVar = oVar;
+            } else if (GeoSpatial.TIME_VALUE.equals(p)) {
+               timeVar = oVar;
+            } else if (GeoSpatial.LOCATION_AND_TIME_VALUE.equals(p)) {
+               locationAndTimeVar = oVar;
+            } 
 
          }
 
@@ -442,6 +481,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.spatialUnit = spatialUnit;
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
+         this.locationVar = locationVar;
+         this.timeVar = timeVar;
+         this.locationAndTimeVar = locationAndTimeVar;
          this.kb = kb;
          
          geoSpatialCounters =
@@ -457,9 +499,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          // iterate over the incoming binding set, issuing search requests
          // for all bindings in the binding set
          return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction,
-               predicate, context, spatialCircleCenter, spatialCircleRadius,
-               spatialRectangleUpperLeft, spatialRectangleLowerRight,
-               spatialUnit, timeStart, timeEnd, defaults, kb, this);
+               searchVar, predicate, context, spatialCircleCenter, spatialCircleRadius,
+               spatialRectangleUpperLeft, spatialRectangleLowerRight, spatialUnit,
+               timeStart, timeEnd, locationVar, timeVar, locationAndTimeVar, defaults, kb, this);
 
       }
 
@@ -493,6 +535,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final GlobalAnnotations globals = new GlobalAnnotations(kb
                .getLexiconRelation().getNamespace(), kb.getSPORelation()
                .getTimestamp());
+         
+         final BigdataValueFactory vf = kb.getValueFactory();
          
          // this is needed for any function
          final Long timeStart = query.getTimeStart();
@@ -582,12 +626,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          final RangeBOp rangeBop = ASTRangeOptimizer.toRangeBOp(context, range,
                globals);
-
+         
+         // we support projection of fixed subjects into the SERVICE call
+         IConstant<?> constSubject = query.getSubject();
+         
          // set up the predicate
-         final VarNode s = new VarNode(vars[0].getName());
+         final TermNode s = constSubject==null ? 
+            new VarNode(vars[0].getName()) : new ConstantNode((IConstant<IV>)constSubject);
          final TermNode p = query.getPredicate();
          final VarNode o = new VarNode(oVar);
-
 
          /**
           * We call kb.getPredicate(), which has the nice feature that it
@@ -661,7 +708,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
          }
          
-         
          /**
           * Set up the advancer, which iterates exactly over the values in range
           * TODO: we want to have this multi threaded at some point
@@ -669,8 +715,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Advancer<SPO> bigMinAdvancer = 
             new ZOrderIndexBigMinAdvancer(
                lowerZOrderKey, upperZOrderKey, litExt, objectPos, geoSpatialCounters);
+
+         final Var<?> locationVar = varFromIVar(query.getLocationVar());
+         final Var<?> timeVar = varFromIVar(query.getTimeVar());
+         final Var<?> locationAndTimeVar = varFromIVar(query.getLocationAndTimeVar());
          
-         final Var var = Var.var(vars[0].getName());
+         
+         final Var<?> var = Var.var(vars[0].getName());
          final IBindingSet incomingBindingSet = query.getIncomingBindings();
          final Iterator<IBindingSet> itr = 
             new Striterator(accessPath.getIndex().rangeIterator(
@@ -689,11 +740,51 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
                         final byte[] key = ((ITuple<?>) obj).getKey();
                              
-                        final IV[] ivs = IVUtility.decode(key, subjectPos+1);
+                        final boolean reportsObjectComponents =
+                           locationVar!=null || timeVar!=null || locationAndTimeVar!=null;
+
+                        // if results are reported, we need to decode up to subject + object,
+                        // otherwise decoding up to the subject position is sufficient
+                        final int extractToPosition =
+                           reportsObjectComponents ? 
+                           Math.max(objectPos, subjectPos) + 1: 
+                           subjectPos + 1;
+                        final IV[] ivs = IVUtility.decode(key, extractToPosition);
 
                         final IBindingSet bs = incomingBindingSet.clone();
                         bs.set(var, new Constant<IV>(ivs[subjectPos]));
 
+                        // handle request for return of index components
+                        if (reportsObjectComponents) {
+                           
+                           if (locationVar!=null) {
+                              
+                              // wrap positions 0 + 1 (lat + lon) into a literal
+                              final BigdataLiteral locationLit = 
+                                 vf.createLiteral(
+                                    litExt.toComponentString(0,1,(LiteralExtensionIV)ivs[objectPos]));
+                              
+                              bs.set(locationVar, 
+                                 new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) locationLit)));
+                           }
+
+                           if (timeVar!=null) {
+                              
+                              // wrap positions 2 of the index into a literal
+                              final BigdataLiteral timeLit = 
+                                    vf.createLiteral(
+                                       Long.valueOf(litExt.toComponentString(2,2,(LiteralExtensionIV)ivs[objectPos])));
+                              
+                              bs.set(timeVar, 
+                                    new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) timeLit)));
+                           }
+
+                           if (locationAndTimeVar!=null) {
+                              bs.set(locationAndTimeVar, new Constant<IV>(ivs[objectPos]));
+                           }
+
+                        }
+                        
                         return bs;
 
                      }
@@ -701,6 +792,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                );
 
          return (ICloseableIterator<IBindingSet>)itr;
+      }
+      
+      private static Var<?> varFromIVar(IVariable<?> iVar) {
+         
+         return iVar==null ? null : Var.var(iVar.getName());
+         
+         
       }
    }
    
@@ -714,6 +812,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       private final IBindingSet[] bindingSet;
       private final TermNode searchFunction;
+      private final IVariable<?> searchVar;
       private final TermNode predicate;
       private final TermNode context;
       private final TermNode spatialCircleCenter;
@@ -723,6 +822,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final TermNode spatialUnit;
       private final TermNode timeStart;
       private final TermNode timeEnd;
+      private final IVariable<?> locationVar;
+      private final IVariable<?> timeVar;
+      private final IVariable<?> locationAndTimeVar;
+      
 
       final GeoSpatialDefaults defaults;
       final AbstractTripleStore kb;
@@ -733,18 +836,20 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       ICloseableIterator<IBindingSet> curDelegate;
 
       public GeoSpatialInputBindingsIterator(final IBindingSet[] bindingSet,
-            final TermNode searchFunction, final TermNode predicate,
-            final TermNode context, final TermNode spatialCircleCenter,
-            final TermNode spatialCircleRadius,
+            final TermNode searchFunction, IVariable<?> searchVar,
+            final TermNode predicate, final TermNode context, 
+            final TermNode spatialCircleCenter, final TermNode spatialCircleRadius,
             final TermNode spatialRectangleUpperLeft,
             final TermNode spatialRectangleLowerRight,
             final TermNode spatialUnit, final TermNode timeStart,
-            final TermNode timeEnd, final GeoSpatialDefaults defaults,
-            final AbstractTripleStore kb,
+            final TermNode timeEnd, final IVariable<?> locationVar,
+            final IVariable<?> timeVar, final IVariable<?> locationAndTimeVar,
+            final GeoSpatialDefaults defaults, final AbstractTripleStore kb,
             final GeoSpatialServiceCall serviceCall) {
 
          this.bindingSet = bindingSet;
          this.searchFunction = searchFunction;
+         this.searchVar = searchVar;
          this.predicate = predicate;
          this.context = context;
          this.spatialCircleCenter = spatialCircleCenter;
@@ -754,6 +859,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.spatialUnit = spatialUnit;
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
+         this.locationVar = locationVar;
+         this.timeVar = timeVar;
+         this.locationAndTimeVar = locationAndTimeVar;
          this.defaults = defaults;
          this.kb = kb;
          this.serviceCall = serviceCall;
@@ -851,9 +959,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Long timeEnd = resolveAsLong(this.timeEnd, bs);
 
          GeoSpatialSearchQuery sq = new GeoSpatialSearchQuery(searchFunction,
-               predicate, context, spatialCircleCenter, spatialCircleRadius,
-               spatialRectangleUpperLeft, spatialRectangleLowerRight,
-               spatialUnit, timeStart, timeEnd, bs);
+               bs.get(searchVar), predicate, context, spatialCircleCenter, 
+               spatialCircleRadius, spatialRectangleUpperLeft, 
+               spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, 
+               locationVar, timeVar, locationAndTimeVar, bs);
 
          curDelegate = serviceCall.search(sq, kb);
 
@@ -1351,7 +1460,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_UPPER_LEFT)
                || predicate.equals(GeoSpatial.SPATIAL_UNIT)
                || predicate.equals(GeoSpatial.TIME_START)
-               || predicate.equals(GeoSpatial.TIME_END)) {
+               || predicate.equals(GeoSpatial.TIME_END)
+               || predicate.equals(GeoSpatial.TIME_VALUE)
+               || predicate.equals(GeoSpatial.LOCATION_VALUE)
+               || predicate.equals(GeoSpatial.LOCATION_AND_TIME_VALUE)) {
                
                requiredBound.add((IVariable<?>)object); // the subject var is what we return                  
             }
@@ -1360,5 +1472,23 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       return requiredBound;
    }
+   
+   // TODO: not sure if we want to have this code in, it's a quite generic assumption
+   //       and I'm not sure this is a good heuristics in the general case
+//   @Override
+//   public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
+//      
+//      /**
+//       * It is desirably to have the subject position variable bound, as it provides
+//       * us with a way to implement efficient index lookups.
+//       */
+//      final Set<IVariable<?>> desiredBound = new HashSet<IVariable<?>>();
+//      for (StatementPatternNode sp : getStatementPatterns(serviceNode)) {
+//         desiredBound.add((IVariable<?>)sp.s().getValue());
+//      }
+//
+//      return desiredBound;
+//      
+//   }
    
 }

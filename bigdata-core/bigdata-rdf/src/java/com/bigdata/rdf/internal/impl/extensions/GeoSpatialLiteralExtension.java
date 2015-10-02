@@ -38,10 +38,12 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.bop.Constant;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
@@ -379,7 +381,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final long[] componentsAsLongArr = asLongArray(iv);
       
       // set up the component and merge them into a string (C->B)
-      final String litStr = longArrAsComponentString(componentsAsLongArr);
+      final String litStr = 
+         longArrAsComponentString(0, componentsAsLongArr.length-1, componentsAsLongArr);
       
       // setup a literal carrying the component string (B->A)
       return (V) vf.createLiteral(litStr, datatype);
@@ -410,6 +413,18 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned);
       
       return componentsAsLongArr;
+   }
+   
+
+   /**
+    * Helper function that converts the components from (and including)
+    * startPos to (and including) endPos into its string representation.
+    */
+   @SuppressWarnings("rawtypes")
+   public String toComponentString(int startPos, int endPos, LiteralExtensionIV iv) {
+      
+      long[] longArr = asLongArray(iv);
+      return longArrAsComponentString(startPos, endPos, longArr);
    }
    
    /**
@@ -504,14 +519,14 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * 
     * Implements a wrapper around step C->B.
     */
-   public final String longArrAsComponentString(final long[] arr) {
+   public String longArrAsComponentString(int startPos, int endPos, final long[] arr) {
       
       final Object[] componentArr = longArrAsComponentArr(arr);
       
       final StringBuffer buf = new StringBuffer();
-      for (int i=0; i<componentArr.length; i++) {
+      for (int i=startPos; i<=endPos; i++) {
          
-         if (i>0)
+         if (i>startPos)
             buf.append(COMPONENT_SEPARATOR);
          
          buf.append(componentArr[i]);
@@ -689,5 +704,6 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
       
    }
+
 
 }

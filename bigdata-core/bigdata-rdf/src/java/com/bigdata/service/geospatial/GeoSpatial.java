@@ -148,4 +148,10 @@ public interface GeoSpatial {
    final URI TIME_START = new URIImpl(NAMESPACE + "timeStart");
    final URI TIME_END = new URIImpl(NAMESPACE + "timeEnd");
    
+   // output
+   final URI LOCATION_VALUE = new URIImpl(NAMESPACE + "locationValue");
+   final URI TIME_VALUE = new URIImpl(NAMESPACE + "timeValue");
+   final URI LOCATION_AND_TIME_VALUE = new URIImpl(NAMESPACE + "locationAndTimeValue");
+   
+   
 }
