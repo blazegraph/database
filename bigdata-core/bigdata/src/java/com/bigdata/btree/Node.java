@@ -2528,7 +2528,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * <p>
      * As always, the mutable B+Tree is single threaded so there are not added
      * synchronization costs. Concurrent readers can only arise for read-only
-     * {@link BTree}s and for {@link IndexSegment}s.</strong>
+     * {@link BTree}s and for {@link IndexSegment}s.
      * 
      * @param index
      *            The index of the child to be read from the store (in
