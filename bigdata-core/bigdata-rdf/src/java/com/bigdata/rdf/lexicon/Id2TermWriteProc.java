@@ -270,17 +270,20 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
                  * you SHOULD use.
                  */
 
-                if (!ndx.contains(key)) {
-
-                    val = getValue(i);
-                    
-                    if (ndx.insert(key, val) != null) {
-
-                        throw new AssertionError();
-
-                    }
-
-                }
+            // See BLZG-1539
+            ndx.putIfAbsent(key, getValue(i));
+            
+//                if (!ndx.contains(key)) {
+//
+//                    val = getValue(i);
+//                    
+//                    if (ndx.insert(key, val) != null) {
+//
+//                        throw new AssertionError();
+//
+//                    }
+//
+//                }
 
 //            }
             
