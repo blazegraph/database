@@ -1996,6 +1996,12 @@ public class DataLoader {
                     DataLoader.Options.DURABLE_QUEUES,
                     DataLoader.Options.DUMP_JOURNAL,
                     DataLoader.Options.VERBOSE,
+                    // Useful Journal options.
+                    Journal.Options.WRITE_CACHE_BUFFER_COUNT,
+                    // DirectBufferPool options.
+                    com.bigdata.io.DirectBufferPool.Options.BUFFER_CAPACITY,
+                    // B+Tree
+                    com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
             };
             for (String s : overrides) {
                 if (System.getProperty(s) != null) {
