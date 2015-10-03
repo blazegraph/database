@@ -167,13 +167,33 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure<Long>
              * Note: This is an optimization which avoids mutation of the btree
              * when there would be no change in the data.
              */
-            final boolean write = overwrite || !ndx.contains(key);
-            
-            if (write && ndx.insert(key, val) != null) {
-                
-                updateCount++;
-                
+            if(overwrite) {
+
+            	// overwrite.
+            	if (ndx.insert(key, val) != null) {
+
+					updateCount++;
+
+				}
+            	
+            } else {
+            	
+            	// conditional mutation.
+				if (ndx.putIfAbsent(key, val) != null) {
+
+                    updateCount++;
+
+            	}
+            	
             }
+
+//            final boolean write = overwrite || !ndx.contains(key);
+//            
+//            if (write && ndx.insert(key, val) != null) {
+//                
+//                updateCount++;
+//                
+//            }
 
         }
 

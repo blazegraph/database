@@ -121,6 +121,12 @@ public class JustIndexWriteProc
 
             final byte[] key = getKey( i );
             
+			/*
+			 * Note: We can not decide nwritten using putIfAbsent() since the
+			 * index is storing nulls.
+			 * 
+			 * See BLZG-1539.
+			 */
             if (!ndx.contains(key)) {
 
                 ndx.insert(key, null/* no value */);
