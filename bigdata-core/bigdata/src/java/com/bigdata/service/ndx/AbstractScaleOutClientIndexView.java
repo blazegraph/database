@@ -55,6 +55,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.BatchPutIfAbsent.BatchPutIfAbsentConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -473,6 +474,26 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
         submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
                 BatchInsertConstructor.RETURN_OLD_VALUES, resultHandler);
+
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
+
+    }
+
+    @Override
+    public byte[] putIfAbsent(final byte[] key, final byte[] value) {
+
+        if (batchOnly)
+            log.error(NON_BATCH_API,new RuntimeException());
+        else
+            if(WARN) log.warn(NON_BATCH_API);
+
+        final byte[][] keys = new byte[][] { key };
+        final byte[][] vals = new byte[][] { value };
+        
+        final IResultHandler resultHandler = new IdentityHandler();
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
+                BatchPutIfAbsentConstructor.RETURN_OLD_VALUES, resultHandler);
 
         return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 

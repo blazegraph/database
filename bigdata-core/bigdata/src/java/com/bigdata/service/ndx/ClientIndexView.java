@@ -62,6 +62,7 @@ import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.BatchPutIfAbsent.BatchPutIfAbsentConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -158,7 +159,6 @@ import cutthecrap.utils.striterators.IFilter;
  *       against which the parallelized operation must be mapped.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ClientIndexView implements IScaleOutClientIndex {
 
@@ -462,7 +462,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         return tupleSer;
 
     }
-    
+
+    @Override
     public boolean contains(Object key) {
 
         key = getTupleSerializer().serializeKey(key);
@@ -471,7 +472,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
     
-    public boolean contains(byte[] key) {
+    @Override
+    public boolean contains(final byte[] key) {
         
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -489,6 +491,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
     
+    @Override
     public Object insert(Object key,Object val) {
         
         final ITupleSerializer tupleSer = getTupleSerializer();
@@ -504,7 +507,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
     
-    public byte[] insert(byte[] key, byte[] value) {
+    @Override
+    public byte[] insert(final byte[] key, final byte[] value) {
 
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -523,6 +527,27 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
+    @Override
+    public byte[] putIfAbsent(final byte[] key, final byte[] value) {
+
+        if (batchOnly)
+            log.error(NON_BATCH_API,new RuntimeException());
+        else
+            if(WARN) log.warn(NON_BATCH_API);
+
+        final byte[][] keys = new byte[][] { key };
+        final byte[][] vals = new byte[][] { value };
+        
+        final IResultHandler resultHandler = new IdentityHandler();
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
+                BatchPutIfAbsentConstructor.RETURN_OLD_VALUES, resultHandler);
+
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
+
+    }
+
+    @Override
     public Object lookup(Object key) {
         
         key = getTupleSerializer().serializeKey(key);
@@ -534,7 +559,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
 
-    public byte[] lookup(byte[] key) {
+    @Override
+    public byte[] lookup(final byte[] key) {
 
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -552,6 +578,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
+    @Override
     public Object remove(Object key) {
         
         key = getTupleSerializer().serializeKey(key);

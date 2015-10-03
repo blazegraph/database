@@ -220,6 +220,8 @@ public class IsolatedFusedView extends FusedView {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Write an entry for the key on the write set.
      */
     @Override
@@ -237,7 +239,7 @@ public class IsolatedFusedView extends FusedView {
              */
             
 //            srcs[0]
-            getMutableBTree().insert(key, val, false/*delete*/, startTime, null/*tuple*/);
+            getMutableBTree().insert(key, val, false/*delete*/, false/*putIfAbsent*/, startTime, null/*tuple*/);
             
             return null;
             
@@ -258,7 +260,62 @@ public class IsolatedFusedView extends FusedView {
             final long timestamp = tuple.getVersionTimestamp();
             
 //            srcs[0]
-            getMutableBTree().insert(key, val, false/*delete*/, timestamp, null/*tuple*/);
+            getMutableBTree().insert(key, val, false/*delete*/, false/*putIfAbsent*/, timestamp, null/*tuple*/);
+
+            return tuple.isNull() || tuple.isDeletedVersion() ? null : tuple
+                    .getValue();
+            
+        }
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Write an entry for the key on the write set.
+     */
+    @Override
+    public byte[] putIfAbsent(final byte[] key, final byte[] val) {
+
+        final Tuple<?> tuple = lookup(key, getMutableBTree().getLookupTuple());
+
+        if (tuple == null) {
+            
+            /*
+             * There is no entry under that key in the view, not even a deleted
+             * entry. Therefore we insert a new entry using the startTime of the
+             * transaction. We return [null] since there was no value under that
+             * key.
+             * 
+             * See BLZG-1539. Note for this code path the insert is unconditional
+             * since we already know that there is no entry under that key in the
+             * index.
+             */
+            
+//            srcs[0]
+            getMutableBTree().insert(key, val, false/*delete*/, false/*putIfAbsent*/, startTime, null/*tuple*/);
+            
+            return null;
+            
+        } else {
+            
+            /*
+			 * There is an (potentially deleted) entry under that key and we are
+			 * going to overwrite it IFF it is a deleted entry (conditional
+			 * insert). We will use the timestamp from that entry. If the entry
+			 * is NOT in the write set then the timestamp will be the
+			 * [revisionTime] of the last write on that key before this
+			 * transaction's start time and the timestamp will be copied into
+			 * the write set. If the entry is in the write set then the
+			 * timestamp will either have been copied already into the write set
+			 * previously by this code branch or it will be the startTime of
+			 * this transaction (the code branch above).
+			 */
+            
+            final long timestamp = tuple.getVersionTimestamp();
+            
+//            srcs[0]
+            getMutableBTree().insert(key, val, false/*delete*/, true/*putIfAbsent*/, timestamp, null/*tuple*/);
 
             return tuple.isNull() || tuple.isDeletedVersion() ? null : tuple
                     .getValue();
@@ -271,7 +328,7 @@ public class IsolatedFusedView extends FusedView {
      * Write a deleted entry for the key on the write set.
      */
     @Override
-    public byte[] remove(byte[] key) {
+    public byte[] remove(final byte[] key) {
 
         final Tuple<?> tuple = lookup(key, getMutableBTree().getLookupTuple());
         
@@ -285,7 +342,7 @@ public class IsolatedFusedView extends FusedView {
              */
             
 //            srcs[0]
-            getMutableBTree().insert(key, null, true/* delete */, startTime, null/*tuple*/);
+            getMutableBTree().insert(key, null, true/* delete */, false/*putIfAbsent*/, startTime, null/*tuple*/);
             
             return null;
             
@@ -320,7 +377,7 @@ public class IsolatedFusedView extends FusedView {
                  */
                 
 //                srcs[0]
-                 getMutableBTree().insert(key, null, true/* delete */, timestamp, null/* tuple */);
+                 getMutableBTree().insert(key, null, true/* delete */, false/*putIfAbsent*/, timestamp, null/* tuple */);
                 
             }
 
@@ -599,13 +656,13 @@ public class IsolatedFusedView extends FusedView {
                 
                 if(tuple.isDeletedVersion()) {
                 
-                    writeSet.insert(tuple.getKey(), null, true/* deleted */,
+                    writeSet.insert(tuple.getKey(), null, true/* deleted */, false/*putIfAbsent*/, 
                             startTime, null/*tuple*/);
                     
                 } else {
 
                     writeSet.insert(tuple.getKey(), tuple.getValue(),
-                            false/* deleted */, startTime, null/* tuple */);
+                            false/* deleted */, false/*putIfAbsent*/, startTime, null/* tuple */);
                     
                 }
                 
@@ -696,7 +753,7 @@ public class IsolatedFusedView extends FusedView {
                 if (groundState.contains(key)) {
 
 //                    globalScope.remove(key);
-                    groundStateWriteSet.insert(key, null/* val */, true/* delete */,
+                    groundStateWriteSet.insert(key, null/* val */, true/* delete */, false/*putIfAbsent*/, 
                             revisionTime, null/*tuple*/);
 
                 } else {
@@ -718,7 +775,7 @@ public class IsolatedFusedView extends FusedView {
                  */
 
                 groundStateWriteSet.insert(key, entry.getValue(),
-                        false/* delete */, revisionTime, null/* tuple */);
+                        false/* delete */, false/*putIfAbsent*/, revisionTime, null/* tuple */);
 
             }
 

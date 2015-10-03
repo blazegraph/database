@@ -134,9 +134,9 @@ public class TestIsolatedFusedView extends AbstractBTreeTestCase {
          */
         final BTree unisolatedIndex = BTree.create(journal, md);
         
-        unisolatedIndex.insert(k3, v3a, false/* deleted */, t1, null/* tuple */);
+        unisolatedIndex.insert(k3, v3a, false/* deleted */, false/*putIfAbsent*/, t1, null/* tuple */);
 
-        unisolatedIndex.insert(k7, null, true/* deleted */, t2, null/* tuple */);
+        unisolatedIndex.insert(k7, null, true/* deleted */, false/*putIfAbsent*/, t2, null/* tuple */);
 
         // checkpoint the unisolated index.
         final long addrCheckpoint1 = unisolatedIndex.writeCheckpoint();
