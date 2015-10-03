@@ -399,6 +399,23 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList,
     }
 
     @Override
+    public byte[] putIfAbsent(final byte[] key, final byte[] value) {
+
+        final Lock lock = writeLock();
+        lock.lock();        
+        try {
+            
+            return ndx.putIfAbsent(key,value);
+            
+        } finally {
+            
+            unlock(lock);
+            
+        }
+        
+    }
+
+    @Override
     public byte[] remove(final byte[] key) {
 
         final Lock lock = writeLock();

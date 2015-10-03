@@ -116,6 +116,9 @@ public class TestAll_BTreeBasics extends TestCase {
          */
         suite.addTestSuite(TestDeleteMarkers.class);
 
+        // test putIfAbsent() (w/ and w/o delete markers)
+        suite.addTestSuite(TestPutIfAbsent.class);
+
         /*
          * test persistence protocols. 
          */

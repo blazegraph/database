@@ -252,6 +252,13 @@ public class ReadCommittedView implements ILocalBTreeView {
     }
 
     @Override
+    public byte[] putIfAbsent(byte[] key, byte[] value) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    @Override
     public Object insert(Object key, Object value) {
         
         throw new UnsupportedOperationException();

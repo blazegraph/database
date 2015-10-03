@@ -34,14 +34,10 @@ package com.bigdata.btree;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see UnicodeKeyBuilder, which may be used to encode one or more primitive
  *      data type values or Unicode strings into a variable length unsigned
  *      byte[] key.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ISimpleBTree {
 
@@ -58,6 +54,40 @@ public interface ISimpleBTree {
      *         marked as deleted.
      */
     public byte[] insert(byte[] key, byte[] value);
+    
+    /**
+	 * Insert or update a value under the key iff there is no entry for that key
+	 * in the index. This is equivalent to
+	 * 
+	 * <pre>
+	 * if (!contains(key))
+	 * 	insert(key, value);
+	 * </pre>
+	 * 
+	 * However, if the index allows <code>null</code> values to be stored under
+	 * a key and the application in fact stores <code>null</code> values for
+	 * some tuples, then caller is not able to decide using this method whether
+	 * or not the mutation was applied based on the return value. For these
+	 * cases if the caller needs to know whether or not the conditional mutation
+	 * actually took place, the caller CAN use the pattern
+	 * <code>if(!contains()) insert(key,value);</code> to obtain that
+	 * information.
+	 * 
+	 * @param key
+	 *            The key.
+	 * @param value
+	 *            The value (may be null).
+	 * 
+	 * @return The previous value under that key or <code>null</code> if the key
+	 *         was not found or if the previous entry for that key was marked as
+	 *         deleted. Note that the return value MAY be <code>null</code> even
+	 *         if there was an entry under the key. This is because the index is
+	 *         capable of storing a <code>null</code> value. In such cases the
+	 *         conditional mutation WAS NOT applied.
+	 * 
+	 * @see BLZG-1539 (putIfAbsent)
+	 */
+    public byte[] putIfAbsent(byte[] key, byte[] value);
     
     /**
      * Lookup a value for a key.

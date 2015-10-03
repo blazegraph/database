@@ -831,7 +831,7 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
             }
 
             @Override
-            public Tuple insert(byte[] key, byte[] val, boolean deleted,
+            public Tuple insert(byte[] key, byte[] val, boolean deleted, boolean putIfAbsent,
                     long timestamp, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
@@ -1029,7 +1029,7 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
             }
 
             @Override
-            public Tuple insert(byte[] key, byte[] val, boolean deleted,
+            public Tuple insert(byte[] key, byte[] val, boolean deleted, boolean putIfAbsent,
                     long timestamp, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
