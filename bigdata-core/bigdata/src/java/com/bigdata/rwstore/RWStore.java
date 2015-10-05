@@ -2711,6 +2711,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     
                     final ArrayList<FixedAllocator> list = m_freeFixed[i];
                     if (list.size() == 0) {
+                    	/*
+                    	 * Small slot optimization to minimize waste. 
+                    	 * 
+                    	 * @see BLZG-201
+                    	 */
                     	final FixedAllocator candidate;
                     	if (size < this.cSmallSlot) {
                     		// check to see if can locate a good enough Allocator
@@ -2792,6 +2797,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         }
     }
     
+    /**
+	 * For a small slot size only, look for an existing allocator that has a
+	 * sufficient percentage of free bits and add it to the free list. If this
+	 * test fails then the caller must allocate a new allocator.
+	 * 
+	 * @param block
+	 * @return
+	 * @see https://jira.blazegraph.com/browse/BLZG-201 (minimize small slot
+	 *      waste)
+	 */
     private FixedAllocator findAllocator(final int block) {
 		// only look if small slot
     	if (block > cSmallSlot) {
