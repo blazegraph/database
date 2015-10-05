@@ -42,36 +42,36 @@ import com.bigdata.service.ndx.ClientIndexView;
  */
 public interface IKeyArrayIndexProcedure<T> extends IIndexProcedure<T> {
 
-    /**
-     * The #of keys/tuples
-     * 
-     * @deprecated by {@link #getKeys()}
-     */
-    public int getKeyCount();
-    
-    /**
-     * Return the key at the given index.
-     * 
-     * @param i
-     *            The index (origin zero).
-     * 
-     * @return The key at that index.
-     * 
-     * @deprecated by {@link #getKeys()}
-     */
-    public byte[] getKey(int i);
-    
-    /**
-     * Return the value at the given index.
-     * 
-     * @param i
-     *            The index (origin zero).
-     * 
-     * @return The value at that index.
-     * 
-     * @deprecated by {@link #getValues()}
-     */
-    public byte[] getValue(int i);
+//    /**
+//     * The #of keys/tuples
+//     * 
+//     * @deprecated by {@link #getKeys()}
+//     */
+//    public int getKeyCount();
+//    
+//    /**
+//     * Return the key at the given index.
+//     * 
+//     * @param i
+//     *            The index (origin zero).
+//     * 
+//     * @return The key at that index.
+//     * 
+//     * @deprecated by {@link #getKeys()}
+//     */
+//    public byte[] getKey(int i);
+//    
+//    /**
+//     * Return the value at the given index.
+//     * 
+//     * @param i
+//     *            The index (origin zero).
+//     * 
+//     * @return The value at that index.
+//     * 
+//     * @deprecated by {@link #getValues()}
+//     */
+//    public byte[] getValue(int i);
 
     /**
      * The keys.

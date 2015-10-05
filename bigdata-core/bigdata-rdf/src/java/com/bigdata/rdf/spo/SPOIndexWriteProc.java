@@ -176,6 +176,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> im
 
         final IRaba keys = getKeys();
         
+        final IRaba vals = getValues();
+        
         final int n = keys.size();//getKeyCount();
 
 //        // used to generate the values that we write on the index.
@@ -208,7 +210,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> im
              * the value MUST also encode the statement identifier (bytes 1-9).
              * Otherwise the statement identifier MUST NOT be present.
              */
-            final byte[] val = getValue(i);
+            final byte[] val = vals.get(i);
             assert val != null;
             assert val.length == 1;
 

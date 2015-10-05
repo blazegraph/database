@@ -176,29 +176,29 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
         
     }
     
-    @Override
-    final public int getKeyCount() {
-
-        return keys.size();
-
-    }
-
-    @Override
-    final public byte[] getKey(final int i) {
-
-        return keys.get(i);
-
-    }
-
-    @Override
-    final public byte[] getValue(final int i) {
-
-        if (vals == null)
-            throw new UnsupportedOperationException();
-        
-        return vals.get( i );
-
-    }
+//    @Override
+//    final public int getKeyCount() {
+//
+//        return keys.size();
+//
+//    }
+//
+//    @Override
+//    final public byte[] getKey(final int i) {
+//
+//        return keys.get(i);
+//
+//    }
+//
+//    @Override
+//    final public byte[] getValue(final int i) {
+//
+//        if (vals == null)
+//            throw new UnsupportedOperationException();
+//        
+//        return vals.get( i );
+//
+//    }
 
     /**
      * De-serialization constructor.

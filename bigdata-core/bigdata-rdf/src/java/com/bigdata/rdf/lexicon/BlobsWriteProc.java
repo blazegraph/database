@@ -40,6 +40,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.LongPacker;
@@ -176,7 +177,11 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 	@Override
     public Result apply(final IIndex ndx) {
         
-        final int numTerms = getKeyCount();
+		final IRaba keys = getKeys();
+		
+		final IRaba vals = getValues();
+		
+        final int numTerms = keys.size();
         
         assert numTerms > 0 : "numTerms="+numTerms;
 
@@ -215,7 +220,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 
             // Copy key into reused buffer to reduce allocation.
 //            final byte[] baseKey = getKey(i);
-			getKeys().copy(i, kbuf.reset());
+			keys.copy(i, kbuf.reset());
 
 			// decode the VTE from the flags.
 			final VTE vte = AbstractIV
@@ -265,7 +270,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 
 					// The size of the collision bucket (aka the assigned ctr).
 					counter = helper.addBNode(ndx, keyBuilder, baseKey,
-							getValue(i), tmp);
+							vals.get(i), tmp);
 
                 }
                 
@@ -280,7 +285,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 				 * also need to decode the byte which represents the termCode
 				 * can can be used to derive the VTE of the Value.
 				 */
-            	final byte[] val = getValue(i);
+            	final byte[] val = vals.get(i);
             	
 				counter = helper.resolveOrAddValue(ndx, readOnly,
 						keyBuilder, baseKey, val, tmp, null/* bucketSize */);

@@ -35,6 +35,7 @@ import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
@@ -173,7 +174,11 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
 
         int i = 0;
         
-        final int n = getKeyCount();
+		final IRaba keys = getKeys();
+
+		final IRaba vals = getValues();
+
+        final int n = keys.size();
 
         final byte[][] ret = (returnOldValues ? new byte[n][] : null);
         
@@ -181,9 +186,9 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         
         while (i < n) {
 
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);
             
-            final byte[] val = getValue(i);
+            final byte[] val = vals.get(i);
 
             final byte[] old = (byte[]) ndx.insert(key, val);
 

@@ -257,7 +257,9 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
     @Override
     public Object apply(final IIndex ndx) {
 
-        final int n = getKeyCount();
+        final IRaba keys = getKeys();
+        
+        final int n = keys.size();
 
         final boolean returnOldValues = getReturnOldValues();
         
@@ -268,8 +270,6 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
         
         int i = 0, mutationCount = 0;
 
-        final IRaba keys = getKeys();
-        
         while (i < n) {
 
             final byte[] key = keys.get(i);

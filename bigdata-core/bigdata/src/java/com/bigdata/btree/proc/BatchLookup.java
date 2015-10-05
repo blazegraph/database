@@ -29,6 +29,7 @@ package com.bigdata.btree.proc;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
@@ -117,7 +118,9 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
     @Override
     public ResultBuffer apply(final IIndex ndx) {
 
-        final int n = getKeyCount();
+		final IRaba keys = getKeys();
+    	
+        final int n = keys.size();
         
         final byte[][] ret = new byte[n][];
         
@@ -125,7 +128,7 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         
         while (i < n) {
 
-            ret[i] = ndx.lookup(getKey(i));
+            ret[i] = ndx.lookup(keys.get(i));
 
             i++;
 
