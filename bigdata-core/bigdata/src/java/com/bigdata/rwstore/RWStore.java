@@ -2728,6 +2728,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     		candidate.addToFreeList();
                     		allocator = candidate;
                     	} else {
+							/*
+							 * We need a new allocator.
+							 */
 	                        allocator = new FixedAllocator(this, block);
 	                        
 	                        allocator.setFreeList(list);
@@ -2824,6 +2827,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     		return null;
     	}
     	
+		/**
+		 * FIXME Update code and configuration property names. We do not want to
+		 * use slotWaste here. We want to use %SlotsUnused
+		 * 
+		 * <pre>
+		 *  <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
+		 * </pre>
+		 * 
+		 * FIXME BytesAppData is bad (separate ticket perhaps).
+		 */
     	// only check small slots if total waste is larger than some configurable amount
     	final float slotWaste = stats.slotWaste();
     	if (slotWaste < cSmallSlotHighWaste) {
