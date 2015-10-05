@@ -89,11 +89,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     static private final URI queryIdHint = new URIImpl(QueryHints.NAMESPACE
             + QueryHints.QUERYID);
 
-	@Deprecated // @igorkim : remove me.
-	public Bigdata2ASTSPARQLParser(AbstractTripleStore store) {
-        this();
-    }
-
     public Bigdata2ASTSPARQLParser() {
       
     }

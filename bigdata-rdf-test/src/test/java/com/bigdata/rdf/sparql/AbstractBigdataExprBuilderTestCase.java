@@ -284,7 +284,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     protected UpdateRoot parseUpdate(final String updateStr, final String baseURI)
             throws MalformedQueryException {
 
-        Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(tripleStore);
+        Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser();
         ASTContainer ast = parser.parseUpdate2(updateStr, baseURI);
         ASTDeferredIVResolution.resolveUpdate(tripleStore, ast);
         return ast.getOriginalUpdateAST();

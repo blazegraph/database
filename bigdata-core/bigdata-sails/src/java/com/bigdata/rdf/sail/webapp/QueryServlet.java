@@ -518,8 +518,8 @@ public class QueryServlet extends BigdataRDFServlet {
 					 * parse the query exactly once in order to minimize the
 					 * resources associated with the query parser.
 					 */
-					final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-							tripleStore).parseUpdate2(updateStr, baseURI);
+					final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+							.parseUpdate2(updateStr, baseURI);
 
 					if (log.isDebugEnabled())
 						log.debug(astContainer.toString());

@@ -218,8 +218,8 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         getSailConnection()
                 .flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                getTripleStore()).parseQuery2(queryStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                .parseQuery2(queryStr, baseURI);
 
         final QueryType queryType = astContainer.getOriginalAST()
                 .getQueryType();
@@ -275,8 +275,8 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
                 .flushStatementBuffers(true/* assertions */, true/* retractions */);
 
         // Parse the UPDATE request.
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                getTripleStore()).parseUpdate2(updateStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                .parseUpdate2(updateStr, baseURI);
 
         return new BigdataSailUpdate(astContainer, this);
 

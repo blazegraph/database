@@ -159,30 +159,6 @@ public class LoadGraph extends GraphUpdate {
 
     }
 
-//    /**
-//     * Return the {@link RDFParserOptions}.
-//     * 
-//     * @return The {@link RDFParserOptions} -or- <code>null</code> if the
-//     *         options were not configured.
-//     */
-//    public IRDFParserOptions getRDFParserOptions() {
-//
-//        return (IRDFParserOptions) getProperty(Annotations.OPTIONS);
-//
-//    }
-//
-//    /**
-//     * Set the {@link RDFParserOptions}.
-//     * 
-//     * @param options
-//     *            The options (may be <code>null</code>).
-//     */
-    @Deprecated
-    public void setRDFParserOptions(final IRDFParserOptions options) {
-
-        throw new UnsupportedOperationException();
-
-    }
     
 //    LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
     @Override
