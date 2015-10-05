@@ -30,7 +30,6 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
@@ -54,14 +53,13 @@ import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
-import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
-
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -79,6 +77,7 @@ import cutthecrap.utils.striterators.Striterator;
  *
  * @see https://jira.blazegraph.com/browse/BLZG-1176
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class VerifyAggregates {
 
     private static final Logger log = Logger.getLogger(VerifyAggregates.class);
@@ -101,27 +100,12 @@ public class VerifyAggregates {
         return sb.toString();
     }
     
-    private boolean isAggregate(List<BOp> args) {
-        for (BOp arg: args) {
-            if (arg instanceof FunctionNode) {
-                FunctionNode functionNode = (FunctionNode) arg;
-                if (FunctionRegistry.isAggregate(functionNode.getFunctionURI()) || isAggregate(functionNode.args())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     public VerifyAggregates(final ProjectionNode projection,
             final GroupByNode groupBy, final HavingNode having) {
 
 //        // normalize an empty[] to a null.
-//        this.groupBy = groupBy != null && groupBy.arity() == 0 ? null : groupBy;
         this.groupBy = groupBy == null || groupBy.arity() == 0 ? null : groupBy.getValueExpressions();
         
-//        // must be non-null, non-empty array.
-//        this.select = projection;
         // Replacing unresolvedFunctionNodes with specific AggregateBase to be able
         // to check for aggregates in com.bigdata.bop.solutions.GroupByState.isAggregate
         if (projection!=null) {
@@ -133,17 +117,7 @@ public class VerifyAggregates {
                 IValueExpression expr = n.getValueExpression();
                 IValueExpressionNode exprNode = n.getValueExpressionNode();
                 if (expr == null && exprNode instanceof FunctionNode) {
-                    if (FunctionRegistry.isAggregate(((FunctionNode) exprNode).getFunctionURI()) || isAggregate(((FunctionNode) exprNode).args())) {
-                        List<BOp> args = ((FunctionNode) exprNode).args();
-                        expr = new AggregateBase<IV>(args.toArray(new BOp[args.size()]), null) {
-                            @Override public void reset() {}
-                            @Override public IV done() { return null; }
-                        };
-                    } else {
-                        List<BOp> args = ((FunctionNode) exprNode).args();
-                        expr = new UnknownFunctionBOp(args.toArray(new BOp[args.size()]), null);
-                    }
-        
+                    expr = convertAggregates((FunctionNode)exprNode);
                 }
                 exprs[i++] = new Bind(n.getVar(), expr);
             }
@@ -171,19 +145,7 @@ public class VerifyAggregates {
                 } else if (node instanceof FunctionNode) {
                     
                     FunctionNode exprNode = (FunctionNode)node;
-                    BOp expr;
-                    if (FunctionRegistry.isAggregate(((FunctionNode) exprNode).getFunctionURI()) || isAggregate(((FunctionNode) exprNode).args())) {
-                        List<BOp> args = ((FunctionNode) exprNode).args();
-                        expr = new AggregateBase<IV>(args.toArray(new BOp[args.size()]), null) {
-                            @Override public void reset() {}
-                            @Override public IV done() { return null; }
-                        };
-                    } else {
-                        List<BOp> args = ((FunctionNode) exprNode).args();
-                        expr = new UnknownFunctionBOp(args.toArray(new BOp[args.size()]), null);
-                    }
-
-                    
+                    BOp expr = convertAggregates(exprNode);
                     exprs2[i] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(new BOp[]{
                             expr}, null);
                     
@@ -359,6 +321,35 @@ public class VerifyAggregates {
 
     }
 
+    private IValueExpression convertAggregates(BOp exprNode) {
+        IValueExpression expr;
+        BOp[] args = new BOp[exprNode.args().size()];
+        if (exprNode!=null && exprNode.arity()>0) {
+            for (int i=0; i<exprNode.args().size(); i++) {
+                BOp arg = exprNode.args().get(i);
+                IValueExpression newValue = convertAggregates(arg); 
+                if (newValue!=null) {
+                    args[i] = newValue;
+                } else {
+                    args[i] = arg;
+                }
+            }
+        }
+        if (exprNode instanceof FunctionNode) {
+            if ((exprNode instanceof FunctionNode) && FunctionRegistry.isAggregate(((FunctionNode) exprNode).getFunctionURI())) {
+                expr = new AggregateBase(args, null) {
+                    @Override public void reset() {}
+                    @Override public IV done() { return null; }
+                };
+            } else {
+                expr = new UnknownFunctionBOp(args, null);
+            }
+        } else {
+            expr = null;
+        }
+        return expr;
+    }
+
     /**
      * Return <code>true</code> iff the expression is an aggregate.
      * <p>
@@ -447,7 +438,9 @@ public class VerifyAggregates {
             final AtomicBoolean isAnyDistinct,
             final boolean withinAggregateFunction) {
 
-        if (op instanceof IAggregate<?>) {
+        if (op instanceof IAggregate<?> ||
+                ((op instanceof FunctionNode) && FunctionRegistry.isAggregate(((FunctionNode) op).getFunctionURI()))
+                    ) {
             if(withinAggregateFunction) {
                 isNestedAggregates.set(true);
             }
@@ -506,9 +499,11 @@ public class VerifyAggregates {
         final Iterator<BOp> itr = op.argIterator();
         while (itr.hasNext()) {
             final BOp arg = itr.next();
-            if(!(arg instanceof IValueExpression<?>)) {
-                // skip non-value expression arguments.
-                continue;
+            if (selectVars.contains(arg)) {
+                if (isSelectClause)
+                    isSelectDependency.set(true);
+                isAggregate = true;
+                return true;
             }
             if (log.isTraceEnabled())
                 log.trace("op=" + op.getClass()
