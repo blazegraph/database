@@ -228,7 +228,7 @@ abstract public class AbstractRaba implements IRaba {
 
         return new Iterator<byte[]>() {
 
-            int i = fromIndex;
+        	private int i = fromIndex;
 
             @Override
             public boolean hasNext() {

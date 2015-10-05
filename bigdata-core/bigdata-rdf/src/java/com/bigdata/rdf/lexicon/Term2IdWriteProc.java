@@ -40,6 +40,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.LongPacker;
@@ -277,15 +278,17 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
     @Override
     public Result apply(final IIndex ndx) {
 
-       final boolean DEBUG = log.isDebugEnabled();
-       
-        final int numTerms = getKeyCount();
-        
+		final boolean DEBUG = log.isDebugEnabled();
+
+		final IRaba keys = getKeys();
+
+		final int numTerms = keys.size();
+
         assert numTerms > 0 : "numTerms="+numTerms;
         
-        // used to store the discovered / assigned term identifiers.
-        @SuppressWarnings("rawtypes")
-      final IV[] ivs = new IV[numTerms];
+		// used to store the discovered / assigned term identifiers.
+		@SuppressWarnings("rawtypes")
+		final IV[] ivs = new IV[numTerms];
         
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
@@ -310,7 +313,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
             // Note: Copying the key into a buffer does not help since we need
             // it in its own byte[] to do lookup against the index.
 //          getKeys().copy(i, kbuf.reset());
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);
 
             // this byte encodes the kind of term (URI, Literal, BNode, etc.)
             final byte code = key[0];//KeyBuilder.decodeByte(key[0]);
@@ -457,8 +460,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
 
     }
     
-    private void groundTruthTest(byte[] key, long termId, IIndex ndx,
-            ICounter counter) {
+    private void groundTruthTest(final byte[] key, final long termId, final IIndex ndx,
+            final ICounter counter) {
         
         if(groundTruthId2Term.isEmpty()) {
             
@@ -518,7 +521,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
         
     }
     
-    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
+    @Override
+    protected void readMetadata(final ObjectInput in) throws IOException, ClassNotFoundException {
         
         super.readMetadata(in);
         
@@ -541,7 +545,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
      * 
      * @throws IOException
      */
-    protected void writeMetadata(ObjectOutput out) throws IOException {
+    @Override
+    protected void writeMetadata(final ObjectOutput out) throws IOException {
 
         super.writeMetadata(out);
 
@@ -580,7 +585,6 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
      * client.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class Result implements Externalizable {
 
@@ -606,8 +610,9 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
         }
 
         private final static transient short VERSION0 = 0x0;
-        
-        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+        @Override
+        public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
 
             final short version = ShortPacker.unpackShort(in);
             
@@ -630,7 +635,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> imp
             
         }
 
-        public void writeExternal(ObjectOutput out) throws IOException {
+        @Override
+        public void writeExternal(final ObjectOutput out) throws IOException {
 
             final int n = ivs.length;
             

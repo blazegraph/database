@@ -30,6 +30,7 @@ package com.bigdata.btree.proc;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
@@ -123,7 +124,9 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure<ResultBitBuffe
     @Override
     public ResultBitBuffer apply(final IIndex ndx) {
 
-        final int n = getKeyCount();
+		final IRaba keys = getKeys();
+		
+        final int n = keys.size();
 
         final boolean[] ret = new boolean[n];
 
@@ -131,7 +134,7 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure<ResultBitBuffe
 
         while (i < n) {
 
-            if(ret[i] = ndx.contains(getKey(i))) {
+            if(ret[i] = ndx.contains(keys.get(i))) {
                 
                 onCount++;
                 

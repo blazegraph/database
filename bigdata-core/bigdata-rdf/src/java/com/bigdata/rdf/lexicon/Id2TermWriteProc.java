@@ -30,6 +30,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValueSerializer;
@@ -154,13 +155,17 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
     @Override
     public Void apply(final IIndex ndx) {
         
-        final int n = getKeyCount();
+    	final IRaba keys = getKeys();
+
+    	final IRaba vals = getValues();
+
+        final int n = keys.size();
         
         for (int i = 0; i < n; i++) {
 
             // Note: the key is the term identifier.
             // @todo copy key/val into reused buffers to reduce allocation.
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);
             
             // Note: the value is the serialized term (and never a BNode).
             final byte[] val;
@@ -271,11 +276,11 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
                  */
 
             // See BLZG-1539
-            ndx.putIfAbsent(key, getValue(i));
+            ndx.putIfAbsent(key, vals.get(i));
             
 //                if (!ndx.contains(key)) {
 //
-//                    val = getValue(i);
+//                    val = vals.get(i);
 //                    
 //                    if (ndx.insert(key, val) != null) {
 //
