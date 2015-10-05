@@ -2,6 +2,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -14,6 +15,7 @@ import java.util.Map.Entry;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -32,9 +34,11 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.sparql.DatasetDeclProcessor;
+import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
+import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
@@ -69,8 +73,10 @@ import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
  * This class provides batch resolution of internal values, which were left
@@ -110,11 +116,13 @@ public class ASTDeferredIVResolution {
      */
     private final List<Runnable> deferredRunnables = new ArrayList<>();
     /*
-     * IV of BD.VIRTUAL_GRAPH, which will be later passed to DatasetDeclProcessor 
+     * IVs of graphs, which will be later passed to DatasetDeclProcessor
+     * No need for synchronization or keeping order of values. 
      */
-    private IV virtualGraphIV;
+    private final Map<Value, IV> resolvedValues = new HashMap<>();
     
-    /**
+
+   /**
      * Do deferred resolution of IVs, which were left unresolved while preparing the query
      * @param store - triple store, which will be used for values resolution
      * @param ast - AST model of the query, which should be resolved
@@ -125,22 +133,9 @@ public class ASTDeferredIVResolution {
     	final long beginNanos = System.nanoTime();
     	
         final QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
-        
+
         final AST2BOpContext context = new AST2BOpContext(ast, store);
-        /*
-         * I think here we could set the value expressions and do last- minute
-         * validation.
-         */
-        final ASTSetValueExpressionsOptimizer opt = new ASTSetValueExpressionsOptimizer();
 
-        final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
-
-        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
-        
-        termsResolver.resolve(context, queryRoot2);
-        
-        queryRoot2.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
-        
         /*
          * Handle dataset declaration
          * 
@@ -156,23 +151,30 @@ public class ASTDeferredIVResolution {
          * 
          * Note: This handles VIRTUAL GRAPH resolution.
          */
+        Map<IDataSetNode, List<ASTDatasetClause>> dcLists = new LinkedHashMap<>();
         {
-			final ASTQueryContainer qc = (ASTQueryContainer) ast.getProperty(Annotations.PARSE_TREE);
-
-			if (qc != null && qc.getOperation() != null) {
-			
-				final DatasetNode dataSetNode = new DatasetDeclProcessor(context, termsResolver.virtualGraphIV)
-						.process(qc.getOperation().getDatasetClauseList(), false);
-
-				if (dataSetNode != null) {
-
-					queryRoot2.setDataset(dataSetNode);
-
-				}
-
-			}
-			
+            final ASTQueryContainer qc = (ASTQueryContainer) ast.getProperty(Annotations.PARSE_TREE);
+            if (qc != null && qc.getOperation() != null) {
+                List<ASTDatasetClause> dcList = new ArrayList<>();
+                dcList.addAll(qc.getOperation().getDatasetClauseList());
+                dcLists.put(queryRoot, dcList);
+            }
+            
         }
+        
+        /*
+         * I think here we could set the value expressions and do last- minute
+         * validation.
+         */
+        final ASTSetValueExpressionsOptimizer opt = new ASTSetValueExpressionsOptimizer();
+
+        final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
+
+        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
+        
+        termsResolver.resolve(context, queryRoot2, dcLists);
+        
+        queryRoot2.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
         
         ast.setOriginalAST(queryRoot2);
 
@@ -197,28 +199,25 @@ public class ASTDeferredIVResolution {
          * (aka ASTModify). It is attached to each DeleteInsertNode for
          * which it is given.
          */
+        Map<IDataSetNode, List<ASTDatasetClause>> dcLists = new LinkedHashMap<>();
         for (final Update update: qc.getChildren()) {
-            final DatasetNode dataSetNode = new DatasetDeclProcessor(new AST2BOpContext(ast, store), null)
-                .process(update.getDatasetClauses(), true);
-            
-                if (dataSetNode != null) {
-        
-                        /*
-                         * Attach the data set (if present)
-                         * 
-                         * Note: The data set can only be attached to a
-                         * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
-                         */
-        
-                        ((IDataSetNode) update).setDataset(dataSetNode);
-        
-                }
+            if (update instanceof IDataSetNode) {
+                List<ASTDatasetClause> dcList = new ArrayList();
+                dcList.addAll(update.getDatasetClauses());
+                dcLists.put((IDataSetNode)update, dcList);
+            }
         }
+        
         final AST2BOpContext context2 = new AST2BOpContext(ast, store);
+
         final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
-        termsResolver.resolve(context2, qc);
+
+        termsResolver.resolve(context2, qc, dcLists);
+
         if (ast.getOriginalUpdateAST().getPrefixDecls()!=null && !ast.getOriginalUpdateAST().getPrefixDecls().isEmpty()) {
+
             qc.setPrefixDecls(ast.getOriginalUpdateAST().getPrefixDecls());
+
         }
 
         ast.setOriginalUpdateAST(qc);
@@ -256,16 +255,139 @@ public class ASTDeferredIVResolution {
 
     /**
      * Prepare and execute batch resolution of IVs in provided queryNode
+     * @param dcList 
+     * @throws MalformedQueryException 
      */
-    private void resolve(final AST2BOpContext context, final QueryNodeBase queryNode) {
+    private void resolve(final AST2BOpContext context, final QueryNodeBase queryNode, Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
 
         // prepare deferred handlers for batch IVs resolution
         prepare(context, queryNode);
-        
+
+        resolveDataset(context, dcLists);
+
         // execute batch resolution and run all deferred handlers,
         // which will update unresolved values across AST model 
         resolveIVs(context);
+        
+    }
 
+    /*
+     * Lazily instantiated sets for the default and named graphs.
+     */
+
+    private Set<IV<?,?>> defaultGraphs = null;
+    
+    private Set<IV<?,?>> namedGraphs = null;
+
+    /**
+     * Add a graph to the set of default or named graphs.
+     * 
+     * @param graph
+     *            The {@link IV} of the graph.
+     * @param named
+     *            When <code>true</code>, it will be added to the set of named
+     *            graphs. Otherwise, it will be added to the set of graphs in
+     *            the default graph.
+     */
+    private void addGraph(final IV<?,?> graph, final boolean named) {
+
+        if (graph == null)
+            throw new IllegalArgumentException();
+        
+        if (named) {
+
+            if (namedGraphs == null)
+                namedGraphs = new LinkedHashSet<IV<?,?>>();
+
+            namedGraphs.add(graph);
+
+        } else {
+
+            if (defaultGraphs == null)
+                defaultGraphs = new LinkedHashSet<IV<?,?>>();
+
+            defaultGraphs.add(graph);
+
+        }
+
+    }
+
+    private void resolveDataset(final AST2BOpContext context, Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
+        for (final Entry<IDataSetNode, List<ASTDatasetClause>> dcList: dcLists.entrySet()) {
+            final boolean update = dcList.getKey() instanceof Update;
+            List<ASTDatasetClause> datasetClauses = dcList.getValue();
+            if (datasetClauses!=null && !datasetClauses.isEmpty()) {
+
+                if (!context.getAbstractTripleStore().isQuads()) {
+                    throw new QuadsOperationInTriplesModeException(
+                        "NAMED clauses in queries are not supported in"
+                        + " triples mode.");
+                }
+               
+                for (final ASTDatasetClause dc : datasetClauses) {
+                
+                    final ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
+                    defer((BigdataURI)astIri.getRDFValue(),new Handler(){
+                        @Override
+                        public void handle(IV newIV) {
+                            BigdataValue uri = newIV.getValue();
+                            if (dc.isVirtual()) {
+
+                                if (uri.getIV().isNullIV()) {
+                                    /*
+                                     * A virtual graph was referenced which is not
+                                     * declared in the database. This virtual graph will
+                                     * not have any members.
+                                     */
+                                    throw new RuntimeException("Not declared: " + uri);
+                                }
+                                
+                                IV virtualGraph = resolvedValues.get(BD.VIRTUAL_GRAPH);
+
+                                if (virtualGraph == null) {
+
+                                    throw new RuntimeException("Not declared: "
+                                            + BD.VIRTUAL_GRAPH);
+                                    
+                                }
+
+                                final IAccessPath<ISPO> ap = context.getAbstractTripleStore()
+                                        .getSPORelation()
+                                        .getAccessPath(//
+                                                uri.getIV(),// the virtual graph "name"
+                                                virtualGraph, null/* o */, null/* c */);
+                                
+                                final Iterator<ISPO> itr = ap.iterator();
+                                
+                                while(itr.hasNext()) {
+
+                                    final IV memberGraph = itr.next().o();
+                                    BigdataValue value = context.getAbstractTripleStore().getLexiconRelation().getTerm(memberGraph);
+                                    memberGraph.setValue(value);
+                                    addGraph(memberGraph, dc.isNamed());
+
+                                }
+                                
+                            } else {
+
+                                if (uri.getIV() != null)
+                                    addGraph(uri.getIV(), dc.isNamed());
+
+                            }
+                            if (defaultGraphs != null || namedGraphs != null) {
+    
+                            // Note: Cast required to shut up the compiler.
+                            @SuppressWarnings("unchecked")
+                            final DatasetNode datasetNode = new DatasetNode((Set) defaultGraphs, (Set) namedGraphs, update);
+                            
+                            dcList.getKey().setDataset(datasetNode);
+                            }
+                        }
+                    });
+
+                }
+            }
+        }
     }
     
     /**
@@ -274,6 +396,7 @@ public class ASTDeferredIVResolution {
 	 *
      * @param context
      * @param queryNode
+     * @param dcList 
      */
     private void prepare(
         final AST2BOpContext context, final QueryNodeBase queryNode) {
@@ -666,19 +789,19 @@ public class ASTDeferredIVResolution {
              */
             int i = 0;
             
-            for (final BigdataValue v: deferred.keySet()) {
+            for (final BigdataValue v: vocab) {
 
                 final BigdataValue toBeResolved = v.getValueFactory().asValue(v);
-                ivs[i] = v.getIV();
+                ivs[i] = TermId.mockIV(VTE.valueOf(v));
                 toBeResolved.clearInternalValue();
                 values[i++] = toBeResolved;
                 
             }
 
-            for (final BigdataValue v: vocab) {
+            for (final BigdataValue v: deferred.keySet()) {
 
                 final BigdataValue toBeResolved = v.getValueFactory().asValue(v);
-                ivs[i] = TermId.mockIV(VTE.valueOf(v));
+                ivs[i] = v.getIV();
                 toBeResolved.clearInternalValue();
                 values[i++] = toBeResolved;
                 
@@ -743,17 +866,16 @@ public class ASTDeferredIVResolution {
                 }
                 if (iv!=null) {
                     iv.setValue(v);
+                    v.setIV(iv);
                     
-                    if (BD.VIRTUAL_GRAPH.equals(v)) {
-                        virtualGraphIV = iv;
-                    }
-    
                     final List<Handler> deferredHandlers = deferred.get(v);
                     if (deferredHandlers!=null) { // No handlers are usually defined for vocab values (see above)
                         for(final Handler handler: deferredHandlers) {
                             handler.handle(iv);
                         }
                     }
+                    // overwrite entry with unresolved key by entry with resolved key
+                    resolvedValues.put(v, iv);
                 }
 
             }
