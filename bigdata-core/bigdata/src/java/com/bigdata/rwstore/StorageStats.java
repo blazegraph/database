@@ -153,12 +153,26 @@ public class StorageStats {
 	
 	public class Bucket {
 		final int m_start;
+		/** AllocatorSize: The #of bytes in the allocated slots issued by this allocator. */
 		final int m_size;
+		/** AllocatorCount: The #of fixed allocators for that slot size. */
 		int m_allocators;
+		/** SlotsReserved: The #of slots in this slot size which have had storage reserved for them. */
 		long m_totalSlots;
+		/** SlotsAllocated: Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome). */
 		long m_slotAllocations;
+		/** SlotsRecycled: Cumulative recycled slots to date in this slot size (regardless of the transaction outcome). */
 		long m_slotDeletes;
+		/** The user bytes in use across all allocations for this slot size (does not consider recycled or deleted slots). */
 		long m_sizeAllocations;
+		/**
+		 * The user bytes that were in use across all allocations for this slot
+		 * size that have been recycled / deleted.
+		 * <p>
+		 * Note: Per BLZG-1551, this value is not tracked accurately!
+		 * 
+		 * @see BLZG-1551 (Storage statistics documentation and corrections)
+		 */
 		long m_sizeDeletes;
 		
 		// By copying committed data the stats can be reset on abort
@@ -168,7 +182,8 @@ public class StorageStats {
 			m_size = size;
 			m_start = startRange;
 		}
-		public Bucket(DataInputStream instr) throws IOException {
+
+		public Bucket(final DataInputStream instr) throws IOException {
 			m_size = instr.readInt();
 			m_start = instr.readInt();
 			m_allocators = instr.readInt();
@@ -180,7 +195,8 @@ public class StorageStats {
 			
 			commit();
 		}
-		public void write(DataOutputStream outstr) throws IOException {
+		
+		public void write(final DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
 			outstr.writeInt(m_start);
 			outstr.writeInt(m_allocators);
@@ -226,8 +242,13 @@ public class StorageStats {
 				throw new IllegalArgumentException("delete requires positive size, got: " + sze);
 			
 			if (m_size > 64 && sze < 64) {
-				// if called from deferFree then may not include size.  If so then use
-				//	average size of slots to date as best running estimate.
+				/*
+				 * If called from deferFree then may not include size. If so
+				 * then use average size of slots to date as best running
+				 * estimate.
+				 * 
+				 * @see BLZG-1551 (Storage statistics documentation and corrections)
+				 */
 				sze = meanAllocation();
 			}
 			
@@ -240,7 +261,8 @@ public class StorageStats {
 			m_sizeDeletes += sze;
 			m_slotDeletes++;
 		}
-		public void allocate(int sze) {
+		
+		public void allocate(final int sze) {
 			if (sze <= 0)
 				throw new IllegalArgumentException("allocate requires positive size, got: " + sze);
 			
@@ -248,10 +270,11 @@ public class StorageStats {
 			m_slotAllocations++;
 		}
 		
-		public void addSlots(int slots) {
+		public void addSlots(final int slots) {
 			m_totalSlots += slots;
 		}
 		
+		/** SlotsInUse: SlotsAllocated - SlotsRecycled (net slots in use for this slot size). */
 		public long usedSlots() {
 			return m_slotAllocations - m_slotDeletes;
 		}
@@ -260,11 +283,23 @@ public class StorageStats {
 			return m_totalSlots - usedSlots();
 		}
 		
+		/**
+		 * BytesAppData: The #of bytes in the allocated slots which are used by
+		 * application data (including the record checksum).
+		 * 
+		 * FIXME BLZG-1551 : The data reported here is bad. It is pretty clear
+		 * that {@link #m_sizeDeletes} is not being tracked correctly in the
+		 * {@link StorageStats}. Thus while we know the user data in the slots
+		 * for each slot size, we do not know how much user data was in those
+		 * slots when they were recycled. However, this should never return a
+		 * native number! Instead we could always fall back to (slotsAllocated -
+		 * slotsRecycled) * slotSize
+		 */
 		public long usedStore() {
 			return m_sizeAllocations - m_sizeDeletes;
 		}
 		
-		// return as percentage
+		/** %SlotWaste: How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)). */
 		public float slotWaste() {	
 			if (usedStore() == 0)
 				return 0.0f;
@@ -274,33 +309,54 @@ public class StorageStats {
 			if(size.signum()==0) return 0f;
 			return store.divide(size, 2, RoundingMode.HALF_UP).floatValue();
 		}
-		public float totalWaste(long total) {	
+
+		/*
+		 * TODO This is invoked for both %TotalWaste and %FileWaste. Is it
+		 * correctly invoked for both statistics? Note that we do not have an
+		 * official definition of %TotalWaste. See BLZG-1551.
+		 */
+		public float totalWaste(final long total) {	
+
 			if (total == 0)
 				return 0.0f;
 			
-			long slotWaste = reservedStore() - usedStore();
+			final long slotWaste = reservedStore() - usedStore();
 			
-			BigDecimal localWaste = new BigDecimal(100 * slotWaste);
-			BigDecimal totalWaste = new BigDecimal(total);			
+			final BigDecimal localWaste = new BigDecimal(100 * slotWaste);
+			final BigDecimal totalWaste = new BigDecimal(total);			
+			
 			if(totalWaste.signum()==0) return 0f;
+			
 			return localWaste.divide(totalWaste, 2, RoundingMode.HALF_UP).floatValue();
 		}
+		
+		/**
+		 * BytesReserved: The space reserved on the backing file for those allocation slots (AllocatorSlots * SlotsReserved). */
 		public long reservedStore() {
 			return m_size * m_totalSlots;
 		}
+		
 		public void addAlocator() {
 			m_allocators++;
 		}
+		
+		/**
+		 * SlotsChurn: How frequently slots of this size are re-allocated (SlotsRecycled/SlotsAllocated)
+		 */
 		public float slotChurn() {
-			// Handle case where we may have deleted all allocations
-			if (usedSlots() == 0)
-				return m_slotAllocations;
+		
+			final BigDecimal slotsRecycled = new BigDecimal(m_slotDeletes);
 			
-			BigDecimal allocs = new BigDecimal(m_slotAllocations);
-			BigDecimal used = new BigDecimal(usedSlots());			
-			if(used.signum()==0) return 0f;
-			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
+			final BigDecimal slotsAllocated = new BigDecimal(m_slotAllocations);
+			
+			if (slotsAllocated.signum() == 0)
+				return 0f;
+			
+			return slotsRecycled.divide(slotsAllocated, 2, RoundingMode.HALF_UP).floatValue();
+			
 		}
+		
+		/** %SlotsUnused: The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)). */
 		public float slotsUnused() {
 			if (m_totalSlots == 0) {
 				return 0.0f;
@@ -311,26 +367,51 @@ public class StorageStats {
 			if(total.signum()==0) return 0f;
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
-		public float percentAllocations(long totalAllocations) {
+		
+		/**
+		 * %SlotsAllocated: SlotsAllocated/(Sum of SlotsAllocated across all
+		 * slot sizes).
+		 * 
+		 * @param totalAllocations
+		 *            The #of allocations across all slot sizes.
+		 * @return
+		 */
+		public float percentAllocations(final long totalAllocations) {
 			if (totalAllocations == 0) {
 				return 0.0f;
 			}
 			
-			BigDecimal used = new BigDecimal(100 * m_slotAllocations);			
-			BigDecimal total = new BigDecimal(totalAllocations);
+			final BigDecimal used = new BigDecimal(100 * m_slotAllocations);			
+			final BigDecimal total = new BigDecimal(totalAllocations);
 			if(total.signum()==0) return 0f;
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
-		public float percentSlotsInuse(long totalInuse) {
+		
+		/**
+		 * %SlotsInUse: SlotsInUse / (total SlotsInUse across all slots sizes).
+		 * 
+		 * @param totalInuse
+		 *            The total of SlotsInUse across all slot sizes.
+		 */
+		public float percentSlotsInuse(final long totalInuse) {
+			
 			if (totalInuse == 0) {
 				return 0.0f;
 			}
 			
-			BigDecimal used = new BigDecimal(100 * usedSlots());			
-			BigDecimal total = new BigDecimal(totalInuse);
+			final BigDecimal used = new BigDecimal(100 * usedSlots());	
+			
+			final BigDecimal total = new BigDecimal(totalInuse);
+			
 			if(total.signum()==0) return 0f;
+			
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
+		
+		/**
+		 * MeanAllocation: (total application bytes used across all allocations for this slot size) / SlotsAllocated
+		 * @return
+		 */
 		public int meanAllocation() {
 			if (m_slotAllocations == 0)
 				return 0;
@@ -478,35 +559,27 @@ public class StorageStats {
 	 * <dl>
 	 * <dt>AllocatorSize</dt><dd>The #of bytes in the allocated slots issued by this allocator.</dd>
 	 * <dt>AllocatorCount</dt><dd>The #of fixed allocators for that slot size.</dd>
-	 * <dt>SlotsInUse</dt><dd>The difference between the two previous columns (net slots in use for this slot size).</dd>
-	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
 	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>%SlotsAllocated</dt><dd>SlotsAllocated/(Sum of SlotsAllocated across all slot sizes).</dd>
 	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
-	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsInUse/SlotsAllocated).</dd>
+	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsRecycled/SlotsAllocated).</dd>
+	 * <dt>SlotsInUse</dt><dd>SlotsAllocated - SlotsRecycled (net slots in use for this slot size).</dd>
+	 * <dt>%SlotsInUse</dt><dd>SlotsInUse / (total SlotsInUse across all slots sizes).</dd>
+	 * <dt>MeanAllocation</dt><dd>((Total application bytes used across all allocations for this slot size) / SlotsAllocated).</dd>
+	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
 	 * <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
-	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots</dd>
+	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots (AllocatorSlots * SlotsReserved).</dd>
 	 * <dt>BytesAppData</dt><dd>The #of bytes in the allocated slots which are used by application data (including the record checksum).</dd>
 	 * <dt>%SlotWaste</dt><dd>How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)).</dd>
 	 * <dt>%AppData</dt><dd>How much of your data is stored by each allocator (BytesAppData/Sum(BytesAppData)).</dd>
 	 * <dt>%StoreFile</dt><dd>How much of the backing file is reserved for each allocator (BytesReserved/Sum(BytesReserved)).</dd>
+	 * TODO TotalWaste
 	 * <dt>%StoreWaste</dt><dd>How much of the total waste on the store is waste for this allocator size ((BytesReserved-BytesAppData)/(Sum(BytesReserved)-Sum(BytesAppData))).</dd>
 	 * </dl>
 	 * 
-	 * @param str
-	 * 
-	 * FIXME Javadoc edit - this has diverged from the comments above. Also, there 
-	 * is also a divideByZero which can appear (this has been fixed).<pre>
-     [java] Exception in thread "main" java.lang.ArithmeticException: / by zero
-     [java] 	at java.math.BigDecimal.divideAndRound(BigDecimal.java:1407)
-     [java] 	at java.math.BigDecimal.divide(BigDecimal.java:1381)
-     [java] 	at java.math.BigDecimal.divide(BigDecimal.java:1491)
-     [java] 	at com.bigdata.rwstore.StorageStats$Bucket.slotsUnused(StorageStats.java:240)
-     [java] 	at com.bigdata.rwstore.StorageStats.showStats(StorageStats.java:448)
-     [java] 	at com.bigdata.rwstore.RWStore.showAllocators(RWStore.java:2620)
-     [java] 	at com.bigdata.rdf.store.DataLoader.main(DataLoader.java:1415)
-     </pre>
+	 * @param str The allocator statistics will be appended to the caller's buffer.
 	 */
-	public void showStats(StringBuilder str) {
+	public void showStats(final StringBuilder str) {
 		str.append("\n-------------------------\n");
 		str.append("RWStore Allocator Summary\n");
 		str.append("-------------------------\n");
@@ -531,38 +604,39 @@ public class StorageStats {
 				"%FileWaste"
 				));
 		
-		long totalAppData = 0;
-		long totalFileStore = 0;
-		long totalAllocations = 0;
-		long totalInuse = 0;
+		// aggregate over all slot sizes
+		long totalAppData = 0; // total BytesAppData across all slot sizes.
+		long totalFileStore = 0; // total BytesReserved across all slot sizes.
+		long totalAllocations = 0; // total SlotsAllocated across all slot sizes.
+		long totalInuse = 0; // total SlotsInUse across all slots sizes.
 		for (Bucket b: m_buckets) {
 			totalAppData += b.usedStore();
 			totalFileStore += b.reservedStore();
 			totalAllocations += b.m_slotAllocations;
 			totalInuse += b.usedSlots();
 		}
-		long totalWaste = totalFileStore - totalAppData;
+		final long totalWaste = totalFileStore - totalAppData;
 		
 		for (Bucket b: m_buckets) {
 			str.append(String.format("%-16d %16d %16d %16.2f %16d %16.2f %16d %16.2f %16d %16d %16.2f %16d %16d %16.2f %16.2f %16.2f %16.2f  %16.2f \n",
-				b.m_size,
-				b.m_allocators,
-				b.m_slotAllocations,
-				b.percentAllocations(totalAllocations),
-				b.m_slotDeletes,
-				b.slotChurn(),
-				b.usedSlots(),
-				b.percentSlotsInuse(totalInuse),
-				b.meanAllocation(),
-				b.m_totalSlots,
-				b.slotsUnused(),
-				b.reservedStore(),
-				b.usedStore(),
-				b.slotWaste(),
-				dataPercent(b.usedStore(), totalAppData),
-				dataPercent(b.reservedStore(), totalFileStore),
-				b.totalWaste(totalWaste),
-				b.totalWaste(totalFileStore)
+				b.m_size, // AllocatorSize
+				b.m_allocators, // AllocatorCount
+				b.m_slotAllocations, // SlotsAllocated
+				b.percentAllocations(totalAllocations), // %SlotsAllocated 
+				b.m_slotDeletes, // SlotsRecycled
+				b.slotChurn(), // SlotChurn
+				b.usedSlots(), // SlotsInUse
+				b.percentSlotsInuse(totalInuse), // %SlotsInUse
+				b.meanAllocation(), // MeanAllocation
+				b.m_totalSlots, // SlotsReserved
+				b.slotsUnused(), // %SlotsUnused
+				b.reservedStore(), // BytesReserved
+				b.usedStore(), // BytesAppData 
+				b.slotWaste(), // %SlotWaste
+				dataPercent(b.usedStore(), totalAppData), // %AppData
+				dataPercent(b.reservedStore(), totalFileStore), // %StoreFile
+				b.totalWaste(totalWaste), // %TotalWaste
+				b.totalWaste(totalFileStore) // %FileWaste
 			));
 		}
 		
@@ -596,14 +670,24 @@ public class StorageStats {
 		
 	}
 
-	private float dataPercent(long usedData, long totalData) {
+	/**
+	 * Helper method returns the ratio <code>(usedData/totalData)</code> as a
+	 * percentage.
+	 * 
+	 * @param usedData
+	 * @param totalData
+	 * @return
+	 */
+	static private float dataPercent(final long usedData, final long totalData) {
+
 		if (totalData == 0)
 			return 0.0f;
 		
-		BigDecimal used = new BigDecimal(100 * usedData);
-		BigDecimal total = new BigDecimal(totalData);
+		final BigDecimal used = new BigDecimal(100 * usedData);
+		final BigDecimal total = new BigDecimal(totalData);
 		
 		return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
+
 	}
 
 	public void register(SectorAllocator allocator, boolean init) {
