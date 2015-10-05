@@ -109,8 +109,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             final RDFParserOptions options = new RDFParserOptions();
             
-            op.setRDFParserOptions(options);
-
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -146,8 +144,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             final RDFParserOptions options = new RDFParserOptions();
             
-            op.setRDFParserOptions(options);
-
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -183,8 +179,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             final RDFParserOptions options = new RDFParserOptions();
             
-            op.setRDFParserOptions(options);
-
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
 
@@ -219,8 +213,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final RDFParserOptions options = new RDFParserOptions();
             
-            op.setRDFParserOptions(options);
-
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
 
@@ -233,8 +225,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final RDFParserOptions options = new RDFParserOptions();
             
-            op.setRDFParserOptions(options);
-
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data1"))));
 
@@ -247,8 +237,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final RDFParserOptions options = new RDFParserOptions();
             
-            op.setRDFParserOptions(options);
-
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data2"))));
 
@@ -285,8 +273,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             final RDFParserOptions options = new RDFParserOptions();
             
             options.setVerifyData(true);
-            
-            op.setRDFParserOptions(options);
             
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
@@ -325,8 +311,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             options.setVerifyData(false);
             
-            op.setRDFParserOptions(options);
-            
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -362,8 +346,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             final RDFParserOptions options = new RDFParserOptions();
             
             options.setStopAtFirstError(true);
-            
-            op.setRDFParserOptions(options);
             
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
@@ -401,8 +383,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             options.setStopAtFirstError(false);
             
-            op.setRDFParserOptions(options);
-            
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -438,8 +418,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             final RDFParserOptions options = new RDFParserOptions();
             
             options.setPreserveBNodeIDs(true);
-            
-            op.setRDFParserOptions(options);
             
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
@@ -477,8 +455,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             options.setPreserveBNodeIDs(false);
             
-            op.setRDFParserOptions(options);
-            
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -514,8 +490,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             final RDFParserOptions options = new RDFParserOptions();
             
             options.setDatatypeHandling(DatatypeHandling.IGNORE);
-            
-            op.setRDFParserOptions(options);
             
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
@@ -553,8 +527,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             options.setDatatypeHandling(DatatypeHandling.VERIFY);
             
-            op.setRDFParserOptions(options);
-            
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -590,8 +562,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             final RDFParserOptions options = new RDFParserOptions();
             
             options.setDatatypeHandling(DatatypeHandling.VERIFY);
-            
-            op.setRDFParserOptions(options);
             
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
@@ -630,8 +600,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             options.setVerifyData(true);
             
             options.setDatatypeHandling(DatatypeHandling.VERIFY);
-
-            op.setRDFParserOptions(options);
 
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));

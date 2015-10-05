@@ -118,7 +118,7 @@ public class TestASTGraphGroupOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         ASTDeferredIVResolution.resolveQuery(store, astContainer);
@@ -217,7 +217,7 @@ public class TestASTGraphGroupOptimizer extends
        store.getLexiconRelation()
                .addTerms(values, values.length, false/* readOnly */);
 
-       final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+       final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                .parseQuery2(queryStr, baseURI);
 
        ASTDeferredIVResolution.resolveQuery(store, astContainer);
@@ -311,7 +311,7 @@ public class TestASTGraphGroupOptimizer extends
                 + "  }\n"//
                 + "}";
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -341,7 +341,7 @@ public class TestASTGraphGroupOptimizer extends
                 + "}";
 
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);

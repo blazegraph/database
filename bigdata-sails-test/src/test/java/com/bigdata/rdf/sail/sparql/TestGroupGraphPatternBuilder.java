@@ -40,6 +40,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.AbstractBigdataExprBuilderTestCase;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -53,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -1349,4 +1351,20 @@ public class TestGroupGraphPatternBuilder extends
 
     }
 
+    public void test001() throws MalformedQueryException {
+        String queryStr = "PREFIX : <http://example/> " +
+                "SELECT ?book (MIN(?r) * 2 AS ?doubleMin) " +
+                "WHERE {  " +
+                "?book :rating ?r . " + 
+                "} " +
+                "GROUP BY ?book";
+        final Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser();
+        
+        final ASTContainer astContainer = parser.parseQuery2(queryStr, baseURI);
+        
+        ASTDeferredIVResolution.resolveQuery(tripleStore, astContainer);
+        
+        final QueryRoot ast = astContainer.getOriginalAST();
+        
+    }
 }

@@ -2391,8 +2391,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * the query parser.
          */
         final AbstractTripleStore tripleStore = cxn.getTripleStore();
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                tripleStore).parseQuery2(queryStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                .parseQuery2(queryStr, baseURI);
 
         if (log.isDebugEnabled())
             log.debug(astContainer.toString());
