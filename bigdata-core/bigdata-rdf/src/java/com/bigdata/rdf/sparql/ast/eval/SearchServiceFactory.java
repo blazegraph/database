@@ -372,6 +372,11 @@ public class SearchServiceFactory extends AbstractServiceFactoryBase {
         private final Literal maxRelevance;
         private final boolean matchAllTerms;
         private final boolean matchExact;
+        /**
+		 * @deprecated Feature was never completed due to scalability issues.
+		 * See BZLG-1548, BLZG-563.
+		 */
+        @Deprecated
         private final boolean subjectSearch;
         private final Literal searchTimeout;
         private final Literal matchRegex;
