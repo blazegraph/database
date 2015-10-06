@@ -101,8 +101,6 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
     protected BigdataValueFactory valueFactory = null;
 
-//    protected BigdataASTContext context;
-
     @Override
     protected void setUp() throws Exception {
         
@@ -111,8 +109,6 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         lex = tripleStore.getLexiconRelation().getNamespace();
         
         valueFactory = tripleStore.getValueFactory();
-        
-//        this.context = new BigdataASTContext(tripleStore);
         
     }
 
@@ -132,8 +128,6 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         lex = null;
         
         valueFactory = null;
-        
-//        context = null;
         
     }
 

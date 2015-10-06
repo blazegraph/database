@@ -64,11 +64,6 @@ public class LoadGraph extends GraphUpdate {
      */
     public interface Annotations extends GraphUpdate.Annotations{
 
-//        /**
-//         * {@link RDFParserOptions} (optional).
-//         */
-//        String OPTIONS = "options";
-
 		/*
 		 * Options for RDF data parser that can be specified by SPARQL UPDATE
 		 * "LOAD" extension syntax.
@@ -175,8 +170,6 @@ public class LoadGraph extends GraphUpdate {
         final ConstantNode sourceGraph = getSourceGraph();
         
         final ConstantNode targetGraph = getTargetGraph();        
-
-//        final IRDFParserOptions rdfParserOptions = getRDFParserOptions();        
 
         if(silent)
             sb.append(" SILENT");

@@ -70,14 +70,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
 
     }
 
-//    /**
-//     * Return <code>true</code> iff the KB is in an RDR enabled mode.
-//     */
-//    protected boolean getStatementIdentifiers() {
-//       
-//       return context.tripleStore.getStatementIdentifiers();
-//       
-//    }
     
     /**
      * Return the depth of the node in the parse tree. The depth is ZERO (0) if

@@ -54,17 +54,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  */
 public class BigdataASTContext {
 
-//    protected final AbstractTripleStore tripleStore;
-//
-//    protected final LexiconRelation lexicon;
-//
-//    /**
-//     * The namespace of the {@link #lexicon}.
-//     */
-//    protected final String lex;
-//
-//    protected final ILexiconConfiguration<BigdataValue> conf;
-
     protected final BigdataValueFactory valueFactory;
 
     /**
@@ -81,8 +70,6 @@ public class BigdataASTContext {
      */
     private int constantVarID = 1;
 
-//	private final Properties updateProperties;
-
 	/**
 	 * 
 	 * @param values
@@ -91,45 +78,13 @@ public class BigdataASTContext {
 	 *            objects that will be used to process the request.
 	 */
     public BigdataASTContext(final Map<Value, BigdataValue> values) {
-    	
-//    	this.tripleStore = null;
 
     	this.valueFactory = BigdataValueFactoryImpl.getInstance("");
         
-//        this.lexicon = null;
-
-//        this.lex = null;
-
-//        this.conf = null;
-        
     	this.vocab = values;
-    	
-//    	this.updateProperties = updateProperties;
 
     }
-    
-//    public BigdataASTContext(final AbstractTripleStore tripleStore) {
-//
-//        this.tripleStore = tripleStore;
-//
-//        this.valueFactory = tripleStore.getValueFactory();
-//
-//        this.lexicon = tripleStore.getLexiconRelation();
-//
-//        this.lex = lexicon.getNamespace();
-//
-//        this.conf = lexicon.getLexiconConfiguration();
-//        
-//        this.vocab = new LinkedHashMap<Value, BigdataValue>();
-//        
-//        this.updateProperties = tripleStore.getProperties();
-//
-//    }
 
-//    public Properties getUpdateProperties() {
-//		return updateProperties;
-//	}
-    
     /**
      * Create an anonymous variable. The variable name will be unique (within
      * the scope of the query parser) and {@link VarNode#isAnonymous()} will

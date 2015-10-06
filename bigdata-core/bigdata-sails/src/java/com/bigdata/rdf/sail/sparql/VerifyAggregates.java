@@ -111,11 +111,11 @@ public class VerifyAggregates {
         if (projection!=null) {
             final IValueExpression<?>[] exprs = new IValueExpression[projection.arity()];
             int i = 0;
-            Striterator projectionNodes = new Striterator(projection.iterator());
+            final Striterator projectionNodes = new Striterator(projection.iterator());
             while(projectionNodes.hasMoreElements()) {
-                AssignmentNode n = (AssignmentNode) projectionNodes.nextElement();
+                final AssignmentNode n = (AssignmentNode) projectionNodes.nextElement();
                 IValueExpression expr = n.getValueExpression();
-                IValueExpressionNode exprNode = n.getValueExpressionNode();
+                final IValueExpressionNode exprNode = n.getValueExpressionNode();
                 if (expr == null && exprNode instanceof FunctionNode) {
                     expr = convertAggregates((FunctionNode)exprNode);
                 }
@@ -136,16 +136,16 @@ public class VerifyAggregates {
         if (having!=null) {
             final IConstraint[] exprs2 = new IConstraint[having.arity()];
             int i = 0;
-            for (IValueExpressionNode node : having) {
+            for (final IValueExpressionNode node : having) {
     
-                IValueExpression<? extends IV> ve = node.getValueExpression();
+                final IValueExpression<? extends IV> ve = node.getValueExpression();
                 if (ve!=null) {
                     exprs2[i] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                             ve);
                 } else if (node instanceof FunctionNode) {
                     
-                    FunctionNode exprNode = (FunctionNode)node;
-                    BOp expr = convertAggregates(exprNode);
+                    final FunctionNode exprNode = (FunctionNode)node;
+                    final BOp expr = convertAggregates(exprNode);
                     exprs2[i] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(new BOp[]{
                             expr}, null);
                     
@@ -181,7 +181,7 @@ public class VerifyAggregates {
         if (groupBy != null) {
 
             // Collect top-level variables from GROUP_BY value expressions.
-            for (IValueExpression<?> expr : this.groupBy) {
+            for (final IValueExpression<?> expr : this.groupBy) {
                 if (expr instanceof IVariable<?>) {
                     groupByVars.add((IVariable<?>) expr);
                 } else if (expr instanceof IBind<?>) {
@@ -217,7 +217,7 @@ public class VerifyAggregates {
             // true iff any aggregate expression uses a reference to another
             // aggregate expression in the select clause.
             final AtomicBoolean selectDependency = new AtomicBoolean(false);
-            for (IValueExpression<?> expr : this.select) {
+            for (final IValueExpression<?> expr : this.select) {
                 /*
                  * Each SELECT value expression must be either a top-level
                  * IVariable in the GROUP BY clause or an IBind wrapping a value
@@ -276,7 +276,7 @@ public class VerifyAggregates {
         boolean simpleHaving = true;
         if (having != null) {
             
-            for (IConstraint c : this.having) {
+            for (final IConstraint c : this.having) {
 
                 /*
                  * The constraint must be an aggregate expression.
@@ -321,13 +321,13 @@ public class VerifyAggregates {
 
     }
 
-    private IValueExpression convertAggregates(BOp exprNode) {
+    private IValueExpression convertAggregates(final BOp exprNode) {
         IValueExpression expr;
-        BOp[] args = new BOp[exprNode.args().size()];
+        final BOp[] args = new BOp[exprNode.args().size()];
         if (exprNode!=null && exprNode.arity()>0) {
             for (int i=0; i<exprNode.args().size(); i++) {
-                BOp arg = exprNode.args().get(i);
-                IValueExpression newValue = convertAggregates(arg); 
+                final BOp arg = exprNode.args().get(i);
+                final IValueExpression newValue = convertAggregates(arg); 
                 if (newValue!=null) {
                     args[i] = newValue;
                 } else {
@@ -598,7 +598,7 @@ public class VerifyAggregates {
 
                 new VerifyAggregates(projection, groupBy, having);
 
-            } catch (IllegalArgumentException ex) {
+            } catch (final IllegalArgumentException ex) {
 
                 throw new VisitorException("Bad aggregate", ex);
 

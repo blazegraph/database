@@ -68,7 +68,6 @@ import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Overridden version of the openrdf {@link SPARQLParser} class which extracts
@@ -234,7 +233,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  
                         if (sharedPrefixDeclarations != null) {
                         
-                            for (ASTPrefixDecl prefixDecl : sharedPrefixDeclarations) {
+                            for (final ASTPrefixDecl prefixDecl : sharedPrefixDeclarations) {
                             
                                 uc.jjtAppendChild(prefixDecl);
                                 
@@ -302,11 +301,11 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             
             return astContainer;
             
-        } catch (ParseException e) {
+        } catch (final ParseException e) {
             throw new MalformedQueryException(e.getMessage(), e);
-        } catch (TokenMgrError e) {
+        } catch (final TokenMgrError e) {
             throw new MalformedQueryException(e.getMessage(), e);
-        } catch (VisitorException e) {
+        } catch (final VisitorException e) {
             throw new MalformedQueryException(e.getMessage(), e);
         }
 
@@ -327,7 +326,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ASTContainer parseQuery2(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
-        long startTime = System.nanoTime();
+        final long startTime = System.nanoTime();
         
         if(log.isInfoEnabled())
             log.info(queryStr);
@@ -388,19 +387,19 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             
             return ast;
 
-        } catch (IllegalArgumentException e) {
+        } catch (final IllegalArgumentException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);
             
-        } catch (VisitorException e) {
+        } catch (final VisitorException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);
             
-        } catch (ParseException e) {
+        } catch (final ParseException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);
             
-        } catch (TokenMgrError e) {
+        } catch (final TokenMgrError e) {
             
             throw new MalformedQueryException(e.getMessage(), e);
             
@@ -433,7 +432,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
             return (QueryRoot) qc.jjtAccept(exprBuilder, null);
 
-        } catch (VisitorException e) {
+        } catch (final VisitorException e) {
 
             throw new MalformedQueryException(e.getMessage(), e);
 
@@ -488,7 +487,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 try {
                     // Parse (validates that this is a UUID).
                     UUID.fromString(queryIdStr);
-                } catch (IllegalArgumentException ex) {
+                } catch (final IllegalArgumentException ex) {
                     throw new MalformedQueryException("Not a valid UUID: "
                             + queryIdStr);
                 }
