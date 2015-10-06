@@ -117,7 +117,7 @@ public class TestExplainHints extends AbstractDataDrivenSPARQLTestCase {
      * SELECT ?s ?type WHERE {
      *   BIND("http://example.com/" AS ?typeBase)
      *   {
-     *     BIND(URI(CONCAT(?typeBase,"Person")) AS ?type)
+     *     BIND(?typeBase AS ?type)
      *     ?s a ?o
      *     FILTER(?o=?type)
      *    }
@@ -384,6 +384,28 @@ public class TestExplainHints extends AbstractDataDrivenSPARQLTestCase {
              ExplainHints.explainHintAnnotatedBOpIterator(container.getOptimizedAST());
           assertFalse(explainHintAnnotatedBOps.hasNext());
     }
+    
+    /**
+     * Variant of testBottomUpSemanticsExplainHint06, motivated by the fix
+     * made in https://jira.blazegraph.com/browse/BLZG-1463: the idea is to
+     * test a non-complex BIND expression (not containing CONCAT etc.) and
+     * whether this is reported correctly.
+     * 
+     * @throws Exception
+     */
+    public void testTicketBlzg463d() throws Exception {
+       
+       final ASTContainer container = new TestHelper(
+             "explainHints-blzg1463d",// name
+             "explainHints-blzg1463d.rq",// query URL
+             "explainHints.trig",// data URL
+             "explainHints-blzg1463d.srx"// results URL
+          ).runTest();
+
+          final Iterator<BOp> explainHintAnnotatedBOps = 
+             ExplainHints.explainHintAnnotatedBOpIterator(container.getOptimizedAST());
+          assertTrue(explainHintAnnotatedBOps.hasNext());
+    }
 
     
     /**
@@ -412,5 +434,5 @@ public class TestExplainHints extends AbstractDataDrivenSPARQLTestCase {
     	    	assertFalse(explainHintAnnotatedBOps.hasNext());
     	    			 
     }
-    
+
 }
