@@ -63,8 +63,10 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * by tokens which appear within those terms.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @deprecated Feature was never completed due to scalability issues. See
+ *             BZLG-1548, BLZG-563.
  */
+@Deprecated
 public class TestSubjectCentricFullTextIndex extends AbstractTripleStoreTestCase {
 
 	private static final transient Logger log = Logger.getLogger(TestSubjectCentricFullTextIndex.class);
@@ -82,9 +84,10 @@ public class TestSubjectCentricFullTextIndex extends AbstractTripleStoreTestCase
         super(name);
     }
 
+    @Override
     public Properties getProperties() {
 
-        Properties properties = new Properties(super.getProperties());
+    	final Properties properties = new Properties(super.getProperties());
         
         // enable the full text index.
         properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX,"true");
