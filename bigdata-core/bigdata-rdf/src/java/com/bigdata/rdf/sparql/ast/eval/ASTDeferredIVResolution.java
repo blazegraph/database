@@ -151,11 +151,11 @@ public class ASTDeferredIVResolution {
          * 
          * Note: This handles VIRTUAL GRAPH resolution.
          */
-        Map<IDataSetNode, List<ASTDatasetClause>> dcLists = new LinkedHashMap<>();
+        final Map<IDataSetNode, List<ASTDatasetClause>> dcLists = new LinkedHashMap<>();
         {
             final ASTQueryContainer qc = (ASTQueryContainer) ast.getProperty(Annotations.PARSE_TREE);
             if (qc != null && qc.getOperation() != null) {
-                List<ASTDatasetClause> dcList = new ArrayList<>();
+                final List<ASTDatasetClause> dcList = new ArrayList<>();
                 dcList.addAll(qc.getOperation().getDatasetClauseList());
                 dcLists.put(queryRoot, dcList);
             }
@@ -199,10 +199,10 @@ public class ASTDeferredIVResolution {
          * (aka ASTModify). It is attached to each DeleteInsertNode for
          * which it is given.
          */
-        Map<IDataSetNode, List<ASTDatasetClause>> dcLists = new LinkedHashMap<>();
+        final Map<IDataSetNode, List<ASTDatasetClause>> dcLists = new LinkedHashMap<>();
         for (final Update update: qc.getChildren()) {
             if (update instanceof IDataSetNode) {
-                List<ASTDatasetClause> dcList = new ArrayList();
+                final List<ASTDatasetClause> dcList = new ArrayList();
                 dcList.addAll(update.getDatasetClauses());
                 dcLists.put((IDataSetNode)update, dcList);
             }
@@ -258,7 +258,7 @@ public class ASTDeferredIVResolution {
      * @param dcList 
      * @throws MalformedQueryException 
      */
-    private void resolve(final AST2BOpContext context, final QueryNodeBase queryNode, Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
+    private void resolve(final AST2BOpContext context, final QueryNodeBase queryNode, final Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
 
         // prepare deferred handlers for batch IVs resolution
         prepare(context, queryNode);
@@ -312,10 +312,10 @@ public class ASTDeferredIVResolution {
 
     }
 
-    private void resolveDataset(final AST2BOpContext context, Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
+    private void resolveDataset(final AST2BOpContext context, final Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
         for (final Entry<IDataSetNode, List<ASTDatasetClause>> dcList: dcLists.entrySet()) {
             final boolean update = dcList.getKey() instanceof Update;
-            List<ASTDatasetClause> datasetClauses = dcList.getValue();
+            final List<ASTDatasetClause> datasetClauses = dcList.getValue();
             if (datasetClauses!=null && !datasetClauses.isEmpty()) {
 
                 if (!context.getAbstractTripleStore().isQuads()) {
@@ -329,8 +329,8 @@ public class ASTDeferredIVResolution {
                     final ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
                     defer((BigdataURI)astIri.getRDFValue(),new Handler(){
                         @Override
-                        public void handle(IV newIV) {
-                            BigdataValue uri = newIV.getValue();
+                        public void handle(final IV newIV) {
+                            final BigdataValue uri = newIV.getValue();
                             if (dc.isVirtual()) {
 
                                 if (uri.getIV().isNullIV()) {
@@ -342,7 +342,7 @@ public class ASTDeferredIVResolution {
                                     throw new RuntimeException("Not declared: " + uri);
                                 }
                                 
-                                IV virtualGraph = resolvedValues.get(BD.VIRTUAL_GRAPH);
+                                final IV virtualGraph = resolvedValues.get(BD.VIRTUAL_GRAPH);
 
                                 if (virtualGraph == null) {
 
@@ -362,7 +362,7 @@ public class ASTDeferredIVResolution {
                                 while(itr.hasNext()) {
 
                                     final IV memberGraph = itr.next().o();
-                                    BigdataValue value = context.getAbstractTripleStore().getLexiconRelation().getTerm(memberGraph);
+                                    final BigdataValue value = context.getAbstractTripleStore().getLexiconRelation().getTerm(memberGraph);
                                     memberGraph.setValue(value);
                                     addGraph(memberGraph, dc.isNamed());
 
@@ -584,12 +584,12 @@ public class ASTDeferredIVResolution {
         if (bop instanceof CreateGraph) {
             fillInIV(context,((CreateGraph)bop).getTargetGraph());
         } if (bop instanceof AbstractGraphDataUpdate) {
-            AbstractGraphDataUpdate update = ((AbstractGraphDataUpdate)bop);
+            final AbstractGraphDataUpdate update = ((AbstractGraphDataUpdate)bop);
             // @see https://jira.blazegraph.com/browse/BLZG-1176
             // Check for using context value in DATA block with triple store not supporting quads
             // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.doUnparsedQuadsDataBlock(ASTUpdate, Object, boolean, boolean)
             if (!context.isQuads()) {
-                for (BigdataStatement sp: update.getData()) {
+                for (final BigdataStatement sp: update.getData()) {
                     if (sp.getContext()!=null) {
                         throw new QuadsOperationInTriplesModeException(
                                 "Quads in SPARQL update data block are not supported " +

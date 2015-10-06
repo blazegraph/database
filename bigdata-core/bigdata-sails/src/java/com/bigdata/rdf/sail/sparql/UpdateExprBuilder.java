@@ -286,35 +286,6 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         if (node.isSilent())
             op.setSilent(true);
 
-//        final RDFParserOptions options = new RDFParserOptions(
-//                context.getUpdateProperties());
-//
-//        if (node.verifyData != null) {
-//
-//            options.setVerifyData(node.verifyData);
-//
-//        }
-//
-//        if (node.stopAtFirstError != null) {
-//
-//            options.setStopAtFirstError(node.stopAtFirstError);
-//
-//        }
-//
-//        if (node.preserveBNodeIDs != null) {
-//
-//            options.setPreserveBNodeIDs(node.preserveBNodeIDs);
-//
-//        }
-//
-//        if (node.datatypeHandling != null) {
-//
-//            options.setDatatypeHandling(node.datatypeHandling);
-//
-//        }
-//
-//        op.setRDFParserOptions(options);
-        
         if (node.jjtGetNumChildren() > 1) {
 
             final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(1)

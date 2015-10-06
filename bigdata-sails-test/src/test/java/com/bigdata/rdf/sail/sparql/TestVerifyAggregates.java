@@ -70,12 +70,13 @@ public class TestVerifyAggregates extends TestCase2 {
     /**
      * @param name
      */
-    public TestVerifyAggregates(String name) {
+    public TestVerifyAggregates(final String name) {
         super(name);
     }
     
     private GlobalAnnotations globals;
     
+    @Override
     protected void setUp() throws Exception {
 
         super.setUp();
@@ -83,6 +84,7 @@ public class TestVerifyAggregates extends TestCase2 {
         globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
     }
     
+    @Override
     protected void tearDown() throws Exception {
         
         globals = null;
@@ -429,7 +431,7 @@ public class TestVerifyAggregates extends TestCase2 {
         try {
             new VerifyAggregates(select, groupBy, having);
             fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
+        } catch (final IllegalArgumentException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex,ex);
         }
@@ -452,7 +454,7 @@ public class TestVerifyAggregates extends TestCase2 {
         final VarNode x = new VarNode("x");
         final VarNode z = new VarNode("z");
 
-        Map<String, Object> scalarValues = new HashMap<>();
+        final Map<String, Object> scalarValues = new HashMap<>();
         scalarValues.put(Annotations.DISTINCT, Boolean.TRUE);
         final IValueExpressionNode xExpr = new FunctionNode(FunctionRegistry.SUM, scalarValues, y);
 
@@ -497,7 +499,7 @@ public class TestVerifyAggregates extends TestCase2 {
         groupBy.addGroupByVar(z);
 
         final HavingNode having = new HavingNode();
-        Map<String, Object> scalarValues = new HashMap<>();
+        final Map<String, Object> scalarValues = new HashMap<>();
         scalarValues.put(Annotations.DISTINCT, Boolean.TRUE);
         having.addExpr(FunctionNode.GT(
                 new FunctionNode(FunctionRegistry.SUM, scalarValues, y),
@@ -557,7 +559,7 @@ public class TestVerifyAggregates extends TestCase2 {
         try {
             new VerifyAggregates(null/* select */, groupBy, having);
             fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
+        } catch (final IllegalArgumentException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex, ex);
         }
@@ -567,7 +569,7 @@ public class TestVerifyAggregates extends TestCase2 {
             new VerifyAggregates(new ProjectionNode()/* select */, groupBy,
                     having);
             fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
+        } catch (final IllegalArgumentException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex, ex);
         }

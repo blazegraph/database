@@ -146,10 +146,6 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         this.vocab = new LinkedHashMap<>();
 
     }
-    
-//    public Map<ASTRDFValue, BigdataValue> getNodes() {
-//        return nodes;
-//    }
 
     /**
      * Visit the parse tree, locating and collecting references to all
@@ -178,7 +174,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
              */
             qc.jjtAccept(new RDFValueResolver(), null);
             
-        } catch (VisitorException e) {
+        } catch (final VisitorException e) {
             
             // Turn the exception into a Query exception.
             throw new MalformedQueryException(e);
@@ -210,9 +206,9 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                     bigdataValue.setIV(iv);
                     iv.setValue(bigdataValue);
                 } else if (value instanceof ASTRDFLiteral) {
-                    ASTRDFLiteral rdfNode = (ASTRDFLiteral) value;
-                    String lang = rdfNode.getLang();
-                    ASTIRI dataTypeIri = rdfNode.getDatatype();
+                    final ASTRDFLiteral rdfNode = (ASTRDFLiteral) value;
+                    final String lang = rdfNode.getLang();
+                    final ASTIRI dataTypeIri = rdfNode.getDatatype();
                     URIImpl dataTypeUri = null;
                     DTE dte = null;
                     if (dataTypeIri!=null && dataTypeIri.getValue()!=null) {
@@ -236,9 +232,9 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                         bigdataValue.setIV(iv);
                     }
                 } else if (value instanceof ASTNumericLiteral) {
-                    ASTNumericLiteral rdfNode = (ASTNumericLiteral) value;
-                    URI dataTypeUri = rdfNode.getDatatype();
-                    DTE dte = DTE.valueOf(dataTypeUri);
+                    final ASTNumericLiteral rdfNode = (ASTNumericLiteral) value;
+                    final URI dataTypeUri = rdfNode.getDatatype();
+                    final DTE dte = DTE.valueOf(dataTypeUri);
                     bigdataValue = getBigdataValue(rdfNode.getValue(), dte);
                     if (!bigdataValue.stringValue().equals(rdfNode.getValue())) {
                         // Data loss could occur if inline IV will be used, as string representation of original value differ from decoded value
@@ -290,7 +286,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         {
 
             // Cache the BigdataValues on the IVs for later
-            for (BigdataValue value : vocab.values()) {
+            for (final BigdataValue value : vocab.values()) {
 
                 final IV iv = value.getIV();
 
@@ -419,7 +415,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
                 return null;
 
-            } catch (IllegalArgumentException e) {
+            } catch (final IllegalArgumentException e) {
 
                 // invalid URI
                 throw new VisitorException(e.getMessage());
@@ -450,7 +446,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
                     datatype = valueFactory.createURI(datatypeNode.getValue());
 
-                } catch (IllegalArgumentException e) {
+                } catch (final IllegalArgumentException e) {
 
                     // invalid URI
                     throw new VisitorException(e);
