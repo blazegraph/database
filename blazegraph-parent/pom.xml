@@ -148,7 +148,7 @@ dependencies.
           <reuseForks>true</reuseForks>
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
-          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack}</argLine>
+          <argLine>-server -ea -Xms512m -Xmx4g</argLine>
 	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
