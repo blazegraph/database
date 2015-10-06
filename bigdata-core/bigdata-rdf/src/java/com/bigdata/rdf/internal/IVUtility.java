@@ -102,7 +102,7 @@ public class IVUtility {
      * Note: This option requires that term identifiers are non-negative. That
      * is not currently true for the cluster due to the {@link TermIdEncoder}.
      * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/548">
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-654">
      *      Pack TIDs</a>
      */
     public static final boolean PACK_TIDS = false;
