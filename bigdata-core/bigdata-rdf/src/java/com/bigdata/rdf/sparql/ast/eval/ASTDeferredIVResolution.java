@@ -40,6 +40,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
+import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
@@ -106,19 +107,22 @@ public class ASTDeferredIVResolution {
         void handle(IV newIV);
     }
     
-    /*
+    /**
      * Deferred handlers, linked to particular BigdataValue resolution
      */
     private final Map<BigdataValue, List<Handler>> deferred = new LinkedHashMap<>();
-    /*
-     * Deferred handlers, NOT linked to particular BigdataValue resolution,
-     * used to provide  sets of resolved default and named graphs into DataSetSummary constructor
-     */
+    /**
+	 * Deferred handlers, NOT linked to particular BigdataValue resolution, used
+	 * to provide sets of resolved default and named graphs into DataSetSummary
+	 * constructor
+	 */
     private final List<Runnable> deferredRunnables = new ArrayList<>();
-    /*
-     * IVs of graphs, which will be later passed to DatasetDeclProcessor
-     * No need for synchronization or keeping order of values. 
-     */
+    /**
+	 * IVs of graphs, which will be later passed to
+	 * {@link #resolveDataset(AST2BOpContext, Map)}.
+	 * 
+	 * No need for synchronization or keeping order of values.
+	 */
     private final Map<Value, IV> resolvedValues = new HashMap<>();
     
 
@@ -263,7 +267,9 @@ public class ASTDeferredIVResolution {
         // prepare deferred handlers for batch IVs resolution
         prepare(context, queryNode);
 
-        resolveDataset(context, dcLists);
+		// Assign DataSetNode to each IDataSetNode (sets up handlers that are
+		// then invoked by call backs).
+		resolveDataset(context, dcLists);
 
         // execute batch resolution and run all deferred handlers,
         // which will update unresolved values across AST model 
@@ -312,26 +318,48 @@ public class ASTDeferredIVResolution {
 
     }
 
+    /**
+	 * Method is invoked after IV resolution and sets the
+	 * {@link IDataSetNode#setDataset(DatasetNode) data set} on each
+	 * {@link IDataSetNode} to a newly constructed {@link DatasetNode}
+	 * object.
+	 * 
+	 * @param context
+	 * @param dcLists
+	 *            A mapping from the {@link IDataSetNode} objects to the set of
+	 *            {@link ASTDatasetClause data set declarations clauses} (there
+	 *            can be more than one for SPARQL UPDATE).
+	 * 
+	 * @throws MalformedQueryException
+	 */
     private void resolveDataset(final AST2BOpContext context, final Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
-        for (final Entry<IDataSetNode, List<ASTDatasetClause>> dcList: dcLists.entrySet()) {
-            final boolean update = dcList.getKey() instanceof Update;
-            final List<ASTDatasetClause> datasetClauses = dcList.getValue();
-            if (datasetClauses!=null && !datasetClauses.isEmpty()) {
+       
+    	for (final Entry<IDataSetNode, List<ASTDatasetClause>> dcList: dcLists.entrySet()) {
+        
+    		final boolean update = dcList.getKey() instanceof Update;
+            
+    		final List<ASTDatasetClause> datasetClauses = dcList.getValue();
 
-                if (!context.getAbstractTripleStore().isQuads()) {
-                    throw new QuadsOperationInTriplesModeException(
-                        "NAMED clauses in queries are not supported in"
-                        + " triples mode.");
-                }
-               
+			if (datasetClauses != null && !datasetClauses.isEmpty()) {
+
+				if (!context.getAbstractTripleStore().isQuads()) {
+					throw new QuadsOperationInTriplesModeException(
+							"NAMED clauses in queries are not supported in" + " triples mode.");
+				}
+
                 for (final ASTDatasetClause dc : datasetClauses) {
                 
                     final ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
-                    defer((BigdataURI)astIri.getRDFValue(),new Handler(){
-                        @Override
+    
+                    // Setup the callback handler : TODO Pull handler into a private class? Questions about scope for defaultGraphs and namedGraphs.
+					defer((BigdataURI) astIri.getRDFValue(), new Handler() {
+
+						@Override
                         public void handle(final IV newIV) {
-                            final BigdataValue uri = newIV.getValue();
-                            if (dc.isVirtual()) {
+                        
+							final BigdataValue uri = newIV.getValue();
+                            
+							if (dc.isVirtual()) {
 
                                 if (uri.getIV().isNullIV()) {
                                     /*
@@ -374,15 +402,22 @@ public class ASTDeferredIVResolution {
                                     addGraph(uri.getIV(), dc.isNamed());
 
                             }
-                            if (defaultGraphs != null || namedGraphs != null) {
-    
-                            // Note: Cast required to shut up the compiler.
-                            @SuppressWarnings("unchecked")
-                            final DatasetNode datasetNode = new DatasetNode((Set) defaultGraphs, (Set) namedGraphs, update);
-                            
-                            dcList.getKey().setDataset(datasetNode);
-                            }
-                        }
+
+							if (defaultGraphs != null || namedGraphs != null) {
+
+								// Note: Cast required to shut up the compiler.
+								final DatasetNode datasetNode = new DatasetNode((Set) defaultGraphs, (Set) namedGraphs,
+										update);
+
+								/*
+								 * Set the data set on the QueryRoot or
+								 * DeleteInsertGraph node.
+								 */
+								dcList.getKey().setDataset(datasetNode);
+
+							}
+							
+						}
                     });
 
                 }
