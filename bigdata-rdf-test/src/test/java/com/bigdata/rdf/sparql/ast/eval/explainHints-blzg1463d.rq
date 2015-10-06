@@ -1,0 +1,8 @@
+SELECT ?s ?type WHERE {
+  BIND("http://example.com/Person" AS ?typeBase)
+  {
+    BIND(?typeBase AS ?type)
+     ?s a ?o
+     FILTER(?o=?type)
+   }
+ }
