@@ -117,7 +117,7 @@ public class TestExplainHints extends AbstractDataDrivenSPARQLTestCase {
      * SELECT ?s ?type WHERE {
      *   BIND("http://example.com/" AS ?typeBase)
      *   {
-     *     BIND(URI(CONCAT(?typeBase,"Person")) AS ?type)
+     *     BIND(?typeBase AS ?type)
      *     ?s a ?o
      *     FILTER(?o=?type)
      *    }
@@ -326,6 +326,89 @@ public class TestExplainHints extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
+     * Explain hint rendering & bottom up rewriting broken for subqueries,
+     * see https://jira.blazegraph.com/browse/BLZG-1463.
+     * 
+     * @throws Exception
+     */
+    public void testTicketBlzg463a() throws Exception {
+       
+       final ASTContainer container = new TestHelper(
+             "explainHints-blzg1463a",// name
+             "explainHints-blzg1463a.rq",// query URL
+             "empty.trig",// data URL
+             "explainHints-blzg1463a.srx"// results URL
+          ).runTest();
+
+          final Iterator<BOp> explainHintAnnotatedBOps = 
+             ExplainHints.explainHintAnnotatedBOpIterator(container.getOptimizedAST());
+          assertTrue(explainHintAnnotatedBOps.hasNext());
+    }
+    
+    /**
+     * Explain hint rendering & bottom up rewriting broken for subqueries,
+     * see https://jira.blazegraph.com/browse/BLZG-1463.
+     * 
+     * @throws Exception
+     */
+    public void testTicketBlzg463b() throws Exception {
+       
+       final ASTContainer container = new TestHelper(
+             "explainHints-blzg1463b",// name
+             "explainHints-blzg1463b.rq",// query URL
+             "empty.trig",// data URL
+             "explainHints-blzg1463b.srx"// results URL
+          ).runTest();
+
+          final Iterator<BOp> explainHintAnnotatedBOps = 
+             ExplainHints.explainHintAnnotatedBOpIterator(container.getOptimizedAST());
+          assertTrue(explainHintAnnotatedBOps.hasNext());
+    }
+    
+    /**
+     * Explain hint rendering & bottom up rewriting broken for subqueries,
+     * see https://jira.blazegraph.com/browse/BLZG-1463.
+     * 
+     * @throws Exception
+     */
+    public void testTicketBlzg463c() throws Exception {
+       
+       final ASTContainer container = new TestHelper(
+             "explainHints-blzg1463c",// name
+             "explainHints-blzg1463c.rq",// query URL
+             "empty.trig",// data URL
+             "explainHints-blzg1463c.srx"// results URL
+          ).runTest();
+
+          final Iterator<BOp> explainHintAnnotatedBOps = 
+             ExplainHints.explainHintAnnotatedBOpIterator(container.getOptimizedAST());
+          assertFalse(explainHintAnnotatedBOps.hasNext());
+    }
+    
+    /**
+     * Variant of testBottomUpSemanticsExplainHint06, motivated by the fix
+     * made in https://jira.blazegraph.com/browse/BLZG-1463: the idea is to
+     * test a non-complex BIND expression (not containing CONCAT etc.) and
+     * whether this is reported correctly.
+     * 
+     * @throws Exception
+     */
+    public void testTicketBlzg463d() throws Exception {
+       
+       final ASTContainer container = new TestHelper(
+             "explainHints-blzg1463d",// name
+             "explainHints-blzg1463d.rq",// query URL
+             "explainHints.trig",// data URL
+             "explainHints-blzg1463d.srx"// results URL
+          ).runTest();
+
+          final Iterator<BOp> explainHintAnnotatedBOps = 
+             ExplainHints.explainHintAnnotatedBOpIterator(container.getOptimizedAST());
+          assertTrue(explainHintAnnotatedBOps.hasNext());
+    }
+
+    
+    /**
      * Asserts that the given {@link QueryRoot} carries exactly one explain
      * hint of the specified type.
      * 
@@ -351,4 +434,5 @@ public class TestExplainHints extends AbstractDataDrivenSPARQLTestCase {
     	    	assertFalse(explainHintAnnotatedBOps.hasNext());
     	    			 
     }
+
 }
