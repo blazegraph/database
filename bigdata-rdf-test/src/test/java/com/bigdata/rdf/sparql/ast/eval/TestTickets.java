@@ -1282,5 +1282,60 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         ).runTest();       
      }
 
+    /**
+     * Query having *no* bottom-up issues.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463a() throws Exception {
+       new TestHelper(
+             "ticket_bg1463a",// testURI,
+             "ticket_bg1463a.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463a.srx"// resultFileURL
+          ).runTest();
+    }
+    
+    /**
+     * Query having bottom-up issues.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463b() throws Exception {
+       new TestHelper(
+             "ticket_bg1463b",// testURI,
+             "ticket_bg1463b.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463b.srx"// resultFileURL
+          ).runTest();       
+    }
+    
+    /**
+     * Same as 1463a, just nested into subquery.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463c() throws Exception {
+       new TestHelper(
+             "ticket_bg1463c",// testURI,
+             "ticket_bg1463c.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463c.srx"// resultFileURL
+          ).runTest();   
+    }
+
+    /**
+     * Same as 1463b, just nested into subquery.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463d() throws Exception {
+       new TestHelper(
+             "ticket_bg1463d",// testURI,
+             "ticket_bg1463d.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463d.srx"// resultFileURL
+          ).runTest();   
+    }
 
 }
