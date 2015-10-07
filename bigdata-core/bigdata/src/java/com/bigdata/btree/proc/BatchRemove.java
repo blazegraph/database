@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
@@ -107,7 +108,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
         
         private final int w;
         
-        private ReturnWhatEnum(int w) {
+        private ReturnWhatEnum(final int w) {
             this.w = w;
         }
 
@@ -134,7 +135,6 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
      * Factory for {@link BatchRemove} procedures.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class BatchRemoveConstructor extends
             AbstractKeyArrayIndexProcedureConstructor<BatchRemove> {
@@ -144,7 +144,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
          * the index by the operation.
          */
         public static final BatchRemoveConstructor RETURN_OLD_VALUES = new BatchRemoveConstructor(
-                false, ReturnWhatEnum.OldValues);
+				false/* assertFound */, ReturnWhatEnum.OldValues);
 
         /**
          * Singleton does NOT request the return of the values that were removed
@@ -152,7 +152,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
          * is return (the mutationCount).
          */
         public static final BatchRemoveConstructor RETURN_MUTATION_COUNT = new BatchRemoveConstructor(
-                false, ReturnWhatEnum.MutationCount);
+				false/* assertFound */, ReturnWhatEnum.MutationCount);
 
         /**
          * Singleton requests the return of a {@link ResultBitBuffer} providing
@@ -161,15 +161,15 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
          * in a non-deleted state).
          */
         public static final BatchRemoveConstructor RETURN_BIT_MASK = new BatchRemoveConstructor(
-                false, ReturnWhatEnum.BitMask);
+				false/* assertFound */, ReturnWhatEnum.BitMask);
 
         /**
          * Singleton does NOT request the return of the values that were removed
          * from the index by the operation but asserts that each key was in fact
          * present in the index.
          */
-        public static final BatchRemoveConstructor ASSERT_FOUND_RETURN_NO_VALUES = new BatchRemoveConstructor(
-                true, ReturnWhatEnum.BitMask);
+		public static final BatchRemoveConstructor ASSERT_FOUND_RETURN_NO_VALUES = new BatchRemoveConstructor(
+				true/* assertFound */, ReturnWhatEnum.BitMask);
 
         private final boolean assertFound;
         private final ReturnWhatEnum returnWhat;
@@ -194,11 +194,11 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
         }
 
         @Override
-        public BatchRemove newInstance(IRabaCoder keySer, IRabaCoder valSer,
-                int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
+        public BatchRemove newInstance(final IRabaCoder keySer, final IRabaCoder valSer,
+                final int fromIndex, final int toIndex, final byte[][] keys, final byte[][] vals) {
 
-            if (vals != null)
-                throw new IllegalArgumentException("vals should be null");
+			if (vals != null)
+				throw new IllegalArgumentException(Errors.ERR_VALS_NOT_NULL);
 
             return new BatchRemove(keySer, valSer, fromIndex, toIndex, keys,
                     assertFound, returnWhat);
@@ -228,9 +228,9 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
      * 
      * @see BatchRemoveConstructor
      */
-    protected BatchRemove(IRabaCoder keySer, IRabaCoder valSer,
-            int fromIndex, int toIndex, byte[][] keys, boolean assertFound,
-            ReturnWhatEnum returnWhat) {
+    protected BatchRemove(final IRabaCoder keySer, final IRabaCoder valSer,
+            final int fromIndex, final int toIndex, final byte[][] keys, final boolean assertFound,
+            final ReturnWhatEnum returnWhat) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, null/* vals */);
 
@@ -255,10 +255,8 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
      *             given key was not found in the index.
      */
     @Override
-    public Object apply(final IIndex ndx) {
+    public Object applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
-        final IRaba keys = getKeys();
-        
         final int n = keys.size();
 
         final boolean returnOldValues = getReturnOldValues();
@@ -331,6 +329,34 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implemen
         }
         
     }
+
+    /**
+	 * Returns an appropriate aggregator depending on {@link #returnWhat}.
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
+	protected IResultHandler<Object,Object> newAggregator() {
+
+        switch (returnWhat) {
+        
+        case MutationCount:
+            
+			return (IResultHandler) new LongAggregator();
+
+        case OldValues:
+        
+    		return (IResultHandler) new ResultBufferHandler(getKeys().size(), getValuesCoder());
+    		
+        case BitMask:
+            
+			return (IResultHandler) new ResultBitBufferHandler(getKeys().size());
+        
+        default:
+            throw new AssertionError();
+        
+        }
+
+	}
 
     @Override
     protected void readMetadata(final ObjectInput in) throws IOException,

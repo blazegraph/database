@@ -1364,8 +1364,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
     
     @Override
-    final public Object submit(final byte[] key,
-            final ISimpleIndexProcedure proc) {
+	final public <T> T submit(final byte[] key, final ISimpleIndexProcedure<T> proc) {
 
         return proc.apply(this);
 
@@ -1437,7 +1436,6 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * associated with each of the source indices.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected class FusedBloomFilter implements IBloomFilter {
 

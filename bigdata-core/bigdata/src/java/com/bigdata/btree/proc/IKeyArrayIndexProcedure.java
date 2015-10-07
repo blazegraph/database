@@ -42,50 +42,19 @@ import com.bigdata.service.ndx.ClientIndexView;
  */
 public interface IKeyArrayIndexProcedure<T> extends IIndexProcedure<T> {
 
-//    /**
-//     * The #of keys/tuples
-//     * 
-//     * @deprecated by {@link #getKeys()}
-//     */
-//    public int getKeyCount();
-//    
-//    /**
-//     * Return the key at the given index.
-//     * 
-//     * @param i
-//     *            The index (origin zero).
-//     * 
-//     * @return The key at that index.
-//     * 
-//     * @deprecated by {@link #getKeys()}
-//     */
-//    public byte[] getKey(int i);
-//    
-//    /**
-//     * Return the value at the given index.
-//     * 
-//     * @param i
-//     *            The index (origin zero).
-//     * 
-//     * @return The value at that index.
-//     * 
-//     * @deprecated by {@link #getValues()}
-//     */
-//    public byte[] getValue(int i);
-
     /**
      * The keys.
      * 
      * @return The keys and never <code>null</code>.
      */
-    public IRaba getKeys();
+	public IRaba getKeys();
 
-    /**
-     * The values.
-     * 
-     * @return The values -or- <code>null</code> if no values were associated
-     *         with the {@link IIndexProcedure}.
-     */
-    public IRaba getValues();
+	/**
+	 * The values.
+	 * 
+	 * @return The values -or- <code>null</code> if no values were associated
+	 *         with the {@link IIndexProcedure}.
+	 */
+	public IRaba getValues();
 
 }

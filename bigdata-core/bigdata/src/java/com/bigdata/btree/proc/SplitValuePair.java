@@ -21,29 +21,46 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Feb 12, 2007
- */
+package com.bigdata.btree.proc;
 
-package com.bigdata.btree;
+import java.util.Comparator;
+
+import com.bigdata.service.Split;
 
 /**
- * Error messages for the B+Tree package.
+ * A key/value pair where the key is a Split.
  * 
- * @todo add error codes; localize.
+ * @param <K>
+ * @param <V>
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author bryan
  */
-public class Errors {
+public class SplitValuePair<K extends Split,V> {
 
-    public static final transient String ERR_FROM_INDEX = "fromIndex is invalid";
+	final public K key;
+	final public V val;
 
-    public static final transient String ERR_TO_INDEX = "toIndex is invalid";
+	public SplitValuePair(final K key, final V val) {
+		this.key = key;
+		this.val = val;
+	}
 
-    public static final transient String ERR_KEYS_NULL = "keys is null";
+	/**
+	 * Sorts {@link SplitValuePair}s.
+	 * 
+	 * @author bryan
+	 */
+	public static class PairComparator<K extends Split, V> implements Comparator<SplitValuePair<K, V>> {
 
-    public static final transient String ERR_VALS_NULL = "values is null";
+		@Override
+		public int compare(final SplitValuePair<K, V> o1, final SplitValuePair<K, V> o2) {
+			if (o1.key.fromIndex < o2.key.fromIndex)
+				return -1;
+			if (o1.key.fromIndex > o2.key.fromIndex)
+				return 1;
+			return 0;
+		}
 
-    public static final transient String ERR_VALS_NOT_NULL = "values must be null";
+	}
 
 }

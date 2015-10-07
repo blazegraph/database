@@ -12,7 +12,6 @@ import com.bigdata.service.IDataService;
  * range partitions and mapped against each relevant index partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public abstract class AbstractKeyArrayIndexProcedureConstructor<T extends IKeyArrayIndexProcedure> {
 

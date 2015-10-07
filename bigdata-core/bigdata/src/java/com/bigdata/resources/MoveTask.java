@@ -861,15 +861,16 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     private static class IsIndexRegistered_UsingWriteService implements
-            IIndexProcedure {
+            IIndexProcedure<IndexMetadata> {
         
         /**
          * 
          */
         private static final long serialVersionUID = -6492979226768348981L;
 
-        public IndexMetadata apply(IIndex ndx) {
-            
+        @Override
+        public IndexMetadata apply(final IIndex ndx) {
+
             return ndx.getIndexMetadata();
             
         }

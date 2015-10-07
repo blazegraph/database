@@ -64,7 +64,7 @@ public class SubRangeRaba implements IRaba {
 	 * @throws IllegalArgumentException
 	 *             if the fromIndex is GTE to toIndex.
 	 */
-	protected SubRangeRaba(final IRaba delegate, final int fromIndex, final int toIndex) {
+	public SubRangeRaba(final IRaba delegate, final int fromIndex, final int toIndex) {
 
 		if (delegate == null)
 			throw new IllegalArgumentException();
@@ -254,4 +254,12 @@ public class SubRangeRaba implements IRaba {
 //		return search;
 //	}
 
+	@Override
+	public String toString() {
+
+		return getClass().getName() + "{fromIndex=" + fromIndex + ",toIndex=" + toIndex + ",size=" + size + ",delegate="
+				+ delegate + "}";
+		
+	}
+	
 }

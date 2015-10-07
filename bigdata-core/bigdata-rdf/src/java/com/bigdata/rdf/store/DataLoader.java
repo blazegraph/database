@@ -546,9 +546,12 @@ public class DataLoader {
 
 		/**
 		 * When greater than ZERO (0), significant information may be reported
-		 * at each commit point. At ONE (1) it provides information at each
-		 * commit. At TWO (2), it provides that information each time it logs
-		 * the status of the ongoing load.
+		 * at each commit point. At ONE (1) it enables a trace of the parser
+		 * performance (statements loaded, statements per second, etc). At TWO
+		 * (2) it provides detailed information about the performance counters
+		 * at each commit. At THREE (3) it provides additional information about
+		 * the assertion buffers each time it reports on the incremental parser
+		 * performance.
 		 */
 		String VERBOSE = DataLoader.class.getName() + ".verbose";
 
@@ -940,7 +943,7 @@ public class DataLoader {
 			if (log.isInfoEnabled())
 				log.info("commit: latency=" + totals.commitTime + "ms");
 
-			if (verbose > 0)
+			if (verbose > 1)
 				logCounters(database);
 
 		}
@@ -1473,21 +1476,28 @@ public class DataLoader {
         // Note: allocates a new buffer iff the [buffer] is null.
         getAssertionBuffer();
         
-		if (!buffer.isEmpty()) {
-            
-            /*
-             * Note: this is just paranoia. If the buffer is not empty when we
-             * are starting to process a new document then either the buffer was
-             * not properly cleared in the error handling for a previous source
-             * or the DataLoader instance is being used by concurrent threads.
-             */
-            
-            buffer.reset();
-            
-        }
+        /*
+		 * Nope! We do not call reset() here. The buffer is non-empty when
+		 * flush:=false.
+		 * 
+		 * @see BLZG-1562 (DataLoader.Options.FLUSH does not defer flush of
+		 * StatementBuffer)
+		 */
+//		if (!buffer.isEmpty()) {
+//            
+//            /*
+//             * Note: this is just paranoia. If the buffer is not empty when we
+//             * are starting to process a new document then either the buffer was
+//             * not properly cleared in the error handling for a previous source
+//             * or the DataLoader instance is being used by concurrent threads.
+//             */
+//            
+//            buffer.reset();
+//            
+//        }
         
-        // Setup the loader.
-        final PresortRioLoader loader = new PresortRioLoader ( buffer ) ;
+		// Setup the loader. Flush buffer at end of source iff flush:=true.
+        final PresortRioLoader loader = new PresortRioLoader ( buffer, flush ) ;
 
         // @todo review: disable auto-flush - caller will handle flush of the buffer.
 //        loader.setFlush(false);
@@ -1516,7 +1526,7 @@ public class DataLoader {
 						System.out.println(msg);
 				}
 
-				if (verbose > 1) {
+				if (verbose > 2) {
 					// Show more details, especially about the assertion buffers.
 					final StatementBuffer<?> tmp = buffer;
 					if (tmp != null) {
@@ -1611,7 +1621,7 @@ public class DataLoader {
                 if (log.isInfoEnabled())
                     log.info("commit: latency=" + stats.commitTime + "ms");
 
-				if (verbose > 0)
+				if (verbose > 1)
 					logCounters(database);
     			
             }
@@ -1700,12 +1710,17 @@ public class DataLoader {
 		{
 			final StatementBuffer<?> tmp = buffer;
 			if (tmp != null) {
-				counters.makePath("assertionBuffer").attach(getAssertionBuffer().getCounters());
+				counters.makePath("assertionBuffer").attach(buffer.getCounters());
 			}
 		}
 
 		System.out.println(counters.toString());
 
+		/*
+		 * This provides total page bytes written per index and average page
+		 * size by index. Use DumpJournal for detailed histogram of index page
+		 * size distribution.
+		 */
 		System.out
 				.println(((AbstractLocalTripleStore) database)
 						.getLocalBTreeBytesWritten(new StringBuilder())
@@ -2103,7 +2118,7 @@ public class DataLoader {
 
             totals.commit(); // Note: durable queues pattern.
 			
-			if (verbose > 0)
+			if (verbose > 1)
 				dataLoader.logCounters(dataLoader.database);
 
 			/*
