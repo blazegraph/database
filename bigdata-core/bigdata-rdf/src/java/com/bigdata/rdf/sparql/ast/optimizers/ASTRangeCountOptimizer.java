@@ -240,7 +240,7 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
      *            The externally given bindings (optional).
      */
     @SuppressWarnings("rawtypes")
-    private final IV getIV(final TermNode term,
+    static protected IV getIV(final TermNode term,
             final IBindingSet exogenousBindings) {
 
         if (term != null && term.isVariable() && exogenousBindings != null) {
