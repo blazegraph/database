@@ -650,7 +650,10 @@ public class SD {
         }
 
         if (tripleStore.getLexiconRelation().isSubjectCentricTextIndex()) {
-
+			/*
+			 * @deprecated Feature was never completed due to scalability
+			 * issues. See BZLG-1548, BLZG-563.  Code should be removed.
+			 */
             g.add(aService, SD.feature, TextIndexSubjectCentric);
 
         }

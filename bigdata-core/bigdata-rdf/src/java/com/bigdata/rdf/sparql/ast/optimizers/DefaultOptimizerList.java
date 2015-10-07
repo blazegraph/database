@@ -486,7 +486,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Add range counts to all statement patterns.
          */
-        add(new ASTRangeCountOptimizer());
+        addRangeCountOptimizer();
         
         /**
          * Attach cardinality to join groups and unions.  Not fully implemented
@@ -705,6 +705,36 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Identify and assign the join variables to sub-groups.
          */
         add(new ASTSubGroupJoinVarOptimizer());
+    }
+
+    /**
+     * Tries to add the GPU-based {@link ASTRangeCountOptimizer}. If adding
+     * this optimizer fails, this method adds {@link ASTRangeCountOptimizer}.
+     */
+    protected void addRangeCountOptimizer() {
+
+       final IASTOptimizer o = initGPURangeCountOptimizer();
+       if ( o != null ) {
+          add(o);
+       } else {
+          add(new ASTRangeCountOptimizer());
+       }
+
+    }
+
+    /**
+     * Tries to create the GPU-based {@link ASTRangeCountOptimizer}; returns
+     * <code>null</code> if the attempt fails.
+     */
+    protected IASTOptimizer initGPURangeCountOptimizer() {
+
+       return ClassPathUtil.classForName(//
+             "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPURangeCountOptimizer", // preferredClassName,
+             null, // defaultClass,
+             IASTOptimizer.class, // sharedInterface,
+             getClass().getClassLoader() // classLoader
+       );
+
     }
 
     /**
