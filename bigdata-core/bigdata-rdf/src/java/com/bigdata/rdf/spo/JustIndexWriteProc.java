@@ -32,6 +32,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.inf.Justification;
@@ -112,11 +114,9 @@ public class JustIndexWriteProc
      *         {@link Long}.
      */
     @Override
-    public Long apply(final IIndex ndx) {
+    public Long applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
         long nwritten = 0;
-        
-        final IRaba keys = getKeys();
         
         final int n = keys.size();
         
@@ -143,5 +143,15 @@ public class JustIndexWriteProc
         return Long.valueOf(nwritten);
         
     }
+
+    /**
+     * Uses {@link LongAggregator} to combine the mutation counts.
+     */
+	@Override
+	protected IResultHandler<Long, Long> newAggregator() {
+
+		return new LongAggregator();
+
+	}
     
 }

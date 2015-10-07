@@ -109,9 +109,9 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         }
 
         @Override
-        public BatchInsert newInstance(IRabaCoder keysCoder,
-                IRabaCoder valsCoder, int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public BatchInsert newInstance(final IRabaCoder keysCoder,
+            	final IRabaCoder valsCoder, final int fromIndex, final int toIndex,
+                final byte[][] keys, final byte[][] vals) {
 
             return new BatchInsert(keysCoder, valsCoder, fromIndex, toIndex,
                     keys, vals, returnOldValues);
@@ -148,9 +148,9 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
      * 
      * @see BatchInsertConstructor
      */
-    protected BatchInsert(IRabaCoder keysCoder, IRabaCoder valsCoder,
-            int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            boolean returnOldValues) {
+    protected BatchInsert(final IRabaCoder keysCoder, final IRabaCoder valsCoder,
+            final int fromIndex, final int toIndex, final byte[][] keys, final byte[][] vals,
+            final boolean returnOldValues) {
 
         super(keysCoder, valsCoder, fromIndex, toIndex, keys, vals);
 
@@ -170,14 +170,10 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
      *         or a {@link ResultBuffer} containing the old values.
      */
     @Override
-    public ResultBuffer apply(final IIndex ndx) {
+    public ResultBuffer applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
         int i = 0;
         
-		final IRaba keys = getKeys();
-
-		final IRaba vals = getValues();
-
         final int n = keys.size();
 
         final byte[][] ret = (returnOldValues ? new byte[n][] : null);
@@ -245,5 +241,19 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         out.writeBoolean(returnOldValues);
 
     }
+
+	@Override
+	protected IResultHandler<ResultBuffer, ResultBuffer> newAggregator() {
+
+		if (!getReturnOldValues()) {
+
+			// No result returned, no aggregation handler.
+			return null;
+
+		}
+		
+		return new ResultBufferHandler(getKeys().size(), getValuesCoder());
+
+	}
 
 }

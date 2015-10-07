@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.proc;
 
+import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
@@ -53,7 +54,6 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure<ResultBitBuffe
      * Factory for {@link BatchContains} procedures.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class BatchContainsConstructor extends AbstractKeyArrayIndexProcedureConstructor<BatchContains> {
 
@@ -71,11 +71,12 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure<ResultBitBuffe
         }
  
         @Override
-        public BatchContains newInstance(IRabaCoder keysCoder,
-                IRabaCoder valsCoder, int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public BatchContains newInstance(final IRabaCoder keysCoder,
+                final IRabaCoder valsCoder, final int fromIndex, final int toIndex,
+                final byte[][] keys, final byte[][] vals) {
 
-            assert vals == null;
+			if (vals != null)
+				throw new IllegalArgumentException(Errors.ERR_VALS_NOT_NULL);
             
             return new BatchContains(keysCoder, fromIndex, toIndex, keys);
             
@@ -122,10 +123,8 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure<ResultBitBuffe
      * @return A {@link ResultBitBuffer}.
      */
     @Override
-    public ResultBitBuffer apply(final IIndex ndx) {
+    public ResultBitBuffer applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
-		final IRaba keys = getKeys();
-		
         final int n = keys.size();
 
         final boolean[] ret = new boolean[n];
@@ -147,5 +146,15 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure<ResultBitBuffe
         return new ResultBitBuffer(n, ret, onCount);
 
     }
-    
+
+	@Override
+	protected IResultHandler<ResultBitBuffer, ResultBitBuffer> newAggregator() {
+
+		// knows how to aggregate ResultBitBuffers.
+		final ResultBitBufferHandler resultHandler = new ResultBitBufferHandler(getKeys().size());
+
+		return resultHandler;
+		
+	}
+
 }

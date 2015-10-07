@@ -35,6 +35,7 @@ import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
@@ -172,13 +173,9 @@ public class BatchPutIfAbsent extends AbstractKeyArrayIndexProcedure<ResultBuffe
      *         or a {@link ResultBuffer} containing the old values.
      */
     @Override
-    public ResultBuffer apply(final IIndex ndx) {
+    public ResultBuffer applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
         int i = 0;
-        
-		final IRaba keys = getKeys();
-
-		final IRaba vals = getValues();
         
         final int n = keys.size();
 
@@ -247,5 +244,19 @@ public class BatchPutIfAbsent extends AbstractKeyArrayIndexProcedure<ResultBuffe
         out.writeBoolean(returnOldValues);
 
     }
+
+	@Override
+	protected IResultHandler<ResultBuffer, ResultBuffer> newAggregator() {
+
+		if (!getReturnOldValues()) {
+
+			// No result returned, no aggregation handler.
+			return null;
+
+		}
+		
+		return new ResultBufferHandler(getKeys().size(), getValuesCoder());
+
+	}
 
 }

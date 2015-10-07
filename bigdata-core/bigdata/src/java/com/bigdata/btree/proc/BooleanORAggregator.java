@@ -36,7 +36,6 @@ import com.bigdata.service.Split;
  * component results was <code>true</code>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BooleanORAggregator implements IResultHandler<Boolean, Boolean> {
 
@@ -52,15 +51,14 @@ public class BooleanORAggregator implements IResultHandler<Boolean, Boolean> {
         
     }
     
-    /**
-     * 
-     */
-    synchronized public void aggregate(final Boolean result, final Split split) {
+	@Override
+	synchronized public void aggregate(final Boolean result, final Split split) {
 
         flag |= result.booleanValue();
 
     }
 
+	@Override
     synchronized public Boolean getResult() {
 
         return flag;

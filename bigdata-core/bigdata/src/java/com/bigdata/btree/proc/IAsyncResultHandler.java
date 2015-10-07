@@ -31,7 +31,6 @@ package com.bigdata.btree.proc;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
-import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.IndexPartitionWriteTask;
 
 /**
@@ -45,7 +44,6 @@ import com.bigdata.service.ndx.pipeline.IndexPartitionWriteTask;
  * a NOP.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo This interface was hacked in after the fact to support asynchronous
  *       writes.

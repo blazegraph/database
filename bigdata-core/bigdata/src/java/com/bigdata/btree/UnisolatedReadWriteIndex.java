@@ -44,6 +44,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.Split;
 
 import cutthecrap.utils.striterators.IFilter;
@@ -112,7 +113,9 @@ import cutthecrap.utils.striterators.IFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class UnisolatedReadWriteIndex implements IIndex, ILinearList,
-        IReadWriteLockManager {
+        IReadWriteLockManager
+        // NOT ILocalBTreeView 
+        {
 
     /**
      * The object that manages the locks for the associated index.
@@ -651,7 +654,7 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList,
     } // ChunkedIterator
     
     @Override
-    public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
+    public <T> T submit(final byte[] key, final ISimpleIndexProcedure<T> proc) {
 
         final Lock lock = lock(proc);
         lock.lock();
@@ -713,9 +716,9 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList,
         try {
             
             /*
-             * Apply the procedure to the underlying index now that we are
-             * holding the appropriate lock.
-             */
+			 * Apply the procedure to the underlying index now that we are
+			 * holding the appropriate lock.
+			 */
             
             final Object result = proc.apply(ndx);
 
@@ -791,4 +794,68 @@ public class UnisolatedReadWriteIndex implements IIndex, ILinearList,
         }
     }
 
+//    /*
+//	 * ILocalBTreeView
+//	 * 
+//	 * FIXME Perhaps it is NOT a good idea to implement this the ILocalBTreeView
+//	 * interface since we can not safely expose the backing AbstractBTree
+//	 * objects (especially the mutable BTree) without breaking the thread-safety
+//	 * contract offered by the UnisolatedReadWriteIndex.
+//	 */
+//    
+//	@Override
+//	public int getSourceCount() {
+//		return ndx.getSourceCount();
+//	}
+//
+//	/**
+//	 * @throws UnsupportedOperationException
+//	 *             It is not possible to return the backing indices without
+//	 *             breaking the thread-safety pattern imposed by the
+//	 *             {@link UnisolatedReadWriteIndex}.
+//	 */
+//	@Override
+//	public AbstractBTree[] getSources() {
+////		return new AbstractBTree[] { ndx };
+//		throw new UnsupportedOperationException();
+//	}
+//
+//	/**
+//	 * @throws UnsupportedOperationException
+//	 *             It is not possible to return the backing index without
+//	 *             breaking the thread-safety pattern imposed by the
+//	 *             {@link UnisolatedReadWriteIndex}.
+//	 * 
+//	 *             TODO It might be possible to change the return type for this
+//	 *             method to something that was a greatest common set of shared
+//	 *             interfaces for a {@link BTree} a
+//	 *             {@link UnisolatedReadWriteIndex} where the backing index is a
+//	 *             simple {@link BTree} rather than a {@link FusedView}.
+//	 */
+//	@Override
+//	public BTree getMutableBTree() {
+////		return ndx;
+//		throw new UnsupportedOperationException();
+//	}
+//
+//	@Override
+//	public IBloomFilter getBloomFilter() {
+//		return ndx.getBloomFilter();
+//	}
+
+    /**
+     * Return the backing store for the index.
+     */
+    public IRawStore getStore() {
+    	
+        final Lock lock = readLock();
+        lock.lock();
+        try {
+        	return ndx.getStore();
+        } finally {
+            lock.unlock();
+        }
+    	
+    }
+    
 }

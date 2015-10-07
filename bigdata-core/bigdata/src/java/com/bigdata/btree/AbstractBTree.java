@@ -3205,7 +3205,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     @Override
-    public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
+    public <T> T submit(final byte[] key, final ISimpleIndexProcedure<T> proc) {
 
         // conditional range check on the key.
         if (key != null)

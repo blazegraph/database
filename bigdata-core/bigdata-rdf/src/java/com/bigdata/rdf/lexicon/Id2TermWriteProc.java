@@ -30,6 +30,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -153,13 +154,9 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
      * @return <code>null</code>.
      */
     @Override
-    public Void apply(final IIndex ndx) {
+    public Void applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
         
-    	final IRaba keys = getKeys();
-
-    	final IRaba vals = getValues();
-
-        final int n = keys.size();
+    	final int n = keys.size();
         
         for (int i = 0; i < n; i++) {
 
@@ -167,9 +164,9 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
             // @todo copy key/val into reused buffers to reduce allocation.
             final byte[] key = keys.get(i);
             
-            // Note: the value is the serialized term (and never a BNode).
-            final byte[] val;
-
+//            // Note: the value is the serialized term (and never a BNode).
+//            final byte[] val;
+//
 //            if (validate) {
 //
 //                // The term identifier.
@@ -297,5 +294,17 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
         return null;
         
     }
+
+    /**
+	 * Nothing is returned, so nothing to aggregate.
+	 * 
+	 * @return <code>null</code>
+	 */
+	@Override
+	protected IResultHandler<Void, Void> newAggregator() {
+
+		return null;
+
+	}
 
 }

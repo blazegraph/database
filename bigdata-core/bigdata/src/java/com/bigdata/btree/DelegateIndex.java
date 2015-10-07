@@ -160,7 +160,7 @@ public class DelegateIndex implements IIndex {
     }
 
     @Override
-    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
+    public <T> T submit(final byte[] key, final ISimpleIndexProcedure<T> proc) {
         return delegate.submit(key, proc);
     }
 
