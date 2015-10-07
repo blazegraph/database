@@ -88,7 +88,7 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
      * already attached to the node. This makes it possible to write unit tests
      * without real data.
      */
-    private final void attachRangeCounts(final AST2BOpContext ctx,
+    protected void attachRangeCounts(final AST2BOpContext ctx,
             final List<StatementPatternNode> spNodes,
             final IBindingSet exogenousBindings) {
 
