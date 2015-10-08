@@ -2014,6 +2014,8 @@ public class DataLoader {
                     // Useful Journal options.
                     Journal.Options.WRITE_CACHE_BUFFER_COUNT,
                     Journal.Options.WRITE_CACHE_MIN_CLEAN_LIST_SIZE,
+                    // HttpPlugin
+                    com.bigdata.journal.HttpPlugin.Options.HTTPD_PORT,
                     // DirectBufferPool options.
                     com.bigdata.io.DirectBufferPool.Options.BUFFER_CAPACITY,
                     // B+Tree
