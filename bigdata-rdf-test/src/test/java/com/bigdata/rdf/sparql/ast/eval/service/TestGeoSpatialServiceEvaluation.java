@@ -147,7 +147,7 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "-10000#8.8837" .
+     *     ?res geo:spatialRectangleUpperLeft "-90#8.8837" .
      *     ?res geo:spatialRectangleLowerRight "1.00#12.2344" .
      *     ?res geo:timeStart "7" .
      *     ?res geo:timeEnd "100000000000000" .
@@ -173,8 +173,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "-10000E0#.88837E1" .
-     *     ?res geo:spatialRectangleLowerRight "1.00#100000000.2344" .
+     *     ?res geo:spatialRectangleUpperLeft "-90E0#.88837E1" .
+     *     ?res geo:spatialRectangleLowerRight "1.00#179.2344" .
      *     ?res geo:timeStart "7" .
      *     ?res geo:timeEnd "1000000" .
      *   }
@@ -199,8 +199,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      * SELECT ?res WHERE {
      *   ?res geo:search "inRectangle" .
      *   ?res geo:predicate <http://p> .
-     *   ?res geo:spatialRectangleUpperLeft "-10000E0#.88837E1" .
-     *   ?res geo:spatialRectangleLowerRight "1.00#100000000.2344" .
+     *   ?res geo:spatialRectangleUpperLeft "-90E0#.88837E1" .
+     *   ?res geo:spatialRectangleLowerRight "1.00#179.2344" .
      *   ?res geo:timeStart "7" .
      *   ?res geo:timeEnd "1000000" .
      * } 
@@ -729,6 +729,208 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
           "geo-valueextr04.srx").runTest();
        
     }
+    
+    /**
+     * Verify that a circle query with illegal center point latitude
+     * value fails.
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SERVICE geo:search {
+     *   ?res geo:search "inCircle" .
+     *   ?res geo:predicate <http://p> .
+     *   ?res geo:spatialCircleCenter "-91#0.883" .
+     *   ?res geo:spatialCircleRadius "10000000" . # spans all earth
+     *   ?res geo:timeStart "0" .
+     *   ?res geo:timeEnd "0" .
+     * }
+     */
+    public void testCircleOutOfBounds01a() throws Exception {
+       
+       try {
+          new TestHelper(
+             "geo-circle-outofbounds1a",
+             "geo-circle-outofbounds1a.rq", 
+             "geo-small.nt",
+             "geo-circle-outofbounds1a.srx").runTest();
+       } catch (Exception e) {
+          
+          // error message is saying that "NortSouth" coordinates 
+          // are out of range
+          assertTrue(e.getMessage().contains("NorthSouth"));
+          
+          return; // we should follow this code path
+       }
+       
+       throw new RuntimeException("Expected to run into exception. Test case failed.");
+    }
+    
+    /**
+     * Verify that a circle query with illegal center point longitude
+     * value fails.
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SERVICE geo:search {
+     *   ?res geo:search "inCircle" .
+     *   ?res geo:predicate <http://p> .
+     *   ?res geo:spatialCircleCenter "27.9932#182" .
+     *   ?res geo:spatialCircleRadius "10000000" . # spans all earth
+     *   ?res geo:timeStart "0" .
+     *   ?res geo:timeEnd "0" .
+     * }
+     */
+    public void testCircleOutOfBounds01b() throws Exception {
+       
+       try {
+
+          new TestHelper(
+                "geo-circle-outofbounds1b",
+                "geo-circle-outofbounds1b.rq", 
+                "geo-small.nt",
+                "geo-circle-outofbounds1b.srx").runTest();
+       } catch (Exception e) {
+          
+          // error message is saying that "EastWest" coordinates 
+          // are out of range
+          assertTrue(e.getMessage().contains("EastWest"));
+          
+          return; // we should follow this code path
+
+       }
+       
+       throw new RuntimeException("Expected to run into exception. Test case failed.");
+
+    }
+
+    /**
+     * 
+     * Verify that a query that spans over the max lat + lon
+     * values does not fail, but yields all data in the database.
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SERVICE geo:search {
+     *   ?res geo:search "inCircle" .
+     *   ?res geo:predicate <http://p> .
+     *   ?res geo:spatialCircleCenter "27.9932#39.928" .
+     *   ?res geo:spatialCircleRadius "10000000" . # spans all earth
+     *   ?res geo:timeStart "0" .
+     *   ?res geo:timeEnd "0" .
+     * }
+     */
+    public void testCircleOutOfBounds02() throws Exception {
+       
+       new TestHelper(
+             "geo-circle-outofbounds2",
+             "geo-circle-outofbounds2.rq", 
+             "geo-small.nt",
+             "geo-circle-outofbounds2.srx").runTest();
+    }
+    
+    
+    /**
+     * Assert failing in case of invalid rectangle coordinates (in upper left).
+     * 
+     * @throws Exception
+     */
+    public void testRectangleOutOfBounds01a() throws Exception {
+       
+       try {
+          new TestHelper(
+             "geo-rectangle-outofbounds1a",
+             "geo-rectangle-outofbounds1a.rq", 
+             "geo-small.nt",
+             "geo-rectangle-outofbounds1a.srx").runTest();
+       } catch (Exception e) {
+          
+          // error message is saying that "NortSouth" coordinates 
+          // are out of range
+          assertTrue(e.getMessage().contains("NorthSouth"));
+          
+          return; // we should follow this code path
+       }
+       
+       throw new RuntimeException("Expected to run into exception. Test case failed.");
+    }
+    
+    /**
+     * Assert failing in case of invalid rectangle coordinates (in lower right).
+     * 
+     * @throws Exception
+     */
+    public void testRectangleOutOfBounds01b() throws Exception {
+       
+       try {
+          new TestHelper(
+             "geo-rectangle-outofbounds1b",
+             "geo-rectangle-outofbounds1b.rq", 
+             "geo-small.nt",
+             "geo-rectangle-outofbounds1b.srx").runTest();
+       } catch (Exception e) {
+          
+          // error message is saying that "EathWest" coordinates 
+          // are out of range
+          assertTrue(e.getMessage().contains("EastWest"));
+          
+          return; // we should follow this code path
+       }
+       
+       
+       throw new RuntimeException("Expected to run into exception. Test case failed.");
+    }
+    
+    /**
+     * Real world test against geo coordinates of few cities.
+     * 
+     * @throws Exception
+     */
+    public void testRealWordCircle01() throws Exception {
+       
+       new TestHelper(
+             "geo-realworld-circle01",
+             "geo-realworld-circle01.rq", 
+             "geo-realworld-cities.nt",
+             "geo-realworld-circle01.srx").runTest();
+    }
+
+    /**
+     * Real world test against geo coordinates of few cities.
+     * 
+     * @throws Exception
+     */
+    public void testRealWordCircle02() throws Exception {
+       
+       new TestHelper(
+             "geo-realworld-circle02",
+             "geo-realworld-circle02.rq", 
+             "geo-realworld-cities.nt",
+             "geo-realworld-circle02.srx").runTest();
+    }
+
+    /**
+     * Real world test against geo coordinates of few cities.
+     * 
+     * @throws Exception
+     */
+    public void testRealWordRectangle01() throws Exception {
+       
+       new TestHelper(
+             "geo-realworld-rectangle01",
+             "geo-realworld-rectangle01.rq", 
+             "geo-realworld-cities.nt",
+             "geo-realworld-rectangle01.srx").runTest();       
+    }
+
+    /**
+     * Real world test against geo coordinates of few cities.
+     * 
+     * @throws Exception
+     */
+    public void testRealWordRectangle02() throws Exception {
+       
+    }
+
     
     @Override
     public Properties getProperties() {

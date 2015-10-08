@@ -572,12 +572,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             // construct the points with time
             final PointLatLonTime upperLeftWithTime = 
-               new PointLatLonTime(
-                  PointLatLon.fromCoordinateDD(upperLeft), timeStart);
+               new PointLatLonTime(upperLeft, timeStart);
             
             final PointLatLonTime lowerRightWithTime = 
-               new PointLatLonTime(
-                  PointLatLon.fromCoordinateDD(lowerRight), timeEnd);
+               new PointLatLonTime(lowerRight, timeEnd);
 
             // convert to componet strings
             lowerBorderComponents = PointLatLonTime

@@ -149,7 +149,7 @@ public class CoordinateUtility {
        final Double deltaEastWest = (1 / (111320 * Math.cos(currentLat/360*2*Math.PI))) * distanceAsMeters;
        
        final CoordinateDD ret = new CoordinateDD(
-             start.northSouth - deltaNorthSouth, start.eastWest - deltaEastWest);
+             start.northSouth - deltaNorthSouth, start.eastWest - deltaEastWest, true);
        
        return ret;
     }
@@ -169,7 +169,7 @@ public class CoordinateUtility {
           final Double deltaEastWest = (1 / (111320 * Math.cos(currentLat/360*2*Math.PI))) * distanceAsMeters;
 
           final CoordinateDD ret = new CoordinateDD(
-                start.northSouth + deltaNorthSouth, start.eastWest + deltaEastWest);
+                start.northSouth + deltaNorthSouth, start.eastWest + deltaEastWest, true);
           
           return ret;
 
@@ -274,61 +274,34 @@ public class CoordinateUtility {
         final double degrees = _180_div_pi * radians;
         return degrees;
     }
-
-    // public static double approxMetersPerSecondOfLongitudeAtSeaLevel(double
-    // secondsNorth) {
-    //        
-    // return approxMetersPerSecondOfLongitudeAtSeaLevel(secondsNorth*3600.);
-    //        
-    // }
+    
+    
     /**
-     * On a spherical surface at sea level, one latitudinal second measures
-     * 30.82 metres and one latitudinal minute 1849 metres. Parallels are each
-     * 110.9 kilometres away. The circles of longitude, the meridians, meet at
-     * the geographical poles, with the west-east width of a second being
-     * dependent on the latitude. On a spherical surface at sea level, one
-     * longitudinal second measures 30.92 metres on the equator, 26.76 metres on
-     * the 30th parallel, 19.22 metres in Greenwich (51� 28' 38" N) and 15.42
-     * metres on the 60th parallel.
+     * Computes the distance between two coordinates.
      * 
-     * @param p1
-     *            A point on the Earth's surface in decimal degrees.
-     * @param p2
-     *            A point on the Earth's surface in decimal degrees.
-     * @param units
-     *            The units in which the distance between those points will be
-     *            reported.
-     * @return The distance between the points in the specified units.
+     * @param p1 coordinate one
+     * @param p2 coordinate two
+     * @param units desired return unit
+     * @return
      */
     public static double distance(CoordinateDD p1, CoordinateDD p2, UNITS units) {
-        /*
-         * Latitude degrees from p1 to p2.
-         */
-        final double degreesLatitude = Math.abs(p1.northSouth - p2.northSouth);
-        /*
-         * Latitude meters from p1 to p2.
-         */
-        final double metersLatitude = degreesLatitude
-                * metersPerDegreeOfLatitudeAtSeaLevel;
-        /*
-         * Longitude degrees from p1 to p2.
-         */
-        final double degreesLongitude = Math.abs(p1.eastWest - p2.eastWest);
-        /*
-         * Longitude meters from p1 to p2 (adjusted for the real width of a
-         * second of longitude at the given latitude).
-         */
-        final double metersLongitude = degreesLongitude
-                * realMetersPerDegreeOfLongitudeAtSeaLevel(degreesLatitude);
-        /*
-         * The distance in meters between the points on the surface of the Earth
-         * 
-         * d = sqrt( a^2 + b^2 )
-         */
-        final double d = Math.sqrt(metersLatitude * metersLatitude
-                + metersLongitude * metersLongitude);
-        return metersToUnits(d, units);
+       
+       final double latP1 = p1.northSouth;
+       final double latP2 = p2.northSouth;
+       final double lonP1 = p1.eastWest;
+       final double lonP2 = p2.eastWest;
+       
+       double distRad = 
+          Math.acos(
+             Math.sin(toRadians(latP1)) * Math.sin(toRadians(latP2)) + 
+             Math.cos(toRadians(latP1)) * Math.cos(toRadians(latP2)) * Math.cos(toRadians(lonP1 - lonP2)));
+
+       final double distAsDegree = toDegrees(distRad);
+
+       return metersToUnits(distAsDegree * 60 * 1.1515 * 1609.344, units);
     }
+
+
 
     /**
      * Convert meters to the desired units.
@@ -401,5 +374,5 @@ public class CoordinateUtility {
             double seconds) {
         return degrees + minutes / 60d + seconds / 3600d;
     }
-    
+   
 }
