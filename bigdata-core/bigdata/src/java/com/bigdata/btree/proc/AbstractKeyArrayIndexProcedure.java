@@ -334,11 +334,6 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
     @Override
 	final public T apply(final IIndex ndx) {
 
-		if (maxReaders == 0) {
-			// Disables parallelism entirely.
-			return applyOnce(ndx, keys, vals);
-		}
-    	
 		if (ndx instanceof IClientIndex) {
 			/*
 			 * The client index views already parallelize index operations
@@ -348,13 +343,34 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			 * IResultHandler would be null on the DS/MDS nodes in scale-out
 			 * since only the client has access to that object).
 			 * 
-			 * TODO It is safe to just uncomment the applyOnce() call rather
-			 * than throwing an exception.
+			 * TODO Note: It *is* safe to just uncomment the applyOnce() call
+			 * rather than throwing an exception.
 			 */
 			// return applyOnce(ndx, keys, vals);
 			throw new UnsupportedOperationException();
 		}
 
+		/*
+		 * Note: Do not parallelize small batches. A single thread is enough.
+		 * 
+		 * FIXME We actually we might to run parallel threads even for smaller
+		 * batches if the index is large enough since the parallelism will be
+		 * required to drive the disk read queue. Otherwise we will be facing
+		 * additive latency from sequential disk reads. This would show up in
+		 * small updates to large indices.  The point of comparison would be
+		 * that large updates to large indices were more efficient. If this is
+		 * observed, then we do want to parallelize small batches also if the
+		 * index is large.
+		 */
+		final boolean smallBatch = false;//keys.size() <= batchSize;
+
+		if (maxReaders <= 0 || smallBatch || !(this instanceof IParallelizableIndexProcedure)) {
+
+			// Disables parallelism entirely.
+			return applyOnce(ndx, keys, vals);
+			
+		}
+    	
     	/*
 		 * Obtain an aggregator that can be used to combine the results across
 		 * index local splits. This index-local aggregator was introduced to
@@ -362,42 +378,27 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		 * index view.
 		 */
     	final IResultHandler<T, T> resultHandler = newAggregator();
-    	
-		/*
-		 * Note: Do not parallelize small batches. A single thread is enough.
-		 * 
-		 * FIXME We actually do want to run parallel threads even for smaller
-		 * batches if the index is large enough since the parallelism will be
-		 * required to drive the disk read queue. Otherwise we will be facing
-		 * additive latency from sequential disk reads.
-		 */
-		final boolean smallBatch = keys.size() <= batchSize;
+
+		if (resultHandler == null) {
+
+			/*
+			 * Can't use parallelism without an aggregator.
+			 * 
+			 * FIXME Verify that we always specify an aggregator, even if it is
+			 * a NOP, since parallelism is otherwise disabled. For example,
+			 * INSERT without returning anything should still specify an
+			 * aggregator that is a NOP. Make sure that this is documented.
+			 */
+			return applyOnce(ndx, keys, vals);
+			
+    	}
 
 		// FIXME IMPLEMENT PARALLEL OPERATION FOR FusedView. 
 		final boolean isFusedView = (ndx instanceof ILocalBTreeView) && ((ILocalBTreeView) ndx).getSourceCount() > 1;
 		
-		if (!(this instanceof IParallelizableIndexProcedure) || resultHandler == null || smallBatch || isFusedView) {
+		if (isFusedView && !isReadOnly()) {
 
-    		/*
-			 * Old code path processes everything in a single thread.
-			 * 
-			 * Note: We use this if the index procedure is not parallelizable.
-			 * 
-			 * Note: We use this if there is no [resultHandler].
-			 * 
-			 * Note: For scale-out the [resultHandler] will be null on the
-			 * server. The scale-out client has an IResultHandler and uses it to
-			 * combine the result of the index procedure when applied to each.
-			 * However, that IResultHandler is NOT available on the server when
-			 * the index procedure is invoked by a remote client. This is due to
-			 * the historical design in which the client parallelized the index
-			 * procedure across the shards. The present design goes further and
-			 * also supports parallelization within a shard, but the index
-			 * procedure would need a pattern to construct the IResultHandler on
-			 * the server if we wanted to also parallelize within a shard
-			 * (similar to how we construct a filter object on the server based
-			 * on a constructor defined by the client).
-			 */
+			// Do not parallelize mutations against a fused view (not yet implemented).
 			return applyOnce(ndx, keys, vals);
 
 		}
@@ -458,8 +459,11 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			if (isReadOnly()) {
 
 				/*
-				 * It is easier to parallelize operations when we have a
-				 * read-only procedure such as BatchLookup, BatchContains, etc.
+				 * Simpler code path for parallelizing read-only operations. We
+				 * just split up the keys among N readers. All work is done by a
+				 * ReadOnlyTask for its own key-range and the results are
+				 * aggregated. No locking is required since no mutation is
+				 * involved.
 				 */
 
 				return applyMultipleReadersNoWriter(executorService, ndx, resultHandler);
@@ -494,14 +498,143 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	private T applyMultipleReadersNoWriter(final ExecutorService executorService, final IIndex ndx,
 			final IResultHandler<T, T> resultHandler) throws InterruptedException, ExecutionException {
 
-		/*
-		 * Note: This just delegates to the MROW version, but we could have a
-		 * dedicated version that was read-only if there was any advantage to
-		 * this.
-		 */
-		return applyMultipleReadersOneWriter(executorService, ndx, true/* readOnly */, resultHandler); 
-    	
+		// This is the #of keys in the keys IRaba.
+		final int keysSize = keys.size();
+
+		// Track statistics.
+		final Stats stats = new Stats();
+		
+		// Setup readers.
+		final List<Callable<Void>> readerTasks = new LinkedList<Callable<Void>>();
+		{
+			
+			/*
+			 * Determine how many tuples to assign to each reader. Round up. The
+			 * last reader will wind up a bit short if the tuples can not be
+			 * divided evenly by the #of readers.
+			 * 
+			 * Note: If there is not enough data for a single batch, then we use
+			 * only one reader.
+			 */
+			final int readerSize = Math.max(batchSize, (int) Math.ceil(keysSize / (double) maxReaders));
+			int fromIndex = 0, toIndex = -1;
+			boolean done = false;
+			while (!done) {
+				toIndex = fromIndex + readerSize;
+				if (toIndex > keysSize) {
+					/*
+					 * This will be the last reader.
+					 * 
+					 * Note: toIndex is an exclusive upper bound. Allowable
+					 * values are in 0:rangeCount-1. Setting toIndex to nstmts
+					 * (aka rangeCount) sets it to one more than the last legal
+					 * toIndex. The reader will notice that the toIndex is GTE
+					 * the rangeCount and use a [null] toKey to read until the
+					 * last tuple in the index.
+					 * 
+					 * We validate that we have read and transferred rangeCount
+					 * tuples to the mapgraph-runtime as a cross check.
+					 */
+					toIndex = keysSize;
+					done = true;
+				}
+				readerTasks.add(new ReadOnlyTask(ndx, resultHandler, stats, new Batch(fromIndex, toIndex, keys, vals)));
+				fromIndex = toIndex;
+			}
+			stats.readerBatchCount.set(readerTasks.size());
+		}
+
+		// start readers
+		final List<Future<Void>> readerFutures = executorService.invokeAll(readerTasks);
+
+		// check reader futures.
+		for (Future<Void> f : readerFutures) {
+
+			f.get();
+
+		}
+
+		// configuration parameters. followed by invocation instance data.
+		log.fatal("maxReaders=" + maxReaders //
+				+ ", skipCount=" + skipCount //
+				+ ", spannedRangeMultiplier=" + spannedRangeMultiplier //
+				+ ", batchSize=" + batchSize //
+				+ ", queueCapacity=" + queueCapacity
+				// invocation instance data.
+				+ ", nkeys=" + keysSize //
+				+ ", nreaders=" + stats.readerBatchCount //
+//				+ ", writerBatches=" + stats.writerBatchCount //
+//				+ ", keys/writeBatch=" + (keysSize / stats.writerBatchCount.get()) //
+				+ ", proc=" + getClass().getSimpleName()//
+		);
+
+		return resultHandler.getResult();
+		
     }
+
+	/**
+	 * Task for a read-only index procedure. No locking is required. Each task
+	 * just handles its sub-key-range of the original keys raba.
+	 *
+	 * @author bryan
+	 */
+	private class ReadOnlyTask implements Callable<Void> {
+
+		private final IIndex view;
+		private final Batch batch;
+		private final IResultHandler<T, T> resultHandler;
+		private final Stats stats; 
+
+		/**
+		 * 
+		 * @param view
+		 *            The index against which the procedure will be applied.
+		 * @param resultHandler
+		 *            Used to combine the intermediate results from the
+		 *            application of the index procedure to each {@link Batch}.
+		 * @param batch
+		 *            A batch of keys (and optionally values) to be processed.
+		 */
+		ReadOnlyTask(final IIndex view, final IResultHandler<T, T> resultHandler, final Stats stats,
+				final Batch batch) {
+
+			if (view == null)
+				throw new IllegalArgumentException();
+			if (batch == null)
+				throw new IllegalArgumentException();
+			if (resultHandler== null)
+				throw new IllegalArgumentException();
+			if (stats== null)
+				throw new IllegalArgumentException();
+			
+			this.view = view;
+			this.batch = batch;
+			this.resultHandler = resultHandler;
+			this.stats = stats;
+			
+		}
+
+		@Override
+		public Void call() throws Exception {
+
+			// Setup view onto the sub-key range of the keys / vals.
+			
+			final IRaba keysView = new SubRangeRaba(batch.keys, batch.fromIndex, batch.toIndex);
+
+			final IRaba valsView = batch.vals == null ? null
+					: new SubRangeRaba(batch.vals, batch.fromIndex, batch.toIndex);
+
+			// Apply procedure to sub-key range.
+			final T aResult = applyOnce(view, keysView, valsView);
+
+			// aggregate results.
+			resultHandler.aggregate(aResult, batch);
+
+			return null; 
+
+		}
+
+	}
 
 	/**
 	 * MROW version (multiple readers, one writer).
@@ -545,7 +678,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 
 		final int effectiveQueueCapacity;
 		{
-			if (queueCapacity < 0) {
+			if (queueCapacity <= 0) {
 				/*
 				 * Note: This is MAX readers, not the actual number of readers.
 				 * We need to create the queue before we create the readers.
@@ -783,7 +916,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	
 				final IRaba keysView = new SubRangeRaba(batch.keys, batch.fromIndex, batch.toIndex);
 
-				final IRaba valsView = vals == null ? null
+				final IRaba valsView = batch.vals == null ? null
 						: new SubRangeRaba(batch.vals, batch.fromIndex, batch.toIndex);
 
 				final T aResult;
