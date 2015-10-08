@@ -3372,6 +3372,180 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
+     * A sequences of DELETE/INSERT operations with different data sets and no
+     * WITH clause. Test ensures, that named graph from dataset definition
+     * of the first clause does not get leaked into the second clause dataset definition.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * DELETE { ?person foaf:givenName 'Bill' }
+     * USING NAMED <http://example/addresses>
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH ?graph {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * };
+     * INSERT { ?person foaf:givenName 'William' }
+     * USING NAMED <http://example/addresses2>
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH ?graph {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_datasets_isolation() throws MalformedQueryException,
+          TokenMgrError, ParseException {
+
+      final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+              + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+              + "USING NAMED <http://example/addresses>\n"//
+              + "WHERE {\n"//
+              + "  ?person foaf:givenName 'Bill'. \n"//
+              + "  GRAPH ?graph {\n"//
+              + "    ?person foaf:givenName 'Bill'\n"//
+              + "    }\n"//
+              + "};"//
+              + "INSERT { ?person foaf:givenName 'William' }\n"//
+              + "USING NAMED <http://example/addresses2>\n"//
+              + "WHERE {\n"//
+              + "  ?person foaf:givenName 'Bill'. \n"//
+              + "  GRAPH ?graph {\n"//
+              + "    ?person foaf:givenName 'Bill'\n"//
+              + "    }\n"//
+              + "}";
+      
+      final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+      final IV addresses2 = makeIV(valueFactory.createURI("http://example/addresses2"));
+      final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+      final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+      final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+      final UpdateRoot expected = new UpdateRoot();
+      {
+          
+            {
+
+                final DeleteInsertGraph op = new DeleteInsertGraph();
+
+                expected.addChild(op);
+
+                {
+
+                    final QuadData deleteClause = new QuadData();
+
+                    deleteClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
+
+                }
+
+                {
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    op.setWhereClause(whereClause);
+
+                    // Outside the GRAPH group.
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    // The GRAPH group.
+                    whereClause.addChild(new JoinGroupNode(
+                            new VarNode("graph"), new StatementPatternNode(
+                                    new VarNode("person"), new ConstantNode(
+                                            givenName),
+                                    new ConstantNode(label1), new VarNode(
+                                            "graph"), Scope.NAMED_CONTEXTS)));
+
+                }
+
+                final Set<IV> namedGraphs = new LinkedHashSet<IV>();
+                namedGraphs.add(addresses);
+
+                @SuppressWarnings("unchecked")
+                final DatasetNode dataset = new DatasetNode(
+                        (Set) Collections.emptySet(),// defaultGraph
+                        namedGraphs,//
+                        true // update
+                );
+
+                op.setDataset(dataset);
+            }
+
+            {
+                final DeleteInsertGraph op = new DeleteInsertGraph();
+
+                expected.addChild(op);
+
+                {
+
+                    final QuadData insertClause = new QuadData();
+
+                    insertClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label2), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
+
+                }
+
+                {
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    op.setWhereClause(whereClause);
+
+                    // Outside the GRAPH group.
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    // The GRAPH group.
+                    whereClause.addChild(new JoinGroupNode(
+                            new VarNode("graph"), new StatementPatternNode(
+                                    new VarNode("person"), new ConstantNode(
+                                            givenName),
+                                    new ConstantNode(label1), new VarNode(
+                                            "graph"), Scope.NAMED_CONTEXTS)));
+
+                }
+
+                final Set<IV> namedGraphs = new LinkedHashSet<IV>();
+                namedGraphs.add(addresses2);
+
+                @SuppressWarnings("unchecked")
+                final DatasetNode dataset = new DatasetNode(
+                        (Set) Collections.emptySet(),// defaultGraph
+                        namedGraphs,//
+                        true // update
+                );
+
+                op.setDataset(dataset);
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        // fails due to broken dataset processing in 
+        // com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution.resolveDataset()
+        // assertSameAST(sparql, expected, actual);
+
+    }
+
+   /**
      * <pre>
      * INSERT {
      * 
