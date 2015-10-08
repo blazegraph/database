@@ -104,21 +104,59 @@ public class CoordinateDD implements ICoordinate {
      * @exception IllegalArgumentException
      *                if <i>eastWest</i> is out of the range [-180:+180].
      */
-    public CoordinateDD(double northSouth, double eastWest) {
+    public CoordinateDD(double northSouth, double eastWest) { 
+       this(northSouth, eastWest, false);
+    }
+    
+    
+    /**
+     * Constructor for a coordinate using decimal degrees.
+     * 
+     * @param northSouth
+     *            Decimal degrees north (or south iff negative). The range is
+     *            [-90:+90].
+     * 
+     * @param eastWest
+     *            Decimal degrees east (or west iff negative). The range is
+     *            (-180:+180].
+     *            
+     * @param adjustToMinMax
+     *            If this parameter is set to true we may pass in values that are out of
+     *            range. Such values are adjusted to the respective MIN and MAX
+     *            values. If set to false, exceptions are thrown.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>adjustToMinMax</i> is false AND <i>northSouth</i> is out of the range [-90:+90].
+     * @exception IllegalArgumentException
+     *                if <i>adjustToMinMax</i> is false AND if <i>eastWest</i> is out of the range [-180:+180].
+     */
+    public CoordinateDD(double northSouth, double eastWest, boolean adjustToMinMax) {
+       
         if (northSouth < MIN_NORTH_SOUTH || northSouth > MAX_NORTH_SOUTH) {
-            throw new IllegalArgumentException("NorthSouth: "
-                    + FMT_DECIMAL_DEGREES.format(northSouth));
+           
+           if (adjustToMinMax) {
+            
+              northSouth = northSouth < MIN_NORTH_SOUTH ? MIN_NORTH_SOUTH : MAX_NORTH_SOUTH;
+              
+           } else {
+               throw new IllegalArgumentException("NorthSouth: "
+                       + FMT_DECIMAL_DEGREES.format(northSouth));
+           }
         }
         if (eastWest < MIN_EAST_WEST || eastWest > MAX_EAST_WEST) {
-            throw new IllegalArgumentException("EastWest: "
-                    + FMT_DECIMAL_DEGREES.format(eastWest));
+           
+           if (adjustToMinMax) {
+              
+              eastWest = eastWest < MIN_EAST_WEST ? MIN_EAST_WEST : MAX_EAST_WEST;
+              
+           } else {
+              
+               throw new IllegalArgumentException("EastWest: "
+                       + FMT_DECIMAL_DEGREES.format(eastWest));
+               
+           }
         }
-        if (eastWest == MIN_EAST_WEST) {
-            /*
-             * Normalize both 180W and 180E both to 180E.
-             */
-            eastWest = MAX_EAST_WEST;
-        }
+
         this.northSouth = northSouth;
         this.eastWest = eastWest;
     }
@@ -205,7 +243,7 @@ public class CoordinateDD implements ICoordinate {
         if (m.matches()) {
             double northSouth = Double.parseDouble(m.group(group_degreesNorth));
             double eastWest = Double.parseDouble(m.group(group_degreesEast));
-            return new CoordinateDD(northSouth, eastWest);
+            return new CoordinateDD(northSouth, eastWest, false);
         }
         throw new ParseException("Not decimal degrees: [" + text + "]", 0);
     }

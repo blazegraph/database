@@ -36,16 +36,19 @@ import com.bigdata.rdf.internal.gis.CoordinateDD;
  */
 public class GeoSpatialUtility {
 
-
    /**
-    * A two dimensional point representing latitude and longitude.
+    * A two dimensional point representing latitude and longitude. Wraps
+    * the {@link CoordinateDD} with some use case specific functionality.
     */
    public static class PointLatLon {
       
       public static final String POINT_SEPARATOR = "#";
-
-      private final Double lat;
-      private final Double lon;
+      
+      final CoordinateDD point;
+      
+      public PointLatLon(CoordinateDD point) {
+         this.point = point;
+      }
       
       /**
        * Construction from string.
@@ -60,46 +63,38 @@ public class GeoSpatialUtility {
          if (coords.length!=2) {
             throw new NumberFormatException("Point must have 2 components, but has " + coords.length);
          }
-         
-         lat = Double.valueOf(coords[0]);
-         lon = Double.valueOf(coords[1]);
+
+         this.point = new CoordinateDD(
+            Double.valueOf(coords[0]), Double.valueOf(coords[1]));
       }
 
       /**
        * Construction from data.
        */
       public PointLatLon(final Double lat, final Double lon) {
-         this.lat = lat;
-         this.lon = lon;
+         
+         this.point = new CoordinateDD(lat, lon);         
       }
       
       public Double getLat() {
-         return lat;
+         return point.northSouth;
       }
       
 
       public Double getLon() {
-         return lon;
+         return point.eastWest;
       }
       
       public CoordinateDD asCoordinateDD() {
-    	  
-    	  return new CoordinateDD(lat, lon);
-    	  
+         return point;
       }
-      
-      public static PointLatLon fromCoordinateDD(CoordinateDD dd) {
-         
-         return new PointLatLon(dd.northSouth, dd.eastWest);
-      }
-
       
       @Override
       public String toString() {
          final StringBuffer buf = new StringBuffer();
-         buf.append(lat);
+         buf.append(getLat());
          buf.append("#");
-         buf.append(lon);
+         buf.append(getLon());
          return buf.toString();
       }
       
@@ -156,6 +151,15 @@ public class GeoSpatialUtility {
        * Construction from data.
        */
       public PointLatLonTime(
+         final CoordinateDD spatialPoint, final Long timestamp) {
+         
+         this(new PointLatLon(spatialPoint), timestamp);
+      }
+      
+      /**
+       * Construction from data.
+       */
+      public PointLatLonTime(
          final PointLatLon spatialPoint, final Long timestamp) {
          
          this.spatialPoint = spatialPoint;
@@ -194,11 +198,11 @@ public class GeoSpatialUtility {
       @Override
       public String toString() {
          final StringBuffer buf = new StringBuffer();
-         buf.append(spatialPoint.lat);
+         buf.append(getLat());
          buf.append("#");
-         buf.append(spatialPoint.lon);
+         buf.append(getLon());
          buf.append("#");
-         buf.append(timestamp);
+         buf.append(getTimestamp());
          return buf.toString();
       }
       
