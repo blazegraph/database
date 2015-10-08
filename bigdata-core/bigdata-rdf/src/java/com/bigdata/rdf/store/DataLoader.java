@@ -2013,10 +2013,19 @@ public class DataLoader {
                     DataLoader.Options.VERBOSE,
                     // Useful Journal options.
                     Journal.Options.WRITE_CACHE_BUFFER_COUNT,
+                    Journal.Options.WRITE_CACHE_MIN_CLEAN_LIST_SIZE,
                     // DirectBufferPool options.
                     com.bigdata.io.DirectBufferPool.Options.BUFFER_CAPACITY,
                     // B+Tree
                     com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
+                    // Index procedure // FIXME Remove or replace with symbolic Options.
+                    // @see BLZG-1537 (Schedule more IOs when loading data)
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.maxReaders",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.skipCount",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.spannedRangeMultiplier",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.batchSize",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.queueCapacity",
+
             };
             for (String s : overrides) {
                 if (System.getProperty(s) != null) {

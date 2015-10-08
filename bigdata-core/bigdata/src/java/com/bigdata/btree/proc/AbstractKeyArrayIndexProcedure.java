@@ -82,6 +82,8 @@ import it.unimi.dsi.io.OutputBitStream;
  * index).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * @see BLZG-1537 (Schedule more IOs when loading data)
  */
 abstract public class AbstractKeyArrayIndexProcedure<T> extends
         AbstractIndexProcedure<T> implements IKeyArrayIndexProcedure<T>,
@@ -895,7 +897,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			this.resultHandler = resultHandler;
 		
 			this.stats = stats;
-			
+			if(isReadOnly())throw new UnsupportedOperationException(); // No point. Other code path is used.
 		}
 		
 		@Override
@@ -920,31 +922,31 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 						: new SubRangeRaba(batch.vals, batch.fromIndex, batch.toIndex);
 
 				final T aResult;
-				if (false && isReadOnly()) {
-
-					/*
-					 * Read-only index procedure on sub-range.
-					 * 
-					 * FIXME We can just do the work in the readers for this
-					 * case. There is no need to separate out prefetch readers
-					 * and a single writer thread if the index procedure is
-					 * read-only. So this is much simpler. Just reader tasks. No
-					 * queues. No eviction. No read/write lock. Just split the
-					 * key ranges across the readers and await their futures.
-					 * Also, we do not have to specialize anything for FusedView
-					 * if it is read-only since we are doing all the work in the
-					 * readers.  So change this to an assert !isReadOnly() and
-					 * handle read-only index procedures separately.
-					 */
-					lock.readLock().lock();
-					try {
-						aResult = applyOnce(ndx, keysView, valsView);
-					} finally {
-						lock.readLock().unlock();
-					}
-
-				} else {
-					
+//				if (false && isReadOnly()) {
+//
+//					/*
+//					 * Read-only index procedure on sub-range.
+//					 * 
+//					 * FIXME We can just do the work in the readers for this
+//					 * case. There is no need to separate out prefetch readers
+//					 * and a single writer thread if the index procedure is
+//					 * read-only. So this is much simpler. Just reader tasks. No
+//					 * queues. No eviction. No read/write lock. Just split the
+//					 * key ranges across the readers and await their futures.
+//					 * Also, we do not have to specialize anything for FusedView
+//					 * if it is read-only since we are doing all the work in the
+//					 * readers.  So change this to an assert !isReadOnly() and
+//					 * handle read-only index procedures separately.
+//					 */
+//					lock.readLock().lock();
+//					try {
+//						aResult = applyOnce(ndx, keysView, valsView);
+//					} finally {
+//						lock.readLock().unlock();
+//					}
+//
+//				} else {
+				{
 					/*
 					 * Acquire write lock to avoid concurrent mutation errors in
 					 * the B+Tree.
