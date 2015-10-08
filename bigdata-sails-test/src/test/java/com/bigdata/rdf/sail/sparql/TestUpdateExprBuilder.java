@@ -3539,9 +3539,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final UpdateRoot actual = parseUpdate(sparql, baseURI);
 
-        // fails due to broken dataset processing in 
-        // com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution.resolveDataset()
-        // assertSameAST(sparql, expected, actual);
+        assertSameAST(sparql, expected, actual);
 
     }
 

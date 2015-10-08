@@ -277,47 +277,6 @@ public class ASTDeferredIVResolution {
         
     }
 
-    /*
-     * Lazily instantiated sets for the default and named graphs.
-     */
-
-    private Set<IV<?,?>> defaultGraphs = null;
-    
-    private Set<IV<?,?>> namedGraphs = null;
-
-    /**
-     * Add a graph to the set of default or named graphs.
-     * 
-     * @param graph
-     *            The {@link IV} of the graph.
-     * @param named
-     *            When <code>true</code>, it will be added to the set of named
-     *            graphs. Otherwise, it will be added to the set of graphs in
-     *            the default graph.
-     */
-    private void addGraph(final IV<?,?> graph, final boolean named) {
-
-        if (graph == null)
-            throw new IllegalArgumentException();
-        
-        if (named) {
-
-            if (namedGraphs == null)
-                namedGraphs = new LinkedHashSet<IV<?,?>>();
-
-            namedGraphs.add(graph);
-
-        } else {
-
-            if (defaultGraphs == null)
-                defaultGraphs = new LinkedHashSet<IV<?,?>>();
-
-            defaultGraphs.add(graph);
-
-        }
-
-    }
-
     /**
 	 * Method is invoked after IV resolution and sets the
 	 * {@link IDataSetNode#setDataset(DatasetNode) data set} on each
@@ -346,6 +305,14 @@ public class ASTDeferredIVResolution {
 					throw new QuadsOperationInTriplesModeException(
 							"NAMED clauses in queries are not supported in" + " triples mode.");
 				}
+
+			    /*
+			     * Lazily instantiated sets for the default and named graphs.
+			     */
+
+				final Set<IV<?,?>> defaultGraphs = new LinkedHashSet<>();
+
+				final Set<IV<?,?>> namedGraphs = new LinkedHashSet<>();
 
                 for (final ASTDatasetClause dc : datasetClauses) {
                 
@@ -392,18 +359,41 @@ public class ASTDeferredIVResolution {
                                     final IV memberGraph = itr.next().o();
                                     final BigdataValue value = context.getAbstractTripleStore().getLexiconRelation().getTerm(memberGraph);
                                     memberGraph.setValue(value);
-                                    addGraph(memberGraph, dc.isNamed());
+
+                                    if (dc.isNamed()) {
+
+                                        namedGraphs.add(memberGraph);
+
+                                    } else {
+
+                                        defaultGraphs.add(memberGraph);
+
+                                    }
 
                                 }
                                 
                             } else {
 
-                                if (uri.getIV() != null)
-                                    addGraph(uri.getIV(), dc.isNamed());
+                                if (uri.getIV() != null) {
+
+                                    if (dc.isNamed()) {
+
+                                        namedGraphs.add(uri.getIV());
+
+                                    } else {
+
+                                        defaultGraphs.add(uri.getIV());
+
+                                    }
+
+                                }
 
                             }
-
-							if (defaultGraphs != null || namedGraphs != null) {
+						}
+					});
+					deferRunnable(new Runnable(){
+					    public void run() {
+							if (!defaultGraphs.isEmpty() || !namedGraphs.isEmpty()) {
 
 								// Note: Cast required to shut up the compiler.
 								final DatasetNode datasetNode = new DatasetNode((Set) defaultGraphs, (Set) namedGraphs,
