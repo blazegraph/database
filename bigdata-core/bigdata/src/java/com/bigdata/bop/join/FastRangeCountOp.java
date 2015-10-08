@@ -187,28 +187,28 @@ public class FastRangeCountOp<E> extends PipelineOp {
     /**
      * Copy the source to the sink.
      */
-    static private class ChunkTask<E> implements Callable<Void> {
+    static protected class ChunkTask<E> implements Callable<Void> {
 
-        private final FastRangeCountOp<E> op;
+        protected final FastRangeCountOp<E> op;
 
-        private final BOpContext<IBindingSet> context;
+        protected final BOpContext<IBindingSet> context;
 
         /**
          * The variable that gets bound to the fast range count.
          */
-        private final IVariable<?> countVar;
+        protected final IVariable<?> countVar;
         
 		/**
 		 * The source for the elements to be joined.
 		 */
-        private final IPredicate<E> predicate;
+        protected final IPredicate<E> predicate;
         
 		/**
 		 * The relation associated with the {@link #predicate} operand.
 		 */
-        private final IRelation<E> relation;
+        protected final IRelation<E> relation;
         
-        ChunkTask(final FastRangeCountOp<E> op,
+        protected ChunkTask(final FastRangeCountOp<E> op,
                 final BOpContext<IBindingSet> context) {
 
             this.op = op;
@@ -298,46 +298,7 @@ public class FastRangeCountOp<E> extends PipelineOp {
 //
 //					}
 
-        			/**
-					 * The {@link IAccessPath} corresponding to the asBound
-					 * {@link IPredicate} for this join dimension. The asBound
-					 * {@link IPredicate} is {@link IAccessPath#getPredicate()}.
-					 * 
-					 * Note: The exact range count using will be two key probes
-					 * unless the index supports delete markers or there is a
-					 * filter attached to the access path.
-					 * 
-					 * Note: This will throw an exception if either of those
-					 * conditions is true (the index supports delete markers or
-					 * there is a filter attached to the access path). The
-					 * exception is thrown since those conditions change the
-					 * cost of this operator from O(2) (the cost of TWO key
-					 * probes) to the O(fast-range-count) (the cost of a
-					 * key-range scan). Thus, generating this operator when
-					 * those conditions are violated leads to incorrect
-					 * reasoning about the cost of the operator.
-					 */
-					final IAccessPath<E> accessPath = context.getAccessPath(
-							relation, asBound);
-
-					if (accessPath.getPredicate().getIndexLocalFilter() != null) {
-						// index has local filter. requires scan.
-						throw new AssertionError();
-					}
-
-					if (accessPath.getPredicate().getAccessPathFilter() != null) {
-						// access path filter exists. requires scan.
-						throw new AssertionError();
-					}
-
-					/*
-					 * Request an exact range count.
-					 * 
-					 * Note: This will be 2 key probes since we have verified
-					 * that there are no filters imposed on the access path.
-					 */
-					final long rangeCount = accessPath
-							.rangeCount(true/* exact */);
+					final long rangeCount = determineRangeCount( asBound );
 
 					// New binding set.
 					final IBindingSet right = new ListBindingSet();
@@ -384,6 +345,49 @@ public class FastRangeCountOp<E> extends PipelineOp {
                 
             }
 
+        }
+
+        protected long determineRangeCount( final IPredicate<E> pred )
+        {
+           /**
+            * The {@link IAccessPath} corresponding to the asBound
+            * {@link IPredicate} for this join dimension. The asBound
+            * {@link IPredicate} is {@link IAccessPath#getPredicate()}.
+            * 
+            * Note: The exact range count using will be two key probes
+            * unless the index supports delete markers or there is a
+            * filter attached to the access path.
+            * 
+            * Note: This will throw an exception if either of those
+            * conditions is true (the index supports delete markers or
+            * there is a filter attached to the access path). The
+            * exception is thrown since those conditions change the
+            * cost of this operator from O(2) (the cost of TWO key
+            * probes) to the O(fast-range-count) (the cost of a
+            * key-range scan). Thus, generating this operator when
+            * those conditions are violated leads to incorrect
+            * reasoning about the cost of the operator.
+            */
+           final IAccessPath<E> accessPath = context.getAccessPath( relation,
+                                                                    pred );
+
+           if (accessPath.getPredicate().getIndexLocalFilter() != null) {
+              // index has local filter. requires scan.
+              throw new AssertionError();
+           }
+
+           if (accessPath.getPredicate().getAccessPathFilter() != null) {
+              // access path filter exists. requires scan.
+              throw new AssertionError();
+           }
+
+           /*
+            * Request an exact range count.
+            * 
+            * Note: This will be 2 key probes since we have verified
+            * that there are no filters imposed on the access path.
+            */
+           return accessPath.rangeCount(true/* exact */);
         }
 
     } // class ChunkTask
