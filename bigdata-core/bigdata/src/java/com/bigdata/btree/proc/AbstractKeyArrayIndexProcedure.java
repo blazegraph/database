@@ -113,7 +113,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	 * is the historical behavior).
 	 */
 	transient static private final int maxReaders = Integer
-			.parseInt(System.getProperty(AbstractKeyArrayIndexProcedure.class.getName() + ".maxReaders", "10"));
+			.parseInt(System.getProperty(AbstractKeyArrayIndexProcedure.class.getName() + ".maxReaders", "0"));
 
 	/**
 	 * How many keys to skip over in the reader threads.
