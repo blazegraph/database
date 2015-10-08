@@ -90,10 +90,18 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	private static final Logger log = Logger.getLogger(AbstractKeyArrayIndexProcedure.class);
 
 	/*
-	 * TODO These parameters should be specified from the derived class and
+	 * FIXME These parameters should be specified from the derived class and
 	 * default from the environment or be set dynamically through ergonomics. It
 	 * might be possible to do this by sharing a global reader thread pool for
 	 * the journal.
+	 * 
+	 * Right now they can be set from the environment, but this is just for
+	 * testing purposes. We need a better mechanisms / ergonomics. Some of the
+	 * main drivers should be the #of keys, the size of the index (total range
+	 * count), and the amount of observed scatter (inverse of locality) on the
+	 * index (ID2TERM has none on write (but a fair amount on read), SPO has
+	 * little on write, TERM2ID can have a lot of write if there are UUIDs, OSP
+	 * has a lot on write).
 	 */
     
 	/**
@@ -102,7 +110,8 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	 * significantly. Set to ZERO (0) to always run in the caller's thread (this
 	 * is the historical behavior).
 	 */
-	transient static private final int maxReaders = 10; 
+	transient static private final int maxReaders = Integer
+			.parseInt(System.getProperty(AbstractKeyArrayIndexProcedure.class.getName() + ".maxReaders", "10"));
 
 	/**
 	 * How many keys to skip over in the reader threads.
@@ -110,7 +119,9 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	 * Note: This also sets the minimum number of keys in a batch that we hand
 	 * off to the writer.
 	 */
-	transient static private final int skipCount = 256; 
+	transient static private final int skipCount = 
+			Integer
+			.parseInt(System.getProperty(AbstractKeyArrayIndexProcedure.class.getName() + ".skipCount", "256")); 
 
 	/**
 	 * This is multiplied by the branching factor of the index (when ZERO, the
@@ -121,7 +132,8 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	 * key is in the same page as the first key, but only that it is close and
 	 * will share most of the parents in the B+Tree ancestry.
 	 */
-	transient static private final int spannedRangeMultiplier = 10;
+	transient static private final int spannedRangeMultiplier = Integer
+			.parseInt(System.getProperty(AbstractKeyArrayIndexProcedure.class.getName() + ".spannedRangeMultiplier", "10"));;
 	
 	/**
 	 * The size of a sub-key-range that will be handed off by a reader to a
@@ -129,14 +141,27 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	 * to each sub-key-range in turn. This separation makes it possible to
 	 * ensure that pages on in memory and that the writer only does work on
 	 * pages that are already in memory.
+	 * <p>
+	 * 
+	 * FIXME As a rule of thumb, performance is quite reasonable with a single
+	 * thread running the batch until the indices grow relatively large. So we
+	 * really want to increase the striping of the readers as a function of the
+	 * index size and the proportion of scattered reads on the index. A large
+	 * index with good update locality is not a problem. A large index with poor
+	 * update locality is a big problem and requires a bunch of readers to
+	 * prefetch the index pages for the writer.
 	 */
-	transient static private final int batchSize = 10240;
+	transient static private final int batchSize = Integer
+			.parseInt(System.getProperty(AbstractKeyArrayIndexProcedure.class.getName() + ".batchSize", "10240"));
     
 	/**
-	 * The maximum depth of the queue. This should be at least equal to the #of
+	 * The maximum depth of the queue -or- ZERO (0) to use
+	 * <code>maxReaders * 2</code> (note that this is based on maxReaders, not
+	 * the actual number of readers). This should be at least equal to the #of
 	 * readers and could be a small multiple of that number.
 	 */
-	transient static private final int queueCapacity = maxReaders * 2; // capacity of the batch queue.
+	transient static private final int queueCapacity = Integer
+			.parseInt(System.getProperty(AbstractKeyArrayIndexProcedure.class.getName() + ".queueCapacity", "0"));;
 
 	static private class Stats {
 
@@ -518,8 +543,21 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		 */
 		final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
+		final int effectiveQueueCapacity;
+		{
+			if (queueCapacity < 0) {
+				/*
+				 * Note: This is MAX readers, not the actual number of readers.
+				 * We need to create the queue before we create the readers.
+				 */
+				effectiveQueueCapacity = maxReaders * 2;
+			} else {
+				effectiveQueueCapacity = queueCapacity;
+			}
+		}
+		
 		// Queue used to pass batches from readers to writer.
-		final LinkedBlockingQueue<Batch> queue = new LinkedBlockingQueue<Batch>(queueCapacity);
+		final LinkedBlockingQueue<Batch> queue = new LinkedBlockingQueue<Batch>(effectiveQueueCapacity);
 		
 		// Track statistics.
 		final Stats stats = new Stats();
@@ -751,16 +789,27 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 				final T aResult;
 				if (false && isReadOnly()) {
 
-					// invoke index procedure on sub-range.
 					/*
-					 * FIXME Some tests fail if we do not always take the
-					 * writeLock. Why? Should not be required for readers.
-					 * Re-check. I have also seen some failures when we are
-					 * always taking the write lock so this might be a red
-					 * herring.
+					 * Read-only index procedure on sub-range.
+					 * 
+					 * FIXME We can just do the work in the readers for this
+					 * case. There is no need to separate out prefetch readers
+					 * and a single writer thread if the index procedure is
+					 * read-only. So this is much simpler. Just reader tasks. No
+					 * queues. No eviction. No read/write lock. Just split the
+					 * key ranges across the readers and await their futures.
+					 * Also, we do not have to specialize anything for FusedView
+					 * if it is read-only since we are doing all the work in the
+					 * readers.  So change this to an assert !isReadOnly() and
+					 * handle read-only index procedures separately.
 					 */
-					aResult = applyOnce(ndx, keysView, valsView);
-					
+					lock.readLock().lock();
+					try {
+						aResult = applyOnce(ndx, keysView, valsView);
+					} finally {
+						lock.readLock().unlock();
+					}
+
 				} else {
 					
 					/*
