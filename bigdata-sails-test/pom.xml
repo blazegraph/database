@@ -102,7 +102,7 @@ dependencies.
           <reuseForks>true</reuseForks>
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
-          <argLine>-server -ea -Xms512m -Xmx4g -Dlog4j.configuration=file:src/test/resources/log4j.properties</argLine>
+          <argLine>-server -ea -Xms512m -Xmx8g -Dlog4j.configuration=file:src/test/resources/log4j.properties</argLine>
  	  <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
