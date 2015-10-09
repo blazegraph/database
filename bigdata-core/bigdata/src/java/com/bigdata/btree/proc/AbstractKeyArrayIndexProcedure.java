@@ -42,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -708,7 +709,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		final Stats stats = new Stats();
 		
 		// Setup writer.
-		final FutureTask<T> writeFuture = new FutureTask<T>(new WriterTask(lock, queue, ndx, resultHandler, stats));
+		final FutureTask<T> writerFuture = new FutureTask<T>(new WriterTask(lock, queue, ndx, resultHandler, stats));
 
 		// Setup readers.
 		final List<Callable<Void>> readerTasks = new LinkedList<Callable<Void>>();
@@ -744,7 +745,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 					toIndex = keysSize; 
 					done = true;
 				}
-				readerTasks.add(new ReaderTask(readOnly, lock, queue, ndx, new Batch(fromIndex, toIndex, keys, vals)));
+				readerTasks.add(new ReaderTask(readOnly, lock, queue, writerFuture, ndx, new Batch(fromIndex, toIndex, keys, vals)));
 				fromIndex = toIndex;
 			}
 			stats.readerBatchCount.set(readerTasks.size());
@@ -753,14 +754,15 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		try {
 
 			// start writer.
-			executorService.submit(writeFuture);
+			executorService.submit(writerFuture);
 
 			// start readers. all readers are done by the time this returns (including if interrupted).
 			final List<Future<Void>> readerFutures = executorService.invokeAll(readerTasks);
 
 			// Readers are done. drop poison pill on writer so it will terminate. 
 			// Note: will block if queue is full.
-			queue.put(Batch.POISON_PILL);
+			// Note: will notice if the writer fails.
+			putOnQueue(writerFuture, queue, Batch.POISON_PILL);
 			
 			// check reader futures.
 			for (Future<Void> f : readerFutures) {
@@ -770,7 +772,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			}
 
 			// check writer future.
-			final T ret = writeFuture.get();
+			final T ret = writerFuture.get();
 
 			// configuration parameters. followed by invocation instance data.
 			log.fatal("maxReaders=" + maxReaders //
@@ -797,7 +799,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			 * returns via any code path so we do not need to cancel
 			 * them here.
 			 */
-			writeFuture.cancel(true/* mayInterruptIfRunning */);
+			writerFuture.cancel(true/* mayInterruptIfRunning */);
 
 		}
 
@@ -923,7 +925,8 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 
 				if (batch == Batch.POISON_PILL)
 					break;
-
+				if(batch.ntuples==0) throw new AssertionError("Empty batch");
+				
 				/*
 				 * Setup sub-range for keys and values and invoke the index
 				 * procedure on that sub-range.
@@ -972,11 +975,12 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	 * 
 	 * @author bryan
 	 */
-	static private class ReaderTask implements Callable<Void> {
+	static private class ReaderTask<T> implements Callable<Void> {
 
 		private final boolean readOnly;
 		private final ReentrantReadWriteLock lock;
 		private final LinkedBlockingQueue<Batch> queue;
+		private final Future<T> writerFuture;
 		private final IIndex view;
 		private final Batch batch;
 
@@ -998,11 +1002,13 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		 *            locality in the index.
 		 */
 		ReaderTask(final boolean readOnly, final ReentrantReadWriteLock lock, final LinkedBlockingQueue<Batch> queue,
-				final IIndex view, final Batch batch) {
+				final Future<T> writerFuture, final IIndex view, final Batch batch) {
 		
 			if (lock == null)
 				throw new IllegalArgumentException();
 			if (queue == null)
+				throw new IllegalArgumentException();
+			if (writerFuture == null)
 				throw new IllegalArgumentException();
 			if (view == null)
 				throw new IllegalArgumentException();
@@ -1012,6 +1018,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			this.readOnly = readOnly;
 			this.lock = lock;
 			this.queue = queue;
+			this.writerFuture = writerFuture;
 			this.view = view;
 			this.batch = batch;
 			
@@ -1120,7 +1127,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		 *            
 		 * @throws InterruptedException
 		 */
-		static private void doSimpleBTree(final ReentrantReadWriteLock lock, final IIndex ndx, final Batch batch,
+		private void doSimpleBTree(final ReentrantReadWriteLock lock, final IIndex ndx, final Batch batch,
 				final LinkedBlockingQueue<Batch> queue) throws InterruptedException {
 
 			if (lock == null)
@@ -1170,6 +1177,14 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 				final long indexOf;
 				lock.readLock().lock();
 				try {
+					if (writerFuture.isDone()) {
+						/*
+						 * If the writer hits an error condition, then the index
+						 * can be left is an inconsistent state. At this point
+						 * we MUST NOT read on the index.
+						 */
+						throw new RuntimeException("Writer is dead?");
+					}
 					long n = ((ILinearList) ndx).indexOf(currentKey);
 					if (n < 0) {
 
@@ -1200,7 +1215,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 				if (spannedRange >= evictRange) {
 
 					// Evict a batch (blocking put).
-					queue.put(new Batch(firstRabaIndex, currentRabaIndex, batch.keys, batch.vals));
+					putOnQueue(new Batch(firstRabaIndex, currentRabaIndex, batch.keys, batch.vals));
 
 					// start a new batch.
 					firstRabaIndex = currentRabaIndex;
@@ -1212,13 +1227,65 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			if ((currentRabaIndex - firstRabaIndex) > 0) {
 
 				// Last batch (blocking put).
-				queue.put(new Batch(firstRabaIndex, batch.toIndex, batch.keys, batch.vals));
+				putOnQueue(new Batch(firstRabaIndex, batch.toIndex, batch.keys, batch.vals));
 
 			}
 
 		}
 		
+		/**
+		 * Evict a batch (blocking put, but spins to look for an error in the
+		 * writer {@link Future}).
+		 * 
+		 * @param batch
+		 *            A batch.
+		 * 
+		 * @throws InterruptedException
+		 */
+		private void putOnQueue(final Batch batch) throws InterruptedException {
+
+			AbstractKeyArrayIndexProcedure.putOnQueue(writerFuture, queue, batch);
+
+		}
+		
 	} // ReaderTask
+
+	/**
+	 * Evict a batch (blocking put, but spins to look for an error in the
+	 * <i>writerFuture</i> to avoid a deadlock if the writer fails).
+	 * 
+	 * @param writerFuture
+	 *            The {@link Future} of the {@link WriterTask} (required).
+	 * @param queue
+	 *            The queue onto which the batches are being transferred
+	 *            (required).
+	 * @param batch
+	 *            A batch (required).
+	 * 
+	 * @throws InterruptedException
+	 */
+	private static void putOnQueue(final Future<?> writerFuture, final LinkedBlockingQueue<Batch> queue,
+			final Batch batch) throws InterruptedException {
+
+		while (!writerFuture.isDone()) {
+
+			if (queue.offer(batch, 100L, TimeUnit.MILLISECONDS)) {
+				return;
+			}
+
+		}
+		
+		if (writerFuture.isDone()) {
+
+			/*
+			 * This is most likely to indicate either an error or interrupt in the writer.
+			 */
+
+			throw new RuntimeException("Writer is done, but reader still working?");
+
+		}
+		
+	}
 	
     /**
 	 * Apply the procedure to the specified key range of the index.
