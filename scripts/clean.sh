@@ -1,3 +1,4 @@
 #!/bin/bash
-#must be run from repository root
-mvn -f blazegraph-parent/pom.xml clean
+BASE_DIR=`dirname $0`
+
+mvn -f "${BASE_DIR}"/../blazegraph-parent/pom.xml clean

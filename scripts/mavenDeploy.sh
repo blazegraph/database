@@ -1,4 +1,4 @@
 #!/bin/bash
-#assume the root of the repo
+BASE_DIR=`dirname $0`
 
-mvn -f blazegraph-parent/pom.xml clean deploy -DskipTests
+mvn -f "${BASE_DIR}"/../blazegraph-parent/pom.xml clean deploy -DskipTests
