@@ -51,6 +51,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.Banner;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
@@ -1870,7 +1871,9 @@ public class DataLoader {
 	 * @see BLZG-1534 (durable queues)
 	 */
     public static void main(final String[] args) throws IOException {
-
+    	
+    	Banner.banner();
+    	
         // default namespace.
         String namespace = "kb";
         boolean doClosure = false;
