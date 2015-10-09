@@ -3,7 +3,7 @@
 # Must be run from the root of the bigdata project, i.e. ./scripts/updatePomVersions.sh
 
 PARENT_POM=./blazegraph-parent/pom.xml
-CURRENT_VERSION=1.5.3
+CURRENT_VERSION=1.6.0
 BRANCH="master"
 SNAPSHOT="SNAPSHOT"
 
