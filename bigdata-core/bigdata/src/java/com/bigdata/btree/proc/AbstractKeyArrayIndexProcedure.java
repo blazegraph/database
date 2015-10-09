@@ -69,6 +69,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.IClientIndex;
+import com.bigdata.service.ndx.NopAggregator;
 
 import it.unimi.dsi.bits.BitVector;
 import it.unimi.dsi.bits.LongArrayBitVector;
@@ -240,15 +241,18 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 	 * Return an {@link IResultHandler} that will be used to combine the results
 	 * if the index procedure is parallelized against a local index (including a
 	 * scale-out shard). If a <code>null</code> is returned, then the index
-	 * procedure can not be parallelized against the local index. However, the
-	 * index procedure MAY still be shard-wise parallelized if submitted to a
-	 * remote view of a sharded index. A non-<code>null</code> value will permit
-	 * both index local parallelization of the index procedure and (in
+	 * procedure WILL NOT be parallelized against the local index. To
+	 * parallelize index procedures that do not return anything against a local
+	 * index, just use {@link NopAggregator}. A non-<code>null</code> value will
+	 * permit both index local parallelization of the index procedure and (in
 	 * scale-out) parallelization of the index procedure across the shards as
-	 * well.
+	 * well. In order to be parallelized, the index procedure must also be
+	 * marked as {@link IParallelizableIndexProcedure}.
 	 * 
 	 * @return The {@link IResultHandler} -or- <code>null</code>
 	 * 
+	 * @see NopAggregator
+	 * @see IParallelizableIndexProcedure
 	 * @see BLZG-1537 (Schedule more IOs when loading data)
 	 */
 	abstract protected IResultHandler<T, T> newAggregator();
@@ -309,7 +313,11 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
         
         this.valsCoder = valsCoder;
         
-        // FIXME Am I ignoring the (fromIndex, toIndex) on the original keys and values?
+		/*
+		 * FIXME I ignoring the (fromIndex, toIndex) on the original keys and
+		 * values? These should really be passed through. The correctness issue
+		 * probably only shows up in scale-out.
+		 */
         this.keys = new ReadOnlyKeysRaba(fromIndex, toIndex, keys);
 
         this.vals = (vals == null ? null : new ReadOnlyValuesRaba(fromIndex,
@@ -386,10 +394,9 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			/*
 			 * Can't use parallelism without an aggregator.
 			 * 
-			 * FIXME Verify that we always specify an aggregator, even if it is
-			 * a NOP, since parallelism is otherwise disabled. For example,
-			 * INSERT without returning anything should still specify an
-			 * aggregator that is a NOP. Make sure that this is documented.
+			 * Note: Use NopAggregator to avoid this code path and strip an
+			 * index procedure against a local index even if it is not going
+			 * to return anything.
 			 */
 			return applyOnce(ndx, keys, vals);
 			
@@ -546,7 +553,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			stats.readerBatchCount.set(readerTasks.size());
 		}
 
-		// start readers
+		// Start readers. all readers are done by the time this returns (including if interrupted).
 		final List<Future<Void>> readerFutures = executorService.invokeAll(readerTasks);
 
 		// check reader futures.
@@ -678,6 +685,9 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		 */
 		final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
+		// This is the #of keys in the keys IRaba.
+		final int keysSize = keys.size();
+		
 		final int effectiveQueueCapacity;
 		{
 			if (queueCapacity <= 0) {
@@ -700,9 +710,6 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		// Setup writer.
 		final FutureTask<T> writeFuture = new FutureTask<T>(new WriterTask(lock, queue, ndx, resultHandler, stats));
 
-		// This is the #of keys in the keys IRaba.
-		final int keysSize = keys.size();
-		
 		// Setup readers.
 		final List<Callable<Void>> readerTasks = new LinkedList<Callable<Void>>();
 		{
@@ -748,10 +755,11 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			// start writer.
 			executorService.submit(writeFuture);
 
-			// start readers
+			// start readers. all readers are done by the time this returns (including if interrupted).
 			final List<Future<Void>> readerFutures = executorService.invokeAll(readerTasks);
 
-			// readers are done.  drop poison pill on writer so it will terminate.
+			// Readers are done. drop poison pill on writer so it will terminate. 
+			// Note: will block if queue is full.
 			queue.put(Batch.POISON_PILL);
 			
 			// check reader futures.
@@ -897,7 +905,12 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 			this.resultHandler = resultHandler;
 		
 			this.stats = stats;
-			if(isReadOnly())throw new UnsupportedOperationException(); // No point. Other code path is used.
+
+			if (isReadOnly()) {
+				// No point. Other code path is used.
+				throw new UnsupportedOperationException();
+			}
+			
 		}
 		
 		@Override
@@ -921,50 +934,23 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 				final IRaba valsView = batch.vals == null ? null
 						: new SubRangeRaba(batch.vals, batch.fromIndex, batch.toIndex);
 
+				/*
+				 * Acquire write lock to avoid concurrent mutation errors in the
+				 * B+Tree.
+				 */
 				final T aResult;
-//				if (false && isReadOnly()) {
-//
-//					/*
-//					 * Read-only index procedure on sub-range.
-//					 * 
-//					 * FIXME We can just do the work in the readers for this
-//					 * case. There is no need to separate out prefetch readers
-//					 * and a single writer thread if the index procedure is
-//					 * read-only. So this is much simpler. Just reader tasks. No
-//					 * queues. No eviction. No read/write lock. Just split the
-//					 * key ranges across the readers and await their futures.
-//					 * Also, we do not have to specialize anything for FusedView
-//					 * if it is read-only since we are doing all the work in the
-//					 * readers.  So change this to an assert !isReadOnly() and
-//					 * handle read-only index procedures separately.
-//					 */
-//					lock.readLock().lock();
-//					try {
-//						aResult = applyOnce(ndx, keysView, valsView);
-//					} finally {
-//						lock.readLock().unlock();
-//					}
-//
-//				} else {
-				{
-					/*
-					 * Acquire write lock to avoid concurrent mutation errors in
-					 * the B+Tree.
-					 */
-					
-					lock.writeLock().lock();
-					
-					try {
-						
-						// invoke index procedure on sub-range.
-						aResult = applyOnce(ndx, keysView, valsView);
-					
-					} finally {
-					
-						lock.writeLock().unlock();
-						
-					}
-					
+
+				lock.writeLock().lock();
+
+				try {
+
+					// invoke index procedure on sub-range.
+					aResult = applyOnce(ndx, keysView, valsView);
+
+				} finally {
+
+					lock.writeLock().unlock();
+
 				}
 
 				// aggregate results.
@@ -1042,22 +1028,8 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 					throw new AssertionError("Unexpected index type: " + view.getClass().getName()
 							+ " does not implement " + ILinearList.class.getName());
 
-//				/*
-//				 * Note: if the index procedure is read-write, then this lock is
-//				 * used to coordinate with the writer thread to avoid concurrent
-//				 * modification errors in the BTree.
-//				 * 
-//				 * Note: We always take the read lock here since it will not be
-//				 * contended for read-only procedures, but the writer will only
-//				 * take a lock if the index procedure is read-write.
-//				 */
 				// Note: Can't take the lock here.  Queue.put() will block if writer has lock.
-//				lock.readLock().lock();
-//				try {
-					doSimpleBTree(lock, view, batch, queue);
-//				} finally {
-//					lock.readLock().unlock();
-//				}
+				doSimpleBTree(lock, view, batch, queue);
 
 			} else if (view instanceof ILocalBTreeView) {
 
@@ -1145,46 +1117,8 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 		 * @param ndx
 		 *            Either an {@link UnisolatedReadWriteIndex} or an
 		 *            {@link AbstractBTree}.
-		 * 
-		 *            TODO How can we explicitly test this case and assess the
-		 *            performance impact?
-		 * 
-		 *            FIXME This just scans the key range, forcing the pages
-		 *            into memory. It would be best to pin the actual pages
-		 *            associated with each batch. This would be one (or more)
-		 *            pages per source. Those pages could then be pass along
-		 *            with the batch to the writer. The writer would not use
-		 *            them directly, but it would benefit from having those
-		 *            pages pinned in memory until it handles the batch.
-		 * 
-		 *            Without this explicit coordination, there is a chance that
-		 *            the pages of interest will have been evicted from the
-		 *            relevant write retention queues. This will mean a page
-		 *            miss and a read through to the write cache, the OS cache,
-		 *            or the backing file channel.
-		 * 
-		 *            To minimize the likelihood of that eviction, we need to
-		 *            control the #of pages that are being brought into memory
-		 *            for each batch. One way to do this is notice when we have
-		 *            entered another page. One way to estimate that (without
-		 *            getting into a lower level of the index) is to look at the
-		 *            range count between the first and last tuple in the batch
-		 *            when we assign the keys to batches.
-		 * 
-		 *            Another way is to evict a Batch (newly created for a
-		 *            sub-range) here if we discover that we have advanced a
-		 *            significant distance through the index.
-		 * 
-		 *            Note: The FusedView makes this complicated since we can be
-		 *            moving a different distance in the mutable btree and in
-		 *            each of the other B+Tree indices in the view.
-		 * 
-		 *            FIXME We need to explicitly make sure the BTree is setup
-		 *            to work with concurrent readers and one writer. This can
-		 *            be achieved by setting up the memoizer patter on the
-		 *            mutable BTree object.
 		 *            
-		 * @throws InterruptedException 
+		 * @throws InterruptedException
 		 */
 		static private void doSimpleBTree(final ReentrantReadWriteLock lock, final IIndex ndx, final Batch batch,
 				final LinkedBlockingQueue<Batch> queue) throws InterruptedException {
@@ -1202,7 +1136,7 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 
 			if (batch == null)
 				throw new IllegalArgumentException();
-			
+
 			/*
 			 * The maximum #of keys in a leaf.
 			 */
@@ -1210,19 +1144,16 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 
 			final long evictRange = branchingFactor
 					* (spannedRangeMultiplier == 0 ? branchingFactor : spannedRangeMultiplier);
-			
+
 			// The linear list position into the B+Tree for the current key.
 			long firstIndex = -1;
 
-//			// The #of keys in this batch.
-//			final int keySize = batch.keys.size(); 
-			
 			// The index into the raba for the start of the batch.
 			int firstRabaIndex = batch.fromIndex;
-			
+
 			// The current index into the raba.
 			int currentRabaIndex = firstRabaIndex;
-			
+
 			// Loop over the current index into the raba.
 			for (; currentRabaIndex < batch.toIndex; currentRabaIndex += skipCount) {
 
@@ -1791,15 +1722,6 @@ abstract public class AbstractKeyArrayIndexProcedure<T> extends
 
         /**
 		 * The aggregated results.
-		 * 
-		 * FIXME BLZG-1537 (performance optimization). It would be better to
-		 * wrap the results from each split and index into them directly in
-		 * order to avoid decoding the byte[][]s associated with each split. We
-		 * would need to return an appropriate {@link IRaba} implementation here
-		 * instead. This is especially true now that we are striping the index
-		 * procedure across a local index.
-		 * 
-		 * @see BLZG-1537 (Schedule more IOs when loading data)
 		 */
         @Override
         public ResultBuffer getResult() {
