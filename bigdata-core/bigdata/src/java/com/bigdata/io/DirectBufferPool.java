@@ -826,8 +826,8 @@ public class DirectBufferPool {
 
         assert lock.isHeldByCurrentThread();
 
-        if(log.isInfoEnabled())
-            log.info("");
+        if(log.isDebugEnabled())
+            log.debug("");
 
         try {
 
