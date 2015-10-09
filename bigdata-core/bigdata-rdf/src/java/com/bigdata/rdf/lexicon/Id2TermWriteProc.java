@@ -36,6 +36,7 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
+import com.bigdata.service.ndx.NopAggregator;
 
 /**
  * Unisolated write operation makes consistent assertions on the
@@ -296,14 +297,15 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
     }
 
     /**
-	 * Nothing is returned, so nothing to aggregate.
-	 * 
-	 * @return <code>null</code>
+	 * Nothing is returned, so nothing to aggregate, but uses a
+	 * {@link NopAggregator} to preserve striping against a local index.
 	 */
+	@SuppressWarnings("unchecked")
 	@Override
 	protected IResultHandler<Void, Void> newAggregator() {
 
-		return null;
+		// NOP aggegrator preserves striping against the index.
+		return NopAggregator.INSTANCE;
 
 	}
 

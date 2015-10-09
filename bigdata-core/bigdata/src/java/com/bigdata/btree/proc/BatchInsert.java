@@ -37,6 +37,7 @@ import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.service.ndx.NopAggregator;
 
 /**
  * Batch insert operation.
@@ -242,13 +243,14 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
 
     }
 
+	@SuppressWarnings("unchecked")
 	@Override
 	protected IResultHandler<ResultBuffer, ResultBuffer> newAggregator() {
 
 		if (!getReturnOldValues()) {
 
-			// No result returned, no aggregation handler.
-			return null;
+			// NOP aggegrator preserves striping against the index.
+			return NopAggregator.INSTANCE;
 
 		}
 		
