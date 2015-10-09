@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -705,7 +706,53 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		}
 	}
     
-    /**
+	/**
+	 * Evict a batch (blocking put, but spins to look for an error in
+	 * {@link Future} for the thread draining the queue.
+	 * 
+	 * @param batch
+	 *            A batch (required).
+	 * 
+	 * @throws InterruptedException
+	 */
+	private void putOnQueue(final Batch<S> batch) throws InterruptedException {
+
+		Future<Void> f;
+		while ((f = ft) != null && !f.isDone()) {
+
+			if (queue.offer(batch, 100L, TimeUnit.MILLISECONDS)) {
+
+				return;
+
+			}
+
+		}
+
+		if (f == null) {
+
+			/*
+			 * The Future of the task draining the queue has been cleared (most
+			 * likely due to an error or interrupt). At this point nothing more
+			 * will be drained from the queue.
+			 */
+
+			throw new RuntimeException("Writer is done, but reader still working?");
+
+		} else if (f.isDone()) {
+
+			/*
+			 * This is most likely to indicate either an error or interrupt in
+			 * the writer. At this point nothing more will be drained from the
+			 * queue.
+			 */
+
+			throw new RuntimeException("Writer is done, but reader still working?");
+
+		}
+		
+	}
+
+	/**
 	 * Drains {@link Batch}es from the queue and writes on the database.
 	 * 
 	 * @author bryan
@@ -2370,6 +2417,36 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         stmts[numStmts++] = stmt;
 
         numTotalStmts++;
+
+		final Future<Void> f = ft;
+
+		if (f != null && f.isDone()) {
+
+			/*
+			 * We are transferring batches to a queue, but the task draining the
+			 * queue is no longer running.
+			 */
+
+			try {
+			
+				f.get(); // get the future. Expect ExecutionException.
+				
+				// Nothing thrown, but task draining queue is not running so it
+				// is still a problem.
+				throw new RuntimeException("Writer is done?");
+				
+			} catch (InterruptedException e) {
+				
+				// Propagate interrupt
+				Thread.currentThread().interrupt();
+				
+			} catch (ExecutionException ex) {
+				
+				throw new RuntimeException(ex);
+				
+			}
+			
+        }
         
 //        if (c != null && statementIdentifiers && c instanceof BNode) {
 //        	
