@@ -693,6 +693,18 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		
     }
 
+	/**
+	 * Added to ensure that the {@link FutureTask} is cancelled in case the
+	 * caller does not shutdown the {@link StatementBuffer} normally.
+	 */
+    @Override
+    protected void finalize() throws Throwable {
+    	super.finalize();
+		if (ft != null) {
+			reset();
+		}
+	}
+    
     /**
 	 * Drains {@link Batch}es from the queue and writes on the database.
 	 * 
