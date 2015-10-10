@@ -504,7 +504,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 *      </a>
 		 */
 		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
-			add(new ASTFastRangeCountOptimizer());
+			addFastRangeCountOptimizer();
 
 		/**
 		 * Optimizes SELECT COUNT(*) ?z { triple-pattern } GROUP BY ?z using
@@ -710,6 +710,8 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     /**
      * Tries to add the GPU-based {@link ASTRangeCountOptimizer}. If adding
      * this optimizer fails, this method adds {@link ASTRangeCountOptimizer}.
+     *
+     * @see https://github.com/SYSTAP/bigdata-gpu/issues/23
      */
     protected void addRangeCountOptimizer() {
 
@@ -725,11 +727,47 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     /**
      * Tries to create the GPU-based {@link ASTRangeCountOptimizer}; returns
      * <code>null</code> if the attempt fails.
+     *
+     * @see https://github.com/SYSTAP/bigdata-gpu/issues/23
      */
     protected IASTOptimizer initGPURangeCountOptimizer() {
 
        return ClassPathUtil.classForName(//
              "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPURangeCountOptimizer", // preferredClassName,
+             null, // defaultClass,
+             IASTOptimizer.class, // sharedInterface,
+             getClass().getClassLoader() // classLoader
+       );
+
+    }
+
+    /**
+     * Tries to add the GPU-based {@link ASTFastRangeCountOptimizer}. If adding
+     * this optimizer fails, this method adds {@link ASTFastRangeCountOptimizer}.
+     *
+     * @see https://github.com/SYSTAP/bigdata-gpu/issues/101
+     */
+    protected void addFastRangeCountOptimizer() {
+
+       final IASTOptimizer o = initGPUFastRangeCountOptimizer();
+       if ( o != null ) {
+          add(o);
+       } else {
+          add(new ASTFastRangeCountOptimizer());
+       }
+
+    }
+
+    /**
+     * Tries to create the GPU-based {@link ASTFastRangeCountOptimizer};
+     * returns <code>null</code> if the attempt fails.
+     *
+     * @see https://github.com/SYSTAP/bigdata-gpu/issues/101
+     */
+    protected IASTOptimizer initGPUFastRangeCountOptimizer() {
+
+       return ClassPathUtil.classForName(//
+             "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUFastRangeCountOptimizer", // preferredClassName,
              null, // defaultClass,
              IASTOptimizer.class, // sharedInterface,
              getClass().getClassLoader() // classLoader
