@@ -347,6 +347,20 @@ public class AST2BOpJoins extends AST2BOpFilters {
 			final AST2BOpContext ctx//
 			) {
 
+		if ( ctx.gpuEvaluation != null
+		     && pred.getProperty(GpuAnnotations.EVALUATE_ON_GPU,
+		                         GpuAnnotations.DEFAULT_EVALUATE_ON_GPU) )
+		{
+         return ctx.gpuEvaluation.fastRangeCountJoin( left,
+                                                      anns,
+                                                      pred,
+                                                      dataset,
+                                                      cutoffLimitIsIgnored,
+                                                      fastRangeCountVar,
+                                                      queryHints,
+                                                      ctx );
+		}
+
 		anns.add(new NV(FastRangeCountOp.Annotations.COUNT_VAR,
 				fastRangeCountVar.getValueExpression()));
 
