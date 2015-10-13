@@ -28,44 +28,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
-import com.bigdata.htree.HTree;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
+import com.bigdata.bop.join.HashIndexOp.ChunkTask;
+import com.bigdata.bop.join.HashIndexOpBase.Annotations;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
+import cutthecrap.utils.striterators.ICloseableIterator;
+import cutthecrap.utils.striterators.SingleValueIterator;
+
 /**
- * Operator builds a hash index from the source solutions. Once all source
- * solutions have been indexed, the source solutions are output on the default
- * sink. The set of variables to be copied to the sink may be restricted by an
- * annotation.
- * <p>
- * The main use case for building a hash index is to execute a sub-group or
- * sub-select. In both cases, the {@link HashIndexOp} is generated before we
- * enter the sub-plan. All solutions from the hash index are then flowed into
- * the sub-plan. Solutions emitted by the sub-plan are then re-integrated into
- * the parent using a {@link SolutionSetHashJoinOp}.
- * <p>
- * There are two concrete implementations of this operator. One for the
- * {@link HTree} and one for the JVM {@link ConcurrentHashMap}. Both hash index
- * build operators have the same general logic, but differ in their specifics.
- * Those differences are mostly encapsulated by the {@link IHashJoinUtility}
- * interface. They also have somewhat different annotations, primarily because
- * the {@link HTree} version needs access to the lexicon to setup its ivCache.
- * <p>
- * This operator is NOT thread-safe. It relies on the query engine to provide
- * synchronization. The operator MUST be run on the query controller.
  * 
- * @see SolutionSetHashJoinOp
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
-public class HashIndexOp extends HashIndexOpBase {
+public class PipelinedHashIndexOp extends HashIndexOp {
 
 //    static private final transient Logger log = Logger
 //            .getLogger(HashIndexOp.class);
@@ -75,14 +57,14 @@ public class HashIndexOp extends HashIndexOpBase {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends HashIndexOpBase.Annotations {
+    public interface Annotations extends HashIndexOp.Annotations {
 
     }
     
     /**
      * Deep copy constructor.
      */
-    public HashIndexOp(final HashIndexOp op) {
+    public PipelinedHashIndexOp(final PipelinedHashIndexOp op) {
         super(op);
     }
     
@@ -92,13 +74,13 @@ public class HashIndexOp extends HashIndexOpBase {
      * @param args
      * @param annotations
      */
-    public HashIndexOp(final BOp[] args, final Map<String, Object> annotations) {
+    public PipelinedHashIndexOp(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
 
     }
 
-    public HashIndexOp(final BOp[] args, final NV... annotations) {
+    public PipelinedHashIndexOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -111,9 +93,9 @@ public class HashIndexOp extends HashIndexOpBase {
         
     }
     
-    protected static class ChunkTask extends ChunkTaskBase {
+    private static class ChunkTask extends com.bigdata.bop.join.HashIndexOp.ChunkTask {
 
-        public ChunkTask(final HashIndexOp op,
+        public ChunkTask(final PipelinedHashIndexOp op,
                 final BOpContext<IBindingSet> context) {
 
             super(op, context);
@@ -131,15 +113,13 @@ public class HashIndexOp extends HashIndexOpBase {
                 if (sourceIsPipeline) {
 
                     // Buffer all source solutions.
-                    acceptSolutions();
+                    acceptAndOutputSolutions();
 
                     if (context.isLastInvocation()) {
 
                         // Checkpoint the solution set.
                         checkpointSolutionSet();
 
-                        // Output the buffered solutions.
-                        outputSolutions();
 
                     }
 
@@ -148,7 +128,7 @@ public class HashIndexOp extends HashIndexOpBase {
                     if(first) {
                     
                         // Accept ALL solutions.
-                        acceptSolutions();
+                        acceptAndOutputSolutions();
                         
                         // Checkpoint the generated solution set index.
                         checkpointSolutionSet();
@@ -181,7 +161,7 @@ public class HashIndexOp extends HashIndexOpBase {
         /**
          * Output the buffered solutions.
          */
-        private void outputSolutions() {
+        private void acceptAndOutputSolutions() {
 
             // default sink
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
@@ -189,7 +169,45 @@ public class HashIndexOp extends HashIndexOpBase {
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            state.outputSolutions(unsyncBuffer);
+            final ICloseableIterator<IBindingSet[]> src;
+
+            // TODO: this is duplicate code, see HashIndexOp.acceptSolutions
+            if (sourceIsPipeline) {
+            
+                src = context.getSource();
+                
+            } else if (op.getProperty(Annotations.NAMED_SET_SOURCE_REF) != null) {
+                
+                /*
+                 * Metadata to identify the optional *source* solution set. When
+                 * <code>null</code>, the hash index is built from the solutions flowing
+                 * through the pipeline. When non-<code>null</code>, the hash index is
+                 * built from the solutions in the identifier solution set.
+                 */
+                final INamedSolutionSetRef namedSetSourceRef = (INamedSolutionSetRef) op
+                        .getRequiredProperty(Annotations.NAMED_SET_SOURCE_REF);
+
+                src = context.getAlternateSource(namedSetSourceRef);
+                
+            } else if (op.getProperty(Annotations.BINDING_SETS_SOURCE) != null) {
+
+                /*
+                 * The IBindingSet[] is directly given. Just wrap it up as an
+                 * iterator. It will visit a single chunk of solutions.
+                 */
+                final IBindingSet[] bindingSets = (IBindingSet[]) op
+                        .getProperty(Annotations.BINDING_SETS_SOURCE);
+
+                src = new SingleValueIterator<IBindingSet[]>(bindingSets);
+                
+            } else {
+
+                throw new UnsupportedOperationException(
+                        "Source was not specified");
+                
+            }
+            
+            ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(unsyncBuffer, src, stats);
             
             unsyncBuffer.flush();
 

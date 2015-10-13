@@ -161,28 +161,28 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * The #of solutions accepted into the hash index.
      */
-    private final CAT rightSolutionCount = new CAT();
+    protected final CAT rightSolutionCount = new CAT();
     
     /**
      * The maximum #of (left,right) solution joins that will be considered
      * before failing the join. This is used IFF there are no join variables.
      */
     private final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
-    
-    /**
+
+   /**
      * The #of left solutions considered for a join.
      */
-    private final CAT nleftConsidered = new CAT();
+    protected final CAT nleftConsidered = new CAT();
 
     /**
      * The #of right solutions considered for a join.
      */
-    private final CAT nrightConsidered = new CAT();
+    protected final CAT nrightConsidered = new CAT();
 
     /**
      * The #of solution pairs considered for a join.
      */
-    private final CAT nJoinsConsidered = new CAT();
+    protected final CAT nJoinsConsidered = new CAT();
     
     /**
      * Human readable representation of the {@link IHashJoinUtility} metadata
@@ -375,6 +375,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         return constraints;
     }
 
+    protected long getNoJoinVarsLimit() {
+      return noJoinVarsLimit;
+    }
+
+    
     @Override
     public boolean isEmpty() {
 
@@ -382,7 +387,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
     }
 
-    private JVMHashIndex getRightSolutions() {
+    protected JVMHashIndex getRightSolutions() {
         
         return rightSolutionsRef.get();
         
@@ -703,7 +708,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * @param outSolution
      *            The solution.
      */
-    private void outputSolution(final IBuffer<IBindingSet> outputBuffer,
+    protected void outputSolution(final IBuffer<IBindingSet> outputBuffer,
             final IBindingSet outSolution) {
 
         if (log.isDebugEnabled())

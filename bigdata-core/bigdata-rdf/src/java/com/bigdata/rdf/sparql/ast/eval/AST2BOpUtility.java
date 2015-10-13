@@ -62,10 +62,13 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.IHashJoinUtilityFactory;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JVMMergeJoin;
+import com.bigdata.bop.join.JVMPipelinedHashJoinUtility;
+import com.bigdata.bop.join.JVMPipelinedSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NestedLoopJoinOp;
+import com.bigdata.bop.join.PipelinedHashIndexOp;
 import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.bop.paths.ZeroLengthPathOp;
@@ -4099,7 +4102,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
                 ), subgroup, ctx);
         } else {
-            left = applyQueryHints(new JVMSolutionSetHashJoinOp(
+            left = applyQueryHints(new JVMPipelinedSolutionSetHashJoinOp(
                     new BOp[] { subqueryPlan },//
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -5428,10 +5431,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
        if (ctx.nativeHashJoins) {
            joinUtilFactory = HTreeHashJoinUtility.factory;
        } else {
-           joinUtilFactory = JVMHashJoinUtility.factory;
+          // TODO: this needs to be changed
+//           joinUtilFactory = JVMHashJoinUtility.factory;
+           joinUtilFactory = JVMPipelinedHashJoinUtility.factory;
        }
        
-       left = applyQueryHints(new HashIndexOp(leftOrEmpty(left),//
+       
+       // TODO: PipelinedHashIndexOp
+       left = applyQueryHints(new PipelinedHashIndexOp(leftOrEmpty(left),//
            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
            new NV(BOp.Annotations.EVALUATION_CONTEXT,
                   BOpEvaluationContext.CONTROLLER),//
