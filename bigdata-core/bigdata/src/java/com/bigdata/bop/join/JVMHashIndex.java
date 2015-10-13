@@ -132,10 +132,10 @@ public class JVMHashIndex {
      * @see #keyVars
      * @see #indexSolutionsHavingUnboundJoinVars
      */
-    private Key makeKey(//final IVariable<?>[] keyVars,
-            final IBindingSet bset
-//            final boolean indexSolutionsHavingUnboundJoinVars
-            ) {
+    public static Key makeKey(
+          final IVariable<?>[] keyVars,
+          final IBindingSet bset,
+          final boolean indexSolutionsHavingUnboundJoinVars) {
 
         final IConstant<?>[] vals = new IConstant<?>[keyVars.length];
 
@@ -251,7 +251,7 @@ public class JVMHashIndex {
          */
         public final CAT nhits = new CAT();
 
-        private SolutionHit(final IBindingSet solution) {
+        public SolutionHit(final IBindingSet solution) {
 
             if (solution == null)
                 throw new IllegalArgumentException();
@@ -518,7 +518,7 @@ public class JVMHashIndex {
      */
     public Key add(final IBindingSet bset) {
 
-        final Key key = makeKey(bset);
+        final Key key = makeKey(keyVars, bset, indexSolutionsHavingUnboundJoinVars);
 
         if (key == null) {
 
@@ -599,7 +599,7 @@ public class JVMHashIndex {
      */
     public boolean addDistinct(final IBindingSet bset) {
 
-        final Key key = makeKey(bset);
+        final Key key = makeKey(keyVars, bset, indexSolutionsHavingUnboundJoinVars);
 
         assert key != null;
 
@@ -644,7 +644,7 @@ public class JVMHashIndex {
      */
     public Bucket getBucket(final IBindingSet left) {
 
-        final Key key = makeKey(left);
+        final Key key = makeKey(keyVars, left, indexSolutionsHavingUnboundJoinVars);
 
         if (key == null) {
 
