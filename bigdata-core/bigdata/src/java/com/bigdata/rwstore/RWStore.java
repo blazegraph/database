@@ -2126,7 +2126,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 
                 final int slotSize = getBlock((int) addr).getBlockSize();
                 if (slotSize < length) {
-                    throw new IllegalStateException("Bad Address: length requested greater than allocated slot");
+                    throw new IllegalStateException("Bad Address: length requested greater than allocated slot: " + slotSize + " < " + length);
                 }
 
                 final long paddr = physicalAddress((int) addr);
@@ -4971,7 +4971,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
     private int freeDeferrals(final long blockAddr, final long lastReleaseTime) {
         final int addr = (int) (blockAddr >> 32);
-        final int sze = (int) blockAddr & 0xFFFFFF;
+        final int sze = (int) blockAddr & 0xFFFFFFFF;
         
         if (log.isTraceEnabled())
             log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: " + sze + " releaseTime: " + lastReleaseTime);
@@ -7127,7 +7127,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         final boolean writeAll = false;
         
         final int addr = (int) (blockAddr >> 32);
-        final int sze = (int) blockAddr & 0xFFFFFF;
+        final int sze = (int) blockAddr & 0xFFFFFFFF;
 
         if (log.isTraceEnabled())
             log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: "
