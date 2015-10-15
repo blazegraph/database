@@ -27,16 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
-import com.bigdata.bop.join.HashIndexOp.ChunkTask;
-import com.bigdata.bop.join.HashIndexOpBase.Annotations;
+import com.bigdata.bop.controller.SubqueryAnnotations;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
@@ -57,7 +59,12 @@ public class PipelinedHashIndexOp extends HashIndexOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends HashIndexOp.Annotations {
+    // TOOD: cover with existing mechanism -> we may even get rid of this
+    //       completely/inline it, only computing distincts locally
+    private final Set<IBindingSet> distinctSet;
+
+    
+    public interface Annotations extends HashIndexOp.Annotations, SubqueryAnnotations {
 
     }
     
@@ -65,7 +72,11 @@ public class PipelinedHashIndexOp extends HashIndexOp {
      * Deep copy constructor.
      */
     public PipelinedHashIndexOp(final PipelinedHashIndexOp op) {
+       
         super(op);
+
+        distinctSet = new HashSet<IBindingSet>();
+        
     }
     
     /**
@@ -78,8 +89,10 @@ public class PipelinedHashIndexOp extends HashIndexOp {
 
         super(args, annotations);
 
-    }
+        distinctSet = new HashSet<IBindingSet>();
 
+    }
+    
     public PipelinedHashIndexOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
@@ -89,16 +102,26 @@ public class PipelinedHashIndexOp extends HashIndexOp {
     @Override
     protected ChunkTaskBase createChunkTask(final BOpContext<IBindingSet> context) {
 
-        return new ChunkTask(this, context);
+        // TODO: we would like to have the subquery as a proper member variable,
+        //       in order to statically assert it is properly set
+        return new ChunkTask(
+           this, context, (PipelineOp)getRequiredProperty(Annotations.SUBQUERY), distinctSet);
         
     }
     
     private static class ChunkTask extends com.bigdata.bop.join.HashIndexOp.ChunkTask {
 
+        final Set<IBindingSet> distinctSet;
+        final PipelineOp subquery;
+       
         public ChunkTask(final PipelinedHashIndexOp op,
-                final BOpContext<IBindingSet> context) {
+                final BOpContext<IBindingSet> context, final PipelineOp subquery,
+                final Set<IBindingSet> distinctSet) {
 
             super(op, context);
+            
+            this.distinctSet = distinctSet;
+            this.subquery = subquery;
 
         }
         
@@ -207,7 +230,10 @@ public class PipelinedHashIndexOp extends HashIndexOp {
                 
             }
             
-            ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(unsyncBuffer, src, stats);
+            
+            ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
+               unsyncBuffer, src, stats, subquery, distinctSet);
+            
             
             unsyncBuffer.flush();
 

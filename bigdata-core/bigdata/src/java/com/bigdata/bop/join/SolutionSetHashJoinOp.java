@@ -188,23 +188,23 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
     /**
      * Task executing on the node.
      */
-    private static class ChunkTask<E> implements Callable<Void> {
+    protected static class ChunkTask<E> implements Callable<Void> {
 
-        private final BOpContext<IBindingSet> context;
+       protected final BOpContext<IBindingSet> context;
 
-        private final SolutionSetHashJoinOp op;
+        protected final SolutionSetHashJoinOp op;
 
-        private final IHashJoinUtility state;
+        protected final IHashJoinUtility state;
 
-        private final IConstraint[] constraints;
+        protected final IConstraint[] constraints;
         
-        private final boolean release;
+        protected final boolean release;
         
-        private final BaseJoinStats stats;
+        protected final BaseJoinStats stats;
 
-        private final IBlockingBuffer<IBindingSet[]> sink;
+        protected final IBlockingBuffer<IBindingSet[]> sink;
         
-        private final IBlockingBuffer<IBindingSet[]> sink2;
+        protected final IBlockingBuffer<IBindingSet[]> sink2;
 
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final SolutionSetHashJoinOp op) {
@@ -310,7 +310,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
         /**
          * Do a hash join of the buffered solutions with the access path.
          */
-        private void doHashJoin() {
+        protected void doHashJoin() {
 
             if (state.isEmpty())
                 return;
@@ -342,7 +342,7 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
          * evaluation MUST be requested for any other than a
          * {@link JoinTypeEnum#Normal}.
          */
-        private void doLastPass(
+        protected void doLastPass(
                 final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer) {
             
             switch (state.getJoinType()) {

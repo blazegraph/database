@@ -22,27 +22,17 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 30, 2011
+ * Created on Oct. 15, 2015
  */
-
 package com.bigdata.bop.join;
 
 import java.util.Map;
-import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IQueryAttributes;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.INamedSolutionSetRef;
-import com.bigdata.bop.join.SolutionSetHashJoinOp.Annotations;
-import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
 /**
@@ -52,9 +42,7 @@ import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
  * 
  * @see JVMPipelinedHashJoinUtility
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: NamedSubqueryIncludeOp.java 5178 2011-09-12 19:09:23Z
- *          thompsonbry $
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
 public class JVMPipelinedSolutionSetHashJoinOp extends SolutionSetHashJoinOp {
 
@@ -62,7 +50,7 @@ public class JVMPipelinedSolutionSetHashJoinOp extends SolutionSetHashJoinOp {
      * 
      */
     private static final long serialVersionUID = 1L;
-
+    
     /**
      * Deep copy constructor.
      */
@@ -90,5 +78,62 @@ public class JVMPipelinedSolutionSetHashJoinOp extends SolutionSetHashJoinOp {
         this(args, NV.asMap(annotations));
         
     }
+    
+    @Override
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
+        return new FutureTask<Void>(new ChunkTask<IBindingSet>(context, this));
+        
+    }
+
+   /**
+    * Task executing on the node.
+    */
+   protected static class ChunkTask<E> extends SolutionSetHashJoinOp.ChunkTask<E> {
+
+      public ChunkTask(final BOpContext<IBindingSet> context,
+            final SolutionSetHashJoinOp op) {
+         super(context, op);
+      }
+
+      @Override
+      protected void doHashJoin() {
+
+         // TODO -> we need another condition here, this is not valid for queries
+         // with OPTIONAL etc (which may not buffer anything anymore)
+         // if (state.isEmpty())
+         // return;
+
+         stats.accessPathCount.increment();
+
+         // TODO: is this correct?
+         stats.accessPathRangeCount.add(state.getRightSolutionCount());
+
+         final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = 
+            new UnsyncLocalOutputBuffer<IBindingSet>(op.getChunkCapacity(), sink);
+
+         state.hashJoin2(context.getSource(), stats, unsyncBuffer, constraints);
+
+         if (context.isLastInvocation()) {
+
+            doLastPass(unsyncBuffer);
+
+         }
+
+         unsyncBuffer.flush();
+         sink.flush();
+
+      }
+
+      @Override
+      protected void doLastPass(
+            final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer) {
+         
+         /**
+          * There's nothing to be done here: for the pipelined version, the
+          * handling of Optionals and the like must not be delayed to the end,
+          * but is covered directly in hashJoin2().
+          */
+      }
+   }
 }

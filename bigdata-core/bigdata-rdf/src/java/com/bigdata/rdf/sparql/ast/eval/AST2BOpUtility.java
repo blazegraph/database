@@ -62,6 +62,7 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.IHashJoinUtilityFactory;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JVMMergeJoin;
+import com.bigdata.bop.join.JVMPipelinedHashIndex;
 import com.bigdata.bop.join.JVMPipelinedHashJoinUtility;
 import com.bigdata.bop.join.JVMPipelinedSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
@@ -4071,9 +4072,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
         left = addHashIndexOp(left, ctx, subgroup, joinType, joinVars, 
               joinConstraints, projectInVars, namedSolutionSet);
 
-        final PipelineOp subqueryPlan = convertJoinGroupOrUnion(left,
-                subgroup, doneSet, ctx);
+        if (true) { // TODO: distinguish between join parallel and non-parallel hash join
 
+           // subquery execution is controlled  for pipelined hash join
+           final PipelineOp subqueryPlan = 
+              convertJoinGroupOrUnion(null /* subquery stand-alone */, subgroup, doneSet, ctx);
+           left = (PipelineOp)left.setProperty(
+              PipelinedHashIndexOp.Annotations.SUBQUERY, subqueryPlan);
+           
+        } else {
+           // this is more or less the original code (append the subgroup)
+           left = convertJoinGroupOrUnion(left, subgroup, doneSet, ctx);
+        }
+        
         // lastPass unless this is a normal join.
         final boolean lastPass = !joinType.isNormal();
         
@@ -4087,7 +4098,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         if(ctx.nativeHashJoins) {
             left = applyQueryHints(new HTreeSolutionSetHashJoinOp(
-                new BOp[] { subqueryPlan },//
+                new BOp[] { left },//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -4103,7 +4114,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 ), subgroup, ctx);
         } else {
             left = applyQueryHints(new JVMPipelinedSolutionSetHashJoinOp(
-                    new BOp[] { subqueryPlan },//
+                    new BOp[] { left },//
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -5438,6 +5449,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
        
        
        // TODO: PipelinedHashIndexOp
+       // TODO: think about output distinct JVs for pipelined hash index; imho
+       //       it makes no sense here  and should be ignored
        left = applyQueryHints(new PipelinedHashIndexOp(leftOrEmpty(left),//
            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
            new NV(BOp.Annotations.EVALUATION_CONTEXT,
