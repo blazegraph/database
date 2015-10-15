@@ -49,9 +49,9 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.join.JVMHashIndex.Bucket;
-import com.bigdata.bop.join.JVMHashIndex.Key;
-import com.bigdata.bop.join.JVMHashIndex.SolutionHit;
+import com.bigdata.bop.join.IJVMHashIndex.Bucket;
+import com.bigdata.bop.join.IJVMHashIndex.Key;
+import com.bigdata.bop.join.IJVMHashIndex.SolutionHit;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
@@ -156,7 +156,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * Note: There is no separate "joinSet". Instead, the {@link SolutionHit}
      * class provides a join hit counter.
      */
-    private final AtomicReference<JVMHashIndex> rightSolutionsRef = new AtomicReference<JVMHashIndex>();
+    protected final AtomicReference<IJVMHashIndex> rightSolutionsRef = 
+       new AtomicReference<IJVMHashIndex>();
     
     /**
      * The #of solutions accepted into the hash index.
@@ -321,6 +322,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          * hash index.)
          */
 
+
         /*
          * The ordered variables for the keys in the hash index.
          * 
@@ -329,19 +331,36 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          * Otherwise use the [joinVars].
          */
         final IVariable<?>[] keyVars = filter ? (IVariable<?>[]) op
-                .getProperty(JoinAnnotations.SELECT) : joinVars;
-                
-        rightSolutionsRef.set(//
-                new JVMHashIndex(//
-                        keyVars,//
-                        indexSolutionsHavingUnboundJoinVars,//
-                        new LinkedHashMap<Key, Bucket>(op.getProperty(
-                                HashMapAnnotations.INITIAL_CAPACITY,
-                                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                                op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                                        HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
-                        )//
-                ));
+              .getProperty(JoinAnnotations.SELECT) : joinVars;
+              
+        initRightSolutionsRef(
+           op, keyVars, filter, indexSolutionsHavingUnboundJoinVars);
+    }
+    
+    /**
+     * Called from constructor. May be overridden in subclasses to set up a
+     * custom hash index.
+     * 
+     * @param op
+     * @param filter
+     * @param indexSolutionsHavingUnboundJoinVars
+     */
+    protected void initRightSolutionsRef(
+       final PipelineOp op, final IVariable<?>[] keyVars, final boolean filter, 
+       final boolean indexSolutionsHavingUnboundJoinVars) {
+
+
+       rightSolutionsRef.set(//
+             new JVMHashIndex(//
+                     keyVars,//
+                     indexSolutionsHavingUnboundJoinVars,//
+                     new LinkedHashMap<Key, Bucket>(op.getProperty(
+                             HashMapAnnotations.INITIAL_CAPACITY,
+                             HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
+                             op.getProperty(HashMapAnnotations.LOAD_FACTOR,
+                                     HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
+                     )//
+             ));
 
     }
     
@@ -387,7 +406,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
     }
 
-    protected JVMHashIndex getRightSolutions() {
+    protected IJVMHashIndex getRightSolutions() {
         
         return rightSolutionsRef.get();
         
@@ -423,7 +442,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
         try {
 
-            final JVMHashIndex index = getRightSolutions();
+            final IJVMHashIndex index = getRightSolutions();
 
             final IBindingSet[] all = BOpUtility.toArray(itr, stats);
 
@@ -472,7 +491,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
         try {
         
-            final JVMHashIndex index = getRightSolutions();
+            final IJVMHashIndex index = getRightSolutions();
 
             final IBindingSet[] all = BOpUtility.toArray(itr, stats);
 
@@ -550,7 +569,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             final IConstraint[] constraints//
             ) {
 
-        final JVMHashIndex rightSolutions = getRightSolutions();
+        final IJVMHashIndex rightSolutions = getRightSolutions();
           
         if (log.isInfoEnabled()) {
             log.info("rightSolutions: #buckets=" + rightSolutions.bucketCount()
@@ -728,7 +747,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             final Constant f = askVar == null ? null : new Constant(
                     XSDBooleanIV.FALSE);
 
-            final JVMHashIndex rightSolutions = getRightSolutions();
+            final IJVMHashIndex rightSolutions = getRightSolutions();
 
             final IVariable<?>[] selected = getSelectVars();
 
@@ -799,7 +818,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 //             */
 //            final IVariable<?>[] selected = getSelectVars();
 
-            final JVMHashIndex rightSolutions = getRightSolutions();
+            final IJVMHashIndex rightSolutions = getRightSolutions();
 
             if (log.isInfoEnabled())
                 log.info("rightSolutions: #buckets=" + rightSolutions.bucketCount());
@@ -864,7 +883,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
        try {
 
-          final JVMHashIndex rightSolutions = getRightSolutions();
+          final IJVMHashIndex rightSolutions = getRightSolutions();
 
           final IVariable<?>[] selected = getSelectVars();
 
@@ -959,7 +978,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             final Constant t = askVar == null ? null : new Constant(
                     XSDBooleanIV.TRUE);
             
-            final JVMHashIndex rightSolutions = getRightSolutions();
+            final IJVMHashIndex rightSolutions = getRightSolutions();
 
             final IVariable<?>[] selected = getSelectVars();
 
