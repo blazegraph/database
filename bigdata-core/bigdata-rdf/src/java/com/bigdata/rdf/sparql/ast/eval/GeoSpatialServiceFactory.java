@@ -34,10 +34,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -92,6 +96,9 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
+import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.ChunkConsumerIterator;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
@@ -100,6 +107,9 @@ import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
+import com.bigdata.util.BytesUtil;
+import com.bigdata.util.concurrent.Haltable;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
@@ -365,6 +375,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     * not a {@link Serializable} object. It MUST run on the query controller.
     */
    private static class GeoSpatialServiceCall implements BigdataServiceCall {
+      
+      // TODO: need to expose these constants as configuration options
+      private static int THREAD_LOCAL_BUFFER_SIZE = 100;
+      private static int CHUNKS_OF_CHUNKS_CAPACITY = 100;
+      private static int MAX_PARALLEL_THREADS = 10;
+      private static int AVERAGE_DATA_POINTS_PER_THREAD = 1000; 
+      
 
       private final IServiceOptions serviceOptions;
       private final TermNode searchFunction;
@@ -386,6 +403,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final GeoSpatialDefaults defaults;
       private final AbstractTripleStore kb;
       private final GeoSpatialCounters geoSpatialCounters;
+      
+      /**
+       * The service used for executing subtasks (optional).
+       * 
+       * @see #maxParallelChunks
+       */
+      final private Executor executor;
+      
       
       public GeoSpatialServiceCall(final IVariable<?> searchVar,
             final Map<URI, StatementPatternNode> statementPatterns,
@@ -490,6 +515,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             QueryEngineFactory.getQueryController(
                kb.getIndexManager()).getGeoSpatialCounters();
             
+         // set up service
+         if (MAX_PARALLEL_THREADS <= 1) {
+            
+            executor = null;
+            
+         } else {
+            
+            // shared service.
+            executor = new LatchedExecutor(
+               kb.getIndexManager().getExecutorService(), MAX_PARALLEL_THREADS);
+         }
 
       }
 
@@ -523,7 +559,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        * 
        * @return an iterator over the search results
        */
-      @SuppressWarnings({ "unchecked", "rawtypes" })
       public ICloseableIterator<IBindingSet> search(
             final GeoSpatialSearchQuery query, final AbstractTripleStore kb) {
 
@@ -531,272 +566,745 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             QueryEngineFactory.getQueryController(kb.getIndexManager()));
          
          geoSpatialCounters.registerGeoSpatialSearchRequest();
-         
+
          final GlobalAnnotations globals = new GlobalAnnotations(kb
                .getLexiconRelation().getNamespace(), kb.getSPORelation()
                .getTimestamp());
          
          final BigdataValueFactory vf = kb.getValueFactory();
+
+         final BlockingBuffer<IBindingSet[]> buffer = 
+            new BlockingBuffer<IBindingSet[]>(CHUNKS_OF_CHUNKS_CAPACITY);
+
+         final FutureTask<Void> ft = 
+            new FutureTask<Void>(new GeoSpatialServiceCallTask(
+               buffer, query, kb, vars, context, globals, vf, geoSpatialCounters, executor));
          
-         // this is needed for any function
-         final Long timeStart = query.getTimeStart();
-         final Long timeEnd = query.getTimeEnd();
-
-         // the literal extension object used for conversion
-         final GeoSpatialLiteralExtension<BigdataValue> litExt = 
-            new GeoSpatialLiteralExtension<BigdataValue>(
-               kb.getLexiconRelation());
-
-         // construct the bounding boxes and filters, which depend on the
-         // function that is specified within the query
-         final Object[] lowerBorderComponents;
-         final Object[] upperBorderComponents;
-         final GeoSpatialFilterBase filter;
+         buffer.setFuture(ft); // set the future on the buffer
+         kb.getIndexManager().getExecutorService().submit(ft);
          
-         switch (query.getSearchFunction()) {
-         case IN_CIRCLE: {
-            final PointLatLon centerPoint = query.getSpatialCircleCenter();
-            
-            final CoordinateDD centerPointDD = centerPoint.asCoordinateDD();
-            
-            final Double distance = query.getSpatialCircleRadius();
-            final UNITS spatialUnit = query.getSpatialUnit();
-            
-            final CoordinateDD upperLeft = 
-               CoordinateUtility.boundingBoxUpperLeft(
-                  centerPointDD, distance, spatialUnit);
-            
-            final CoordinateDD lowerRight = 
-               CoordinateUtility.boundingBoxLowerRight(
-                  centerPointDD, distance, spatialUnit);
-            
-            // construct the points with time
-            final PointLatLonTime upperLeftWithTime = 
-               new PointLatLonTime(upperLeft, timeStart);
-            
-            final PointLatLonTime lowerRightWithTime = 
-               new PointLatLonTime(lowerRight, timeEnd);
+         return new ChunkConsumerIterator<IBindingSet>(buffer.iterator());
 
-            // convert to componet strings
-            lowerBorderComponents = PointLatLonTime
-                  .toComponentString(upperLeftWithTime);
-            
-            upperBorderComponents = PointLatLonTime
-                  .toComponentString(lowerRightWithTime);
-
-            // set up the filter
-            filter = new GeoSpatialInCircleFilter(
-               centerPoint, distance, spatialUnit, timeStart,
-               timeEnd, litExt, geoSpatialCounters);
-         }
-            break;
-
-         case IN_RECTANGLE: {
-            final PointLatLon upperLeft = query.getSpatialRectangleUpperLeft();
-            final PointLatLon lowerRight = query
-                  .getSpatialRectangleLowerRight();
-
-            // construct the points with time
-            final PointLatLonTime upperLeftWithTime = new PointLatLonTime(
-                  upperLeft, timeStart);
-            final PointLatLonTime lowerRightWithTime = new PointLatLonTime(
-                  lowerRight, timeEnd);
-
-            lowerBorderComponents = PointLatLonTime
-                  .toComponentString(upperLeftWithTime);
-            upperBorderComponents = PointLatLonTime
-                  .toComponentString(lowerRightWithTime);
-
-            filter = new GeoSpatialInRectangleFilter(
-               upperLeftWithTime, lowerRightWithTime, litExt, geoSpatialCounters);
-         }
-            break;
-
-         default:
-            throw new RuntimeException("Unknown geospatial search function.");
-         }
-
-         // set up range scan
-         final Var oVar = Var.var(); // object position variable
-         final RangeNode range = new RangeNode(new VarNode(oVar),
-               new ConstantNode(litExt.createIV(lowerBorderComponents)),
-               new ConstantNode(litExt.createIV(upperBorderComponents)));
-
-         final RangeBOp rangeBop = ASTRangeOptimizer.toRangeBOp(context, range,
-               globals);
-         
-         // we support projection of fixed subjects into the SERVICE call
-         IConstant<?> constSubject = query.getSubject();
-         
-         // set up the predicate
-         final TermNode s = constSubject==null ? 
-            new VarNode(vars[0].getName()) : new ConstantNode((IConstant<IV>)constSubject);
-         final TermNode p = query.getPredicate();
-         final VarNode o = new VarNode(oVar);
-
-         /**
-          * We call kb.getPredicate(), which has the nice feature that it
-          * returns null if the predicate is unsatisfiable (i.e., if the
-          * predicate does not appear in the data). This gives us an early
-          * exit point for the service (see null check below).
-          */
-         IPredicate<ISPO> pred = (IPredicate<ISPO>) kb.getPredicate(
-               (URI) s.getValue(), /* subject */
-               p==null ? null : (URI)p.getValue(), /* predicate */
-               o.getValue(), /* object */
-               null, /* context */
-               null, /* filter */
-               rangeBop); /* rangeBop */
-        
-         // early exit: predicate unsatisfiable
-         if (pred == null) {
-            return null; 
-         }
-
-         pred = (IPredicate<ISPO>) pred.setProperty(
-               IPredicate.Annotations.TIMESTAMP, kb.getSPORelation()
-                     .getTimestamp());
-
-         final IRelation<ISPO> relation = context.getRelation(pred);
-
-         final AccessPath<ISPO> accessPath = (AccessPath<ISPO>) context
-               .getAccessPath(relation, pred);
-
-
-         final byte[] lowerZOrderKey = litExt.toZOrderByteArray(lowerBorderComponents);
-         final byte[] upperZOrderKey = litExt.toZOrderByteArray(upperBorderComponents);
-         
-         if (log.isInfoEnabled()) {
-            log.info("Scanning from " + litExt);
-            log.info("Scanning to   " + litExt);           
-         }
-
-
-         // extract position of subject and object in index
-         final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder();
-         final int subjectPos = keyOrder.getPositionInIndex(SPOKeyOrder.S);
-         final int objectPos = keyOrder.getPositionInIndex(SPOKeyOrder.O);
-         
-         // set object (=z-order literal) position in the surrounding filter
-         filter.setObjectPos(objectPos);
-
-         /**
-          * If the context is provided, we would need a key order such as
-          * PCOS or CPOS, but unfortunately these key order are not available.
-          * As a "workaround", we do not pass in the context into the predicate,
-          * but instead set an additional context check in the filter. 
-          * 
-          * This is, of course, not a good strategy when the context is very
-          * selective and the index access is not. We could do more sophisticated
-          * stuff here, but for now let's try with this solution.
-          */
-         final TermNode ctxTermNode = query.getContext(); 
-         if (ctxTermNode!=null) {
-            
-            final BigdataValue ctx = 
-               ctxTermNode==null ? null : ctxTermNode.getValue();
-            if (ctx!=null && !(ctx instanceof BigdataURI)) {
-               throw new IllegalArgumentException(
-                  "Context in GeoSpatial search must be a URI");
-            }  
-
-            // register context check in the filter
-            filter.addContextCheck(
-               keyOrder.getPositionInIndex(SPOKeyOrder.C), (BigdataURI)ctx);
-            
-         }
-         
-         /**
-          * Set up the advancer, which iterates exactly over the values in range
-          * TODO: we want to have this multi threaded at some point
-          */
-         final Advancer<SPO> bigMinAdvancer = 
-            new ZOrderIndexBigMinAdvancer(
-               lowerZOrderKey, upperZOrderKey, litExt, objectPos, geoSpatialCounters);
-
-         final Var<?> locationVar = varFromIVar(query.getLocationVar());
-         final Var<?> timeVar = varFromIVar(query.getTimeVar());
-         final Var<?> locationAndTimeVar = varFromIVar(query.getLocationAndTimeVar());
-         
-         
-         final Var<?> var = Var.var(vars[0].getName());
-         final IBindingSet incomingBindingSet = query.getIncomingBindings();
-         final Iterator<IBindingSet> itr = 
-            new Striterator(accessPath.getIndex().rangeIterator(
-               accessPath.getFromKey(), accessPath.getToKey(), 0/* capacity */, 
-               IRangeQuery.KEYS | IRangeQuery.CURSOR, bigMinAdvancer))
-                  .addFilter(filter)
-                  .addFilter(new Resolver() {
-
-                     private static final long serialVersionUID = 1L;
-                          
-                     /**
-                       * Resolve tuple to IV.
-                       */
-                     @Override
-                     protected IBindingSet resolve(final Object obj) {
-
-                        final byte[] key = ((ITuple<?>) obj).getKey();
-                             
-                        final boolean reportsObjectComponents =
-                           locationVar!=null || timeVar!=null || locationAndTimeVar!=null;
-
-                        // if results are reported, we need to decode up to subject + object,
-                        // otherwise decoding up to the subject position is sufficient
-                        final int extractToPosition =
-                           reportsObjectComponents ? 
-                           Math.max(objectPos, subjectPos) + 1: 
-                           subjectPos + 1;
-                        final IV[] ivs = IVUtility.decode(key, extractToPosition);
-
-                        final IBindingSet bs = incomingBindingSet.clone();
-                        bs.set(var, new Constant<IV>(ivs[subjectPos]));
-
-                        // handle request for return of index components
-                        if (reportsObjectComponents) {
-                           
-                           if (locationVar!=null) {
-                              
-                              // wrap positions 0 + 1 (lat + lon) into a literal
-                              final BigdataLiteral locationLit = 
-                                 vf.createLiteral(
-                                    litExt.toComponentString(0,1,(LiteralExtensionIV)ivs[objectPos]));
-                              
-                              bs.set(locationVar, 
-                                 new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) locationLit)));
-                           }
-
-                           if (timeVar!=null) {
-                              
-                              // wrap positions 2 of the index into a literal
-                              final BigdataLiteral timeLit = 
-                                    vf.createLiteral(
-                                       Long.valueOf(litExt.toComponentString(2,2,(LiteralExtensionIV)ivs[objectPos])));
-                              
-                              bs.set(timeVar, 
-                                    new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) timeLit)));
-                           }
-
-                           if (locationAndTimeVar!=null) {
-                              bs.set(locationAndTimeVar, new Constant<IV>(ivs[objectPos]));
-                           }
-
-                        }
-                        
-                        return bs;
-
-                     }
-                  }
-               );
-
-         return (ICloseableIterator<IBindingSet>)itr;
       }
       
       private static Var<?> varFromIVar(IVariable<?> iVar) {
          
          return iVar==null ? null : Var.var(iVar.getName());
          
+      }
+      
+      /**
+       * A single serice call request
+       * 
+       * @author msc
+       */
+      private static class GeoSpatialServiceCallTask 
+         extends Haltable<Void> implements Callable<Void> {
+
+         final BlockingBuffer<IBindingSet[]> buffer;
          
+         final private Executor executor;
+         
+         final private GeoSpatialSearchQuery query;
+         final private AbstractTripleStore kb;
+         final private IVariable<?>[] vars;
+         
+         final private GeoSpatialCounters geoSpatialCounters;
+         
+         final private BOpContextBase context;
+         final private GlobalAnnotations globals;
+         final private BigdataValueFactory vf;
+         
+         final private  GeoSpatialLiteralExtension<BigdataValue> litExt;
+
+         
+         
+         
+         /**
+          * The list of tasks to execute. Execution of these tasks is carried out
+          * in parallel if an executor with parallel execution configuration turned
+          * on is provided. Otherwise, the tasks are processed one by one
+          */
+         final private List<GeoSpatialServiceCallSubRangeTask> tasks;
+         
+         /**
+          * 
+          */
+         public GeoSpatialServiceCallTask(
+            final BlockingBuffer<IBindingSet[]> buffer, final GeoSpatialSearchQuery query,
+            final AbstractTripleStore kb, final IVariable<?>[] vars,
+            final BOpContextBase context,
+            final GlobalAnnotations globals, final BigdataValueFactory vf,
+            final GeoSpatialCounters geoSpatialCounters, final Executor executor) {
+            
+            this.buffer = buffer;
+            this.query = query;
+            this.kb = kb;
+            this.vars = vars;
+            this.context = context;
+            this.globals = globals;
+            this.vf = vf;
+            
+            this.executor = executor;
+            this.geoSpatialCounters = geoSpatialCounters;
+
+            // for use in this thread only
+            this.litExt = new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation());
+
+            tasks = getSubTasks();
+            
+         }
+         
+         
+         /**
+          * Decomposes the context path into subtasks. Each subtasks is a simple range
+          * specification, which carries out range iteration.
+          */
+         @SuppressWarnings("rawtypes")
+         protected List<GeoSpatialServiceCallSubRangeTask> getSubTasks() {
+            
+            final List<GeoSpatialServiceCallSubRangeTask> subTasks =
+               new LinkedList<GeoSpatialServiceCallSubRangeTask>();
+            
+            /**
+             * Collect metadata. Note that the filters are not thread-safe, so we need to set 
+             * up one filter objects for the individual threads and cannot do that here. 
+             */
+            final Long timeStart = query.getTimeStart();
+            final Long timeEnd = query.getTimeEnd();
+            final PointLatLonTime upperLeftWithTime;     // upper left as point
+            final PointLatLonTime lowerRightWithTime;    // lower right as point
+            final Object[] lowerBorderComponents;        // upper left as array
+            final Object[] upperBorderComponents;        // lower right as point
+            switch (query.getSearchFunction()) {
+            case IN_CIRCLE: 
+               {
+                  final PointLatLon centerPoint = query.getSpatialCircleCenter();
+                  
+                  final CoordinateDD centerPointDD = centerPoint.asCoordinateDD();
+                  
+                  final Double distance = query.getSpatialCircleRadius();
+                  final UNITS spatialUnit = query.getSpatialUnit();
+                  
+                  final CoordinateDD upperLeft = 
+                     CoordinateUtility.boundingBoxUpperLeft(
+                        centerPointDD, distance, spatialUnit);
+                  
+                  final CoordinateDD lowerRight = 
+                     CoordinateUtility.boundingBoxLowerRight(
+                        centerPointDD, distance, spatialUnit);
+                  
+                  // construct the points with time
+                  upperLeftWithTime = new PointLatLonTime(upperLeft, timeStart);
+                  lowerRightWithTime = new PointLatLonTime(lowerRight, timeEnd);
+      
+                  // convert to component strings
+                  lowerBorderComponents = PointLatLonTime.toComponentString(upperLeftWithTime);
+                  upperBorderComponents = PointLatLonTime.toComponentString(lowerRightWithTime);
+               }
+               break;
+
+            case IN_RECTANGLE: 
+               {
+                  final PointLatLon upperLeft = query.getSpatialRectangleUpperLeft();
+                  final PointLatLon lowerRight = query
+                        .getSpatialRectangleLowerRight();
+      
+                  // construct the points with time
+                  upperLeftWithTime = new PointLatLonTime(upperLeft, timeStart);
+                  lowerRightWithTime = new PointLatLonTime(lowerRight, timeEnd);
+      
+                  // convert to component strings
+                  lowerBorderComponents = PointLatLonTime.toComponentString(upperLeftWithTime);
+                  upperBorderComponents = PointLatLonTime.toComponentString(lowerRightWithTime);
+               }
+               break;
+
+            default:
+               throw new RuntimeException("Unknown geospatial search function.");
+            }
+
+            /**
+             * Assert that the search request is valid in the sense that we have no unsatisfiable ranges
+             * in the search query. In case we have, no subtasks will be generated and hence no results
+             * will be generated (no need to throw a hard error here).
+             */
+            if (upperLeftWithTime.getLat()>lowerRightWithTime.getLat()) {
+               if (log.isInfoEnabled()) {
+                  log.info("Search rectangle upper left latitude (" + upperLeftWithTime.getLat() + 
+                     ") is larger than rectangle lower righ latitude (" + lowerRightWithTime.getLat() + 
+                     ". Search request will give no results.");
+               }
+               return subTasks;
+            }
+            if (upperLeftWithTime.getLon()>lowerRightWithTime.getLon()) {
+               if (log.isInfoEnabled()) {
+                  log.info("Search rectangle upper left longitude (" + upperLeftWithTime.getLon() + 
+                     ") is larger than rectangle lower right longitude (" + lowerRightWithTime.getLon() + 
+                     ". Search request will give no results.");
+               }
+               return subTasks;
+            }
+            if (upperLeftWithTime.getTimestamp()>lowerRightWithTime.getTimestamp()) {
+               if (log.isInfoEnabled()) {
+                  log.info("Search rectangle upper left timestamp (" + upperLeftWithTime.getTimestamp() + 
+                     ") is larger than rectangle lower right timestamp (" + lowerRightWithTime.getTimestamp() + 
+                     ". Search request will give no results.");
+               }
+               return subTasks;
+            }
+
+            
+            /**
+             * We proceed as follows:
+             * 
+             * 1.) Estimate the number of total points in the search range
+             * 2.) Based on the config parameter telling us how many points to process per thread, we obtain the #subtasks
+             * 3.) Knowing the number of subtasks, we split the range into #subtasks equal-length subranges
+             * 4.) For each of these subranges, we set up a subtask to process the subrange
+             */
+            final AccessPath<ISPO> accessPath = getAccessPath(lowerBorderComponents, upperBorderComponents);
+            final long totalPointInRange = accessPath.rangeCount(false/* exact */);
+
+            final long nrSubRanges = Math.max(totalPointInRange / AVERAGE_DATA_POINTS_PER_THREAD, 1); /* at least one subrange */
+
+            LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
+            LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
+            
+            if (log.isDebugEnabled()) {
+               
+               log.debug("[OuterRange] Scanning from " + lowerBorderIV.getDelegate().integerValue() 
+                     + " / " + litExt.toComponentString(0, 2, lowerBorderIV));
+               log.debug("[OuterRange]            to " + upperBorderIV.getDelegate().integerValue()
+                     + " / " +  litExt.toComponentString(0, 2, upperBorderIV));
+
+            }
+            
+            // split range into nrSubRanges, equal-length pieces
+            final GeoSpatialSubRangePartitioner partitioner = 
+               new GeoSpatialSubRangePartitioner(upperLeftWithTime, lowerRightWithTime, nrSubRanges, litExt);
+            
+            // set up tasks for partitions
+            final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder(); // will be the same for all partitions
+            final int subjectPos = keyOrder.getPositionInIndex(SPOKeyOrder.S);
+            final int objectPos = keyOrder.getPositionInIndex(SPOKeyOrder.O);
+            for (GeoSpatialSubRangePartition partition : partitioner.getPartitions()) {
+               
+               // set up a subtask for the partition
+               final GeoSpatialServiceCallSubRangeTask subTask = 
+                  getSubTask(upperLeftWithTime, lowerRightWithTime, 
+                     partition.lowerBorder, partition.upperBorder, keyOrder, subjectPos, objectPos);
+               
+               if (subTask!=null) { // if satisfiable
+                  subTasks.add(subTask);
+               }
+               
+               if (log.isDebugEnabled()) {
+
+                  final Object[] lowerBorderComponentsPart = 
+                     PointLatLonTime.toComponentString(partition.lowerBorder);
+                  final Object[] upperBorderComponentsPart = 
+                     PointLatLonTime.toComponentString(partition.upperBorder);
+                  
+                  LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorderComponentsPart);
+                  LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorderComponentsPart);
+
+                  log.debug("[InnerRange] Scanning from " + lowerBorderIVPart.getDelegate().integerValue() 
+                        + " / " + litExt.toComponentString(0, 2, lowerBorderIVPart) 
+                        + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(lowerBorderComponentsPart)));
+                  log.debug("[InnerRange]            to " + upperBorderIVPart.getDelegate().integerValue() 
+                        + " / " +  litExt.toComponentString(0, 2, upperBorderIVPart) 
+                        + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorderComponentsPart)));
+               }
+
+            }
+
+            return subTasks;
+
+         }
+
+
+         // TODO: documentation
+         protected GeoSpatialServiceCallSubRangeTask getSubTask(
+            final PointLatLonTime outerRangeUpperLeftWithTime,    /* upper left of outer (non subtask) range */
+            final PointLatLonTime outerRangeLowerRightWithTime,   /* lower right of outer (non subtask) range */
+            final PointLatLonTime subRangeUpperLeftWithTime,      /* upper left of the subtask */
+            final PointLatLonTime subRangeLowerRightWithTime,     /* lower right of the subtask */
+            final SPOKeyOrder keyOrder, final int subjectPos, 
+            final int objectPos) {
+            
+            /**
+             * Compose the surrounding filter. The filter is based on the outer range.
+             */
+            final GeoSpatialFilterBase filter;
+            switch (query.getSearchFunction()) {
+            case IN_CIRCLE: 
+               {
+                  filter = new GeoSpatialInCircleFilter(
+                     query.getSpatialCircleCenter(),  query.getSpatialCircleRadius(), query.getSpatialUnit(), 
+                     outerRangeUpperLeftWithTime.getTimestamp(), outerRangeLowerRightWithTime.getTimestamp(), litExt, geoSpatialCounters);
+                  
+               }
+               break;
+
+            case IN_RECTANGLE: 
+               {
+                  filter = new GeoSpatialInRectangleFilter(
+                     outerRangeUpperLeftWithTime, outerRangeLowerRightWithTime, litExt, geoSpatialCounters);
+                  
+               }
+               break;
+
+            default:
+               throw new RuntimeException("Unknown geospatial search function.");
+            }
+
+            filter.setObjectPos(objectPos); // position of the object in the index
+
+            /**
+             * If the context is provided, we would need a key order such as
+             * PCOS or CPOS, but unfortunately these key order are not available.
+             * As a "workaround", we do not pass in the context into the predicate,
+             * but instead set an additional context check in the filter. 
+             * 
+             * This is, of course, not a good strategy when the context is very
+             * selective and the index access is not. We could do more sophisticated
+             * stuff here, but for now let's try with this solution.
+             */
+            final TermNode ctxTermNode = query.getContext(); 
+            if (ctxTermNode!=null) {
+               
+               final BigdataValue ctx = 
+                  ctxTermNode==null ? null : ctxTermNode.getValue();
+               if (ctx!=null && !(ctx instanceof BigdataURI)) {
+                  throw new IllegalArgumentException(
+                     "Context in GeoSpatial search must be a URI");
+               }  
+
+               // register context check in the filter
+               filter.addContextCheck(
+                  keyOrder.getPositionInIndex(SPOKeyOrder.C), (BigdataURI)ctx);
+               
+            }
+
+            // decompose sub range borders into components
+            final Object[] subRangeUpperLeftComponents = 
+               PointLatLonTime.toComponentString(subRangeUpperLeftWithTime);
+            final Object[] subRangeLowerRightComponents = 
+               PointLatLonTime.toComponentString(subRangeLowerRightWithTime);
+
+            // get the access path for the sub range
+            final AccessPath<ISPO> accessPath = 
+               getAccessPath(subRangeUpperLeftComponents, subRangeLowerRightComponents);
+            
+            if (accessPath==null) {
+               return null;
+            }
+
+            // set up a big min advancer for efficient extraction of relevant values from access path
+            final byte[] lowerZOrderKey = litExt.toZOrderByteArray(subRangeUpperLeftComponents);
+            final byte[] upperZOrderKey = litExt.toZOrderByteArray(subRangeLowerRightComponents);
+            
+            final Advancer<SPO> bigMinAdvancer = 
+               new ZOrderIndexBigMinAdvancer(
+                  lowerZOrderKey, upperZOrderKey, litExt, objectPos, geoSpatialCounters);
+
+            
+            // set up a value resolver
+            final Var<?> locationVar = varFromIVar(query.getLocationVar());
+            final Var<?> timeVar = varFromIVar(query.getTimeVar());
+            final Var<?> locationAndTimeVar = varFromIVar(query.getLocationAndTimeVar());
+            
+            final Var<?> var = Var.var(vars[0].getName());
+            final IBindingSet incomingBindingSet = query.getIncomingBindings();
+
+            final GeoSpatialServiceCallResolver resolver = 
+                  new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
+                        timeVar, locationAndTimeVar, subjectPos, objectPos, vf, litExt);
+            
+            // and construct the sub range task
+            return new GeoSpatialServiceCallSubRangeTask(buffer, accessPath, bigMinAdvancer, filter, resolver);
+         }
+
+
+         @SuppressWarnings({ "unchecked", "rawtypes" })
+         protected AccessPath<ISPO> getAccessPath(
+            final Object[] lowerBorderComponents, final Object[] upperBorderComponents) {
+
+            // set up range scan
+            final Var oVar = Var.var(); // object position variable
+            final RangeNode range = new RangeNode(new VarNode(oVar),
+                  new ConstantNode(litExt.createIV(lowerBorderComponents)),
+                  new ConstantNode(litExt.createIV(upperBorderComponents)));
+
+            final RangeBOp rangeBop = ASTRangeOptimizer.toRangeBOp(context, range, globals);
+            
+            // we support projection of fixed subjects into the SERVICE call
+            IConstant<?> constSubject = query.getSubject();
+            
+            // set up the predicate
+            final TermNode s = constSubject==null ? 
+               new VarNode(vars[0].getName()) : new ConstantNode((IConstant<IV>)constSubject);
+            final TermNode p = query.getPredicate();
+            final VarNode o = new VarNode(oVar);
+
+            /**
+             * We call kb.getPredicate(), which has the nice feature that it
+             * returns null if the predicate is unsatisfiable (i.e., if the
+             * predicate does not appear in the data). This gives us an early
+             * exit point for the service (see null check below).
+             */
+            IPredicate<ISPO> pred = (IPredicate<ISPO>) kb.getPredicate(
+                  (URI) s.getValue(), /* subject */
+                  p==null ? null : (URI)p.getValue(), /* predicate */
+                  o.getValue(), /* object */
+                  null, /* context */
+                  null, /* filter */
+                  rangeBop); /* rangeBop */
+           
+            if (pred == null) {
+               return null;
+            }
+
+            pred = (IPredicate<ISPO>) pred.setProperty(
+                  IPredicate.Annotations.TIMESTAMP, kb.getSPORelation().getTimestamp());
+
+            final IRelation<ISPO> relation = context.getRelation(pred);
+
+            final AccessPath<ISPO> accessPath = (AccessPath<ISPO>) context
+                  .getAccessPath(relation, pred);
+
+            return accessPath;
+            
+         }
+
+
+
+         
+         @Override
+         public Void call() throws Exception {
+            
+            // if there's no executor specified or only one subtask, we run the task in process
+            if (executor == null || tasks.size()==1) {
+
+               /*
+                * No Executor, so run each task in the caller's thread.
+                */
+
+               for (GeoSpatialServiceCallSubRangeTask task : tasks) {
+
+                  task.call();
+                  
+               }
+
+               buffer.close();
+               return null;
+
+            }
+            
+
+            /*
+             * Build list of FutureTasks. This list is used to check all
+             * tasks for errors and ensure that any running tasks are
+             * cancelled.
+             */
+            final List<FutureTask<Void>> futureTasks = new LinkedList<FutureTask<Void>>();
+
+            for (GeoSpatialServiceCallSubRangeTask task : tasks) {
+
+               final FutureTask<Void> ft =  new FutureTask<Void>(task);
+
+               futureTasks.add(ft);
+
+            }
+
+            try {
+
+               /*
+                * Execute all tasks.
+                */
+               for (FutureTask<Void> ft : futureTasks) {
+
+                  halted();
+
+                  // Queue for execution.
+                  executor.execute(ft);
+
+               } // next task.
+
+               /*
+                * Wait for each task. If any task throws an exception, then
+                * [halt] will become true and any running tasks will error
+                * out quickly. Once [halt := true], we do not wait for any
+                * more tasks, but proceed to cancel all tasks in the
+                * finally {} clause below.
+                */
+               for (FutureTask<Void> ft : futureTasks) {
+
+                  // Wait for a task.
+                  if (!isDone())
+                     ft.get();
+
+               }
+
+            } finally {
+
+               /*
+                * Ensure that all tasks are cancelled, regardless of
+                * whether they were started or have already finished.
+                */
+               for (FutureTask<Void> ft : futureTasks) {
+
+                  ft.cancel(true/* mayInterruptIfRunning */);
+
+               }
+
+            }
+            
+            buffer.close();
+            return null;
+         }
+         
+         
+         private static class GeoSpatialServiceCallSubRangeTask implements Callable<Void> {
+
+            final private UnsynchronizedArrayBuffer<IBindingSet> localBuffer;
+            
+            final private AccessPath<ISPO> accessPath;
+            
+            final private Advancer<SPO> bigMinAdvancer;
+            
+            final private GeoSpatialFilterBase filter;
+            
+            final private GeoSpatialServiceCallResolver resolver;
+            
+            public GeoSpatialServiceCallSubRangeTask(
+               final BlockingBuffer<IBindingSet[]> backingBuffer,
+               final AccessPath<ISPO> accessPath, Advancer<SPO> bigMinAdvancer,
+               final GeoSpatialFilterBase filter, final GeoSpatialServiceCallResolver resolver) {
+
+               // create a local buffer linked to the backing, thread safe blocking buffer
+               localBuffer = 
+                  new UnsynchronizedArrayBuffer<IBindingSet>(
+                     backingBuffer, IBindingSet.class, THREAD_LOCAL_BUFFER_SIZE);
+
+               this.accessPath = accessPath;
+               this.bigMinAdvancer = bigMinAdvancer;
+               this.filter = filter;
+               this.resolver = resolver;
+               
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public Void call() throws Exception {
+               
+               final Iterator<IBindingSet> itr = 
+                     new Striterator(accessPath.getIndex().rangeIterator(
+                        accessPath.getFromKey(), accessPath.getToKey(), 0/* capacity */, 
+                        IRangeQuery.KEYS | IRangeQuery.CURSOR, bigMinAdvancer))
+                           .addFilter(filter)
+                           .addFilter(resolver);
+
+               // consume and flush the buffer
+               while (itr.hasNext()) {
+                  localBuffer.add(itr.next());
+               }
+               localBuffer.flush();
+               
+               return null;
+            }
+            
+         }
+         
+         /**
+          * Class providing functionality to partition a geospatial search range.
+          * 
+          * @author msc
+          */
+         public static class GeoSpatialSubRangePartitioner {
+          
+            private List<GeoSpatialSubRangePartition> partitions;
+            
+            public GeoSpatialSubRangePartitioner(
+              final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
+              final long numPartitions, GeoSpatialLiteralExtension<BigdataValue> litExt) {
+
+               
+               
+               partitions = new ArrayList<GeoSpatialSubRangePartition>();
+
+               final long lowerTimestamp = lowerBorder.getTimestamp();
+               final long upperTimestamp = upperBorder.getTimestamp();
+
+               final long numPartitionsSafe = Math.max(1, numPartitions); // at least 1 partition
+               
+               final long diff = upperTimestamp - lowerTimestamp;
+               final long dist = diff/numPartitionsSafe;
+
+               final List<Long> breakPoints = new ArrayList<Long>();
+                  
+
+               long lastConsidered = -1;
+               breakPoints.add(lowerTimestamp-1); // first point
+
+               // points in-between (ignoring first and last)
+               for (long i=1; i<numPartitionsSafe; i++) {
+                  
+                  long breakPoint = lowerTimestamp + i*dist;
+                  if (lastConsidered==breakPoint) {
+                     break;
+                  }
+                  
+                  if (breakPoint>lowerTimestamp && breakPoint<upperTimestamp) {
+                     breakPoints.add(breakPoint);
+                  }
+                  
+                  lastConsidered = breakPoint;
+               }
+               
+               breakPoints.add(upperTimestamp); // last point
+
+               for (int i=0; i<breakPoints.size()-1; i++) {
+                  partitions.add(
+                     new GeoSpatialSubRangePartition(
+                        new PointLatLonTime(lowerBorder.getLat(), lowerBorder.getLon(), breakPoints.get(i)+1),
+                        new PointLatLonTime(upperBorder.getLat(), upperBorder.getLon(), breakPoints.get(i+1))));
+               }
+            }
+            
+            public List<GeoSpatialSubRangePartition> getPartitions() {
+               return partitions;
+            }
+
+         }
+         
+         
+         public static class GeoSpatialSubRangePartition {
+            
+            final PointLatLonTime lowerBorder;
+            final PointLatLonTime upperBorder;
+            
+            public GeoSpatialSubRangePartition(
+               final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder) {
+               
+               this.lowerBorder = lowerBorder;
+               this.upperBorder = upperBorder;
+            }
+            
+            @Override
+            public String toString() {
+               
+               StringBuffer buf = new StringBuffer();
+               buf.append("lowerBorder=");
+               buf.append(lowerBorder.toString());
+               buf.append(", upperBorder=");
+               buf.append(upperBorder.toString());
+               
+               return buf.toString();
+            }
+         }
+         
+         
+      }
+      
+      private static class GeoSpatialServiceCallResolver extends Resolver {
+
+         private static final long serialVersionUID = 1L;
+
+         final private Var<?> var;
+         final private IBindingSet incomingBindingSet;
+         final private Var<?> locationVar;
+         final private Var<?> timeVar;
+         final private Var<?> locationAndTimeVar;
+         final private int subjectPos;
+         final private int objectPos;
+         final private BigdataValueFactory vf;
+         final private GeoSpatialLiteralExtension<BigdataValue> litExt;
+         
+         // true if the resolver reports any components from the object literal
+         final boolean reportsObjectComponents;
+         
+         // the position up to which we need to extract IVs
+         final private int extractToPosition;
+         
+         public GeoSpatialServiceCallResolver(final Var<?> var, final IBindingSet incomingBindingSet,
+            final Var<?> locationVar, final Var<?> timeVar, final Var<?> locationAndTimeVar, 
+            final int subjectPos, final int objectPos, final BigdataValueFactory vf,
+            final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+            
+            this.var = var;
+            this.incomingBindingSet = incomingBindingSet;
+            this.locationVar = locationVar;
+            this.timeVar = timeVar;
+            this.locationAndTimeVar = locationAndTimeVar;
+            this.subjectPos = subjectPos;
+            this.objectPos = objectPos;
+            this.vf = vf;
+            this.litExt = litExt;
+            
+            reportsObjectComponents =
+               locationVar!=null || timeVar!=null || locationAndTimeVar!=null;
+            
+            extractToPosition =
+               reportsObjectComponents ? 
+               Math.max(objectPos, subjectPos) + 1: 
+               subjectPos + 1;
+            
+         }
+              
+         /**
+           * Resolve tuple to IV.
+           */
+         @SuppressWarnings("rawtypes")
+         @Override
+         protected IBindingSet resolve(final Object obj) {
+
+            final byte[] key = ((ITuple<?>) obj).getKey();
+
+
+            // if results are reported, we need to decode up to subject + object,
+            // otherwise decoding up to the subject position is sufficient
+
+            final IV[] ivs = IVUtility.decode(key, extractToPosition);
+
+            final IBindingSet bs = incomingBindingSet.clone();
+            bs.set(var, new Constant<IV>(ivs[subjectPos]));
+
+            // handle request for return of index components
+            if (reportsObjectComponents) {
+               
+               if (locationVar!=null) {
+                  
+                  // wrap positions 0 + 1 (lat + lon) into a literal
+                  final BigdataLiteral locationLit = 
+                     vf.createLiteral(
+                        litExt.toComponentString(0,1,(LiteralExtensionIV)ivs[objectPos]));
+                  
+                  bs.set(locationVar, 
+                     new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) locationLit)));
+               }
+
+               if (timeVar!=null) {
+                  
+                  // wrap positions 2 of the index into a literal
+                  final BigdataLiteral timeLit = 
+                        vf.createLiteral(
+                           Long.valueOf(litExt.toComponentString(2,2,(LiteralExtensionIV)ivs[objectPos])));
+                  
+                  bs.set(timeVar, 
+                        new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) timeLit)));
+               }
+
+               if (locationAndTimeVar!=null) {
+                  bs.set(locationAndTimeVar, new Constant<IV>(ivs[objectPos]));
+               }
+
+            }
+            
+            return bs;
+
+         }
       }
    }
    

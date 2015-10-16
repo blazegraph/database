@@ -73,9 +73,10 @@ import com.bigdata.service.geospatial.GeoSpatial;
  * Interpreted as BigInteger, this is the value 24, which is stored as integer
  * literal in the database. The asValue method reverts this (lossless) encoding.
  * 
+ * Note: this class is *not* thread-safe (reusable key builder).
+ * 
  * TODO:
  * - push logics into object where we don't need to re-allocate arrays
- * - document toZOrderByteArray methods -> which do return a trailing zero, which don't
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
