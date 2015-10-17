@@ -1992,7 +1992,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
 
         left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
-              joinConstraints, projectedVars.toArray(new IVariable<?>[0]), namedSolutionSet);
+              joinConstraints, projectedVars.toArray(new IVariable<?>[0]),
+              namedSolutionSet, false /* TODO */);
         
         // Append the subquery plan.
         left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
@@ -2675,7 +2676,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
               null/*ctx.queryId*/, solutionSetName, joinVars);
 
         left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
-              joinVars, null, projectInVarsArr, namedSolutionSet);       
+              joinVars, null, projectInVarsArr, namedSolutionSet,
+              false /* TODO */);       
         
         
         /**
@@ -3978,6 +3980,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
 			final AST2BOpContext ctx//
 			) {
 
+	   // note: no pipelined hash join native variant available
+	   final boolean usePipelinedHashJoin = 
+	      usePipelinedHashJoin(ctx) && !ctx.nativeHashJoins;
+	   
 		if (ctx.isCluster()
 				&& BOpUtility.visitAll((BOp) subgroup,
 						NamedSubqueryInclude.class).hasNext()) {
@@ -3997,7 +4003,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         }
 
-		// true iff the sub-group is OPTIONAL.
+		  // true iff the sub-group is OPTIONAL.
         final boolean optional = subgroup.isOptional();
         
         // true iff the sub-group is MINUS
@@ -4009,7 +4015,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 : minus ? JoinTypeEnum.NotExists : JoinTypeEnum.Normal;
 
         @SuppressWarnings("rawtypes")
-        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = 
+           new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
 
         final IConstraint[] joinConstraints = getJoinConstraints(
                 getJoinConstraints(subgroup), needsMaterialization);
@@ -4070,18 +4077,22 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
                 
         left = addHashIndexOp(left, ctx, subgroup, joinType, joinVars, 
-              joinConstraints, projectInVars, namedSolutionSet);
+              joinConstraints, projectInVars, namedSolutionSet, usePipelinedHashJoin);
 
-        if (true) { // TODO: distinguish between join parallel and non-parallel hash join
+        if (usePipelinedHashJoin) {
 
-           // subquery execution is controlled  for pipelined hash join
+           /**
+            * Subquery execution is controlled by the pipelined hash join
+            * itself, so for the pipelined variant we translate the subplan
+            * as a standalone pipeline op and attach it to the annotation.
+            */
            final PipelineOp subqueryPlan = 
-              convertJoinGroupOrUnion(null /* subquery stand-alone */, subgroup, doneSet, ctx);
+              convertJoinGroupOrUnion(null /* standalone */, subgroup, doneSet, ctx);
            left = (PipelineOp)left.setProperty(
               PipelinedHashIndexOp.Annotations.SUBQUERY, subqueryPlan);
            
         } else {
-           // this is more or less the original code (append the subgroup)
+           // append subquery to the subgroup
            left = convertJoinGroupOrUnion(left, subgroup, doneSet, ctx);
         }
         
@@ -4113,21 +4124,32 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
                 ), subgroup, ctx);
         } else {
-            left = applyQueryHints(new JVMPipelinedSolutionSetHashJoinOp(
-                    new BOp[] { left },//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+           
+            final NV[] hashJoinOpAnns =  {
+                  new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                  new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                          BOpEvaluationContext.CONTROLLER),//
+                  new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
+                  new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            ), subgroup, ctx);
+                  new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                  new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                  new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                  new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            };
+           
+            if (usePipelinedHashJoin) {
+
+               left = applyQueryHints(new JVMPipelinedSolutionSetHashJoinOp(
+                  new BOp[] { left }, hashJoinOpAnns), subgroup, ctx);
+
+            } else {
+            
+               left = applyQueryHints(new JVMSolutionSetHashJoinOp(
+                  new BOp[] { left }, hashJoinOpAnns), subgroup, ctx);
+            }
         }
 
         /*
@@ -4141,8 +4163,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
         return left;
         
     }
-    
-    /**
+
+
+   /**
      * Wrap with an operator which will be evaluated on the query controller so
      * the results will be streamed back to the query controller in scale-out.
      * <p>
@@ -5413,7 +5436,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final IVariable<?>[] joinVars,
         final IConstraint[] joinConstraints,
         final IVariable<?>[] projectInVars,
-        final INamedSolutionSetRef namedSolutionSet) {
+        final INamedSolutionSetRef namedSolutionSet,
+        final boolean usePipelinedHashJoin) {
       
        
        final Set<IVariable<?>> joinVarsSet = new HashSet<IVariable<?>>();
@@ -5442,32 +5466,56 @@ public class AST2BOpUtility extends AST2BOpRTO {
        if (ctx.nativeHashJoins) {
            joinUtilFactory = HTreeHashJoinUtility.factory;
        } else {
-          // TODO: this needs to be changed
-//           joinUtilFactory = JVMHashJoinUtility.factory;
-           joinUtilFactory = JVMPipelinedHashJoinUtility.factory;
+          
+          if (usePipelinedHashJoin) {
+             joinUtilFactory = JVMPipelinedHashJoinUtility.factory;             
+          } else {
+             joinUtilFactory = JVMHashJoinUtility.factory;             
+          }
        }
        
        
-       // TODO: PipelinedHashIndexOp
        // TODO: think about output distinct JVs for pipelined hash index; imho
        //       it makes no sense here  and should be ignored
-       left = applyQueryHints(new PipelinedHashIndexOp(leftOrEmpty(left),//
-           new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-           new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                  BOpEvaluationContext.CONTROLLER),//
-           new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
-           new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-           new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-           new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
-           new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-           // instead of specifying the SELECT vars, we output the distinct join vars
-           new NV(HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
-           new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
-           new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
-                  joinUtilFactory),//
-           new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-       ), node, ctx);
-        
+       if (usePipelinedHashJoin) {
+          
+          left = applyQueryHints(new PipelinedHashIndexOp(leftOrEmpty(left),//
+              new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+              new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                     BOpEvaluationContext.CONTROLLER),//
+              new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
+              new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+              new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+              new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+              new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+              // instead of specifying the SELECT vars, we output the distinct join vars
+              new NV(HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
+              new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
+              new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                     joinUtilFactory),//
+              new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+          ), node, ctx);
+          
+       } else {
+          
+          left = applyQueryHints(new PipelinedHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                       BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                // instead of specifying the SELECT vars, we output the distinct join vars
+                new NV(HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
+                new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                       joinUtilFactory),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            ), node, ctx);
+
+       }
         /** 
          * If the projection was not inlined, we need to apply it on top.
          */
@@ -5646,4 +5694,23 @@ public class AST2BOpUtility extends AST2BOpRTO {
        return true;
    }
     
+
+   /**
+    * Decides, based on the parameters, whether we prefer a pipelined hash
+    * join or not. For now, the decision is purely based on the query
+    * having a LIMIT clause, but we may TODO need to base this decision
+    * on other things such as query hints.
+    * 
+    * @param ctx
+    * @return true if a pipeled hash join is preferred
+    */
+   private static boolean usePipelinedHashJoin(AST2BOpContext ctx) {
+
+     final ASTContainer container = ctx.astContainer;
+     final QueryRoot queryRoot = container.getOptimizedAST();
+
+     // TODO: the decision is actually more complex, if we have OFFSET or
+     //       ORDER BY the LIMIT won't help us and we should return false
+     return queryRoot.hasSlice();
+  }
 }
