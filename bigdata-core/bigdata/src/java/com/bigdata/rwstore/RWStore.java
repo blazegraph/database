@@ -4813,7 +4813,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
     private int freeDeferrals(final long blockAddr, final long lastReleaseTime) {
         final int addr = (int) (blockAddr >> 32);
-        final int sze = (int) blockAddr & 0xFFFFFFFF;
+        final int sze = (int) blockAddr & 0xFFFFFFFF; // Resolution for BLZG-1236 (recycler error)
         
         if (log.isTraceEnabled())
             log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: " + sze + " releaseTime: " + lastReleaseTime);
@@ -6969,7 +6969,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         final boolean writeAll = false;
         
         final int addr = (int) (blockAddr >> 32);
-        final int sze = (int) blockAddr & 0xFFFFFFFF;
+        final int sze = (int) blockAddr & 0xFFFFFFFF; // Resolution for BLZG-1236 (recycler error)
 
         if (log.isTraceEnabled())
             log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: "

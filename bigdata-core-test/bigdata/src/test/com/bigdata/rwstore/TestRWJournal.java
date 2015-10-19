@@ -2682,6 +2682,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			doBlobDeferredFrees(4000); // standard
 		}
 		
+		/**
+		 * This is the test that was able to reproduce the recycler failure for
+		 * BLZG-1236 when run with 10M deferred frees.
+		 * 
+		 * @see BLZG-1236 (recycler error)
+		 */
 		public void test_stressBlobDeferredFrees() {
 			doBlobDeferredFrees(10000000); // 10M (40M data)
 		}
@@ -2696,12 +2702,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
             properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
                     "1,2,3,5,8,12,16"); // 1K
 
-			Journal store = (Journal) getStore(properties);
+			final Journal store = (Journal) getStore(properties);
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
-            	ArrayList<Long> addrs = new ArrayList<Long>();
+            	final ArrayList<Long> addrs = new ArrayList<Long>();
             	for (int i = 0; i < cAddrs; i++) {
             		addrs.add(bs.write(randomData(45)));
             	}
