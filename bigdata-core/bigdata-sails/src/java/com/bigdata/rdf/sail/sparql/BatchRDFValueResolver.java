@@ -36,6 +36,7 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
@@ -59,6 +60,7 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryHeadlessImpl;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
@@ -139,7 +141,8 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         // Unnamed BigdataValueFactory is used to provide instances
         // of BigdataValue, which are required by existing test suite.
         // See also task ...
-        this.valueFactory = BigdataValueFactoryImpl.getInstance("");
+//        this.valueFactory = BigdataValueFactoryImpl.getInstance("parser"+UUID.randomUUID().toString().replaceAll("-", ""));
+        this.valueFactory = new BigdataValueFactoryHeadlessImpl();
         
         this.nodes = new LinkedHashMap<>();
         
