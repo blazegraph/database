@@ -789,8 +789,11 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 final GroupMemberValueExpressionNodeBase filter = 
                         (GroupMemberValueExpressionNodeBase) child;
                 
+                final IValueExpressionNode nodeParent =
+                   (filter instanceof IValueExpressionNode) ? (IValueExpressionNode)filter : null;
+                   
                 if(rewriteUnboundVariablesInFilter(context, maybeBound, map,
-                        null/* parent */, filter.getValueExpressionNode())) {
+                      nodeParent, filter.getValueExpressionNode())) {
                     
                     /*
                      * Re-generate the IVE for this filter.
