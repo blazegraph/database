@@ -784,6 +784,8 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          
          for (IQueryNode node : group) {
 
+            // Note: there's no need to handle BindingsClause here, since
+            //       a BindingsClause always binds to constant values
             if (node instanceof FilterNode || node instanceof AssignmentNode) {
 
                final GroupMemberValueExpressionNodeBase filter = 
@@ -792,7 +794,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                final IValueExpressionNode vexpr = filter.getValueExpressionNode();
                
                extractVarUsageInfo(node, (IValueExpressionNode)vexpr);
-               
+
             } else if (node instanceof StatementPatternNode) {
                
                final StatementPatternNode spn = (StatementPatternNode)node;
@@ -820,23 +822,33 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       private void extractVarUsageInfo(
          final IQueryNode node, final IValueExpressionNode vexpNode) {
 
+         /**
+          * If the vexpNode is a VarNode, we're done and add it to the map
+          * (if it has not yet been recorded before).
+          */
+         if (vexpNode instanceof VarNode) {
+            final VarNode varNode = (VarNode)vexpNode;
+            final IVariable<?> iVar = varNode.getValueExpression();
+            
+            if (!usageMap.containsKey(iVar)) {
+               usageMap.put(iVar, new ArrayList<IQueryNode>());
+            }
+            
+            // add node to list
+            usageMap.get(iVar).add(node);
+            
+            return;
+         }
+         
+         /**
+          * Otherwise, we scan for recursively nested var nodes
+          */
          final BOp nodeAsBop = (BOp)vexpNode;
          final int arity = nodeAsBop.arity();
          for (int i=0; i<arity; i++) {
             
             final BOp child = nodeAsBop.get(i);
-            if (child instanceof VarNode) {
-               
-               final VarNode varNode = (VarNode)child;
-               final IVariable<?> iVar = varNode.getValueExpression();
-               if (!usageMap.containsKey(iVar)) {
-                  usageMap.put(iVar, new ArrayList<IQueryNode>());
-               }
-   
-               // add node to list
-               usageMap.get(iVar).add(node);
-               
-            } else if (child instanceof IValueExpressionNode) {
+            if (child instanceof IValueExpressionNode) {
                
                // recurse
                extractVarUsageInfo(node, (IValueExpressionNode)child);

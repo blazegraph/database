@@ -4720,6 +4720,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //                    .valueOf(cutoffLimit)));
 //        }
 
+        if ( sp.getProperty(GpuAnnotations.EVALUATE_ON_GPU) != null) {
+           // propagate annotation for GPU acceleration
+           anns.add( new NV(GpuAnnotations.EVALUATE_ON_GPU,
+                            sp.getProperty(GpuAnnotations.EVALUATE_ON_GPU)) );
+        }
+
         final Properties queryHints = sp.getQueryHints();
         
         if (queryHints != null

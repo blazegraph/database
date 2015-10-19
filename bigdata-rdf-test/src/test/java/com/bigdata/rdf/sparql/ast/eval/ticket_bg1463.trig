@@ -1,0 +1,5 @@
+<http://mygraph> {
+
+  <http://s> <http://p> <http://o> .
+  <http://s2> <http://p> <http://o2> .
+}
