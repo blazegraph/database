@@ -32,40 +32,11 @@ import org.openrdf.model.vocabulary.XMLSchema;
  * Collects various XSD URIs as constants.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
- * @version $Id$
  * 
  * @see XMLSchema
  */
 public class XSD extends XMLSchema {
     
-//    String NAMESPACE = "http://www.w3.org/2001/XMLSchema#";
-    
-//    URI BOOLEAN = XMLSchema.BOOLEAN;
-//
-//    URI BYTE = XMLSchema.BYTE;
-//
-//    URI SHORT = XMLSchema.SHORT;
-//
-//    URI INT = XMLSchema.INT;
-//
-//    URI LONG = XMLSchema.LONG;
-//
-//    URI UNSIGNED_BYTE = XMLSchema.UNSIGNED_BYTE;
-//
-//    URI UNSIGNED_SHORT = XMLSchema.UNSIGNED_SHORT;
-//
-//    URI UNSIGNED_INT = XMLSchema.UNSIGNED_INT;
-//
-//    URI UNSIGNED_LONG = XMLSchema.UNSIGNED_LONG;
-//    
-//    URI FLOAT = XMLSchema.FLOAT;
-//
-//    URI DOUBLE = XMLSchema.DOUBLE;
-//
-//    URI INTEGER = XMLSchema.INTEGER;
-//
-//    URI DECIMAL = XMLSchema.DECIMAL;
-
 	/**
 	 * @todo This really should not be in the XSD namespace since it is not part
 	 *       of the XML Schema Datatypes specification.
@@ -78,7 +49,5 @@ public class XSD extends XMLSchema {
      * http://www.codesynthesis.com/projects/xsstl/
      */
     static public final URI IPV4 = new URIImpl(NAMESPACE + "IPv4Address");
-    
-//	URI DATETIME = XMLSchema.DATETIME;
     
 }
