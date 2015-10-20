@@ -89,6 +89,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	 */
 	private transient V uri;
 
+	@Override
     public IV<V, IPv4Address> clone(final boolean clearCache) {
 
         final IPv4AddrIV<V> tmp = new IPv4AddrIV<V>(value);//, prefix);
@@ -123,11 +124,11 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	/**
 	 * Regex pattern for IPv4 Address with optional CIDR
 	 */
-	private static final String IPv4_OPTIONAL_CIDR_PATTERN = "((([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5]))(\\/([012]?\\d|3[012]))?";
+	private static transient final String IPv4_OPTIONAL_CIDR_PATTERN = "((([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5]))(\\/([012]?\\d|3[012]))?";
 	
 	// "((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?
 
-	public static final Pattern pattern = 
+	private static transient final Pattern pattern = 
 			Pattern.compile(IPv4_OPTIONAL_CIDR_PATTERN);
 	
     /**
@@ -197,6 +198,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	/**
 	 * Returns the inline value.
 	 */
+	@Override
 	public IPv4Address getInlineValue() throws UnsupportedOperationException {
 		return value;
 	}
@@ -204,6 +206,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	/**
 	 * Returns the Literal representation of this IV.
 	 */
+	@Override
     @SuppressWarnings("unchecked")
     public V asValue(final LexiconRelation lex) {
     	if (uri == null) {
@@ -217,14 +220,17 @@ public class IPv4AddrIV<V extends BigdataLiteral>
      * Return the byte length for the byte[] encoded representation of this
      * internal value.  Depends on the byte length of the encoded inline value.
      */
+	@Override
 	public int byteLength() {
 		return 1 + key().length;
 	}
 
+	@Override
 	public String toString() {
 		return "IPv4("+getLabel()+")";
 	}
 	
+	@Override
 	public int hashCode() {
 		return value.hashCode();
 	}
@@ -272,6 +278,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	/**
 	 * Two {@link IPv4AddrIV} are equal if their InetAddresses are equal.
 	 */
+    @Override
 	public boolean equals(final Object o) {
         if (this == o)
             return true;
@@ -282,7 +289,9 @@ public class IPv4AddrIV<V extends BigdataLiteral>
         return false;
 	}
 
-	public int _compareTo(IV o) {
+	@SuppressWarnings("rawtypes")
+	@Override
+	public int _compareTo(final IV o) {
 
 	    /*
 	     * Note: This works, but it might be more expensive.
@@ -338,7 +347,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
             
         }
         
-        private IPAddrIVState(final IPv4AddrIV iv) {
+        private IPAddrIVState(@SuppressWarnings("rawtypes") final IPv4AddrIV iv) {
 //            this.flags = flags;
             this.key = iv.key();
         }
