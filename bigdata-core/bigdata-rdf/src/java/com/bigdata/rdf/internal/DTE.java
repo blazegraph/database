@@ -84,8 +84,6 @@ import com.bigdata.util.Bytes;
  * spatial index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
- *          $
  * 
  * @see http://www.w3.org/TR/xmlschema-2/
  */
@@ -227,15 +225,18 @@ public enum DTE {
             DTEFlags.NOFLAGS), //
 
 	/**
-	 * This is a place holder for extension of the intrinsic data types. Its
-	 * code corresponds to 0xf, which is to say all four bits are on. When this
-	 * code is used, the next byte(s) must be examined to determine the actual
-	 * intrinsic data type.
+	 * This provides an extension of the intrinsic data types. Its code
+	 * corresponds to 0xf, which is to say all four bits are on. When this code
+	 * is used, you must interpret the next byte using {@link DTEExtension}.
 	 * <p>
 	 * Note: This is NOT the same as the {@link AbstractIV#isExtension()} bit.
 	 * The latter <strong>always</strong> indicates that an {@link IV} follows
-	 * the <code>flags</code> byte. In contrast, {@link DTE#Extension} gives you
-	 * another byte which you can use to handle additional "intrinsic" types.
+	 * the <code>flags</code> byte and indicates the actual datatype URI. In
+	 * contrast, {@link DTE#Extension} gives you another byte which you can use
+	 * to handle additional "intrinsic" types.
+	 *
+	 * @see DTEExtension
+	 * @see BLZG-1507 (Implement support for DTE extension types for URIs)
 	 */
     Extension((byte) 15, 0/* len */, Void.class, null/* datatype */,
             DTEFlags.NOFLAGS);
@@ -337,18 +338,17 @@ public enum DTE {
             return null;
         }
         
-        if (datatype.equals(XSD.IPV4)) {
-            /*
-             * Note: This is a bit of a rough spot in the API. There is no
-             * datatype associated with [Extension] since it is a place holder
-             * for any an extension for any datatype.
-             * 
-             * Right now I am hijacking Extension for IPv4.
-             * 
-             * TODO FIXME
-             */
-            return Extension;
-        }
+// Removed for BLZG-1507 (Implement support for DTE extension types for URIs)        
+//        if (datatype.equals(XSD.IPV4)) {
+//            /*
+//             * Note: This is a bit of a rough spot in the API. There is no
+//             * datatype associated with [Extension] since it is a place holder
+//             * for any an extension for any datatype.
+//             * 
+//             * Right now I am hijacking Extension for IPv4.
+//             */
+//            return Extension;
+//        }
         if (datatype.equals(XSD.BOOLEAN))
             return XSDBoolean;
         if (datatype.equals(XSD.BYTE))
