@@ -522,8 +522,10 @@ public class LexiconConfiguration<V extends BigdataValue>
         /*
          * See if there is a handler for inline URIs for this namespace.
          */
-        @SuppressWarnings("rawtypes")
+        
+    	@SuppressWarnings("rawtypes")
         final URIExtensionIV inline = uriFactory.createInlineURIIV(value);
+        
         if (inline != null) {
 
             return inline;

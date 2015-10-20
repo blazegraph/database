@@ -33,7 +33,6 @@ import com.bigdata.rdf.lexicon.TestTermIVComparator;
  * Aggregates test suites into increasing dependency order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
