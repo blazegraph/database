@@ -54,7 +54,8 @@ import com.bigdata.rdf.vocab.BaseVocabularyDecl;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 
 /**
- * Test suite for {@link InlineURIFactory}.
+ * Integration test suite for {@link InlineURIFactory} (the inline IVs are also
+ * tested in their own package without the triple store integration).
  * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
  */
