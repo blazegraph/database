@@ -52,10 +52,9 @@ public class TestDTE extends TestCase {
     }
 
     /**
-     * Unit test for {@link DTE} verifies that the
-     * correspondence between the enumerated types and the internal values is
-     * correct.
-     */
+	 * Unit test for {@link DTE} verifies that the correspondence between the
+	 * enumerated types and the internal values is correct.
+	 */
     public void test_DTE_selfConsistent() {
 
         for(DTE e : DTE.values()) {
