@@ -62,14 +62,12 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.IHashJoinUtilityFactory;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JVMMergeJoin;
-import com.bigdata.bop.join.JVMPipelinedHashIndex;
 import com.bigdata.bop.join.JVMPipelinedHashJoinUtility;
-import com.bigdata.bop.join.JVMPipelinedSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NestedLoopJoinOp;
-import com.bigdata.bop.join.PipelinedHashIndexOp;
+import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetOp;
 import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.bop.paths.ZeroLengthPathOp;
@@ -4089,7 +4087,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
            final PipelineOp subqueryPlan = 
               convertJoinGroupOrUnion(null /* standalone */, subgroup, doneSet, ctx);
            left = (PipelineOp)left.setProperty(
-              PipelinedHashIndexOp.Annotations.SUBQUERY, subqueryPlan);
+              PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan);
            
         } else {
            // append subquery to the subgroup
@@ -4142,8 +4140,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
            
             if (usePipelinedHashJoin) {
 
-               left = applyQueryHints(new JVMPipelinedSolutionSetHashJoinOp(
-                  new BOp[] { left }, hashJoinOpAnns), subgroup, ctx);
+               // this is all built-in now
+//               left = applyQueryHints(new JVMPipelinedSolutionSetHashJoinOp(
+//                  new BOp[] { left }, hashJoinOpAnns), subgroup, ctx);
 
             } else {
             
@@ -5479,12 +5478,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
        //       it makes no sense here  and should be ignored
        if (usePipelinedHashJoin) {
           
-          left = applyQueryHints(new PipelinedHashIndexOp(leftOrEmpty(left),//
+          left = applyQueryHints(new PipelinedHashIndexAndSolutionSetOp(leftOrEmpty(left),//
               new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
               new NV(BOp.Annotations.EVALUATION_CONTEXT,
                      BOpEvaluationContext.CONTROLLER),//
               new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
-              new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+              new NV(PipelineOp.Annotations.LAST_PASS, true),// required TODO: is this needed?
               new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
               new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
               new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
@@ -5498,7 +5497,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
           
        } else {
           
-          left = applyQueryHints(new PipelinedHashIndexOp(leftOrEmpty(left),//
+          left = applyQueryHints(new HashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                        BOpEvaluationContext.CONTROLLER),//

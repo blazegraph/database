@@ -1434,7 +1434,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/508 (LIMIT causes
      *      hash join utility to log errors)
      */
-    private RuntimeException launderThrowable(final Throwable t) {
+    protected RuntimeException launderThrowable(final Throwable t) {
 
         final String msg = "cause=" + t + ", state=" + toString();
 
