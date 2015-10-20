@@ -27,8 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -38,7 +37,6 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
@@ -71,8 +69,6 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
 
    private final BOpContext<IBindingSet> context;
-   
-   private final int chunkCapacity;
 
    public JVMPipelinedHashJoinUtility(
       PipelineOp op, JoinTypeEnum joinType, BOpContext<IBindingSet> context,
@@ -81,7 +77,6 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
       super(op, joinType);
       
       this.context = context;
-      this.chunkCapacity = chunkCapacity;
       
    }
    
@@ -97,7 +92,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
 
       rightSolutionsRef.set(//
-            new JVMPipelinedHashIndex(//
+            new ZeroMatchRecordingJVMHashIndex(//
                     keyVars,//
                     indexSolutionsHavingUnboundJoinVars,//
                     new LinkedHashMap<Key, Bucket>(op.getProperty(
@@ -133,27 +128,6 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         
     };
     
-
-//    // TODO: do we want to keep this "as is"? It's not really nice design.
-//    @Override
-//    public long acceptSolutions(final ICloseableIterator<IBindingSet[]> itr,
-//          final BOpStats stats) {
-//       
-//       throw new RuntimeException(
-//          "acceptSolutions() not supported by pipelined hash join. "
-//          + "Please use acceptAndOutputSolutions() method instead.");
-//    }
-//    
-//    // TODO: do we want to keep this "as is"? It's not really nice design.
-//    @Override
-//    public void outputSolutions(final IBuffer<IBindingSet> out) {
-//       
-//       throw new RuntimeException(
-//          "outputSolutions() not supported by pipelined hash join. "
-//          + "Please use acceptAndOutputSolutions() method instead.");
-//       
-//    }
-    
     /**
      * AcceptAndOutputSolutions is a special method for building the hash index
      * of the {@link JVMPipelinedHashIndex}, which accepts and immediately
@@ -162,34 +136,63 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
     public long acceptAndOutputSolutions(
           UnsyncLocalOutputBuffer<IBindingSet> out,
           ICloseableIterator<IBindingSet[]> itr, NamedSolutionSetStats stats,
-          PipelineOp subquery, Set<IBindingSet> distinctSet) {
+          final IConstraint[] joinConstraints, PipelineOp subquery) {
        
-      final IJVMHashIndex rightSolutions = getRightSolutions();
-      
-      // TODO: distinct computation
+      final ZeroMatchRecordingJVMHashIndex rightSolutions = 
+         (ZeroMatchRecordingJVMHashIndex)getRightSolutions();
 
       final QueryEngine queryEngine = this.context.getRunningQuery()
             .getQueryEngine();
 
       long naccepted = 0;
-      
+
+      // 1. Compute those distinct binding sets in the chunk not seen before
+      final Set<IBindingSet> distinctSet = new HashSet<IBindingSet>();
+      final List<IBindingSet> dontRequireSubqueryEvaluation = new LinkedList<IBindingSet>();
+      final List<IBindingSet> requireSubqueryEvaluation = new LinkedList<IBindingSet>();
+
+      // first, join the mappings that can be joined immediately and
+      // calculate the remaining ones, including the 
       while (itr.hasNext()) {
-
-         IBindingSet[] chunk = itr.next();
-
-         // compute those distinct binding sets in the chunk not seen before
-         final List<IBindingSet> unseenDistProjsInChunk = new LinkedList<IBindingSet>();
          
+
+         final IBindingSet[] chunk = itr.next();         
+         
+         if (stats != null) {
+            stats.chunksIn.increment();
+            stats.unitsIn.add(chunk.length);
+         }
+
          for (int i=0; i<chunk.length; i++) {
             
             final IBindingSet bsetDistinct = chunk[i].copy(getJoinVars());
-            if (distinctSet.add(bsetDistinct)) {
-               
-               unseenDistProjsInChunk.add(bsetDistinct);
-               
-           }
             
+            final Bucket b = rightSolutions.getBucket(bsetDistinct);
+            if (b!=null || rightSolutions.isKeyWithoutMatch(bsetDistinct)) {
+               
+               dontRequireSubqueryEvaluation.add(chunk[i]);
+               
+            } else {
+               
+               requireSubqueryEvaluation.add(chunk[i]);
+               distinctSet.add(bsetDistinct);
+               
+            }
+
+            naccepted++;
+
          }
+      }
+      
+      // first, process those that can be processed without subquery evaluation
+      // (i.e., for which the subquery has been evaluated before already)
+      if (!dontRequireSubqueryEvaluation.isEmpty()) {
+         hashJoinAndEmit(dontRequireSubqueryEvaluation.toArray(
+            new IBindingSet[0]), stats, out, joinConstraints);
+      }      
+      
+      // second, process those bindings that require subquery evaluation
+      if (!requireSubqueryEvaluation.isEmpty()) {
 
          // next, we execute the subquery for the unseen distinct projections
          IRunningQuery runningSubquery = null;
@@ -197,15 +200,15 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
             
             // set up a subquery for the chunk
             runningSubquery = 
-               queryEngine.eval(subquery, unseenDistProjsInChunk.toArray(new IBindingSet[0]));
+               queryEngine.eval(subquery, distinctSet.toArray(new IBindingSet[0]));
 
-            // TODO: is this necessary?
             ((AbstractRunningQuery) context.getRunningQuery())
                   .addChild(runningSubquery);
 
             // iterate over the results and store them in the index
             final ICloseableIterator<IBindingSet[]> subquerySolutionItr = 
                runningSubquery.iterator();
+            
             while (subquerySolutionItr.hasNext()) {
 
                IBindingSet[] solutions = subquerySolutionItr.next();
@@ -213,14 +216,23 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                for (IBindingSet solution : solutions) {
                   
                   rightSolutions.add(solution);
-
-                  // buffer the solutions in the right-hand index
-                  naccepted++;
+                  
+                  // we remove all mappings that generated at least one result
+                  // from distinct set (which will be further processed later on);
+                  distinctSet.remove(solution.copy(getJoinVars()));
 
               }
 
             }
-
+            
+            /**
+             * register the distinct keys for which the subquery did not yield
+             * any result as "keys without match" at the index; this is an 
+             * improvement (though not necessarily required) in order to avoid
+             * unnecessary re-computation of the subqueries for these keys
+             */
+           rightSolutions.addKeysWithoutMatch(distinctSet);
+            
             // finished with the iterator
             subquerySolutionItr.close();
 
@@ -236,106 +248,43 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
             try {
                throw ex;
             } catch (InterruptedException e) {
-               // TOOD
+               
+               launderThrowable(e);
+               
             }
 
-         } catch (Exception e) {
+         } catch (Throwable t) {
 
-            throw new RuntimeException(e); // TODO
+            launderThrowable(t);
 
-         }
-         
-         // having computed the results for the query, we can now safely
-         // release all solutions
-         for (final IBindingSet bs : chunk) {
-            out.add(bs);
          }
          
          rightSolutionCount.add(naccepted);
+
+         hashJoinAndEmit(
+            requireSubqueryEvaluation.toArray(new IBindingSet[0]), 
+            stats, out, joinConstraints);
+
          
-         return naccepted; // those for which we actually computed the subquery
       }
-       
-       try {
 
-            final IJVMHashIndex index = getRightSolutions();
-
-            final IBindingSet[] all = BOpUtility.toArray(itr, stats);
-
-            if (log.isDebugEnabled())
-                log.debug("Materialized: " + all.length + " source solutions.");
-
-            
-
-            for (IBindingSet bset : all) {
-
-                // add the solution to the index in any case
-                // TODO: choose a different data structure at some point!
-                if (index.add(bset) == null) {
-
-                    continue;
-
-                }
-
-                // compute the projection on the join variables
-                IBindingSet bsetDistinct = bset;
-                bsetDistinct = bsetDistinct.copy(getJoinVars());
-                
-//                // TODO: we don't need the distinct set, but could implement
-//                // this in a space-saving way against the right-hand side index
-//                if (!distinctSet.add(bsetDistinct)) {
-//                   
-//                   // just don't delegate, ignore; this will be handled by
-//                   // the join operation on the right at some point, but we
-//                   // don't need to pipe the mapping through the subgroup again
-//                   
-//                } else {
-                   
-                   // output, piping the distinct binding through the inner
-                   // group spanned by the hash join pattern
-                   out.add(bsetDistinct);
-                   
-//                }
-                   
-                naccepted++;
-
-            }
-
-            if (log.isDebugEnabled())
-                log.debug("There are " + index.bucketCount()
-                        + " hash buckets, joinVars="
-                        + Arrays.toString(getJoinVars()));
-
-            rightSolutionCount.add(naccepted);
-
-            return naccepted;
-
-        } catch (Throwable t) {
-
-            throw launderThrowable(t);
-            
-        }
+      return naccepted; // TODO: check stats
 
     }
 
     
     /**
-     * {@inheritDoc}
-     * <p>
-     * For each source solution materialized, the hash table is probed using the
-     * as-bound join variables for that source solution. A join hit counter is
-     * carried for each solution in the hash index and is used to support
-     * OPTIONAL joins.
+     * Executes the hash join for the chunk of solutions that is passed in
+     * pver rightSolutions and outputs the solutions.
      */
-    @Override
-    public void hashJoin2(//
-            final ICloseableIterator<IBindingSet[]> leftItr,//
+    public void hashJoinAndEmit(//
+            final IBindingSet[] chunk,//
             final BOpStats stats,
             final IBuffer<IBindingSet> outputBuffer,//
-            final IConstraint[] constraints//
-            ) {
+            final IConstraint[] joinConstraints) {
 
-        final IJVMHashIndex rightSolutions = getRightSolutions();
+        final ZeroMatchRecordingJVMHashIndex rightSolutions = 
+           (ZeroMatchRecordingJVMHashIndex)getRightSolutions();
           
         if (log.isInfoEnabled()) {
             log.info("rightSolutions: #buckets=" + rightSolutions.bucketCount()
@@ -345,230 +294,89 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         // join solutions with hash index
         final boolean noJoinVars = getJoinVars().length == 0;
 
-        while (leftItr.hasNext()) {
+        for (final IBindingSet left : chunk) {
               
-           final IBindingSet[] leftChunk = leftItr.next();
+           final Bucket bucket = rightSolutions.getBucket(left);
+           nleftConsidered.increment();
               
-           // record solution stats
-           if (stats != null) {
-              stats.chunksIn.increment();
-              stats.unitsIn.add(leftChunk.length);
-           }
+           boolean matchExists = false; // try to prove otherwise
+           if (bucket != null) {
               
-           // add solution to index
-           for (IBindingSet left : leftChunk) {
-              
-              final Bucket bucket = rightSolutions.getBucket(left);
-              
-              boolean matchExists = false; // try to prove otherwise
-              if (bucket != null) {
-              
-                 final Iterator<SolutionHit> ritr = bucket.iterator();
+              final Iterator<SolutionHit> ritr = bucket.iterator();
+ 
+              while (ritr.hasNext()) {
    
-                 while (ritr.hasNext()) {
-   
-                     final SolutionHit right = ritr.next();
+                  final SolutionHit right = ritr.next();
                      
-                     nrightConsidered.increment();
+                  nrightConsidered.increment();
    
-                     if (log.isDebugEnabled())
-                         log.debug("Join with " + right);
+                  if (log.isDebugEnabled())
+                      log.debug("Join with " + right);
    
-                     nJoinsConsidered.increment();
+                  nJoinsConsidered.increment();
                      
-                     if (noJoinVars
-                           && nJoinsConsidered.get() == getNoJoinVarsLimit()) {
+                  if (noJoinVars
+                        && nJoinsConsidered.get() == getNoJoinVarsLimit()) {
    
-                       if (nleftConsidered.get() > 1
-                               && nrightConsidered.get() > 1) {
+                     if (nleftConsidered.get() > 1
+                            && nrightConsidered.get() > 1) {
    
-                           throw new UnconstrainedJoinException();
-   
-                       }
+                        throw new UnconstrainedJoinException();
    
                      }
-                     
-                     // See if the solutions join.
-                     final IBindingSet outSolution = BOpContext.bind(//
-                             right.solution,//
-                             left,//
-                             constraints,//
-                             getSelectVars()//
-                             );
-                     
-                     // record that we've seen a solution, if so
-                     matchExists |= outSolution!=null;
    
-                     // for normal joins and opt
-                     switch (getJoinType()) {
-                     case Normal:
-                     case Optional:
-                        outputSolution(outputBuffer, outSolution);
-                        break;
-                     case Exists:
-                     case NotExists:
-                        break; // will be handled at the end
-                     default:
-                        throw new AssertionError();
-                        
-                     }                      
-                 }
+                  }
+                     
+                  // See if the solutions join.
+                  final IBindingSet outSolution = BOpContext.bind(//
+                     right.solution,//
+                     left,//
+                     joinConstraints,//
+                     getSelectVars()//
+                  );
+                     
+                  // record that we've seen a solution, if so
+                  matchExists |= outSolution!=null;
+   
+                  // for normal joins and opt
+                  switch (getJoinType()) {
+                  case Normal:
+                  case Optional:
+                     outputSolution(outputBuffer, outSolution);
+                     break;
+                  case Exists:
+                  case NotExists:
+                     break; // will be handled at the end
+                  default:
+                     throw new AssertionError();
+                     
+                  }                      
               }
-              
-              // handle other join types
-              switch (getJoinType()) {
-              case Optional:
-              case NotExists:
-                 if (!matchExists) {
-                    outputSolution(outputBuffer, left);
-                 }
-                 break;
-              case Exists:
-                 if (matchExists) {
-                    outputSolution(outputBuffer, left);
-                 }
-                 break;
-              case Normal:
-                 // this has been fully handled already
-                 break;
-              default:
-                 throw new AssertionError();
-              }                      
-              
            }
               
+           // handle other join types
+           switch (getJoinType()) {
+           case Optional:
+           case NotExists:
+              if (!matchExists) {
+                 outputSolution(outputBuffer, left);
+              }
+              break;
+           case Exists:
+              if (matchExists) {
+                 outputSolution(outputBuffer, left);
+              }
+              break;
+           case Normal:
+              // this has been fully handled already
+              break;
+           default:
+              throw new AssertionError();
+           }                      
+              
         }
- 
-//        
-//        // true iff there are no join variables.
-//        try {
-//
-//           final Iterator<Bucket> bucketIt = leftSolutions.buckets();
-//           while (bucketIt.hasNext()) {
-//              
-//              final Bucket b = bucketIt.next();
-//              
-//              final Iterator<SolutionHit> solutionIt = b.iterator();
-//              
-//              while (solutionIt.hasNext()) {
-//
-//                 final SolutionHit solution = solutionIt.next();
-//                 
-//                 final IBindingSet left = solution.solution;
-//
-//                    nleftConsidered.increment();
-//
-//                    if (log.isDebugEnabled())
-//                        log.debug("Considering " + left);
-//
-//                    final Bucket bucket = rightSolutions.getBucket(left);
-//
-//                    if (bucket == null)
-//                        continue;
-//
-//                    final Iterator<SolutionHit> ritr = bucket.iterator();
-//
-//                    while (ritr.hasNext()) {
-//
-//                        final SolutionHit right = ritr.next();
-//
-//                        nrightConsidered.increment();
-//
-//                        if (log.isDebugEnabled())
-//                            log.debug("Join with " + right);
-//
-//                        nJoinsConsidered.increment();
-//
-//                        if (noJoinVars
-//                                && nJoinsConsidered.get() == getNoJoinVarsLimit()) {
-//
-//                            if (nleftConsidered.get() > 1
-//                                    && nrightConsidered.get() > 1) {
-//
-//                                throw new UnconstrainedJoinException();
-//
-//                            }
-//
-//                        }
-//
-//                        // See if the solutions join.
-//                        final IBindingSet outSolution = BOpContext.bind(//
-//                                right.solution,//
-//                                left,//
-//                                constraints,//
-//                                getSelectVars()//
-//                                );
-//
-//                        switch (getJoinType()) {
-//                        case Normal: {
-//                            if (outSolution != null) {
-//                                // Output the solution.
-//                                outputSolution(outputBuffer, outSolution);
-//                            }
-//                            break;
-//                        }
-//                        case Optional: {
-//                            if (outSolution != null) {
-//                                // Output the solution.
-//                                outputSolution(outputBuffer, outSolution);
-//                                // Increment counter so we know not to output
-//                                // the rightSolution as an optional solution.
-//                                right.nhits.increment();
-//                            }
-//                            break;
-//                        }
-//                        case Exists: {
-//                            /*
-//                             * The right solution is output iff there is at
-//                             * least one left solution which joins with that
-//                             * right solution. Each right solution is output at
-//                             * most one time.
-//                             */
-//                            if (outSolution != null) {
-//                                // if (right.nhits.get() == 0L) {
-//                                // // Output the solution.
-//                                // outputSolution(outputBuffer, right.solution);
-//                                // }
-//                                // Increment counter so we know this solution joins.
-//                                right.nhits.increment();
-//                            }
-//                            break;
-//                        }
-//                        case NotExists: {
-//                            /*
-//                             * The right solution is output iff there does not
-//                             * exist any left solution which joins with that
-//                             * right solution. This basically an optional join
-//                             * where the solutions which join are not output.
-//                             */
-//                            if (outSolution != null) {
-//                                // Increment counter so we know not to output
-//                                // the rightSolution as an optional solution.
-//                                right.nhits.increment();
-//                            }
-//                            break;
-//                        }
-//                        default:
-//                            throw new AssertionError();
-//                        }
-//
-//                    } // while(ritr.hasNext())
-//
-//                } // for(left : leftChunk)
-//                
-//            } // while(leftItr.hasNext())
-//
-//        } catch(Throwable t) {
-//
-//            throw launderThrowable(t);
-//            
-//        } finally {
-//
-//            leftItr.close();
-//
-//        }
-
-    }
+              
+     }
 
     
     /**
@@ -601,5 +409,8 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         
     }
 
+//    
+//    private static class AcceptAndOutputSolutionTask<E> extends Haltable<Void> implements
+//    Callable<Void>
 
 }
