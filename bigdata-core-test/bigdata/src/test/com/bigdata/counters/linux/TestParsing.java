@@ -28,14 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import junit.framework.AssertionFailedError;
+import junit.framework.TestCase2;
+
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Map;
 import java.util.regex.Pattern;
-
-import junit.framework.AssertionFailedError;
-import junit.framework.TestCase2;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -163,7 +164,27 @@ public class TestParsing extends TestCase2 {
         }
 
     }
-    
+
+    public void test_get_data_map() {
+        String header = "15:55:52      UID       PID    %usr %system  %guest    %CPU   CPU  Command\n";
+        String data = "15:55:54     1000      3308    0,50    0,00    0,00    0,25     0  java\n";
+
+        Map<String, String> fields = SysstatUtil.getDataMap(header, data);
+        assertEquals(fields.get("%usr"), "0,50");
+        assertEquals(fields.size(), 9);
+    }
+
+    public void test_get_data_incorrect() {
+        String header = "15:55:52      UID       PID    %usr %system  %guest    %CPU   CPU\n";
+        String data = "15:55:54     1000      3308    0,50    0,00    0,00    0,25     0  java\n";
+
+        try {
+            Map<String, String> fields = SysstatUtil.getDataMap(header, data);
+            assertTrue("Exception should be thrown", false);
+        } catch (IllegalArgumentException e ) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * Used to verify that the header corresponds to our expectations. Logs
