@@ -59,13 +59,9 @@ public class InlineURIFactory implements IInlineURIFactory {
 	 * this to a tree map. This provides lookup by prefix and the longest prefix
 	 * match is now used rather than visiting all registered handlers.
 	 * <p>
-	 * Note: I am not 100% clear on what provides the guarantee for visibility
-	 * of changes in this map. Presumably it is only modified when the triple
-	 * store instance is configured and barriers associated with that process
-	 * ensure that changes are published. Certainly it is NOT OK to make changes
-	 * once the triple store has been configured - the lexicon configuration
-	 * (including this data) needs to be stable across the life cycle of the
-	 * triple store instance. BBT.
+	 * This map should be populated in the constructor for this class and
+	 * the subclasses in order to guarantee that the changes are visible
+	 * once we leave the scope of the constructor.
 	 */
 	private final TreeMap<String, InlineURIHandler> handlersByNamespace = new TreeMap<String, InlineURIHandler>();
     
@@ -80,6 +76,15 @@ public class InlineURIFactory implements IInlineURIFactory {
     	
     }
     
+	/**
+	 * Declare a handler. This must be invoked in the constructor for this class
+	 * or the constructor of a subclass. The set of registered handlers must not
+	 * be changed outside of the constructor scope both for reasons of
+	 * visibility of the changes (thread-safety) and stability of the mapping of
+	 * {@link URI}s onto {@link IV}s.
+	 * 
+	 * @param handler
+	 */
     protected void addHandler(final InlineURIHandler handler) {
 
     	//        this.handlers.add(handler);
