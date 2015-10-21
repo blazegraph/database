@@ -62,7 +62,7 @@ public enum DTEExtension {
 	 *      that can be registered without having to explicitly create them in
 	 *      the code).
 	 */
-	RESERVED((byte) 255, 0/* len */, Void.class, XSD.IPV4, DTEFlags.NOFLAGS);
+	RESERVED((byte) 255, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS);
 
     /**
      * @param v
