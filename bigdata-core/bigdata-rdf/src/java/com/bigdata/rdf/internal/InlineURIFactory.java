@@ -114,13 +114,25 @@ public class InlineURIFactory implements IInlineURIFactory {
  
 		}
 
-		final InlineURIHandler handler = floorEntry.getValue();
+		final String prefix = floorEntry.getKey();
+		
+		/*
+		 * Note: the floorEntry is NOT guaranteed to be a prefix. It can also be
+		 * strictly LT the probe key. Therefore we must additionally verify here
+		 * that the prefix under which the URI handler was registered is a
+		 * prefix of the URI before invoking that handler.
+		 */
+		if (str.startsWith(prefix)) {
 
-		final URIExtensionIV iv = handler.createInlineIV(uri);
+			final InlineURIHandler handler = floorEntry.getValue();
 
-		if (iv != null) {
+			final URIExtensionIV iv = handler.createInlineIV(uri);
 
-			return iv;
+			if (iv != null) {
+
+				return iv;
+
+			}
 
 		}
 
