@@ -46,7 +46,6 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
- * @version $Id$
  */
 public class TestInlineValues extends ProxyBigdataSailTestCase {
 
@@ -55,7 +54,7 @@ public class TestInlineValues extends ProxyBigdataSailTestCase {
     @Override
     public Properties getProperties() {
         
-        Properties props = super.getProperties();
+        final Properties props = new Properties(super.getProperties());
         
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());

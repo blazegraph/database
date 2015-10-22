@@ -27,15 +27,18 @@ import java.util.Arrays;
 
 import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
+/**
+ * Class models an IPv4 address.
+ */
 public class IPv4Address {
 
-	final byte[] address;
+	final private byte[] address;
 
-	public IPv4Address(byte[] address) {
+	public IPv4Address(final byte[] address) {
 		this.address = address;
 	}
 	
-	public IPv4Address(IPv4Address ip) {
+	public IPv4Address(final IPv4Address ip) {
 		this.address = ip.getBytes();
 	}
 
@@ -54,14 +57,14 @@ public class IPv4Address {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
+	public boolean equals(final Object obj) {
 		if (this == obj)
 			return true;
 		if (obj == null)
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		IPv4Address other = (IPv4Address) obj;
+		final IPv4Address other = (IPv4Address) obj;
 
 		return UnsignedByteArrayComparator.INSTANCE.compare(address,
 				other.address) == 0;
@@ -70,6 +73,7 @@ public class IPv4Address {
 	/**
 	 * Return printable version of the IP address
 	 */
+	@Override
 	public String toString() {
 		return byteArrayToIPString(address);
 		
@@ -88,9 +92,9 @@ public class IPv4Address {
         	   (netmask <= 32 ? "/" + netmask : ""); 
 	}
 	
-	public static IPv4Address IPv4Factory(String... s) {
+	public static IPv4Address IPv4Factory(final String... s) {
 
-		byte[] address = new byte[5];
+		final byte[] address = new byte[5];
 		long longVal;
 
 		if(s.length == 4) {
