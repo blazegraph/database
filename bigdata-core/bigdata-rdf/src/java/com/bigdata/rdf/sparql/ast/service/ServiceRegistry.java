@@ -36,6 +36,7 @@ import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.sail.RDRHistoryServiceFactory;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -436,7 +437,7 @@ public class ServiceRegistry {
      */
     public final ServiceCall<? extends Object> toServiceCall(
             final AbstractTripleStore store, final HttpClient cm,
-            URI serviceURI, final ServiceNode serviceNode) {
+            URI serviceURI, final ServiceNode serviceNode, final BaseJoinStats stats) {
 
         if (serviceURI == null)
             throw new IllegalArgumentException();
@@ -471,7 +472,7 @@ public class ServiceRegistry {
         }
 
         final ServiceCallCreateParams params = new ServiceCallCreateParamsImpl(
-                serviceURI, store, serviceNode, cm, f.getServiceOptions());
+                serviceURI, store, serviceNode, cm, f.getServiceOptions(), stats);
 
         return f.create(params);
 
@@ -504,11 +505,13 @@ public class ServiceRegistry {
         private final ServiceNode serviceNode;
         private final HttpClient cm;
         private final IServiceOptions serviceOptions;
+        private final BaseJoinStats stats;
 
         public ServiceCallCreateParamsImpl(final URI serviceURI,
                 final AbstractTripleStore store, final ServiceNode serviceNode,
                 final HttpClient cm,
-                final IServiceOptions serviceOptions) {
+                final IServiceOptions serviceOptions,
+                final BaseJoinStats stats) {
 
             this.serviceURI = serviceURI;
 
@@ -519,6 +522,8 @@ public class ServiceRegistry {
             this.cm = cm;
 
             this.serviceOptions = serviceOptions;
+            
+            this.stats = stats;
 
         }
 
@@ -545,6 +550,11 @@ public class ServiceRegistry {
         @Override
         public IServiceOptions getServiceOptions() {
             return serviceOptions;
+        }
+        
+        @Override
+        public BaseJoinStats getStats() {
+           return stats;
         }
 
         @Override

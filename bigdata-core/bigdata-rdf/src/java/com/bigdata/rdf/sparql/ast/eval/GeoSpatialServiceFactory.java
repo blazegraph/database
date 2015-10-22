@@ -59,6 +59,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.PipelineJoin.Annotations;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -232,7 +233,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        */
       return new GeoSpatialServiceCall(searchVar, statementPatterns,
             getServiceOptions(), dflts, store, maxParallel, avgDataPointsPerThread, 
-            threadLocalBufferCapacity, globalBufferChunkOfChunksCapacity);
+            threadLocalBufferCapacity, globalBufferChunkOfChunksCapacity,
+            createParams.getStats());
 
    }
 
@@ -416,6 +418,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     */
    private static class GeoSpatialServiceCall implements BigdataServiceCall {
       
+      
+      
       private final IServiceOptions serviceOptions;
       private final TermNode searchFunction;
       private final IVariable<?> searchVar;
@@ -441,6 +445,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final int threadLocalBufferCapacity;
       private final int globalBufferChunkOfChunksCapacity;
       
+      private final BaseJoinStats stats;
+      
       /**
        * The service used for executing subtasks (optional).
        * 
@@ -455,7 +461,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final GeoSpatialDefaults dflts, final AbstractTripleStore kb,
             final int maxParallel, final int avgDataPointsPerThread,
             final int threadLocalBufferCapacity, 
-            final int globalBufferChunkOfChunksCapacity) {
+            final int globalBufferChunkOfChunksCapacity,
+            final BaseJoinStats stats) {
 
          if (searchVar == null)
             throw new IllegalArgumentException();
@@ -559,9 +566,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.threadLocalBufferCapacity = threadLocalBufferCapacity;
          this.globalBufferChunkOfChunksCapacity = globalBufferChunkOfChunksCapacity;
          
+         
          // set up executor service (not using any if no parallel access desired)
          executor = maxParallel<=1 ? 
             null : new LatchedExecutor(kb.getIndexManager().getExecutorService(), maxParallel);
+         
+         this.stats = stats;
 
       }
 
@@ -615,7 +625,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final FutureTask<Void> ft = 
             new FutureTask<Void>(new GeoSpatialServiceCallTask(
                buffer, query, kb, vars, context, globals, vf, geoSpatialCounters, 
-               executor, avgDataPointsPerThread, threadLocalBufferCapacity));
+               executor, avgDataPointsPerThread, threadLocalBufferCapacity, stats));
          
          buffer.setFuture(ft); // set the future on the buffer
          kb.getIndexManager().getExecutorService().submit(ft);
@@ -657,6 +667,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          private final int avgDataPointsPerThread;
          private final int threadLocalBufferCapacity;
 
+         private final BaseJoinStats stats;
          
          /**
           * The list of tasks to execute. Execution of these tasks is carried out
@@ -674,7 +685,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final BOpContextBase context,
             final GlobalAnnotations globals, final BigdataValueFactory vf,
             final GeoSpatialCounters geoSpatialCounters, final Executor executor,
-            final int avgDataPointsPerThread, final int threadLocalBufferCapacity) {
+            final int avgDataPointsPerThread, final int threadLocalBufferCapacity,
+            final BaseJoinStats stats) {
             
             this.buffer = buffer;
             this.query = query;
@@ -693,8 +705,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.avgDataPointsPerThread = avgDataPointsPerThread;
             this.threadLocalBufferCapacity = threadLocalBufferCapacity;
             
+            this.stats = stats;
+            
             tasks = getSubTasks();
             
+            // set stats
+            geoSpatialCounters.registerGeoSpatialServiceCallTask();
+            geoSpatialCounters.registerGeoSpatialServiceCallSubRangeTasks(tasks.size());
+
          }
          
          
@@ -707,7 +725,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             final List<GeoSpatialServiceCallSubRangeTask> subTasks =
                new LinkedList<GeoSpatialServiceCallSubRangeTask>();
-            
+
             /**
              * Collect metadata. Note that the filters are not thread-safe, so we need to set 
              * up one filter objects for the individual threads and cannot do that here. 
@@ -807,6 +825,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              */
             final AccessPath<ISPO> accessPath = getAccessPath(lowerBorderComponents, upperBorderComponents);
             final long totalPointInRange = accessPath.rangeCount(false/* exact */);
+            
+            stats.accessPathRangeCount.add(totalPointInRange);
 
             final long nrSubRanges = Math.max(totalPointInRange / avgDataPointsPerThread, 1); /* at least one subrange */
 
@@ -835,7 +855,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                // set up a subtask for the partition
                final GeoSpatialServiceCallSubRangeTask subTask = 
                   getSubTask(upperLeftWithTime, lowerRightWithTime, 
-                     partition.lowerBorder, partition.upperBorder, keyOrder, subjectPos, objectPos);
+                     partition.lowerBorder, partition.upperBorder, keyOrder, subjectPos, objectPos, stats);
                
                if (subTask!=null) { // if satisfiable
                   subTasks.add(subTask);
@@ -890,7 +910,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final PointLatLonTime subRangeUpperLeftWithTime,      /* upper left of the subtask */
             final PointLatLonTime subRangeLowerRightWithTime,     /* lower right of the subtask */
             final SPOKeyOrder keyOrder, final int subjectPos, 
-            final int objectPos) {
+            final int objectPos, final BaseJoinStats stats) {
             
             /**
              * Compose the surrounding filter. The filter is based on the outer range.
@@ -983,7 +1003,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             // and construct the sub range task
             return new GeoSpatialServiceCallSubRangeTask(
-               buffer, accessPath, bigMinAdvancer, filter, resolver, threadLocalBufferCapacity);
+               buffer, accessPath, bigMinAdvancer, filter, resolver, threadLocalBufferCapacity, stats);
          }
 
 
@@ -1140,11 +1160,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             final private GeoSpatialServiceCallResolver resolver;
             
+            final private BaseJoinStats stats;
+            
             public GeoSpatialServiceCallSubRangeTask(
                final BlockingBuffer<IBindingSet[]> backingBuffer,
                final AccessPath<ISPO> accessPath, Advancer<SPO> bigMinAdvancer,
                final GeoSpatialFilterBase filter, final GeoSpatialServiceCallResolver resolver,
-               final int threadLocalBufferCapacity) {
+               final int threadLocalBufferCapacity, final BaseJoinStats stats) {
 
                // create a local buffer linked to the backing, thread safe blocking buffer
                localBuffer = 
@@ -1155,12 +1177,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                this.bigMinAdvancer = bigMinAdvancer;
                this.filter = filter;
                this.resolver = resolver;
+               this.stats = stats;
                
             }
 
             @SuppressWarnings("unchecked")
             @Override
             public Void call() throws Exception {
+               
                
                final Iterator<IBindingSet> itr = 
                      new Striterator(accessPath.getIndex().rangeIterator(
@@ -1170,7 +1194,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                            .addFilter(resolver);
 
                // consume and flush the buffer
+               stats.accessPathCount.increment();
+
                while (itr.hasNext()) {
+                  stats.accessPathUnitsIn.increment();
                   localBuffer.add(itr.next());
                }
                localBuffer.flush();
@@ -1920,20 +1947,24 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       @SuppressWarnings("rawtypes")
       public PointLatLonTime asPoint(final ITuple tuple) {
 
-         final byte[] key = ((ITuple<?>) tuple).getKey();
-         final IV[] ivs = IVUtility.decode(key, objectPos+1);
-         
-         final IV oIV= ivs[objectPos];
-
-         if (oIV instanceof LiteralExtensionIV) {
-            final LiteralExtensionIV lit = (LiteralExtensionIV) oIV;
-
-            long[] longArr = litExt.asLongArray(lit);
-            final Object[] components = litExt.longArrAsComponentArr(longArr);
-
-            return new PointLatLonTime(
-               new PointLatLon((Double) components[0],
-               (Double) components[1]), (Long) components[2]);
+         try {
+            final byte[] key = ((ITuple<?>) tuple).getKey();
+            final IV[] ivs = IVUtility.decode(key, objectPos+1);
+            
+            final IV oIV= ivs[objectPos];
+   
+            if (oIV instanceof LiteralExtensionIV) {
+               final LiteralExtensionIV lit = (LiteralExtensionIV) oIV;
+   
+               long[] longArr = litExt.asLongArray(lit);
+               final Object[] components = litExt.longArrAsComponentArr(longArr);
+   
+               return new PointLatLonTime(
+                  new PointLatLon((Double) components[0],
+                  (Double) components[1]), (Long) components[2]);
+            }
+         } catch (Exception e) {
+            // ignore (this may be an invalid data point)
          }
 
          return null; // something went wrong
