@@ -234,8 +234,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 
         this.pid = pid;
         
-        perProcessIOData = kernelVersion.version >= 2
-                && kernelVersion.major >= 6 && kernelVersion.minor >= 20;
+        perProcessIOData = kernelVersion.version > 2 || (kernelVersion.version == 2
+                && kernelVersion.major >= 6 && kernelVersion.minor >= 20);
 
     }
 
