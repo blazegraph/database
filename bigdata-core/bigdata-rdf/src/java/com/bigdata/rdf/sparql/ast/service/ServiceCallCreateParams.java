@@ -27,12 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import java.util.Map;
-
 import org.apache.http.conn.ClientConnectionManager;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -75,4 +74,9 @@ public interface ServiceCallCreateParams {
      */
     IServiceOptions getServiceOptions();
     
+    /**
+     * Statistics associated with the runtime evaluation of the service call.
+     * May be used by internal services to report on, e.g., access path statistics.
+     */
+    BaseJoinStats getStats();    
 }

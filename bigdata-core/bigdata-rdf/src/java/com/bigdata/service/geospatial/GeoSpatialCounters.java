@@ -31,6 +31,7 @@ import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
+import com.bigdata.rdf.sparql.ast.eval.GeoSpatialServiceFactory;
 
 /**
  * Counters related to the usage of GeoSpatial services
@@ -80,35 +81,15 @@ public class GeoSpatialCounters implements ICounterSetAccess {
      */
     protected final CAT filterCalculationTime = new CAT();
 
-//    protected final CAT ctr0 = new CAT();
-//    public void addToCtr0(final long timeInNanoSec) { ctr0.add(timeInNanoSec); }
-//    
-//    protected final CAT ctr1 = new CAT();
-//    public void addToCtr1(final long timeInNanoSec) { ctr1.add(timeInNanoSec); }
-//    
-//    protected final CAT ctr2 = new CAT();
-//    public void addToCtr2(final long timeInNanoSec) { ctr2.add(timeInNanoSec); }
-//
-//    protected final CAT ctr3 = new CAT();
-//    public void addToCtr3(final long timeInNanoSec) { ctr3.add(timeInNanoSec); }
-//
-//    protected final CAT ctr4 = new CAT();
-//    public void addToCtr4(final long timeInNanoSec) { ctr4.add(timeInNanoSec); }
-//
-//    protected final CAT ctr5 = new CAT();
-//    public void addToCtr5(final long timeInNanoSec) { ctr5.add(timeInNanoSec); }
-//
-//    protected final CAT ctr6 = new CAT();
-//    public void addToCtr6(final long timeInNanoSec) { ctr6.add(timeInNanoSec); }
-//
-//    protected final CAT ctr7 = new CAT();
-//    public void addToCtr7(final long timeInNanoSec) { ctr7.add(timeInNanoSec); }
-//
-//    protected final CAT ctr8 = new CAT();
-//    public void addToCtr8(final long timeInNanoSec) { ctr8.add(timeInNanoSec); }
-//
-//    protected final CAT ctr9 = new CAT();
-//    public void addToCtr9(final long timeInNanoSec) { ctr9.add(timeInNanoSec); }
+    /**
+     * The #of GeoSpatialServiceCallTask tasks scheduled
+     */
+    protected final CAT geoSpatialServiceCallTasks = new CAT();
+
+    /**
+     * The #of GeoSpatialServiceCallSubRangeTask 
+     */
+    protected final CAT geoSpatialServiceCallSubRangeTasks = new CAT();
 
 
     public void registerGeoSpatialSearchRequest() {
@@ -137,6 +118,13 @@ public class GeoSpatialCounters implements ICounterSetAccess {
        filterCalculationTime.add(timeInNanoSec);
     }
     
+    public void registerGeoSpatialServiceCallTask() {
+       geoSpatialServiceCallTasks.increment();
+    }
+
+    public void registerGeoSpatialServiceCallSubRangeTasks(long numSubtasks) {
+       geoSpatialServiceCallSubRangeTasks.add(numSubtasks);
+    }
     
     @Override
     public CounterSet getCounters() {
@@ -148,6 +136,20 @@ public class GeoSpatialCounters implements ICounterSetAccess {
             public void sample() {
                 setValue(geoSpatialSearchRequests.get());
             }
+        });
+        
+        root.addCounter("geoSpatialServiceCallTasks", new Instrument<Long>() {
+           @Override
+           public void sample() {
+               setValue(geoSpatialServiceCallTasks.get());
+           }
+        });
+        
+        root.addCounter("geoSpatialServiceCallSubRangeTasks", new Instrument<Long>() {
+           @Override
+           public void sample() {
+               setValue(geoSpatialServiceCallSubRangeTasks.get());
+           }
         });
 
         root.addCounter("zOrderIndexScannedValues", new Instrument<Long>() {

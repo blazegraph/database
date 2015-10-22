@@ -977,7 +977,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
                     .toServiceCall(ctx.db,
                             ctx.queryEngine.getClientConnectionManager(),
-                            serviceURI, serviceNode);
+                            serviceURI, serviceNode, null /* BOpStats not yet available */);
 
             /*
              * true IFF this is a registered bigdata aware service running in
