@@ -471,8 +471,7 @@ public class ServiceRegistry {
         }
 
         final ServiceCallCreateParams params = new ServiceCallCreateParamsImpl(
-                serviceURI, store, serviceNode, cm, f.getServiceOptions()
-        );
+                serviceURI, store, serviceNode, cm, f.getServiceOptions());
 
         return f.create(params);
 

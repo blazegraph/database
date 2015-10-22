@@ -59,6 +59,7 @@ import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.concurrent.FutureTaskMon;
+import com.bigdata.rdf.sparql.ast.eval.GeoSpatialServiceFactory;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -220,6 +221,19 @@ public class PipelineJoin<E> extends PipelineOp implements
                 .intern();
 
         boolean DEFAULT_REORDER_ACCESS_PATHS = true;
+
+        /**
+         * Average number of data points processed per thread, in case we have
+         * a large access path that is split up into multiple threads. Note that this is currently
+         * *not* supported by the PipelineJoin, but might be implemented in future versions.
+         * It is, however, used for the GeoSpatial Service, see {@link GeoSpatialServiceFactory}.
+         * 
+         * TODO make use of annotation for {@link PipelineJoin}
+         */
+        public String AVG_DATA_POINTS_PER_THREAD = 
+           (PipelineJoin.class.getName() + ".avgDataPointsPerThread").intern();
+        
+        public int DEFAULT_AVG_DATA_POINTS_PER_THREAD = 10000;
 
 	}
 
