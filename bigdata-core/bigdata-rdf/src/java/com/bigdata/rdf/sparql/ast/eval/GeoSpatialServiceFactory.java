@@ -49,14 +49,17 @@ import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
+import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.join.PipelineJoin.Annotations;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.filter.Advancer;
@@ -123,6 +126,7 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
+
    private static final Logger log = Logger
          .getLogger(GeoSpatialServiceFactory.class);
 
@@ -187,12 +191,48 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       validateSearch(searchVar, statementPatterns);
 
+      /**
+       * Get the service call configuration from annotations (attachable via query hints).
+       * Here's how to define the hints:
+       * 
+       * <code>
+          hint:Prior <http://www.bigdata.com/queryHints#maxParallel> "20" .
+          hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity> "10" .
+          hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.IBuffer.chunkCapacity> "100" .
+          hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.avgDataPointsPerThread> "25000" .
+         </code>
+       */
+      final Integer maxParallel = 
+         serviceNode.getQueryHintAsInteger(
+            PipelineOp.Annotations.MAX_PARALLEL, 
+            PipelineOp.Annotations.DEFAULT_MAX_PARALLEL);
+      final Integer avgDataPointsPerThread = 
+         serviceNode.getQueryHintAsInteger(
+            Annotations.AVG_DATA_POINTS_PER_THREAD, 
+            Annotations.DEFAULT_AVG_DATA_POINTS_PER_THREAD);
+      final Integer threadLocalBufferCapacity = 
+         serviceNode.getQueryHintAsInteger(
+            BufferAnnotations.CHUNK_CAPACITY, 
+            BufferAnnotations.DEFAULT_CHUNK_CAPACITY);
+      final Integer globalBufferChunkOfChunksCapacity = 
+         serviceNode.getQueryHintAsInteger(
+            BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY, 
+            BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+  
+      if (log.isDebugEnabled()) {
+         log.debug("maxParallel=" + maxParallel);
+         log.debug("avgDataPointsPerThread=" + avgDataPointsPerThread);
+         log.debug("threadLocalBufferCapacity=" + threadLocalBufferCapacity);
+         log.debug("globalBufferChunkOfChunksCapacity=" + globalBufferChunkOfChunksCapacity);
+      }
+      
       /*
        * Create and return the geospatial service call object, which will
        * execute this search request.
        */
       return new GeoSpatialServiceCall(searchVar, statementPatterns,
-            getServiceOptions(), dflts, store);
+            getServiceOptions(), dflts, store, maxParallel, avgDataPointsPerThread, 
+            threadLocalBufferCapacity, globalBufferChunkOfChunksCapacity);
 
    }
 
@@ -376,13 +416,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     */
    private static class GeoSpatialServiceCall implements BigdataServiceCall {
       
-      // TODO: need to expose these constants as configuration options
-      private static int THREAD_LOCAL_BUFFER_SIZE = 100;
-      private static int CHUNKS_OF_CHUNKS_CAPACITY = 100;
-      private static int MAX_PARALLEL_THREADS = 10;
-      private static int AVERAGE_DATA_POINTS_PER_THREAD = 1000; 
-      
-
       private final IServiceOptions serviceOptions;
       private final TermNode searchFunction;
       private final IVariable<?> searchVar;
@@ -404,6 +437,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final AbstractTripleStore kb;
       private final GeoSpatialCounters geoSpatialCounters;
       
+      private final int avgDataPointsPerThread;
+      private final int threadLocalBufferCapacity;
+      private final int globalBufferChunkOfChunksCapacity;
+      
       /**
        * The service used for executing subtasks (optional).
        * 
@@ -415,7 +452,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       public GeoSpatialServiceCall(final IVariable<?> searchVar,
             final Map<URI, StatementPatternNode> statementPatterns,
             final IServiceOptions serviceOptions,
-            final GeoSpatialDefaults dflts, final AbstractTripleStore kb) {
+            final GeoSpatialDefaults dflts, final AbstractTripleStore kb,
+            final int maxParallel, final int avgDataPointsPerThread,
+            final int threadLocalBufferCapacity, 
+            final int globalBufferChunkOfChunksCapacity) {
 
          if (searchVar == null)
             throw new IllegalArgumentException();
@@ -515,17 +555,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             QueryEngineFactory.getQueryController(
                kb.getIndexManager()).getGeoSpatialCounters();
             
-         // set up service
-         if (MAX_PARALLEL_THREADS <= 1) {
-            
-            executor = null;
-            
-         } else {
-            
-            // shared service.
-            executor = new LatchedExecutor(
-               kb.getIndexManager().getExecutorService(), MAX_PARALLEL_THREADS);
-         }
+         this.avgDataPointsPerThread = avgDataPointsPerThread;
+         this.threadLocalBufferCapacity = threadLocalBufferCapacity;
+         this.globalBufferChunkOfChunksCapacity = globalBufferChunkOfChunksCapacity;
+         
+         // set up executor service (not using any if no parallel access desired)
+         executor = maxParallel<=1 ? 
+            null : new LatchedExecutor(kb.getIndexManager().getExecutorService(), maxParallel);
 
       }
 
@@ -574,11 +610,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final BigdataValueFactory vf = kb.getValueFactory();
 
          final BlockingBuffer<IBindingSet[]> buffer = 
-            new BlockingBuffer<IBindingSet[]>(CHUNKS_OF_CHUNKS_CAPACITY);
+            new BlockingBuffer<IBindingSet[]>(globalBufferChunkOfChunksCapacity);
 
          final FutureTask<Void> ft = 
             new FutureTask<Void>(new GeoSpatialServiceCallTask(
-               buffer, query, kb, vars, context, globals, vf, geoSpatialCounters, executor));
+               buffer, query, kb, vars, context, globals, vf, geoSpatialCounters, 
+               executor, avgDataPointsPerThread, threadLocalBufferCapacity));
          
          buffer.setFuture(ft); // set the future on the buffer
          kb.getIndexManager().getExecutorService().submit(ft);
@@ -616,9 +653,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private BigdataValueFactory vf;
          
          final private  GeoSpatialLiteralExtension<BigdataValue> litExt;
+         
+         private final int avgDataPointsPerThread;
+         private final int threadLocalBufferCapacity;
 
-         
-         
          
          /**
           * The list of tasks to execute. Execution of these tasks is carried out
@@ -635,7 +673,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final AbstractTripleStore kb, final IVariable<?>[] vars,
             final BOpContextBase context,
             final GlobalAnnotations globals, final BigdataValueFactory vf,
-            final GeoSpatialCounters geoSpatialCounters, final Executor executor) {
+            final GeoSpatialCounters geoSpatialCounters, final Executor executor,
+            final int avgDataPointsPerThread, final int threadLocalBufferCapacity) {
             
             this.buffer = buffer;
             this.query = query;
@@ -651,14 +690,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             // for use in this thread only
             this.litExt = new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation());
 
+            this.avgDataPointsPerThread = avgDataPointsPerThread;
+            this.threadLocalBufferCapacity = threadLocalBufferCapacity;
+            
             tasks = getSubTasks();
             
          }
          
          
          /**
-          * Decomposes the context path into subtasks. Each subtasks is a simple range
-          * specification, which carries out range iteration.
+          * Decomposes the context path into subtasks according to the configuration.
+          * Each subtasks is a range scan backed by the buffer.
           */
          @SuppressWarnings("rawtypes")
          protected List<GeoSpatialServiceCallSubRangeTask> getSubTasks() {
@@ -766,7 +808,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final AccessPath<ISPO> accessPath = getAccessPath(lowerBorderComponents, upperBorderComponents);
             final long totalPointInRange = accessPath.rangeCount(false/* exact */);
 
-            final long nrSubRanges = Math.max(totalPointInRange / AVERAGE_DATA_POINTS_PER_THREAD, 1); /* at least one subrange */
+            final long nrSubRanges = Math.max(totalPointInRange / avgDataPointsPerThread, 1); /* at least one subrange */
 
             LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
             LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
@@ -824,7 +866,24 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          }
 
 
-         // TODO: documentation
+         /**
+          * Sets up a subtask for the given configuration. The method may return null
+          * if it can be statically shown that the subtask produces no result, i.e. if
+          * it is trivially not satisfiable. It gets as input information about the outer
+          * range (i.e., the search rectangle surrounding *all* subtasks) and the 
+          * range for the given subtask, plus some additional information about key order,
+          * subject, and object position.
+          * 
+          * @param outerRangeUpperLeftWithTime the upper left geospatial+time point of the outer range
+          * @param outerRangeLowerRightWithTime the lower right geospatial+time point of the outer range 
+          * @param subRangeUpperLeftWithTime the upper left geospatial+time point of sub range covered by the task
+          * @param subRangeLowerRightWithTime the lower right geospatial+time point of sub range covered by the task
+          * @param keyOrder the key order of the underlying access path
+          * @param subjectPos the position of the subject in the key
+          * @param objectPos the position of the object in the key
+          * 
+          * @return the subtask or null 
+          */
          protected GeoSpatialServiceCallSubRangeTask getSubTask(
             final PointLatLonTime outerRangeUpperLeftWithTime,    /* upper left of outer (non subtask) range */
             final PointLatLonTime outerRangeLowerRightWithTime,   /* lower right of outer (non subtask) range */
@@ -923,7 +982,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                         timeVar, locationAndTimeVar, subjectPos, objectPos, vf, litExt);
             
             // and construct the sub range task
-            return new GeoSpatialServiceCallSubRangeTask(buffer, accessPath, bigMinAdvancer, filter, resolver);
+            return new GeoSpatialServiceCallSubRangeTask(
+               buffer, accessPath, bigMinAdvancer, filter, resolver, threadLocalBufferCapacity);
          }
 
 
@@ -997,6 +1057,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   
                }
 
+               buffer.flush();
                buffer.close();
                return null;
 
@@ -1060,7 +1121,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                }
 
             }
-            
+
+            buffer.flush();
             buffer.close();
             return null;
          }
@@ -1081,12 +1143,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             public GeoSpatialServiceCallSubRangeTask(
                final BlockingBuffer<IBindingSet[]> backingBuffer,
                final AccessPath<ISPO> accessPath, Advancer<SPO> bigMinAdvancer,
-               final GeoSpatialFilterBase filter, final GeoSpatialServiceCallResolver resolver) {
+               final GeoSpatialFilterBase filter, final GeoSpatialServiceCallResolver resolver,
+               final int threadLocalBufferCapacity) {
 
                // create a local buffer linked to the backing, thread safe blocking buffer
                localBuffer = 
                   new UnsynchronizedArrayBuffer<IBindingSet>(
-                     backingBuffer, IBindingSet.class, THREAD_LOCAL_BUFFER_SIZE);
+                     backingBuffer, IBindingSet.class, threadLocalBufferCapacity);
 
                this.accessPath = accessPath;
                this.bigMinAdvancer = bigMinAdvancer;

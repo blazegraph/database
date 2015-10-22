@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
+import java.util.Map;
+
+import org.apache.http.conn.ClientConnectionManager;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 
@@ -71,5 +74,5 @@ public interface ServiceCallCreateParams {
      * The configuration options associated with the {@link ServiceFactory}.
      */
     IServiceOptions getServiceOptions();
-
+    
 }
