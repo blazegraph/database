@@ -188,6 +188,7 @@ abstract public class AbstractLiteralIV<V extends BigdataLiteral, T>
 		return XMLDatatypeUtil.parseCalendar(getLabel());
 	}
 	
+    @Override
     public String toString() {
         return super.getDTE() + "(" + stringValue() + ")";
     }
