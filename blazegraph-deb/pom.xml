@@ -28,16 +28,20 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>bigdata-debian</artifactId>
-  <version>1.5.3-master-SNAPSHOT</version>
+  <artifactId>blazegraph-deb</artifactId>
+  <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph Debian Package</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>
 
+  <properties>
+     <debian.user>blzg</debian.user>
+     <debian.group>blzg</debian.group>
+  </properties>
   <build>
      <resources>
         <resource>
@@ -74,6 +78,18 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <destFileName>bigdata.war</destFileName>
                 </artifactItem>
               </artifactItems>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-dependencies</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>false</overWriteSnapshots>
+              <overWriteIfNewer>true</overWriteIfNewer>
             </configuration>
           </execution>
         </executions>
@@ -154,6 +170,124 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   </manifestEntries>
                 </transformer>
               </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Create the debian file -->
+      <plugin>
+        <artifactId>jdeb</artifactId>
+        <groupId>org.vafer</groupId>
+        <version>1.3</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>jdeb</goal>
+            </goals>
+            <configuration>
+              <deb>${project.build.directory}/${artifactId}-${project.version}.deb</deb>
+              <dataSet>
+                <!-- dependencies go in /usr/local/blazegraph-[version]/lib -->
+                <data>
+                  <src>${project.build.directory}/dependency</src>
+                  <type>directory</type>
+                  <includes>*.jar</includes>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/usr/local/blazegraph-${project.version}/lib</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data>
+
+                <!-- resources 
+                <data>
+                  <src>${basedir}/src/main/resources</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/usr/local/blazegraph-${project.version}/resources</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data>-->
+
+                <!-- shell scripts go in /usr/local/blazegraph-[version] -->
+                <data>
+                  <src>${basedir}</src>
+                  <type>directory</type>
+                  <includes>*.sh</includes>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/usr/local/blazegraph-${project.version}</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                    <filemode>744</filemode>
+                  </mapper>
+                </data>
+
+                <!-- soft link to versioned software -->
+                <data>
+                  <type>link</type>
+                  <symlink>true</symlink>
+                  <linkName>/usr/local/blazegraph</linkName>
+                  <linkTarget>/usr/local/blazegraph-${project.version}</linkTarget>
+                </data>
+
+                <!-- create the data directories, log directories -->
+                <data>
+                  <type>template</type>
+                  <paths>
+                    <path>var/log/blazegraph</path>
+                    <path>var/lib/blazegraph</path>
+                  </paths>
+                  <mapper>
+                    <type>perm</type>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data>
+
+                <!-- properties files 
+                <data>
+                  <src>${basedir}/docker.properties</src>
+                  <dst>local.properties</dst>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/etc/blazegraph</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data>-->
+
+                <!-- logging properties files
+                <data>
+                  <src>${basedir}/log4j.properties</src>
+                  <dst>log4j.properties</dst>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/etc/blazegraph</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data> -->
+
+                <!-- upstart script -->
+                <data>
+                  <src>${basedir}/src/deb/init/blazegraph.conf</src>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/etc/init</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data>
+
+              </dataSet>
             </configuration>
           </execution>
         </executions>
