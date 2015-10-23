@@ -360,6 +360,17 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      */
     protected class PIDStatReader extends ProcessReaderHelper {
 
+        private static final String PIDSTAT_FIELD_CPU_PERCENT_USR = "%usr";
+        private static final String PIDSTAT_FIELD_CPU_PERCENT = "%CPU";
+        private static final String PIDSTAT_FIELD_CPU_PERCENT_SYSTEM = "%system";
+        private static final String PIDSTAT_FIELD_MEM_MINOR_FAULTS_PERS = "minflt/s";
+        private static final String PIDSTAT_FIELD_MEM_MAJOR_FAULTS_PERS = "majflt/s";
+        private static final String PIDSTAT_FIELD_MEM_VIRTUAL_SIZE = "VSZ";
+        private static final String PIDSTAT_FIELD_MEM_RESIDENT_SET_SIZE = "RSS";
+        private static final String PIDSTAT_FIELD_MEM_SIZE_PERCENT = "%MEM";
+        private static final String PIDSTAT_FIELD_DISK_KB_READ_PERS = "kB_rd/s";
+        private static final String PIDSTAT_FIELD_DISK_KB_WRITTEN_PERS = "kB_wr/s";
+
         @Override
         protected ActiveProcess getActiveProcess() {
             
@@ -476,7 +487,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 log.info(sb.toString());
                 log.info(header + ";" + data);
             }
-            if(fields.containsKey("%CPU")) {
+            if(fields.containsKey(PIDSTAT_FIELD_CPU_PERCENT)) {
                 
                 /*
                  * CPU data for the specified process.
@@ -487,13 +498,13 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 
 
                 vals.put(IProcessCounters.CPU_PercentUserTime,
-                        Double.parseDouble(fields.get("%usr")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_CPU_PERCENT_USR)));
 
                 vals.put(IProcessCounters.CPU_PercentSystemTime,
-                        Double.parseDouble(fields.get("%system")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_CPU_PERCENT_SYSTEM)));
                 
                 vals.put(IProcessCounters.CPU_PercentProcessorTime,
-                        Double.parseDouble(fields.get("%CPU")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_CPU_PERCENT)));
 
             } else if(fields.containsKey("RSS")) {
                 
@@ -506,19 +517,19 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 
 
                 vals.put(IProcessCounters.Memory_minorFaultsPerSec,
-                        Double.parseDouble(fields.get("minflt/s")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_MEM_MINOR_FAULTS_PERS)));
                 
                 vals.put(IProcessCounters.Memory_majorFaultsPerSec,
-                        Double.parseDouble(fields.get("majflt/s")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_MEM_MAJOR_FAULTS_PERS)));
                 
                 vals.put(IProcessCounters.Memory_virtualSize, 
-                        Long.parseLong(fields.get("VSZ")));
+                        Long.parseLong(fields.get(PIDSTAT_FIELD_MEM_VIRTUAL_SIZE)));
                 
                 vals.put(IProcessCounters.Memory_residentSetSize,
-                        Long.parseLong(fields.get("RSS")));
+                        Long.parseLong(fields.get(PIDSTAT_FIELD_MEM_RESIDENT_SET_SIZE)));
                 
                 vals.put(IProcessCounters.Memory_percentMemorySize, 
-                        Double.parseDouble(fields.get("%MEM")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_MEM_SIZE_PERCENT)));
 
             } else if(perProcessIOData && header.contains("kB_rd/s")) {
 
@@ -530,10 +541,10 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 */
 
                 vals.put(IProcessCounters.PhysicalDisk_BytesReadPerSec,
-                        Double.parseDouble(fields.get("kB_rd/s")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_DISK_KB_READ_PERS)));
                 
                 vals.put(IProcessCounters.PhysicalDisk_BytesWrittenPerSec,
-                        Double.parseDouble(fields.get("kB_wr/s")));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_DISK_KB_WRITTEN_PERS)));
                 
             } else {
                 

@@ -289,7 +289,18 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     private class VMStatReader extends ProcessReaderHelper {
-        
+
+        private static final String VMSTAT_FIELD_SWPD = "swpd";
+        private static final String VMSTAT_FIELD_FREE = "free";
+        private static final String VMSTAT_FIELD_SI = "si";
+        private static final String VMSTAT_FIELD_SO = "so";
+        private static final String VMSTAT_FIELD_BI = "bi";
+        private static final String VMSTAT_FIELD_BO = "bo";
+        private static final String VMSTAT_FIELD_US = "us";
+        private static final String VMSTAT_FIELD_SY = "sy";
+        private static final String VMSTAT_FIELD_ID = "id";
+        private static final String VMSTAT_FIELD_WA = "wa";
+
         @Override
         protected ActiveProcess getActiveProcess() {
             
@@ -363,41 +374,41 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
 
                     if (log.isInfoEnabled())
-                        log.info("\nswpd=" + fields.get("swpd") + ", free=" + fields.get("free") + ", si="
-                                + fields.get("si") + ", so=" + fields.get("so") + ", bi=" + fields.get("bi") + ", bo="
-                                + fields.get("bo") + ", %user=" + fields.get("us") + ", %system="
-                                + fields.get("sy") + ", idle=" + fields.get("id") + ", iowait="
-                                + fields.get("wa") + "\n" + header + "\n" + data);
+                        log.info("\nswpd=" + fields.get(VMSTAT_FIELD_SWPD) + ", free=" + fields.get(VMSTAT_FIELD_FREE) + ", si="
+                                + fields.get(VMSTAT_FIELD_SI) + ", so=" + fields.get(VMSTAT_FIELD_SO) + ", bi=" + fields.get(VMSTAT_FIELD_BI) + ", bo="
+                                + fields.get(VMSTAT_FIELD_BO) + ", %user=" + fields.get(VMSTAT_FIELD_US) + ", %system="
+                                + fields.get(VMSTAT_FIELD_SY) + ", idle=" + fields.get(VMSTAT_FIELD_ID) + ", iowait="
+                                + fields.get(VMSTAT_FIELD_WA) + "\n" + header + "\n" + data);
 
                     vals.put(IHostCounters.Memory_SwapBytesUsed, Double
-                            .parseDouble(fields.get("swpd")));
+                            .parseDouble(fields.get(VMSTAT_FIELD_SWPD)));
 
                     vals.put(IHostCounters.Memory_Bytes_Free, Double
-                            .parseDouble(fields.get("free")));
+                            .parseDouble(fields.get(VMSTAT_FIELD_FREE)));
 
                     vals.put(IRequiredHostCounters.Memory_majorFaultsPerSecond, Double
-                            .parseDouble(fields.get("si")));
+                            .parseDouble(fields.get(VMSTAT_FIELD_SI)));
 
                     vals.put(IRequiredHostCounters.PhysicalDisk_BytesReadPerSec, Double
-                            .parseDouble(fields.get("bi")));
+                            .parseDouble(fields.get(VMSTAT_FIELD_BI)));
 
                     vals.put(IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec, Double
-                            .parseDouble(fields.get("bo")));
+                            .parseDouble(fields.get(VMSTAT_FIELD_BO)));
 
                     if (cpuStats) {
 
                         vals.put(IHostCounters.CPU_PercentUserTime, Double
-                                .parseDouble(fields.get("us")));
+                                .parseDouble(fields.get(VMSTAT_FIELD_US)));
 
                         vals.put(IHostCounters.CPU_PercentSystemTime, Double
-                                .parseDouble(fields.get("sy")));
+                                .parseDouble(fields.get(VMSTAT_FIELD_SY)));
 
                         vals.put(IHostCounters.CPU_PercentIOWait, Double
-                                .parseDouble(fields.get("wa")));
+                                .parseDouble(fields.get(VMSTAT_FIELD_WA)));
 
                         vals.put(
                                 IRequiredHostCounters.CPU_PercentProcessorTime,
-                                (100d - Double.parseDouble(fields.get("id"))));
+                                (100d - Double.parseDouble(fields.get(VMSTAT_FIELD_ID))));
 
                     }
 
