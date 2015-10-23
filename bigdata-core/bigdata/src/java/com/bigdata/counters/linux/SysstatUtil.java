@@ -140,15 +140,8 @@ public class SysstatUtil {
      */
     static public String[] splitDataLine(final String data) {
         
-        final String t = data.substring(11);
-        
-//        final String s = t.replaceAll("", replacement) 
-        
         // split into fields
-        final String[] fields = t.split("\\s+");
-        
-        // the first field is empty, so we put the data in there.
-        fields[0] = data.substring(0,11);
+        final String[] fields = data.split("\\s+");
         
         if(log.isDebugEnabled()) {
             

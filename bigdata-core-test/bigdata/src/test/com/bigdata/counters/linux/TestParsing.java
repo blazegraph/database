@@ -57,14 +57,14 @@ public class TestParsing extends TestCase2 {
      */
     public void test_splitDataLine01(){
 
-        final String header = "06:35:15 AM       PID   %user %system    %CPU   CPU  Command";
+        final String header = "06:35:15        PID   %user %system    %CPU   CPU  Command";
         
         final String[] fields = SysstatUtil.splitDataLine(header);
 
 		if (log.isInfoEnabled())
 			log.info(Arrays.toString(fields));
         
-        assertEquals(new String[] { "06:35:15 AM", "PID", "%user", "%system",
+        assertEquals(new String[] { "06:35:15", "PID", "%user", "%system",
                 "%CPU", "CPU", "Command" }, fields);
 
     }
@@ -74,14 +74,14 @@ public class TestParsing extends TestCase2 {
      */
     public void test_splitDataLine02(){
 
-        final String data   = "06:35:15 AM       501    0.00    0.01    0.00     1  kjournald";
+        final String data   = "06:35:15        501    0.00    0.01    0.00     1  kjournald";
         
         final String[] fields = SysstatUtil.splitDataLine(data);
 
         if(log.isInfoEnabled())
         	log.info(Arrays.toString(fields));
         
-        assertEquals(new String[] {"06:35:15 AM", "501", "0.00", "0.01", "0.00", "1", "kjournald"}, fields);
+        assertEquals(new String[] {"06:35:15", "501", "0.00", "0.01", "0.00", "1", "kjournald"}, fields);
         
     }
     
