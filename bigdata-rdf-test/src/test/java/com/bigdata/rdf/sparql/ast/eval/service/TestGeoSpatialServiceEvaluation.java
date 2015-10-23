@@ -315,6 +315,94 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
     
+    /**
+     * Verify rectangle search with simple:
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "4#4" .
+     *     ?res geo:spatialRectangleLowerRight "5#5" .
+     *     ?res geo:timeStart "1" .
+     *     ?res geo:timeEnd "10" .
+     *   }
+     *   hint:Prior <http://www.bigdata.com/queryHints#maxParallel> "10" .
+     *   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity> "10" .
+     *   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.IBuffer.chunkCapacity> "100" .
+     *   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.avgDataPointsPerThread> "10" .
+     * } 
+     * 
+     * which implies setup of parallel threads for data extraction.
+     */
+    public void testRectangleQueryParallel01() throws Exception {
+       
+       final TestHelper helper = new TestHelper(
+          "geo-rectangle-parallel01",
+          "geo-rectangle-parallel01.rq", 
+          "geo-grid101010.nt",
+          "geo-rectangle-parallel.srx");
+       
+       helper.runTest();
+    }
+    
+    /**
+     * Variant of testRectangleQueryParallel01.
+     */
+    public void testRectangleQueryParallel02() throws Exception {
+       
+       final TestHelper helper = new TestHelper(
+          "geo-rectangle-parallel02",
+          "geo-rectangle-parallel02.rq", 
+          "geo-grid101010.nt",
+          "geo-rectangle-parallel.srx");
+       
+       helper.runTest();
+    }
+    
+    /**
+     * Variant of testRectangleQueryParallel01.
+     */
+    public void testRectangleQueryParallel03() throws Exception {
+       
+       final TestHelper helper = new TestHelper(
+          "geo-rectangle-parallel03",
+          "geo-rectangle-parallel03.rq", 
+          "geo-grid101010.nt",
+          "geo-rectangle-parallel.srx");
+       
+       helper.runTest();
+    }
+    
+    /**
+     * Variant of testRectangleQueryParallel01.
+     */
+    public void testRectangleQueryParallel04() throws Exception {
+       
+       final TestHelper helper = new TestHelper(
+          "geo-rectangle-parallel04",
+          "geo-rectangle-parallel04.rq", 
+          "geo-grid101010.nt",
+          "geo-rectangle-parallel.srx");
+       
+       helper.runTest();
+    }
+    
+    /**
+     * Variant of testRectangleQueryParallel01.
+     */
+    public void testRectangleQueryParallel05() throws Exception {
+       
+       final TestHelper helper = new TestHelper(
+          "geo-rectangle-parallel05",
+          "geo-rectangle-parallel05.rq", 
+          "geo-grid101010.nt",
+          "geo-rectangle-parallel.srx");
+       
+       helper.runTest();
+    }
     
     /**
      * Test query
@@ -616,6 +704,42 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
           "geo-grid101010.nt",
           "geo-circle06d.srx").runTest();
        
+    }
+    
+    /**
+     * Test query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "240000" . 
+     *     ?res geo:spatialUnit "Meters" .
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "5" .
+     *   }
+     *   hint:Prior <http://www.bigdata.com/queryHints#maxParallel> "5" .
+     *   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity> "5" .
+     *   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.IBuffer.chunkCapacity> "10" .
+     *   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.avgDataPointsPerThread> "3" .  
+     * } 
+     * 
+     * , which is the same as circle05 just executed with parallel processing enabled.
+     * 
+     * @throws Exception
+     */
+    public void testInCircleQueryParallel01() throws Exception {
+       
+       final TestHelper helper = new TestHelper(
+          "geo-circle-parallel01",
+          "geo-circle-parallel01.rq", 
+          "geo-grid101010.nt",
+          "geo-circle-parallel01.srx");
+       
+       helper.runTest();
     }
 
     /**
