@@ -36,10 +36,12 @@ import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.sail.RDRHistoryServiceFactory;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.GeoSpatialServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
@@ -51,6 +53,7 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.service.fts.FTS;
 import com.bigdata.service.fts.FulltextSearchServiceFactory;
+import com.bigdata.service.geospatial.GeoSpatial;
 
 import cutthecrap.utils.striterators.ReadOnlyIterator;
 
@@ -120,12 +123,15 @@ public class ServiceRegistry {
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
         
+        // Add the Geospatial search service.
+        add(GeoSpatial.SEARCH, new GeoSpatialServiceFactory());
+
         // Add the external Solr search service
         add(FTS.SEARCH, new FulltextSearchServiceFactory());
 
         // Add the Bigdata search in search service.
         add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());
-
+        
         // Add the sample index service.
         add(SampleServiceFactory.SERVICE_KEY, new SampleServiceFactory());
 
@@ -431,7 +437,7 @@ public class ServiceRegistry {
      */
     public final ServiceCall<? extends Object> toServiceCall(
             final AbstractTripleStore store, final HttpClient cm,
-            URI serviceURI, final ServiceNode serviceNode) {
+            URI serviceURI, final ServiceNode serviceNode, final BaseJoinStats stats) {
 
         if (serviceURI == null)
             throw new IllegalArgumentException();
@@ -466,8 +472,7 @@ public class ServiceRegistry {
         }
 
         final ServiceCallCreateParams params = new ServiceCallCreateParamsImpl(
-                serviceURI, store, serviceNode, cm, f.getServiceOptions()
-        );
+                serviceURI, store, serviceNode, cm, f.getServiceOptions(), stats);
 
         return f.create(params);
 
@@ -500,11 +505,13 @@ public class ServiceRegistry {
         private final ServiceNode serviceNode;
         private final HttpClient cm;
         private final IServiceOptions serviceOptions;
+        private final BaseJoinStats stats;
 
         public ServiceCallCreateParamsImpl(final URI serviceURI,
                 final AbstractTripleStore store, final ServiceNode serviceNode,
                 final HttpClient cm,
-                final IServiceOptions serviceOptions) {
+                final IServiceOptions serviceOptions,
+                final BaseJoinStats stats) {
 
             this.serviceURI = serviceURI;
 
@@ -515,6 +522,8 @@ public class ServiceRegistry {
             this.cm = cm;
 
             this.serviceOptions = serviceOptions;
+            
+            this.stats = stats;
 
         }
 
@@ -541,6 +550,11 @@ public class ServiceRegistry {
         @Override
         public IServiceOptions getServiceOptions() {
             return serviceOptions;
+        }
+        
+        @Override
+        public BaseJoinStats getStats() {
+           return stats;
         }
 
         @Override

@@ -1298,6 +1298,20 @@ abstract public class AbstractTripleStore extends
                 + ".rdrHistoryClass";
 
         /**
+         * Enable GeoSpatial support.
+         */
+        String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
+      
+        String DEFAULT_GEO_SPATIAL = "false";
+
+        /**
+         * GeoSpatial configuration
+         */
+        String GEO_SPATIAL_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialConfig";
+      
+        String DEFAULT_GEO_SPATIAL_CONFIG = null;
+        
+        /**
          * If this option is set to false, do not compute closure for sids.
          */
         public static String COMPUTE_CLOSURE_FOR_SIDS = AbstractTripleStore.class

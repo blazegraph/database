@@ -29,12 +29,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.0-master-SNAPSHOT</version>
+    <version>1.6.0-load-performance-geo-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-runtime</artifactId>
-  <version>1.6.0-master-SNAPSHOT</version>
+  <version>1.6.0-load-performance-geo-SNAPSHOT</version>
   <name>Blazegraph Runtime</name>
   <url>https//www.blazegraph.com/</url>
   <description>This file contains all of the blazegraph artifacts without any external artifacts.</description>

@@ -123,6 +123,19 @@ public class LexiconConfiguration<V extends BigdataValue>
     private final boolean inlineXSDDatatypeLiterals;
 
     /**
+     * <code>true</code> if geospatial support is enabled
+     */
+    private final boolean geoSpatial;
+    
+
+
+    /**
+     * Optional configuration string for the geospatial facilities.
+     */
+    private final String geoSpatialConfig;
+
+    
+    /**
      * <code>true</code> if textual literals will be inlined.
      *
      * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
@@ -229,7 +242,20 @@ public class LexiconConfiguration<V extends BigdataValue>
         return inlineXSDDatatypeLiterals;
 
     }
+    
+    @Override
+    public boolean isGeoSpatial() {
+       
+       return geoSpatial;
+    }
 
+    @Override
+    public String getGeoSpatialConfig() {
+       
+       return geoSpatialConfig;
+    }
+    
+    
     @Override
     public boolean isInlineDateTimes() {
         return inlineDateTimes;
@@ -323,7 +349,9 @@ public class LexiconConfiguration<V extends BigdataValue>
             final IExtensionFactory xFactory,//
             final Vocabulary vocab,
             final BigdataValueFactory valueFactory,//
-            final IInlineURIFactory uriFactory
+            final IInlineURIFactory uriFactory,//
+            final boolean geoSpatial,
+            final String geoSpatialConfig
             ) {
 
         if (blobsThreshold < 0)
@@ -350,6 +378,8 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.vocab = vocab;
         this.valueFactory = valueFactory;
         this.uriFactory = uriFactory;
+        this.geoSpatial = geoSpatial;
+        this.geoSpatialConfig = geoSpatialConfig;
         
         /*
          * TODO Make this configurable.
