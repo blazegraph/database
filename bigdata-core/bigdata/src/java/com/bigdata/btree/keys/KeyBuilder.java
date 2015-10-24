@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.io.LongPacker;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A class that may be used to form multi-component keys but which does not
@@ -705,7 +706,7 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
     }
     
     final public KeyBuilder append(long v) {
-
+       
         // performance tweak adds .3% on rdfs bulk load.
         if (len + 8 > buf.length) ensureCapacity(len+8);
 //        ensureFree(8);
@@ -1896,4 +1897,84 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
 
     }
     
+    @Override
+    public byte[] toZOrder(int numDimensions) {
+
+       // we're operating over Long
+       final int bytesTotal = Long.SIZE / Byte.SIZE * numDimensions;
+
+       byte[] zOrderArr = new byte[bytesTotal]; // target buffer
+
+       // we compose the original components into the the z-order bit array
+       for (int dimIt = 0; dimIt < numDimensions; dimIt++) { // iterate dimensions
+          
+          final int offset = dimIt * Long.SIZE;
+          
+          for (int bufIt = 0; bufIt < Long.SIZE;) { // iterate over bits
+
+             // skip byte if no bit is set here (for performance only,
+             // this check is not required for correctness)
+             if (buf[(bufIt + offset) / Byte.SIZE] != 0) {
+
+               BytesUtil.setBit(
+                  zOrderArr, // target array
+                  bufIt * numDimensions + ((numDimensions - 1) - dimIt), // position
+                  BytesUtil.getBit(buf, bufIt + offset) // value
+               );           
+
+                bufIt++;
+
+            } else {
+
+               bufIt += Byte.SIZE; // skip full byte
+
+            }
+         }
+      }
+
+      return zOrderArr;
+   }
+
+   @Override
+   public long[] fromZOrder(int numDimensions) {      
+
+      // we're operating over Long
+      final int bytesTotal = Long.SIZE / Byte.SIZE * numDimensions;
+
+      byte[] componentArr = new byte[bytesTotal]; // target buffer
+
+      // we compose the original components into the the z-order bit array
+      for (int bufIt=0; bufIt< Long.SIZE * numDimensions; ) {
+         
+         // skip byte if no bit is set here (for performance only,
+         // this check is not required for correctness)
+         if (buf[bufIt / Byte.SIZE] != 0) {
+
+            // first Long.SIZE bits belong to dim=0, next Long.SIZE to dim=1, etc.
+            final int dimension = bufIt % numDimensions;
+            final int bitPos = bufIt/numDimensions + dimension*Long.SIZE;
+
+            BytesUtil.setBit(
+               componentArr,                 // target array
+               bitPos,                       // position
+               BytesUtil.getBit(buf, bufIt)  // value
+            );
+            
+            bufIt++;
+            
+         } else {
+
+            bufIt += Byte.SIZE; // skip full byte
+            
+         }
+      }
+      
+      // having restored the components, decode them as long[]
+      final long[] ret = new long[numDimensions];
+      for (int i=0; i<numDimensions; i++) {
+         ret[(numDimensions-1)-i] = decodeLong(componentArr, i*(Long.SIZE/8));
+      }
+      return ret;
+   }
+
 }
