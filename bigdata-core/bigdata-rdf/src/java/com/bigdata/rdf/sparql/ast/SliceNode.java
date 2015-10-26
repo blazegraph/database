@@ -44,7 +44,7 @@ public class SliceNode extends SolutionModifierBase {
      */
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends SolutionModifierBase.Annotations {
+    public interface Annotations extends SolutionModifierBase.Annotations {
 
         /**
          * The first solution to be returned to the caller (origin ZERO).
