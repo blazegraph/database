@@ -1,8 +1,8 @@
 #!/bin/bash
 # Script to update the version numbers with the git branch of the snapshot build.
-# Must be run from the root of the bigdata project, i.e. ./scripts/updatePomVersions.sh
 
-PARENT_POM=./blazegraph-parent/pom.xml
+BASE_DIR=`dirname $0`
+PARENT_POM="${BASE_DIR}"/../blazegraph-parent/pom.xml
 CURRENT_VERSION=1.6.0
 BRANCH="master"
 SNAPSHOT="SNAPSHOT"
