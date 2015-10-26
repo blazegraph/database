@@ -559,7 +559,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.kb = kb;
          
          geoSpatialCounters =
-            QueryEngineFactory.getQueryController(
+            QueryEngineFactory.getInstance().getQueryController(
                kb.getIndexManager()).getGeoSpatialCounters();
             
          this.avgDataPointsPerThread = avgDataPointsPerThread;
@@ -609,7 +609,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final GeoSpatialSearchQuery query, final AbstractTripleStore kb) {
 
          final BOpContextBase context = new BOpContextBase(
-            QueryEngineFactory.getQueryController(kb.getIndexManager()));
+            QueryEngineFactory.getInstance().getQueryController(kb.getIndexManager()));
          
          geoSpatialCounters.registerGeoSpatialSearchRequest();
 
