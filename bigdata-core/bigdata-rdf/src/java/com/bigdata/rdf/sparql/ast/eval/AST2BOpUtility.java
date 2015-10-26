@@ -5705,11 +5705,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
     */
    private static boolean usePipelinedHashJoin(AST2BOpContext ctx) {
 
-     final ASTContainer container = ctx.astContainer;
-     final QueryRoot queryRoot = container.getOptimizedAST();
+      final ASTContainer container = ctx.astContainer;
+      final QueryRoot queryRoot = container.getOptimizedAST();
 
-     // TODO: the decision is actually more complex, if we have OFFSET or
-     //       ORDER BY the LIMIT won't help us and we should return false
-     return queryRoot.hasSlice();
-  }
+      // check for LIMIT
+      final SliceNode slice = queryRoot.getSlice();
+      if (slice == null || slice.getLimit() == SliceNode.Annotations.DEFAULT_LIMIT) {
+         return false; // no LIMIT specified
+      }
+     
+      // if we end up here: there's a LIMIT clause in the query
+      // -> assert that there's no ORDER BY (order by will require full result
+      //    computation, so it rules out the benefits of the pipelined hash join
+      final OrderByNode orderBy = queryRoot.getOrderBy();
+      return orderBy==null || orderBy.isEmpty();
+   }
 }
