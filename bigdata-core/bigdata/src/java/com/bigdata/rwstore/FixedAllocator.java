@@ -582,7 +582,7 @@ public class FixedAllocator implements Allocator {
 	void resetAllocIndex(final int start) {
 		m_allocIndex = start;
 		
-		if (m_size <= 1024) {
+		if (m_size <= m_store.cSmallSlot) {
 			for (int a = m_allocIndex/m_bitSize; a < m_allocBlocks.size(); a++) {
 				final AllocBlock ab = m_allocBlocks.get(a);
 				
