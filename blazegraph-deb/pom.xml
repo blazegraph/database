@@ -36,13 +36,44 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph Debian Package</name>
   <url>http://maven.apache.org</url>
-  <packaging>jar</packaging>
+  <packaging>deb</packaging>
 
   <properties>
      <debian.user>blzg</debian.user>
      <debian.group>blzg</debian.group>
   </properties>
+
   <build>
+    <extensions>
+      <!-- Add support for the "deb" packaging -->
+      <extension>
+        <groupId>org.vafer</groupId>
+        <artifactId>jdeb</artifactId>
+        <version>1.4</version>
+      </extension>
+    </extensions>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>jdeb</artifactId>
+          <groupId>org.vafer</groupId>
+          <!-- Customize deb package 
+          <configuration>
+            <dataSet>
+              <data>
+                <src>${project.build.directory}/preparedfiles</src>
+                <type>directory</type>
+                <mapper>
+                  <type>perm</type>
+                  <prefix>/usr/lib/xwiki/myproject</prefix>
+                </mapper>
+              </data>
+            </dataSet>
+          </configuration>
+	   -->
+        </plugin>
+      </plugins>
+     </pluginManagement>
      <resources>
         <resource>
             <directory>src/main/resources</directory>
@@ -118,62 +149,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
              </execution>
            </executions>
 	</plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>2.4</version>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-               <filters>
-		<filter>
-                  <artifact>com.blazegraph:rdf-properties</artifact>
-		  <includes>
-		    <include>**/*</include>
-		  </includes>
-	   	</filter>
-		<filter>
-                  <artifact>com.blazegraph:bigdata-jar</artifact>
-		  <includes>
-		    <include>**/*</include>
-		  </includes>
-	   	</filter>
-                <filter>
-                  <artifact>*:*</artifact>
-                  <excludes>
-                    <exclude>org/junit/experimental/**</exclude>
-                    <exclude>org/junit/runners/**</exclude>
-                    <exclude>junit/framework/**</exclude>
-                    <exclude>junit/**</exclude>
-                    <exclude>org/junit/**</exclude>
-                    <exclude>WEB-INF/**</exclude>
-                    <exclude>test*/**</exclude>
-                    <exclude>cia-factbook/**</exclude>
-                    <exclude>**/*.ttl</exclude>
-                    <exclude>**/*.ttlx</exclude>
-                    <exclude>**/*.rq</exclude>
-                    <exclude>**/*.srx</exclude>
-                    <exclude>**/*.trig</exclude>
-                    <exclude>**/sesame*testsuite/**</exclude>
-                  </excludes>
-                </filter>
-               </filters>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <manifestEntries>
-                    <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
-                    <Build-Number>${project.version}</Build-Number>
-                  </manifestEntries>
-                </transformer>
-              </transformers>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <!-- Create the debian file -->
       <plugin>
         <artifactId>jdeb</artifactId>
@@ -196,6 +171,19 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <mapper>
                     <type>perm</type>
                     <prefix>/usr/local/blazegraph-${project.version}/lib</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data>
+
+		<!-- copy the war files to the install war sub directory -->
+                <data>
+                  <src>${project.build.directory}/classes/war</src>
+                  <type>directory</type>
+                  <includes>**/*</includes>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/usr/local/blazegraph-${project.version}/war</prefix>
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
@@ -249,10 +237,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   </mapper>
                 </data>
 
-                <!-- properties files 
+                <!-- Baseline RWStore.properties -->
                 <data>
-                  <src>${basedir}/docker.properties</src>
-                  <dst>local.properties</dst>
+                  <src>${project.build.directory}/classes/RWStore.properties</src>
+                  <dst>RWStore.properties</dst>
                   <type>file</type>
                   <mapper>
                     <type>perm</type>
@@ -260,11 +248,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
-                </data>-->
+                </data>
 
-                <!-- logging properties files
+                <!-- logging properties files -->
                 <data>
-                  <src>${basedir}/log4j.properties</src>
+                  <src>${project.build.directory}/classes/war/WEB-INF/classes/log4j.properties</src>
                   <dst>log4j.properties</dst>
                   <type>file</type>
                   <mapper>
@@ -273,7 +261,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
-                </data> -->
+                </data>
 
                 <!-- upstart script -->
                 <data>
