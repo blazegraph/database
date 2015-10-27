@@ -207,7 +207,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </execution>
           <execution>
             <id>copy-dependencies</id>
-            <phase>package</phase>
+            <phase>compile</phase>
             <goals>
               <goal>copy-dependencies</goal>
             </goals>
