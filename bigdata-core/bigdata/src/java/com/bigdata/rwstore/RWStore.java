@@ -398,13 +398,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         String DEFAULT_SMALL_SLOT_WASTE_CHECK_ALLOCATORS = "100"; // Check waste when more than 100 allocators
 
-        String SMALL_SLOT_THRESHOLD_HIGH_WASTE = RWStore.class.getName() + ".smallSlotThresholdHighWaste";
+        // String SMALL_SLOT_THRESHOLD_HIGH_WASTE = RWStore.class.getName() + ".smallSlotThresholdHighWaste";
 
-        String DEFAULT_SMALL_SLOT_THRESHOLD_HIGH_WASTE = "2048"; // 25% of available bits
+        // String DEFAULT_SMALL_SLOT_THRESHOLD_HIGH_WASTE = "2048"; // 25% of available bits
 
         String SMALL_SLOT_HIGH_WASTE = RWStore.class.getName() + ".smallSlotHighWaste";
 
-        String DEFAULT_SMALL_SLOT_HIGH_WASTE = "0.2f"; // less than 80% usage
+        String DEFAULT_SMALL_SLOT_HIGH_WASTE = "20.0f"; // 20% waste, less than 80% usage
 
        /**
          * When <code>true</code>, scattered writes which are strictly ascending
@@ -879,10 +879,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 Options.SMALL_SLOT_THRESHOLD,
                 Options.DEFAULT_SMALL_SLOT_THRESHOLD));
         
-    	cSmallSlotThresholdHighWaste = Integer.valueOf(fileMetadata.getProperty(
-                Options.SMALL_SLOT_THRESHOLD_HIGH_WASTE,
-                Options.DEFAULT_SMALL_SLOT_THRESHOLD_HIGH_WASTE));
-    	
     	cSmallSlotWasteCheckAllocators = Integer.valueOf(fileMetadata.getProperty(
                 Options.SMALL_SLOT_WASTE_CHECK_ALLOCATORS,
                 Options.DEFAULT_SMALL_SLOT_WASTE_CHECK_ALLOCATORS));
@@ -890,6 +886,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     	cSmallSlotHighWaste = Float.valueOf(fileMetadata.getProperty(
                 Options.SMALL_SLOT_HIGH_WASTE,
                 Options.DEFAULT_SMALL_SLOT_HIGH_WASTE));
+    	
+//    	cSmallSlotThresholdHighWaste = Integer.valueOf(fileMetadata.getProperty(
+//                Options.SMALL_SLOT_THRESHOLD_HIGH_WASTE,
+//                Options.DEFAULT_SMALL_SLOT_THRESHOLD_HIGH_WASTE));
+    	/*
+    	 * The highWasteThreshold is more sensibly calculated from
+    	 * the high waste value.
+    	 */
+    	cSmallSlotThresholdHighWaste = (int) (cSmallSlotHighWaste * 8192 / 100);
     	
         if (cSmallSlot < 0 || cSmallSlot > 2048) {
             throw new IllegalArgumentException(Options.SMALL_SLOT_TYPE
@@ -2838,7 +2843,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		 * FIXME BytesAppData is bad (separate ticket perhaps).
 		 */
     	// only check small slots if total waste is larger than some configurable amount
-    	final float slotWaste = stats.slotWaste();
+    	final float slotWaste = stats.slotsUnused();
     	if (slotWaste < cSmallSlotHighWaste) {
     		return null;
     	}
