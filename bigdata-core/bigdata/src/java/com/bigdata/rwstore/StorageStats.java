@@ -341,18 +341,19 @@ public class StorageStats {
 		}
 		
 		/**
-		 * SlotsChurn: How frequently slots of this size are re-allocated (SlotsRecycled/SlotsAllocated)
+		 * SlotsChurn: A measure of how frequently slots of this size are re-allocated
+		 * provided by totalAllocations/reservedSlots
 		 */
 		public float slotChurn() {
 		
-			final BigDecimal slotsRecycled = new BigDecimal(m_slotDeletes);
+			final BigDecimal reservedSlots = new BigDecimal(m_totalSlots);
 			
 			final BigDecimal slotsAllocated = new BigDecimal(m_slotAllocations);
 			
-			if (slotsAllocated.signum() == 0)
+			if (reservedSlots.signum() == 0)
 				return 0f;
 			
-			return slotsRecycled.divide(slotsAllocated, 2, RoundingMode.HALF_UP).floatValue();
+			return slotsAllocated.divide(reservedSlots, 2, RoundingMode.HALF_UP).floatValue();
 			
 		}
 		
