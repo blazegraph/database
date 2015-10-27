@@ -28,10 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters;
 
+import org.apache.log4j.Logger;
+
 import java.util.List;
 import java.util.Map;
-
-import org.apache.log4j.Logger;
 
 
 /**
@@ -73,6 +73,8 @@ abstract public class AbstractProcessCollector implements IStatisticsCollector {
      * Override if you want to impose settings on environment variables.
      */
     protected void setEnvironment(Map<String,String> env) {
+        // Fixed numbers format for sysstat commands
+        env.put("LC_NUMERIC", "C");
         
     }
     
