@@ -28,9 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import com.bigdata.counters.*;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.Arrays;
@@ -167,16 +170,16 @@ public class TestParsing extends TestCase2 {
 
     public void test_get_data_map() {
         String header = "15:55:52      UID       PID    %usr %system  %guest    %CPU   CPU  Command\n";
-        String data = "15:55:54     1000      3308    0,50    0,00    0,00    0,25     0  java\n";
+        String data = "15:55:54     1000      3308    0.50    0.00    0.00    0.25     0  java\n";
 
         Map<String, String> fields = SysstatUtil.getDataMap(header, data);
-        assertEquals(fields.get("%usr"), "0,50");
+        assertEquals(fields.get("%usr"), "0.50");
         assertEquals(fields.size(), 9);
     }
 
     public void test_get_data_incorrect() {
         String header = "15:55:52      UID       PID    %usr %system  %guest    %CPU   CPU\n";
-        String data = "15:55:54     1000      3308    0,50    0,00    0,00    0,25     0  java\n";
+        String data = "15:55:54     1000      3308    0.50    0.00    0.00    0.25     0  java\n";
 
         try {
             Map<String, String> fields = SysstatUtil.getDataMap(header, data);
@@ -228,4 +231,79 @@ public class TestParsing extends TestCase2 {
 
     }
 
+    public void test_pid_stat_collector_valid() throws IOException, InterruptedException {
+        final String output =
+                "Linux 3.16.0-4-amd64 (hostname)     27.10.2015      _x86_64_        (4 CPU)\n" +
+                        "\n" +
+                        "15:55:52      UID       PID    %usr %system  %guest    %CPU   CPU  Command\n" +
+                        "15:55:54     1000      3308    0.50    0.00    0.00    0.25     0  java\n" +
+                        "\n" +
+                        "15:55:52      UID       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command\n" +
+                        "15:55:54     1000      3308      8.00      0.00 2825204 1289368  15.73  java\n" +
+                        "\n";
+
+        test_pid_stat_collector(output);
+    }
+
+
+    public void test_pid_stat_collector_extra_column() throws IOException, InterruptedException {
+        final String output =
+                "Linux 3.16.0-4-amd64 (hostname)     27.10.2015      _x86_64_        (4 CPU)\n" +
+                        "\n" +
+                        "15:55:52  somecolumn    UID       PID    %usr %system  %guest    %CPU   CPU  Command\n" +
+                        "15:55:54      100500   1000      3308    0.50    0.00    0.00    0.25     0  java\n" +
+                        "\n" +
+                        "15:55:52      UID       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command\n" +
+                        "15:55:54     1000      3308      8.00      0.00 2825204 1289368  15.73  java\n" +
+                        "\n";
+
+        test_pid_stat_collector(output);
+    }
+
+    protected void test_pid_stat_collector(String output) throws IOException, InterruptedException {
+
+
+        final PIDStatCollector pidStatCollector = new PIDStatCollector(1, 1, new KernelVersion("2.6.32")) {
+            @Override
+            public AbstractProcessReader getProcessReader() {
+                return new PIDStatReader() {
+                    @Override
+                    protected ActiveProcess getActiveProcess() {
+                        //return super.getActiveProcess();
+                        return new MockActiveProcess();
+                    }
+                };
+            }
+        };
+        final PIDStatCollector.PIDStatReader pidStatReader = (PIDStatCollector.PIDStatReader) pidStatCollector.getProcessReader();
+        pidStatReader.start(new ByteArrayInputStream(output.getBytes()));
+        Thread t = new Thread(pidStatReader);
+        t.start();
+        Thread.sleep(1000);
+        CounterSet counterSet = pidStatCollector.getCounters();
+        double cpu_usr = (Double)((ICounter) counterSet.getChild(IProcessCounters.CPU).getChild("% User Time")).getInstrument().getValue();
+        long rss = (Long)((ICounter) counterSet.getChild(IProcessCounters.Memory).getChild("Resident Set Size")).getInstrument().getValue();
+        t.interrupt();
+
+
+        assertEquals(cpu_usr, 0.005d);
+        assertEquals(rss, 1289368*1024);
+
+
+
+        /*Iterator<ICounter> counters = counterSet.getCounters(Pattern.compile(".*"));
+        while (counters.hasNext()) {
+            System.err.println(counters.next().getInstrument().getValue().toString());
+        }*/
+
+    }
+
+    private final class MockActiveProcess extends ActiveProcess {
+
+
+        @Override
+        public boolean isAlive() {
+            return true;
+        }
+    }
 }
