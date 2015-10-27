@@ -149,10 +149,25 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     }    
     
     /**
-     * Use pipelined hash join for SERVICE node.
+     * Use pipelined hash join for SPARQL 1.1 subquery.
      */
-    public void testPipelinedHashJoinUsedForService() throws Exception {
+    public void testPipelinedHashJoinUsedForSubquery() throws Exception {
 
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-subquery",// testURI
+                "pipelined-hashjoin-used-subquery.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-subquery.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (!BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting a PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
     }
 
     /**
@@ -290,6 +305,29 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
                     + astContainer.toString());
         }
     }
+    
+    /**
+     * Use pipelined hash join for SPARQL 1.1 subquery.
+     */
+    public void testPipelinedHashJoinNotUsedForSubquery() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-notused-subquery",// testURI
+                "pipelined-hashjoin-notused-subquery.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-subquery.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting no PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
+    }
+
 
     /**
      * Test enabling the pipelined hash join by query hint.
