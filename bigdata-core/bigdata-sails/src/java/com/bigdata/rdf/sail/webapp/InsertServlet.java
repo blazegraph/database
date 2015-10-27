@@ -137,6 +137,8 @@ public class InsertServlet extends BigdataRDFServlet {
         final String baseURI = req.getRequestURL().toString();
         
         final String contentType = req.getContentType();
+        
+        final boolean supressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
 
         if (contentType == null)
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -202,7 +204,7 @@ public class InsertServlet extends BigdataRDFServlet {
             
             submitApiTask(
                     new InsertWithBodyTask(req, resp, getNamespace(req),
-                            ITx.UNISOLATED, baseURI, defaultContext,
+                            ITx.UNISOLATED, supressTruthMaintenance, baseURI, defaultContext,
                             rdfParserFactory)).get();
             
         } catch (Throwable t) {
@@ -226,6 +228,7 @@ public class InsertServlet extends BigdataRDFServlet {
     private static class InsertWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
+        private final boolean supressTruthMaintenance;
         private final Resource[] defaultContext;
         private final RDFParserFactory rdfParserFactory;
 
@@ -248,10 +251,12 @@ public class InsertServlet extends BigdataRDFServlet {
         public InsertWithBodyTask(final HttpServletRequest req,
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
+                final boolean supressTruthMaintenance,
                 final String baseURI, final Resource[] defaultContext,
                 final RDFParserFactory rdfParserFactory) {
             super(req, resp, namespace, timestamp);
             this.baseURI = baseURI;
+            this.supressTruthMaintenance = supressTruthMaintenance;
             this.defaultContext = defaultContext;
             this.rdfParserFactory = rdfParserFactory;
         }
@@ -268,11 +273,19 @@ public class InsertServlet extends BigdataRDFServlet {
 
             final AtomicLong nmodified = new AtomicLong(0L);
 
-            BigdataSailRepositoryConnection conn = null;
+            BigdataSailConnection conn = null;
             boolean success = false;
             try {
 
-                conn = getConnection();
+                conn = getSailConnection();
+                
+                boolean truthMaintenance = conn.getTruthMaintenance();
+                
+                if (truthMaintenance && supressTruthMaintenance) {
+                	
+                	conn.setTruthMaintenance(false);
+                	
+                }
 
                 /**
                  * There is a request body, so let's try and parse it.
@@ -296,13 +309,18 @@ public class InsertServlet extends BigdataRDFServlet {
                 rdfParser
                         .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-                rdfParser.setRDFHandler(new AddStatementHandler(conn
-                        .getSailConnection(), nmodified, defaultContext));
+                rdfParser.setRDFHandler(new AddStatementHandler(conn, nmodified, defaultContext));
 
                 /*
                  * Run the parser, which will cause statements to be inserted.
                  */
                 rdfParser.parse(req.getInputStream(), baseURI);
+                
+                if (truthMaintenance && supressTruthMaintenance) {
+                	
+                	conn.computeClosure();
+                	conn.setTruthMaintenance(true);
+                }
 
                 // Commit the mutation.
                 conn.commit();

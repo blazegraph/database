@@ -38,6 +38,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
@@ -306,6 +307,39 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
         return conn;
 
+    }
+    
+    /**
+    * Return a connection for the namespace. 
+    * 
+    * @return The connection.
+    * 
+    * @throws SailException
+    * @throws RepositoryException
+    * @throws DatasetNotFoundException
+    *            if the specified namespace does not exist.
+    */
+    protected BigdataSailConnection getSailConnection()
+            throws SailException, RepositoryException {
+
+        // resolve the default namespace.
+        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+                .getResourceLocator().locate(namespace, timestamp);
+
+        if (tripleStore == null) {
+
+			throw new DatasetNotFoundException("Not found: namespace="
+					+ namespace);
+
+        }
+
+        // Wrap with SAIL.
+        final BigdataSail sail = new BigdataSail(tripleStore);
+        
+        sail.initialize();
+        
+        return sail.getConnection();
+        
     }
     
     /**
