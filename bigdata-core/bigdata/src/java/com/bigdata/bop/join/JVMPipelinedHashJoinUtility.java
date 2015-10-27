@@ -50,6 +50,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.IJVMHashIndex.Bucket;
 import com.bigdata.bop.join.IJVMHashIndex.Key;
 import com.bigdata.bop.join.IJVMHashIndex.SolutionHit;
+import com.bigdata.bop.paths.ArbitraryLengthPathTask;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -134,9 +135,9 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
      * forwards relevant solutions (non-blocking index).
      */
     public long acceptAndOutputSolutions(
-          UnsyncLocalOutputBuffer<IBindingSet> out,
-          ICloseableIterator<IBindingSet[]> itr, NamedSolutionSetStats stats,
-          final IConstraint[] joinConstraints, PipelineOp subquery) {
+          final UnsyncLocalOutputBuffer<IBindingSet> out,
+          final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,
+          final IConstraint[] joinConstraints, final PipelineOp subquery) {
        
       final ZeroMatchRecordingJVMHashIndex rightSolutions = 
          (ZeroMatchRecordingJVMHashIndex)getRightSolutions();
@@ -164,16 +165,16 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
          }
 
          for (int i=0; i<chunk.length; i++) {
-            
+            // Take a distinct projection of the join variables.
             final IBindingSet bsetDistinct = chunk[i].copy(getJoinVars());
-            
+            // Find bucket in hash index for that distinct projection (bucket of solutions with the same join vars from the subquery).
             final Bucket b = rightSolutions.getBucket(bsetDistinct);
             if (b!=null || rightSolutions.isKeyWithoutMatch(bsetDistinct)) {
-               
+               // Either a match in the bucket or subquery was already computed for this distinct projection but did not produce any results.  Either way, it will take a fast path that avoids the subquery.
                dontRequireSubqueryEvaluation.add(chunk[i]);
                
             } else {
-               
+                // This is a new distinct projection.  It will need to run through the subquery.
                requireSubqueryEvaluation.add(chunk[i]);
                distinctSet.add(bsetDistinct);
                
@@ -187,84 +188,107 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
       // first, process those that can be processed without subquery evaluation
       // (i.e., for which the subquery has been evaluated before already)
       if (!dontRequireSubqueryEvaluation.isEmpty()) {
+          // compute join for the fast path.
          hashJoinAndEmit(dontRequireSubqueryEvaluation.toArray(
             new IBindingSet[0]), stats, out, joinConstraints);
       }      
       
-      // second, process those bindings that require subquery evaluation
+      /* Second, process those bindings that require subquery evaluation.
+       * 
+       * TODO If lastPass := true, then you could avoid a subquery here if the
+       * #of solutions in this list was too small to bother with.
+       */
       if (!requireSubqueryEvaluation.isEmpty()) {
 
          // next, we execute the subquery for the unseen distinct projections
          IRunningQuery runningSubquery = null;
+         
          try {
-            
-            // set up a subquery for the chunk
+
+            // set up a subquery for the chunk of distinct projections.
             runningSubquery = 
                queryEngine.eval(subquery, distinctSet.toArray(new IBindingSet[0]));
 
+            // Notify parent of child subquery.
             ((AbstractRunningQuery) context.getRunningQuery())
                   .addChild(runningSubquery);
 
             // iterate over the results and store them in the index
             final ICloseableIterator<IBindingSet[]> subquerySolutionItr = 
                runningSubquery.iterator();
-            
-            while (subquerySolutionItr.hasNext()) {
 
-               IBindingSet[] solutions = subquerySolutionItr.next();
+            try {
+            
+                while (subquerySolutionItr.hasNext()) {
+    
+                   final IBindingSet[] solutions = subquerySolutionItr.next();
+                   
+                   for (IBindingSet solution : solutions) {
+    
+                      // add solutions to the subquery into the hash index.
+                      rightSolutions.add(solution);
+                      
+                      // we remove all mappings that generated at least one result
+                      // from distinct set (which will be further processed later on);
+                      // This is how we discover the set of distinct projections that
+                      // did not join.
+                      distinctSet.remove(solution.copy(getJoinVars()));
+    
+                  }
+    
+                }
+                
+                /**
+                 * register the distinct keys for which the subquery did not yield
+                 * any result as "keys without match" at the index; this is an 
+                 * improvement (though not necessarily required) in order to avoid
+                 * unnecessary re-computation of the subqueries for these keys
+                 */
+               rightSolutions.addKeysWithoutMatch(distinctSet);
                
-               for (IBindingSet solution : solutions) {
-                  
-                  rightSolutions.add(solution);
-                  
-                  // we remove all mappings that generated at least one result
-                  // from distinct set (which will be further processed later on);
-                  distinctSet.remove(solution.copy(getJoinVars()));
-
-              }
-
+            } finally {
+               
+                // finished with the iterator
+                subquerySolutionItr.close();
+                
             }
-            
-            /**
-             * register the distinct keys for which the subquery did not yield
-             * any result as "keys without match" at the index; this is an 
-             * improvement (though not necessarily required) in order to avoid
-             * unnecessary re-computation of the subqueries for these keys
-             */
-           rightSolutions.addKeysWithoutMatch(distinctSet);
-            
-            // finished with the iterator
-            subquerySolutionItr.close();
 
             // wait for the subquery to halt / test for errors.
             runningSubquery.get();
 
-         } catch (InterruptedException ex) {
+        } catch (Throwable t) {
 
-            // this thread was interrupted, so cancel the subquery.
-            runningSubquery.cancel(true/* mayInterruptIfRunning */);
+             /*
+              * If things fail before we start the subquery, or if a subquery
+              * fails (due to abnormal termination), then propagate the error
+              * to the parent and rethrow the first cause error out of the
+              * subquery.
+              * 
+              * Note: IHaltable#getCause() considers exceptions triggered by
+              * an interrupt to be normal termination. Such exceptions are
+              * NOT propagated here and WILL NOT cause the parent query to
+              * terminate.
+              */
+             final Throwable cause = (runningSubquery != null && runningSubquery
+                     .getCause() != null) ? runningSubquery.getCause() : t;
 
-            // rethrow the exception.
-            try {
-               throw ex;
-            } catch (InterruptedException e) {
-               
-               launderThrowable(e);
-               
-            }
+            throw new RuntimeException(this.context.getRunningQuery().halt(cause));
 
-         } catch (Throwable t) {
+         } finally {
 
-            launderThrowable(t);
+             // ensure subquery is halted.
+             if (runningSubquery != null)
+                 runningSubquery
+                         .cancel(true/* mayInterruptIfRunning */);
 
          }
          
          rightSolutionCount.add(naccepted);
 
+         // hash index join for the subquery path.
          hashJoinAndEmit(
             requireSubqueryEvaluation.toArray(new IBindingSet[0]), 
             stats, out, joinConstraints);
-
          
       }
 
@@ -275,7 +299,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
     
     /**
      * Executes the hash join for the chunk of solutions that is passed in
-     * pver rightSolutions and outputs the solutions.
+     * over rightSolutions and outputs the solutions.
      */
     public void hashJoinAndEmit(//
             final IBindingSet[] chunk,//
