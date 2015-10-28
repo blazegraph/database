@@ -2757,22 +2757,36 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * This test releases over a blobs worth of deferred frees
 		 */
 		public void test_blobDeferredFrees() {
+			doBlobDeferredFrees(4000); // standard
+		}
+		
+		/**
+		 * This is the test that was able to reproduce the recycler failure for
+		 * BLZG-1236 when run with 10M deferred frees.
+		 * 
+		 * @see BLZG-1236 (recycler error)
+		 */
+		public void test_stressBlobDeferredFrees() {
+			doBlobDeferredFrees(10000000); // 10M (40M data)
+		}
+		
+		void doBlobDeferredFrees(final int cAddrs) {
 
-            final Properties properties = new Properties(getProperties());
+			final Properties properties = new Properties(getProperties());
 
             properties.setProperty(
                     AbstractTransactionService.Options.MIN_RELEASE_AGE, "4000");
 
             properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
-                    "1,2,3,5,8,12,16,24,32"); // 2K
+                    "1,2,3,5,8,12,16"); // 1K
 
-			Journal store = (Journal) getStore(properties);
+			final Journal store = (Journal) getStore(properties);
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
-            	ArrayList<Long> addrs = new ArrayList<Long>();
-            	for (int i = 0; i < 4000; i++) {
+            	final ArrayList<Long> addrs = new ArrayList<Long>();
+            	for (int i = 0; i < cAddrs; i++) {
             		addrs.add(bs.write(randomData(45)));
             	}
             	store.commit();
@@ -2780,7 +2794,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	for (long addr : addrs) {
             		bs.delete(addr);
             	}
-                for (int i = 0; i < 4000; i++) {
+                for (int i = 0; i < cAddrs; i++) {
                     if(!bs.isCommitted(addrs.get(i))) {
                         fail("i="+i+", addr="+addrs.get(i));
                     }

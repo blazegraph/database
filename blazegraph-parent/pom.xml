@@ -49,7 +49,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
    <artifactId>blazegraph-parent</artifactId>
-   <version>1.5.3-master-SNAPSHOT</version>
+   <version>1.6.0-master-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
     <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
@@ -148,7 +148,7 @@ dependencies.
           <reuseForks>true</reuseForks>
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
-          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack}</argLine>
+          <argLine>-server -ea -Xms512m -Xmx4g</argLine>
 	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
