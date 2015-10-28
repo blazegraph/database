@@ -28,13 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import org.apache.log4j.Logger;
+
 import java.io.File;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
-
-import org.apache.log4j.Logger;
 
 /**
  * Some utility methods related to integration with <code>sysstat</code>.
@@ -139,15 +140,8 @@ public class SysstatUtil {
      */
     static public String[] splitDataLine(final String data) {
         
-        final String t = data.substring(11);
-        
-//        final String s = t.replaceAll("", replacement) 
-        
         // split into fields
-        final String[] fields = t.split("\\s+");
-        
-        // the first field is empty, so we put the data in there.
-        fields[0] = data.substring(0,11);
+        final String[] fields = data.split("\\s+");
         
         if(log.isDebugEnabled()) {
             
@@ -159,6 +153,30 @@ public class SysstatUtil {
         
     }
 
+    /**
+     * Takes header and data lines and generates a Map<String, String> from them
+     *
+     *
+     * @return a Map where keys are fields names and values are fields values.
+     */
+    static public Map<String, String> getDataMap(final String header, final String data) {
+
+        Map<String, String> fields = new HashMap<>();
+
+        final String[] header_fields = SysstatUtil.splitDataLine(header);
+        final String[] data_fields = SysstatUtil.splitDataLine(data);
+
+        if ( header_fields.length != data_fields.length ) {
+            throw new IllegalArgumentException("Different fields count in header and data");
+        }
+
+        for (int i = 0; i < header_fields.length; i++) {
+            fields.put(header_fields[i], data_fields[i]);
+        }
+
+        return fields;
+
+    }
     /**
      * Used to parse the timestamp associated with each row of sysstat output.
      * <p>

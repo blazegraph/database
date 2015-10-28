@@ -101,7 +101,7 @@ public class IVUtility {
      * Note: This option requires that term identifiers are non-negative. That
      * is not currently true for the cluster due to the {@link TermIdEncoder}.
      * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/548">
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-654">
      *      Pack TIDs</a>
      */
     public static final boolean PACK_TIDS = false;
@@ -708,15 +708,12 @@ public class IVUtility {
         }
         case Extension: {
             /*
-             * TODO Set up an extended DTE mechanism and check the byte after
-             * the flags for the extended DTE. Right now I am just hickacking
-             * Extension for IPv4.
-             */
-            final byte[] addr = new byte[5];
-            System.arraycopy(key, o, addr, 0, 5);
-            final IPv4Address ip = new IPv4Address(addr);
-            final AbstractLiteralIV iv = new IPv4AddrIV(ip);
-            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
+			 * Handle an extension of the intrinsic data types.
+			 * 
+			 * @see BLZG-1507 (Implement support for DTE extension types for
+			 * URIs)
+			 */
+			return decodeInlineLiteralWithDTEExtension(flags, key, dte, isExtension, datatype, o);
         }
         default:
             throw new UnsupportedOperationException("dte=" + dte);
@@ -724,7 +721,33 @@ public class IVUtility {
 
     }
 
-    /**
+	/**
+	 * Handle an extension of the intrinsic data types.
+	 * 
+	 * @see BLZG-1507 (Implement support for DTE extension types for URIs)
+	 */
+	private static IV decodeInlineLiteralWithDTEExtension(final byte flags, final byte[] key, final DTE dte,
+			final boolean isExtension, final IV datatype, int o) {
+
+		// The DTEExtension byte.
+		final DTEExtension dtex = DTEExtension.valueOf(key[o++]);
+//		final DTEExtension dtex = DTEExtension.valueOf(KeyBuilder.decodeByte(key[o++]));
+
+		switch (dtex) {
+		case IPV4: {
+			final byte[] addr = new byte[5];
+			System.arraycopy(key, o, addr, 0, 5);
+			final IPv4Address ip = new IPv4Address(addr);
+			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
+			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
+		}
+		default: {
+			throw new UnsupportedOperationException("dte=" + dte);
+		}
+		}
+	}
+
+	/**
      * Decode an inline literal which is represented as a one or two compressed
      * Unicode values.
      * 

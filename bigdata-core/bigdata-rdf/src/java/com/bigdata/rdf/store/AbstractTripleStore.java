@@ -948,17 +948,21 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_TEXT_INDEX = "true";
 
         /**
-         * Boolean option (default <code>true</code>) enables support for a
-         * full text index that may be used to lookup literals by tokens found
-         * in the text of those literals.
-         * 
-         * @see #TEXT_INDEXER_CLASS
-         * @see #TEXT_INDEX_DATATYPE_LITERALS
-         * @see #INLINE_TEXT_LITERALS
-         * @see #MAX_INLINE_TEXT_LENGTH
-         */
+		 * Boolean option (default <code>true</code>) enables support for a full
+		 * text index that may be used to lookup literals by tokens found in the
+		 * text of those literals.
+		 * 
+		 * @see #TEXT_INDEXER_CLASS
+		 * @see #TEXT_INDEX_DATATYPE_LITERALS
+		 * @see #INLINE_TEXT_LITERALS
+		 * @see #MAX_INLINE_TEXT_LENGTH
+		 * @deprecated Feature was never completed due to scalability issues.
+		 *             See BZLG-1548, BLZG-563.
+		 */
+        @Deprecated
         String SUBJECT_CENTRIC_TEXT_INDEX = AbstractTripleStore.class.getName() + ".subjectCentricTextIndex";
 
+        @Deprecated
         String DEFAULT_SUBJECT_CENTRIC_TEXT_INDEX = "false";
 
 		/**

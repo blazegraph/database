@@ -285,12 +285,12 @@ public class BigdataSailHelper {
      * Return the properties associated with the {@link AbstractTripleStore}
      * backing the {@link BigdataSail}.
      * 
-     * @param namespace
+     * @param sail
      *            The sail.
      *            
      * @return The persistent properties.
      */
-    public Properties getProperties(BigdataSail sail) {
+    public Properties getProperties(final BigdataSail sail) {
 
         return getProperties(sail.getDatabase().getIndexManager(), sail
                 .getDatabase().getNamespace());

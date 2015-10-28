@@ -29,13 +29,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jini-test</artifactId>
-  <version>1.5.3-master-SNAPSHOT</version>
+  <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph JINI (Scaleout) Tests</name>
   <packaging>jar</packaging>
 
@@ -104,7 +104,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         <version>2.18.1</version>
         <configuration>
          <basedir>${basedir}</basedir>
-         <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
+         <argLine>-server -ea -Xms512m -Xmx6g -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
 	 <forkCount>1</forkCount>
          <reuseForks>true</reuseForks>
          <printSummary>false</printSummary>
