@@ -38,9 +38,7 @@ import com.bigdata.rdf.vocab.VocabularyDecl;
 import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
- * Vocabulary and namespace for RDFS.
- * 
- * @see http://www.w3.org/2000/01/rdf-schema#
+ * Vocabulary and namespace for GeoSpatial extensions.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
