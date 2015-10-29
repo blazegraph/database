@@ -100,6 +100,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	private String accept = null;
 	private boolean permit400s = false;
 	private Header[] headers = null;
+	private String suppressTruthMaintenance = "false";
 
     private final String getSparqlURL(final String serviceURL) {
         return serviceURL + "/sparql";
@@ -155,6 +156,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		accept = null;
 		permit400s = false;
 		headers = null;
+		suppressTruthMaintenance = "false";
 	}
 
 	/**
@@ -356,6 +358,9 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 					}
 					sep='&';
 				}
+				if(suppressTruthMaintenance.equals("true")){
+					url.append(sep).append("suppressTruthMaintenance=true");
+				}
 				final HttpPost rslt = new HttpPost(url.toString());
 				rslt.setEntity(toPost);
 				return rslt;
@@ -396,5 +401,9 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 
 	public AbstractProtocolTest(String name)  {
 		this(new QueryServlet(), name);
+	}
+	
+	public void setSuppressTruthMaintenance(String suppressTruthMaintenance) {
+		this.suppressTruthMaintenance = suppressTruthMaintenance;
 	}
 }

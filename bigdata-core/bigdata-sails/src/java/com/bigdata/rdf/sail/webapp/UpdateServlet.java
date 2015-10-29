@@ -287,7 +287,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
     	private final String queryStr;
         private final String baseURI;
-        private final boolean supressTruthMaintenance;
+        private final boolean suppressTruthMaintenance;
         private final RDFParserFactory parserFactory;
         private final Resource[] defaultContextDelete;
         private final Resource[] defaultContextInsert;
@@ -315,7 +315,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 final String namespace, final long timestamp,
                 final String queryStr,//
                 final String baseURI,
-                final boolean supressTruthMaintenance,//
+                final boolean suppressTruthMaintenance,//
                 final Map<String, Value> bindings,
                 final RDFParserFactory parserFactory,
                 final Resource[] defaultContextDelete,//
@@ -324,7 +324,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             super(req, resp, namespace, timestamp);
             this.queryStr = queryStr;
             this.baseURI = baseURI;
-            this.supressTruthMaintenance = supressTruthMaintenance;
+            this.suppressTruthMaintenance = suppressTruthMaintenance;
             this.bindings = bindings;
             this.parserFactory = parserFactory;
             this.defaultContextDelete = defaultContextDelete;
@@ -351,7 +351,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 				
 				boolean truthMaintenance = conn.getTruthMaintenance();
 				
-				if(truthMaintenance && supressTruthMaintenance){
+				if(truthMaintenance && suppressTruthMaintenance){
 					
 					conn.setTruthMaintenance(false);
 					
@@ -436,7 +436,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 							// Await the Future (of the Query)
 							ft.get();
 							
-							if(truthMaintenance && supressTruthMaintenance && (nmodified.get() > 0)){
+							if(truthMaintenance && suppressTruthMaintenance && (nmodified.get() > 0)){
 								
 								conn.removeAllEntailments();
 								
@@ -488,7 +488,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 				}
 				
-				if (truthMaintenance && supressTruthMaintenance) {
+				if (truthMaintenance && suppressTruthMaintenance) {
 					
 					conn.computeClosure();
 
@@ -536,7 +536,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
       private final String queryStr;
       private final String baseURI;
-      private final boolean supressTruthMaintenance;
+      private final boolean suppressTruthMaintenance;
       private final RDFParserFactory parserFactory;
       private final Resource[] defaultContextDelete;
       private final Resource[] defaultContextInsert;
@@ -565,7 +565,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             final long timestamp,
             final String queryStr,//
             final String baseURI,
-            final boolean supressTruthMaintenance, //
+            final boolean suppressTruthMaintenance, //
             final Map<String, Value> bindings,
             final RDFParserFactory parserFactory,
             final Resource[] defaultContextDelete,//
@@ -574,7 +574,7 @@ public class UpdateServlet extends BigdataRDFServlet {
          super(req, resp, namespace, timestamp);
          this.queryStr = queryStr;
          this.baseURI = baseURI;
-         this.supressTruthMaintenance = supressTruthMaintenance;
+         this.suppressTruthMaintenance = suppressTruthMaintenance;
          this.bindings = bindings;
          this.parserFactory = parserFactory;
          this.defaultContextDelete = defaultContextDelete;
@@ -601,7 +601,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             
             boolean truthMaintenance = conn.getTruthMaintenance();
             
-            if(truthMaintenance && supressTruthMaintenance){
+            if(truthMaintenance && suppressTruthMaintenance){
             	
             	conn.setTruthMaintenance(false);
             	
@@ -689,7 +689,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 	                  // Delete the buffered statements.
 	                  buffer.removeAll();
 	                  
-	                  if (truthMaintenance && supressTruthMaintenance && nmodified.get() > 0) {
+	                  if (truthMaintenance && suppressTruthMaintenance && nmodified.get() > 0) {
 	                	  
 	                	  conn.removeAllEntailments();
 	                  }
@@ -736,7 +736,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             	
             }
             
-            if (truthMaintenance && supressTruthMaintenance) {
+            if (truthMaintenance && suppressTruthMaintenance) {
             	
             	conn.computeClosure();
             	conn.setTruthMaintenance(true);
@@ -834,7 +834,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         final String baseURI = req.getRequestURL().toString();
         
-        final boolean supressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
+        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
      
         /*
          * Allow the caller to specify the default context for insert.
@@ -882,7 +882,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                     new UpdateWithBodyTask(req, resp, namespace,
                             ITx.UNISOLATED, //
                             baseURI,//
-                            supressTruthMaintenance, //
+                            suppressTruthMaintenance, //
                             remove,//
                             defaultContextDelete,//
                             add,//
@@ -916,7 +916,7 @@ public class UpdateServlet extends BigdataRDFServlet {
     private static class UpdateWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
-        private final boolean supressTruthMaintenance;
+        private final boolean suppressTruthMaintenance;
         private final FileItem remove;
         private final FileItem add;
         private final Resource[] defaultContextDelete;
@@ -943,7 +943,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
                 final String baseURI,
-                final boolean supressTruthMaintenance,//
+                final boolean suppressTruthMaintenance,//
                 final FileItem remove,
                 final Resource[] defaultContextDelete,//
                 final FileItem add,
@@ -951,7 +951,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 ) {
             super(req, resp, namespace, timestamp);
             this.baseURI = baseURI;
-            this.supressTruthMaintenance = supressTruthMaintenance;
+            this.suppressTruthMaintenance = suppressTruthMaintenance;
             this.remove = remove;
             this.defaultContextDelete = defaultContextDelete;
             this.add = add;
@@ -978,7 +978,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 
                 boolean truthMaintenance = conn.getTruthMaintenance();
                 
-                if(truthMaintenance && supressTruthMaintenance){
+                if(truthMaintenance && suppressTruthMaintenance){
                 	
                 	conn.setTruthMaintenance(false);
                 	
@@ -996,7 +996,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                     processData(conn, contentType, is, handler, baseURI);
                     
-                    if (truthMaintenance && supressTruthMaintenance && nmodified.get() > 0) {
+                    if (truthMaintenance && suppressTruthMaintenance && nmodified.get() > 0) {
 
                     	conn.removeAllEntailments();
                     	
@@ -1018,7 +1018,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                 }
                 
-              	if (truthMaintenance && supressTruthMaintenance) {
+              	if (truthMaintenance && suppressTruthMaintenance) {
               		
               		conn.computeClosure();
               		

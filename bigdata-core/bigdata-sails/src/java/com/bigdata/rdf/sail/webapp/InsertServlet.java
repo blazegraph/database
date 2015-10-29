@@ -138,7 +138,7 @@ public class InsertServlet extends BigdataRDFServlet {
         
         final String contentType = req.getContentType();
         
-        final boolean supressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
+        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
 
         if (contentType == null)
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -204,7 +204,7 @@ public class InsertServlet extends BigdataRDFServlet {
             
             submitApiTask(
                     new InsertWithBodyTask(req, resp, getNamespace(req),
-                            ITx.UNISOLATED, supressTruthMaintenance, baseURI, defaultContext,
+                            ITx.UNISOLATED, suppressTruthMaintenance, baseURI, defaultContext,
                             rdfParserFactory)).get();
             
         } catch (Throwable t) {
@@ -228,7 +228,7 @@ public class InsertServlet extends BigdataRDFServlet {
     private static class InsertWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
-        private final boolean supressTruthMaintenance;
+        private final boolean suppressTruthMaintenance;
         private final Resource[] defaultContext;
         private final RDFParserFactory rdfParserFactory;
 
@@ -251,12 +251,12 @@ public class InsertServlet extends BigdataRDFServlet {
         public InsertWithBodyTask(final HttpServletRequest req,
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
-                final boolean supressTruthMaintenance,
+                final boolean suppressTruthMaintenance,
                 final String baseURI, final Resource[] defaultContext,
                 final RDFParserFactory rdfParserFactory) {
             super(req, resp, namespace, timestamp);
             this.baseURI = baseURI;
-            this.supressTruthMaintenance = supressTruthMaintenance;
+            this.suppressTruthMaintenance = suppressTruthMaintenance;
             this.defaultContext = defaultContext;
             this.rdfParserFactory = rdfParserFactory;
         }
@@ -281,7 +281,7 @@ public class InsertServlet extends BigdataRDFServlet {
                 
                 boolean truthMaintenance = conn.getTruthMaintenance();
                 
-                if (truthMaintenance && supressTruthMaintenance) {
+                if (truthMaintenance && suppressTruthMaintenance) {
                 	
                 	conn.setTruthMaintenance(false);
                 	
@@ -316,7 +316,7 @@ public class InsertServlet extends BigdataRDFServlet {
                  */
                 rdfParser.parse(req.getInputStream(), baseURI);
                 
-                if (truthMaintenance && supressTruthMaintenance) {
+                if (truthMaintenance && suppressTruthMaintenance) {
                 	
                 	conn.computeClosure();
                 	conn.setTruthMaintenance(true);

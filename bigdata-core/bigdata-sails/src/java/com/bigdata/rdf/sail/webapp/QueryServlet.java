@@ -127,7 +127,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * attribute. The latter is used to support chaining of a linked data GET as
      * a SPARQL DESCRIBE query.
      */
-    static final transient String ATTR_TRUTH_MAINTENANCE = "supressTruthMaintenance";
+    static final transient String ATTR_TRUTH_MAINTENANCE = "suppressTruthMaintenance";
 
     /**
      * The name of the parameter/attribute that contains boolean flag to include
