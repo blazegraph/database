@@ -1,0 +1,64 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:          awesomeapp
+# Required-Start:    $local_fs $remote_fs $network $syslog
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start awesomeapp server at boot time
+# Description:       Controls the awesomeapp server
+### END INIT INFO
+
+APP_HOME=/opt/awesomeapp
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+NAME=awesomeapp
+DESC="AwesomeApp Example" 
+APP_USER=www-data
+ARGS="-jar $APP_HOME/$NAME.jar server /etc/$NAME.yaml"
+
+test -e $APP_HOME/$NAME.jar || exit 0
+
+DEFAULT=/etc/default/$NAME
+
+# Include defaults if available
+if [ -f "$DEFAULT" ] ; then
+    . "$DEFAULT"
+fi
+
+set -e
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    echo -n "Starting $DESC: "
+    start-stop-daemon --start --chuid "$APP_USER" --chdir "$APP_HOME" --pidfile /var/run/$NAME.pid \
+        --background --make-pidfile --exec /usr/bin/java -- $ARGS || true
+    echo "$NAME."
+    ;;
+  stop)
+    echo -n "Stopping $DESC: "
+    start-stop-daemon --stop --signal 2 --quiet --pidfile /var/run/$NAME.pid || true
+    echo "$NAME."
+        rm -f /var/run/$NAME.pid
+    ;;
+  restart)
+    echo -n "Restarting $DESC: "
+    start-stop-daemon --stop --signal 2 --quiet --pidfile /var/run/$NAME.pid || true
+        rm -f /var/run/$NAME.pid
+    sleep 1
+        start-stop-daemon --start --chuid "$APP_USER" --chdir "$APP_HOME" --pidfile /var/run/$NAME.pid \
+                --background --make-pidfile --exec /usr/bin/java -- $ARGS || true
+        echo "$NAME."
+    ;;
+  status)
+    status_of_proc -p /var/run/$NAME.pid "$DAEMON" $NAME && exit 0 || exit $?
+    ;;
+  *)
+    echo "Usage: $NAME {start|stop|restart|status}" >&2
+    exit 1
+    ;;
+esac
+
+exit 0
