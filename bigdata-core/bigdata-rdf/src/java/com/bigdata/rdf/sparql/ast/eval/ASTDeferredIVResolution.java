@@ -9,8 +9,8 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -37,12 +37,11 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryHeadlessImpl;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -58,6 +57,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.PathNode;
+import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
 import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
@@ -71,8 +71,6 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
-import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
-import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.ISPO;
@@ -99,7 +97,7 @@ public class ASTDeferredIVResolution {
     
     private final static Logger log = Logger
             .getLogger(ASTDeferredIVResolution.class);
-
+    
     /**
      * Anonymous instances of Handler interface are used as a deferred code,
      * which should be run after particular IV is available in batch resolution results 
@@ -107,17 +105,29 @@ public class ASTDeferredIVResolution {
     private interface Handler {
         void handle(IV newIV);
     }
+
+    /**
+     * The target triple store.
+     */
+    private final AbstractTripleStore store;
+    
+    /**
+     * The value factory for that target triple store.
+     */
+    private final BigdataValueFactory vf;
     
     /**
      * Deferred handlers, linked to particular BigdataValue resolution
      */
     private final Map<BigdataValue, List<Handler>> deferred = new LinkedHashMap<>();
+    
     /**
 	 * Deferred handlers, NOT linked to particular BigdataValue resolution, used
 	 * to provide sets of resolved default and named graphs into DataSetSummary
 	 * constructor
 	 */
     private final List<Runnable> deferredRunnables = new ArrayList<>();
+    
     /**
 	 * IVs of graphs, which will be later passed to
 	 * {@link #resolveDataset(AST2BOpContext, Map)}.
@@ -126,11 +136,25 @@ public class ASTDeferredIVResolution {
 	 */
     private final Map<Value, IV> resolvedValues = new HashMap<>();
     
+    private ASTDeferredIVResolution(AbstractTripleStore store) {
 
-   /**
-     * Do deferred resolution of IVs, which were left unresolved while preparing the query
-     * @param store - triple store, which will be used for values resolution
-     * @param ast - AST model of the query, which should be resolved
+        if (store == null)
+            throw new IllegalArgumentException();
+
+        this.store = store;
+        
+        this.vf = store.getValueFactory();
+        
+    }
+
+    /**
+     * Do deferred resolution of IVs, which were left unresolved while preparing
+     * the query
+     * 
+     * @param store
+     *            - triple store, which will be used for values resolution
+     * @param ast
+     *            - AST model of the query, which should be resolved
      * @throws MalformedQueryException
      */
     public static void resolveQuery(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
@@ -186,7 +210,7 @@ public class ASTDeferredIVResolution {
 
         final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
-        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
+        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution(store);
         
         termsResolver.resolve(context, queryRoot2, dcLists);
         
@@ -239,7 +263,7 @@ public class ASTDeferredIVResolution {
         
         final AST2BOpContext context2 = new AST2BOpContext(ast, store);
 
-        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution();
+        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution(store);
 
         termsResolver.resolve(context2, qc, dcLists);
 
@@ -258,33 +282,39 @@ public class ASTDeferredIVResolution {
     }
 
     /**
-     * Schedule resolution if IV in provided value, provided handler
-     * will be used to process resolved IV. If provided BigdataValue was created
-     * using BigdataValueFactory bound to triple store, and has real IV already
-     * resolved (for example dataset definition), handler will be fired immediately
-     * and no value will be queued for resolution. 
+     * Schedule resolution if IV in provided value, provided handler will be
+     * used to process resolved IV. If provided BigdataValue was created using
+     * BigdataValueFactory bound to triple store, and has real IV already
+     * resolved (for example dataset definition), handler will be fired
+     * immediately and no value will be queued for resolution.
+     * 
      * @param value
      * @param handler
      */
     private void defer(final BigdataValue value, final Handler handler) {
-        if (value!=null) {
-            if (value.getValueFactory() instanceof BigdataValueFactoryImpl && value.isRealIV()) {
-                handler.handle(value.getIV());
-                return;
-            }
-            List<Handler> handlers = deferred.get(value);
-            if (handlers==null) {
-                handlers = new ArrayList<>();
-                deferred.put(value, handlers);
-            }
-            handlers.add(handler);
+        if (value == null)
+            return;
+        if (value.getValueFactory() == vf && value.isRealIV()) {
+            /*
+             * We have a BigdataValue that belongs to the correct namespace and
+             * which has already been resolved to a real IV.
+             */
+            handler.handle(value.getIV());
+            return;
         }
+        List<Handler> handlers = deferred.get(value);
+        if (handlers == null) {
+            handlers = new ArrayList<>();
+            deferred.put(value, handlers);
+        }
+        handlers.add(handler);
     }
 
     /**
-     * Schedule execution of runnable after batch resulution if IVs
-     * (to handle creation of DataSetSummary instances for default
-     * and named graphs collections)
+     * Schedule execution of runnable after batch resolution if IVs (to handle
+     * creation of DataSetSummary instances for default and named graphs
+     * collections)
+     * 
      * @param runnable
      */
     private void deferRunnable(final Runnable runnable) {
@@ -457,8 +487,7 @@ public class ASTDeferredIVResolution {
      * @param queryNode
      * @param dcList 
      */
-    private void prepare(
-        final AST2BOpContext context, final QueryNodeBase queryNode) {
+    private void prepare(final AST2BOpContext context, final QueryNodeBase queryNode) {
 
         if (queryNode instanceof QueryRoot) {
 
@@ -593,16 +622,21 @@ public class ASTDeferredIVResolution {
      * Transitively handles all unresolved IVs inside provided bop
      */
     private void fillInIV(final AST2BOpContext context, final BOp bop) {
-        if (bop==null) {
+   
+        if (bop == null) {
             return;
         }
-        
+
         if (bop instanceof ConstantNode) {
-            
+
             final BigdataValue value = ((ConstantNode) bop).getValue();
-            if (value!=null) {
-                // even if iv is already filled in we should try to resolve it against triplestore,
-                // as previously resolved IV may be inlined, but expected to be term from lexicon relation on evaluation
+            if (value != null) {
+                /*
+                 * Even if iv is already filled in we should try to resolve it
+                 * against triplestore, as previously resolved IV may be
+                 * inlined, but expected to be term from lexicon relation on
+                 * evaluation.
+                 */
                 defer(value, new Handler(){
                     @Override
                     public void handle(final IV newIV) {
@@ -729,7 +763,7 @@ public class ASTDeferredIVResolution {
                         defer(v, new Handler(){
                             @Override
                             public void handle(final IV newIV) {
-                                final BigdataValue resolved = context.getAbstractTripleStore().getValueFactory().asValue(v);
+                                final BigdataValue resolved = vf.asValue(v);
                                 if (resolved.getIV() == null && newIV!=null) {
                                     resolved.setIV(newIV);
                                     newIV.setValue(resolved);
@@ -825,20 +859,20 @@ public class ASTDeferredIVResolution {
         /*
          * Build up the vocabulary (some key vocabulary items which correspond to syntactic sugar in SPARQL.)
          */
-        final BigdataValueFactory f = context.getAbstractTripleStore().getValueFactory();
         final List<BigdataValue> vocab = new LinkedList<>();
         {
             
             // RDF Collection syntactic sugar vocabulary items.
-            vocab.add(f.asValue(RDF.FIRST));
-            vocab.add(f.asValue(RDF.REST));
-            vocab.add(f.asValue(RDF.NIL));
-            vocab.add(f.asValue(BD.VIRTUAL_GRAPH));
+            vocab.add(vf.asValue(RDF.FIRST));
+            vocab.add(vf.asValue(RDF.REST));
+            vocab.add(vf.asValue(RDF.NIL));
+            vocab.add(vf.asValue(BD.VIRTUAL_GRAPH));
 
         }
 
-        final IV[] ivs = new IV[deferred.size()+vocab.size()];
-        final BigdataValue[] values = new BigdataValue[deferred.size()+vocab.size()];
+        final int nvalues = deferred.size() + vocab.size();
+        final IV[] ivs = new IV[nvalues]; // FIXME REMOVE.
+        final BigdataValue[] values = new BigdataValue[nvalues];
         {
         
             /*
@@ -854,7 +888,7 @@ public class ASTDeferredIVResolution {
             
             for (final BigdataValue v: vocab) {
 
-                final BigdataValue toBeResolved = f.asValue(v);
+                final BigdataValue toBeResolved = v; // asValue() invoked above. // f.asValue(v);
                 ivs[i] = TermId.mockIV(VTE.valueOf(v));
                 toBeResolved.clearInternalValue();
                 values[i++] = toBeResolved;
@@ -862,22 +896,8 @@ public class ASTDeferredIVResolution {
             }
 
             for (final BigdataValue v: deferred.keySet()) {
-
-                /*
-                 * Ensure that BigdataValue objects belong to the headless ValueFactory
-                 */
-                if (v!=null) {
-                    BigdataValueFactory vf = v.getValueFactory();
-                    if (vf == null) {
-                        throw new RuntimeException("Invalid null valueFactory for value="+v);
-                    } else if (vf instanceof BigdataValueFactoryImpl) {
-                        throw new RuntimeException("Invalid valueFactory class "+vf.getClass().getName()+" namespace="+((BigdataValueFactoryImpl)vf).getNamespace()+" != " + ((BigdataValueFactoryImpl)f).getNamespace() + " for value="+v);
-                    } else if (!(vf instanceof BigdataValueFactoryHeadlessImpl)) {
-                        throw new RuntimeException("Invalid valueFactory class "+vf.getClass().getName()+" for value="+v);
-                    }
-                }
-
-                BigdataValue toBeResolved = f.asValue(v);
+                
+                final BigdataValue toBeResolved = vf.asValue(v);
                 ivs[i] = v.getIV();
                 toBeResolved.clearInternalValue();
                 values[i++] = toBeResolved;
@@ -886,6 +906,9 @@ public class ASTDeferredIVResolution {
 
             /*
              * Batch resolution.
+             * 
+             * Note: At this point all BigdataValue objects belong to the target
+             * namespace.
              */
             
             if (log.isDebugEnabled())
@@ -901,58 +924,133 @@ public class ASTDeferredIVResolution {
          */
 
         {
-            for (int i = 0; i<values.length; i++) {
+            for (int i = 0; i < values.length; i++) {
 
                 final BigdataValue v = values[i];
-                final IV iv;
-                if (v.isRealIV()) {
 
-                    if (log.isInfoEnabled())
-                        log.info("RESOLVED: " + v + " => " + v.getIV());
+                if (false) {
 
                     /*
-                     * Note: If the constant is an effective constant
-                     * because it was given in the binding sets then we also
-                     * need to capture the variable name associated with
-                     * that constant.
+                     * This is based on the BigdataRDFValueResolver code path.
+                     * 
+                     * FIXME Why does this old code path produce some test
+                     * failures (AST test suite)?
                      */
-
-                    iv = v.getIV();
-                } else {
-                    if (v instanceof Literal) {
-                        final String label = ((Literal)v).getLabel();
-                        final URI dataType = ((Literal)v).getDatatype();
-                        final String language = ((Literal)v).getLanguage();
-                        final BigdataValue resolved;
-                        if (language!=null) {
-                            resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, language);
-                        } else {
-                            resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, dataType);
-                        }
-                        final DTE dte = DTE.valueOf(dataType);
-                        if (dte!=null) {
-                            iv = IVUtility.decode(label, dte.name());
-                        } else {
-                            iv = TermId.mockIV(VTE.valueOf(v));
-                        }
-                        iv.setValue(resolved);
-                        resolved.setIV(iv);
-                    } else {
-                        iv = ivs[i];
-                    }
-                }
-                if (iv!=null) {
-                    iv.setValue(v);
-                    v.setIV(iv);
                     
-                    final List<Handler> deferredHandlers = deferred.get(v);
-                    if (deferredHandlers!=null) { // No handlers are usually defined for vocab values (see above)
-                        for(final Handler handler: deferredHandlers) {
-                            handler.handle(iv);
+                    final IV iv = v.getIV();
+
+                    if (iv == null) {
+
+                        /*
+                         * Since the term identifier is NULL this value is not
+                         * known to the kb.
+                         */
+
+                        if (log.isInfoEnabled())
+                            log.info("Not in knowledge base: " + v);
+
+                        /*
+                         * Create a dummy iv and cache the unknown value on it
+                         * so that it can be used during query evaluation.
+                         */
+                        final IV dummyIV = TermId.mockIV(VTE.valueOf(v));
+
+                        v.setIV(dummyIV);
+
+                        dummyIV.setValue(v);
+
+                        // } else {
+                        //
+                        // iv.setValue(v);
+
+                    } else {
+                        //
+                        // if (iv != null) {
+                        iv.setValue(v);
+                        // v.setIV(iv); // Done by addTerms()
+
+                        final List<Handler> deferredHandlers = deferred.get(v);
+                        if (deferredHandlers != null) {
+                            /*
+                             * No handlers are usually defined for vocab values
+                             * (see above).
+                             */
+                            for (final Handler handler : deferredHandlers) {
+                                handler.handle(iv);
+                            }
+                        }
+                        // overwrite entry with unresolved key by entry with
+                        // resolved key
+                        resolvedValues.put(v, iv);
+                    }
+
+                } else {
+                    
+                    /*
+                     * This is the code path proposed by Igor.
+                     */
+                    
+                    final IV iv;
+                    if (v.isRealIV()) {
+
+                        if (log.isInfoEnabled())
+                            log.info("RESOLVED: " + v + " => " + v.getIV());
+
+                        /*
+                         * Note: If the constant is an effective constant
+                         * because it was given in the binding sets then we also
+                         * need to capture the variable name associated with
+                         * that constant.
+                         */
+
+                        iv = v.getIV();
+                    } else {
+                        if (v instanceof Literal) {
+                            /*
+                             * FIXME Why is this code here? It is a bit like an
+                             * asValue() call.
+                             */
+                            final String label = ((Literal) v).getLabel();
+                            final URI dataType = ((Literal) v).getDatatype();
+                            final String language = ((Literal) v).getLanguage();
+                            final BigdataValue resolved;
+                            if (language != null) {
+                                resolved = vf.createLiteral(label, language);
+                            } else {
+                                resolved = vf.createLiteral(label, dataType);
+                            }
+                            final DTE dte = DTE.valueOf(dataType);
+                            if (dte != null) {
+                                iv = IVUtility.decode(label, dte.name());
+                            } else {
+                                iv = TermId.mockIV(VTE.valueOf(v));
+                            }
+                            iv.setValue(resolved);
+                            resolved.setIV(iv);
+                        } else {
+                            iv = ivs[i];
                         }
                     }
-                    // overwrite entry with unresolved key by entry with resolved key
-                    resolvedValues.put(v, iv);
+
+                    if (iv != null) {
+                        iv.setValue(v);
+                        v.setIV(iv);
+
+                        final List<Handler> deferredHandlers = deferred.get(v);
+                        if (deferredHandlers != null) {
+                            /*
+                             * No handlers are usually defined for vocab values
+                             * (see above).
+                             */
+                            for (final Handler handler : deferredHandlers) {
+                                handler.handle(iv);
+                            }
+                        }
+                        // overwrite entry with unresolved key by entry with
+                        // resolved key
+                        resolvedValues.put(v, iv);
+                    }
+
                 }
 
             }
@@ -962,22 +1060,7 @@ public class ASTDeferredIVResolution {
         for(final Runnable r: deferredRunnables) {
             r.run();
         }
-
-        /*
-         * Ensure that BigdataValue objects belong to the headless ValueFactory
-         */
-        {
-            for (IV iv: resolvedValues.values()) {
-            	BigdataValueFactory vf = iv.getValue().getValueFactory();
-                if (vf == null) {
-                	throw new RuntimeException("Invalid null valueFactory for value="+iv);
-                } else if (!(vf instanceof BigdataValueFactoryImpl)) {
-                	throw new RuntimeException("Invalid valueFactory class "+vf.getClass().getName()+" for value="+iv);
-                } else if (vf!=f) {
-                	throw new RuntimeException("Invalid valueFactory instance "+vf+"!="+f+" for value="+iv);
-                }
-            }
-        }
         
     }
+    
 }

@@ -92,6 +92,9 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -263,6 +266,10 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
              * configuration properties for the KB instance.
              */
 			astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
+			// Force the QueryEngine to exist for this db.
+            QueryEngineFactory.getInstance().getQueryController((IBTreeManager) store.getIndexManager());
+//            ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
 //            queryPlan = AST2BOpUtility.convert(context = new AST2BOpContext(
 //                    astContainer, store));

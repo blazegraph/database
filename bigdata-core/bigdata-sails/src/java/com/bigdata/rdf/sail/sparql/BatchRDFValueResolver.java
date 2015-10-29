@@ -36,7 +36,6 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
@@ -61,7 +60,6 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryHeadlessImpl;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
@@ -97,14 +95,12 @@ import com.bigdata.rdf.store.BD;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @openrdf
  * 
- * 			FIXME This class should go away per BLZG-1519
- * 
  * @see https://jira.blazegraph.com/browse/BLZG-1176 (decouple SPARQL parser
  *      from DB)
  * @see https://jira.blazegraph.com/browse/BLZG-1519 (Refactor test suite to
  *      remove tight coupling with IVs while checking up parsed queries)
  */
-@Deprecated
+// FIXME RENAME THIS CLASS.
 public class BatchRDFValueResolver extends ASTVisitorBase {
 
     private final static Logger log = Logger
@@ -275,6 +271,11 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             
         }
 
+        /*
+         * FIXME Why is this [vocab] still here? And why the IV assignment logic
+         * if we are not doing any batch resolution?
+         */
+        
         // RDF Collection syntactic sugar vocabulary items.
         vocab.put(RDF.FIRST, valueFactory.asValue(RDF.FIRST));
         vocab.put(RDF.REST, valueFactory.asValue(RDF.REST));
