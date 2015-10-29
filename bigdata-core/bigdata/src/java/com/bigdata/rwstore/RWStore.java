@@ -108,6 +108,7 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.BytesUtil;
 import com.bigdata.util.ChecksumError;
@@ -376,6 +377,74 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         String DEFAULT_SMALL_SLOT_TYPE = "0"; // initial default to no special processing
 
         /**
+         * The #of free bits required to be free in a "small slot" allocator before
+         * it is automatically returned to the free list.  Once the small slot waste
+         * threshold comes into play, the small slot allocator for a given slot size
+         * having the maximum free bits will be automatically returned to the free 
+         * list if the percentage of waste in that slot size exceeds a threshold.
+         * 
+         * @see BLZG-1278 (Implement maximum waste policy for small slot allocators)
+         */
+        String SMALL_SLOT_THRESHOLD = RWStore.class.getName() + ".smallSlotThreshold";
+
+        String DEFAULT_SMALL_SLOT_THRESHOLD = "4096"; // 50% of available bits
+        
+        /**
+         * We have introduced extra parameters to adjust allocator usage if we notice that
+         * a significant amount of storage is wasted.
+         * <p>
+         * First we check how many allocators of a given slot size have been created.  If
+         * above {@value #SMALL_SLOT_WASTE_CHECK_ALLOCATORS} then we look a little closer.
+         * <p>
+         * We retrieve the allocation statistics and determine if the waste threshold is
+         * exceeded, as determined by {@link SMALL_SLOT_HIGH_WASTE}.
+         * <p>
+         * If so, then we attempt to find an available allocator with more free bits as
+         * determined by {@link SMALL_SLOT_THRESHOLD_HIGH_WASTE}.
+         * 
+         * @see BLZG-1278 (Implement maximum waste policy for small slot allocators)
+         */
+        String SMALL_SLOT_WASTE_CHECK_ALLOCATORS = RWStore.class.getName() + ".smallSlotWasteCheckAllocators";
+
+        String DEFAULT_SMALL_SLOT_WASTE_CHECK_ALLOCATORS = "100"; // Check waste when more than 100 allocators
+
+        /**
+         * Once there are at least {@link #SMALL_SLOT_WASTE_CHECK_ALLOCATORS}
+         * for a given slot size, then the {@link #SMALL_SLOT_HIGH_WASTE}
+         * specifies the maximum percentage of waste that will be allowed for
+         * that slot size. This prevents the amount of waste for small slot
+         * allocators from growing significantly as the size of the backing
+         * store increases.
+         * <p>
+         * The dynamic policy for small slots can be thought of as follows.
+         * <dl>
+         * <li>A normal allocator will be dropped onto the free list once it has
+         * {@link #FREE_BITS_THRESHOLD} bits free (default 300 bits out of 8192
+         * = 3.6%).</li>
+         * <li>For a new store, a small slot allocator will be dropped onto the
+         * free list once it has {@link #SMALL_SLOT_THRESHOLD} bits free
+         * (default 4096 bits out of 8192 = 50%).</li>
+         * <li>Once the #of small slots allocators for a given sized allocator
+         * exceeds the {@link #DEFAULT_SMALL_SLOT_WASTE_CHECK_ALLOCATORS}, a
+         * small slot allocator will be dropped onto the free list once it is
+         * {@link #SMALL_SLOT_HIGH_WASTE} percent free (this amounts to 1638
+         * bits out of 8192).</li>
+         * </dl>
+         * Thus, the small slot allocators initially are created freely because
+         * they need to be highly sparse before they can be on the free list.
+         * Once we have "enough" small slot allocators, we create them less
+         * freely - this is achieved by changing the sparsity threshold to a
+         * value that still requires the small slot allocator to be
+         * significantly more sparse than a general purpose allocator.
+         * 
+         * @see BLZG-1278 (Implement maximum waste policy for small slot
+         *      allocators)
+         */
+        String SMALL_SLOT_HIGH_WASTE = RWStore.class.getName() + ".smallSlotHighWaste";
+
+        String DEFAULT_SMALL_SLOT_HIGH_WASTE = "20.0f"; // 1638 bits: 20% waste, less than 80% usage
+
+       /**
          * When <code>true</code>, scattered writes which are strictly ascending
          * will be coalesced within a buffer and written out as a single IO
          * (default {@value #DEFAULT_DOUBLE_BUFFER_WRITES}). This improves write
@@ -840,10 +909,31 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     + " : Must be between 1 and 5000");
         }
         
-        cSmallSlot = Integer.valueOf(fileMetadata.getProperty(
+    	cSmallSlot = Integer.valueOf(fileMetadata.getProperty(
                 Options.SMALL_SLOT_TYPE,
                 Options.DEFAULT_SMALL_SLOT_TYPE));
         
+    	cSmallSlotThreshold = Integer.valueOf(fileMetadata.getProperty(
+                Options.SMALL_SLOT_THRESHOLD,
+                Options.DEFAULT_SMALL_SLOT_THRESHOLD));
+        
+    	cSmallSlotWasteCheckAllocators = Integer.valueOf(fileMetadata.getProperty(
+                Options.SMALL_SLOT_WASTE_CHECK_ALLOCATORS,
+                Options.DEFAULT_SMALL_SLOT_WASTE_CHECK_ALLOCATORS));
+    	
+    	cSmallSlotHighWaste = Float.valueOf(fileMetadata.getProperty(
+                Options.SMALL_SLOT_HIGH_WASTE,
+                Options.DEFAULT_SMALL_SLOT_HIGH_WASTE));
+    	
+//    	cSmallSlotThresholdHighWaste = Integer.valueOf(fileMetadata.getProperty(
+//                Options.SMALL_SLOT_THRESHOLD_HIGH_WASTE,
+//                Options.DEFAULT_SMALL_SLOT_THRESHOLD_HIGH_WASTE));
+    	/*
+    	 * The highWasteThreshold is more sensibly calculated from
+    	 * the high waste value.
+    	 */
+    	cSmallSlotThresholdHighWaste = (int) (cSmallSlotHighWaste * 8192 / 100);
+    	
         if (cSmallSlot < 0 || cSmallSlot > 2048) {
             throw new IllegalArgumentException(Options.SMALL_SLOT_TYPE
                     + " : Must be between 0 and 2048");
@@ -2079,7 +2169,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 
                 final int slotSize = getBlock((int) addr).getBlockSize();
                 if (slotSize < length) {
-                    throw new IllegalStateException("Bad Address: length requested greater than allocated slot");
+                    throw new IllegalStateException("Bad Address: length requested greater than allocated slot: " + slotSize + " < " + length);
                 }
 
                 final long paddr = physicalAddress((int) addr);
@@ -2664,21 +2754,46 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     
                     final ArrayList<FixedAllocator> list = m_freeFixed[i];
                     if (list.size() == 0) {
+                        /*
+                         * No allocator on the free list for that slot size.
+                         */
+                    	final FixedAllocator candidate;
+                    	if (size < this.cSmallSlot) {
+                    		/*
+                             * Check to see if can locate a good enough
+                             * Allocator
+                             * 
+                             * @see BLZG-1278 (Small slot optimization to
+                             * minimize waste).
+                             */
+                    		candidate = findAllocator(block);
+                    	} else {
+                    		candidate = null;
+                    	}
+                    	
+                    	if (candidate != null) {
+                    		candidate.addToFreeList();
+                    		allocator = candidate;
+                    	} else {
+							/*
+							 * We need a new allocator.
+							 */
+	                        allocator = new FixedAllocator(this, block);
+	                        
+	                        allocator.setFreeList(list);
+	                        allocator.setIndex(m_allocs.size());
+	                        
+	                        if (log.isTraceEnabled())
+	                            log.trace("New FixedAllocator for " + block);
 
-                        allocator = new FixedAllocator(this, block);
-                        
-                        allocator.setFreeList(list);
-                        allocator.setIndex(m_allocs.size());
+	                        m_allocs.add(allocator);
+	                        
+	                        if (m_storageStats != null) {
+	                            m_storageStats.register(allocator, true);
+	                        }
+	                        
+                    	}
 
-                        if (log.isTraceEnabled())
-                            log.trace("New FixedAllocator for " + block);
-
-                        m_allocs.add(allocator);
-                        
-                        if (m_storageStats != null) {
-                            m_storageStats.register(allocator, true);
-                        }
-                        
                         if (allocator.checkBlock0()) {
                         	m_commitList.add(allocator);
                         }
@@ -2732,7 +2847,72 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         }
     }
     
-    private int fixedAllocatorIndex(final int size) {
+    /**
+     * For a small slot size only, look for an existing allocator that has a
+     * sufficient percentage of free bits and add it to the free list. If this
+     * test fails then the caller must allocate a new allocator.
+     * 
+     * @param block
+     * 
+     * @return
+     * 
+     * @see BLZG-1278 (Small slot optimization to minimize waste).
+     */
+    private FixedAllocator findAllocator(final int block) {
+		// only look if small slot
+    	if (block > cSmallSlot) {
+    		return null;
+    	}
+    	
+    	// Look up the statistics for that slot size.
+    	final Bucket stats = m_storageStats.findBucket(block);
+    	if (stats == null) {
+    	    // Can't do anything.  This is not an expected code path.
+    		return null;
+    	}
+    	
+        /*
+         * Only check waste if number of allocators is greater than some
+         * configurable amount.
+         * 
+         * The thought here is that it is not necessary to focus on minimizing
+         * waste for small stores and that by allowing that waste we permit
+         * better locality (co-location on a page) for small slots. Once we
+         * start to limit the small slot waste we essentially just change the
+         * #of free bits before we are willing to allow a small slot allocator
+         * onto the free list.
+         */
+    	if (stats.m_allocators < cSmallSlotWasteCheckAllocators) {
+    		return null;
+    	}
+    	
+    	// only check small slots if total waste is larger than some configurable amount
+    	final float slotWaste = stats.slotsUnused();
+    	if (slotWaste < cSmallSlotHighWaste) {
+    		return null;
+    	}
+    	
+    	// Now find candidate allocator with maximum free slots above a minimum threshold
+    	FixedAllocator candidate = null;
+    	int candidateFreeBits = cSmallSlotThresholdHighWaste; // minimum threshold
+    	for (int i = 0; i < m_allocs.size(); i++) {
+    		final FixedAllocator tst = m_allocs.get(i);
+    		if (tst.getBlockSize() == block) { // right size
+    			if (tst.m_freeBits > candidateFreeBits) {
+    				candidate = tst;
+    				candidateFreeBits = candidate.m_freeBits;
+    			}
+     		}
+    	}
+    	
+    	if (candidate != null && log.isDebugEnabled()) {
+    		log.debug("Found candidate small slot allocator");
+    	}
+    	
+    	return candidate;   	
+	}
+
+	private int fixedAllocatorIndex(final int size) {
         int i = 0;
 
         int cmp = m_minFixedAlloc;
@@ -3699,11 +3879,38 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
     final int cDefaultFreeBitsThreshold;
     
-	final int cSmallSlotThreshold = 4096; // debug test
-	
+    /**
+     * The smallSlotThreshold, when activated, is intended to ensure improve the
+     * opportunity for write elissions (to mechanical disks) whilst also reducing 
+     * the read-backs on current generation (2014-15) SSDs that can impact 
+     * write throughput.
+     * Given that the objective is to statistically improve write elission,
+     * the number of required free bits needs to be large - around 50%.
+     * However, this can result in a large amount of store waste for certain
+     * patterns of data - for example when small slots are used to store large
+     * literals that will not be recycled.  In this scenario it is possible
+     * that allocators are not recycled.
+     * Some further thoughts:
+     * 1) The more efficient elission of small slots for the allocation of large literals
+     * is probably the major throughput benefit
+     * 2) OTOH, at a lower level, small sparse but localised writes (eg 16 64 byte writes to a 4k
+     * sector) may only incur a single read-back with good firmware.
+     * To address the concern for high waste, when a statistically large number of allocators have
+     * been created, and the waste is beyond some threshold, then a lower small slot threshold
+     * is used.  The logic for this is implemented in {@link FixedAllocator#meetsSmallSlotThreshold()}
+     */
 	int cSmallSlot = 1024; // @see from Options#SMALL_SLOT_TYPE
     
-    /**
+	int cSmallSlotThreshold = 4096;  // @see from Options#SMALL_SLOT_THRESHOLD
+	
+	/**
+	 * High Waste Criteria
+	 */
+	int cSmallSlotThresholdHighWaste = 2048;  // @see from Options#SMALL_SLOT_THRESHOLD_HIGH_WASTE
+	int cSmallSlotWasteCheckAllocators = 100;  // @see from Options#SMALL_SLOT_WASTE_CHECK_ALLOCATORS
+	float cSmallSlotHighWaste = 0.2f;  // @see from Options#SMALL_SLOT_HIGH_WASTE
+	
+	/**
      * Each "metaBit" is a file region
      */
     private int m_metaBits[];
