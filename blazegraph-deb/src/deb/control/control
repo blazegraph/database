@@ -3,7 +3,7 @@ Version: [[version]]
 Section: misc
 Priority: optional
 Architecture: all
-Depends: jdk (>= 1.7)
+Depends: openjdk-7-jdk
 Maintainer: Blazegraph <blazegraph@blazegraph.com>
 Description: High Performance Graph Database with RDF/SPARQL and Tinkerpop API Support
 Distribution: development
