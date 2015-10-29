@@ -28,6 +28,7 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 
 	private MockTermIdFactory termIdFactory;
 	
+	@Override
 	protected void setUp() throws Exception {
 		
 	    super.setUp();
@@ -36,6 +37,7 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 	    
 	}
 
+	@Override
 	protected void tearDown() throws Exception {
 		
 	    super.tearDown();
