@@ -997,17 +997,21 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		/**
-		 * At scale the small slot handling can lead to large amounts of store waste, tending to
-		 * the small slot allocation thresholds of 50%, dependent on use case.
-		 * <p>
-		 * To mitigate this problem, when more than some minimum number of allocators are in use
-		 * the storage stats are used to check on overall usage.  If the waste is above some
-		 * specified amount, then an attempt is made to locate a "reasonable" candidate allocator
-		 * to be used.
-		 * <p>
-		 * To test below sets thresholds to quickly trigger this behaviour, with a low minimum
-		 * number of allocators, and low "candidate" re-use threshold.
-		 */
+         * At scale the small slot handling can lead to large amounts of store
+         * waste, tending to the small slot allocation thresholds of 50%,
+         * dependent on use case.
+         * <p>
+         * To mitigate this problem, when more than some minimum number of
+         * allocators are in use the storage stats are used to check on overall
+         * usage. If the waste is above some specified amount, then an attempt
+         * is made to locate a "reasonable" candidate allocator to be used.
+         * <p>
+         * To test below sets thresholds to quickly trigger this behaviour, with
+         * a low minimum number of allocators, and low "candidate" re-use
+         * threshold.
+         * 
+         * @see BLZG-1278 (Small slot optimization to minimize waste).
+         */
 		public void test_smallSlotWasteRecylcing() {
 			// Note that the Waste parameter effectively controls the recycling in high waste scenarios
 			final Journal store = (Journal) getSmallSlotStore(1024, 10 /*min allocators to check*/, 20.0f/* % waste of store total slot waste before checking for candidates*/);

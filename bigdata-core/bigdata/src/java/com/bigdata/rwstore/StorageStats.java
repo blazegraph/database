@@ -140,15 +140,23 @@ public class StorageStats {
 				return 0;
 			return (int) (m_allocationSize / m_allocations);
 		}
-		public float churn() {
-			if (active() == 0)
-				return m_allocations;
-			
-			BigDecimal allocs = new BigDecimal(m_allocations);
-			BigDecimal used = new BigDecimal(active());			
-			
-			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
-		}
+
+		/*
+		 * Remove because we lack the concept of reserved slots for blobs. Just
+		 * look at the 8k allocators churn.
+		 */
+//		public float churn() {
+//			
+//		    if (active() == 0)
+//				return m_allocations;
+//			
+//			final BigDecimal allocs = new BigDecimal(m_allocations);
+//			
+//			final BigDecimal used = new BigDecimal(active());			
+//			
+//			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
+//		}
+		
 	}
 	
 	public class Bucket {
@@ -341,19 +349,21 @@ public class StorageStats {
 		}
 		
 		/**
-		 * SlotsChurn: A measure of how frequently slots of this size are re-allocated
-		 * provided by totalAllocations/reservedSlots
-		 */
+         * SlotsChurn: A measure of how frequently slots of this size are
+         * re-allocated provided by slotsAllocated/slotsReserved. This metric is
+         * higher when there are more allocations made against a given #of slots
+         * reserved.
+         */
 		public float slotChurn() {
 		
-			final BigDecimal reservedSlots = new BigDecimal(m_totalSlots);
+            final BigDecimal slotsAllocated = new BigDecimal(m_slotAllocations);
+            
+			final BigDecimal slotsReserved = new BigDecimal(m_totalSlots);
 			
-			final BigDecimal slotsAllocated = new BigDecimal(m_slotAllocations);
-			
-			if (reservedSlots.signum() == 0)
+			if (slotsReserved.signum() == 0)
 				return 0f;
 			
-			return slotsAllocated.divide(reservedSlots, 2, RoundingMode.HALF_UP).floatValue();
+			return slotsAllocated.divide(slotsReserved, 2, RoundingMode.HALF_UP).floatValue();
 			
 		}
 		
@@ -563,7 +573,7 @@ public class StorageStats {
 	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
 	 * <dt>%SlotsAllocated</dt><dd>SlotsAllocated/(Sum of SlotsAllocated across all slot sizes).</dd>
 	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
-	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsRecycled/SlotsAllocated).</dd>
+	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsAllocated/SlotsReserved).</dd>
 	 * <dt>SlotsInUse</dt><dd>SlotsAllocated - SlotsRecycled (net slots in use for this slot size).</dd>
 	 * <dt>%SlotsInUse</dt><dd>SlotsInUse / (total SlotsInUse across all slots sizes).</dd>
 	 * <dt>MeanAllocation</dt><dd>((Total application bytes used across all allocations for this slot size) / SlotsAllocated).</dd>
@@ -644,7 +654,7 @@ public class StorageStats {
 		str.append("\n-------------------------\n");
 		str.append("BLOBS\n");
 		str.append("-------------------------\n");
-		str.append(String.format("%-10s %12s %12s %12s %12s %12s %12s %12s %12s\n", 
+		str.append(String.format("%-10s %12s %12s %12s %12s %12s %12s %12s\n",// %12s\n", 
 			"Bucket(K)",
 			"Allocations",
 			"Allocated",
@@ -652,11 +662,12 @@ public class StorageStats {
 			"Deleted",
 			"Current",
 			"Data",
-			"Mean",
-			"Churn"));
+			"Mean"
+//			"Churn"
+			));
 
 		for (BlobBucket b: m_blobBuckets) {
-			str.append(String.format("%-10d %12d %12d %12d %12d %12d %12d %12d %12.2f\n", 
+			str.append(String.format("%-10d %12d %12d %12d %12d %12d %12d %12d\n",// %12.2f\n", 
 				b.m_size/1024,
 				b.m_allocations,
 				b.m_allocationSize,
@@ -664,8 +675,8 @@ public class StorageStats {
 				b.m_deleteSize,
 				(b.m_allocations - b.m_deletes),
 				(b.m_allocationSize - b.m_deleteSize),
-				b.meanAllocation(),
-				b.churn()
+				b.meanAllocation()
+//				b.churn()
 			));
 		}
 		

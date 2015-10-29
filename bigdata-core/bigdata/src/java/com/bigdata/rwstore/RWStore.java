@@ -376,6 +376,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         // String DEFAULT_SMALL_SLOT_TYPE = "1024"; // standard default
         String DEFAULT_SMALL_SLOT_TYPE = "0"; // initial default to no special processing
 
+        /**
+         * The #of free bits required to be free in a "small slot" allocator before
+         * it is automatically returned to the free list.  Once the small slot waste
+         * threshold comes into play, the small slot allocator for a given slot size
+         * having the maximum free bits will be automatically returned to the free 
+         * list if the percentage of waste in that slot size exceeds a threshold.
+         * 
+         * @see BLZG-1278 (Implement maximum waste policy for small slot allocators)
+         */
         String SMALL_SLOT_THRESHOLD = RWStore.class.getName() + ".smallSlotThreshold";
 
         String DEFAULT_SMALL_SLOT_THRESHOLD = "4096"; // 50% of available bits
@@ -385,26 +394,55 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * a significant amount of storage is wasted.
          * <p>
          * First we check how many allocators of a given slot size have been created.  If
-         * above SMALL_SLOT_WASTE_CHECK_ALLOCATORS then we look a little closer.
+         * above {@value #SMALL_SLOT_WASTE_CHECK_ALLOCATORS} then we look a little closer.
          * <p>
          * We retrieve the allocation statistics and determine if the waste threshold is
-         * exceeded, as determined by SMALL_SLOT_HIGH_WASTE.
+         * exceeded, as determined by {@link SMALL_SLOT_HIGH_WASTE}.
          * <p>
-         * If so, then we attempt to find an available allocator with more freebits as
-         * determined by SMALL_SLOT_THRESHOLD_HIGH_WASTE.
+         * If so, then we attempt to find an available allocator with more free bits as
+         * determined by {@link SMALL_SLOT_THRESHOLD_HIGH_WASTE}.
+         * 
+         * @see BLZG-1278 (Implement maximum waste policy for small slot allocators)
          */
-
         String SMALL_SLOT_WASTE_CHECK_ALLOCATORS = RWStore.class.getName() + ".smallSlotWasteCheckAllocators";
 
         String DEFAULT_SMALL_SLOT_WASTE_CHECK_ALLOCATORS = "100"; // Check waste when more than 100 allocators
 
-        // String SMALL_SLOT_THRESHOLD_HIGH_WASTE = RWStore.class.getName() + ".smallSlotThresholdHighWaste";
-
-        // String DEFAULT_SMALL_SLOT_THRESHOLD_HIGH_WASTE = "2048"; // 25% of available bits
-
+        /**
+         * Once there are at least {@link #SMALL_SLOT_WASTE_CHECK_ALLOCATORS}
+         * for a given slot size, then the {@link #SMALL_SLOT_HIGH_WASTE}
+         * specifies the maximum percentage of waste that will be allowed for
+         * that slot size. This prevents the amount of waste for small slot
+         * allocators from growing significantly as the size of the backing
+         * store increases.
+         * <p>
+         * The dynamic policy for small slots can be thought of as follows.
+         * <dl>
+         * <li>A normal allocator will be dropped onto the free list once it has
+         * {@link #FREE_BITS_THRESHOLD} bits free (default 300 bits out of 8192
+         * = 3.6%).</li>
+         * <li>For a new store, a small slot allocator will be dropped onto the
+         * free list once it has {@link #SMALL_SLOT_THRESHOLD} bits free
+         * (default 4096 bits out of 8192 = 50%).</li>
+         * <li>Once the #of small slots allocators for a given sized allocator
+         * exceeds the {@link #DEFAULT_SMALL_SLOT_WASTE_CHECK_ALLOCATORS}, a
+         * small slot allocator will be dropped onto the free list once it is
+         * {@link #SMALL_SLOT_HIGH_WASTE} percent free (this amounts to 1638
+         * bits out of 8192).</li>
+         * </dl>
+         * Thus, the small slot allocators initially are created freely because
+         * they need to be highly sparse before they can be on the free list.
+         * Once we have "enough" small slot allocators, we create them less
+         * freely - this is achieved by changing the sparsity threshold to a
+         * value that still requires the small slot allocator to be
+         * significantly more sparse than a general purpose allocator.
+         * 
+         * @see BLZG-1278 (Implement maximum waste policy for small slot
+         *      allocators)
+         */
         String SMALL_SLOT_HIGH_WASTE = RWStore.class.getName() + ".smallSlotHighWaste";
 
-        String DEFAULT_SMALL_SLOT_HIGH_WASTE = "20.0f"; // 20% waste, less than 80% usage
+        String DEFAULT_SMALL_SLOT_HIGH_WASTE = "20.0f"; // 1638 bits: 20% waste, less than 80% usage
 
        /**
          * When <code>true</code>, scattered writes which are strictly ascending
@@ -2716,14 +2754,18 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     
                     final ArrayList<FixedAllocator> list = m_freeFixed[i];
                     if (list.size() == 0) {
-                    	/*
-                    	 * Small slot optimization to minimize waste. 
-                    	 * 
-                    	 * @see BLZG-201
-                    	 */
+                        /*
+                         * No allocator on the free list for that slot size.
+                         */
                     	final FixedAllocator candidate;
                     	if (size < this.cSmallSlot) {
-                    		// check to see if can locate a good enough Allocator
+                    		/*
+                             * Check to see if can locate a good enough
+                             * Allocator
+                             * 
+                             * @see BLZG-1278 (Small slot optimization to
+                             * minimize waste).
+                             */
                     		candidate = findAllocator(block);
                     	} else {
                     		candidate = null;
@@ -2806,42 +2848,44 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     }
     
     /**
-	 * For a small slot size only, look for an existing allocator that has a
-	 * sufficient percentage of free bits and add it to the free list. If this
-	 * test fails then the caller must allocate a new allocator.
-	 * 
-	 * @param block
-	 * @return
-	 * @see https://jira.blazegraph.com/browse/BLZG-201 (minimize small slot
-	 *      waste)
-	 */
+     * For a small slot size only, look for an existing allocator that has a
+     * sufficient percentage of free bits and add it to the free list. If this
+     * test fails then the caller must allocate a new allocator.
+     * 
+     * @param block
+     * 
+     * @return
+     * 
+     * @see BLZG-1278 (Small slot optimization to minimize waste).
+     */
     private FixedAllocator findAllocator(final int block) {
 		// only look if small slot
     	if (block > cSmallSlot) {
     		return null;
     	}
     	
+    	// Look up the statistics for that slot size.
     	final Bucket stats = m_storageStats.findBucket(block);
     	if (stats == null) {
+    	    // Can't do anything.  This is not an expected code path.
     		return null;
     	}
     	
-    	// only check waste if number of allocators is greater than some configurable
-    	//	amount
+        /*
+         * Only check waste if number of allocators is greater than some
+         * configurable amount.
+         * 
+         * The thought here is that it is not necessary to focus on minimizing
+         * waste for small stores and that by allowing that waste we permit
+         * better locality (co-location on a page) for small slots. Once we
+         * start to limit the small slot waste we essentially just change the
+         * #of free bits before we are willing to allow a small slot allocator
+         * onto the free list.
+         */
     	if (stats.m_allocators < cSmallSlotWasteCheckAllocators) {
     		return null;
     	}
     	
-		/**
-		 * FIXME Update code and configuration property names. We do not want to
-		 * use slotWaste here. We want to use %SlotsUnused
-		 * 
-		 * <pre>
-		 *  <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
-		 * </pre>
-		 * 
-		 * FIXME BytesAppData is bad (separate ticket perhaps).
-		 */
     	// only check small slots if total waste is larger than some configurable amount
     	final float slotWaste = stats.slotsUnused();
     	if (slotWaste < cSmallSlotHighWaste) {
