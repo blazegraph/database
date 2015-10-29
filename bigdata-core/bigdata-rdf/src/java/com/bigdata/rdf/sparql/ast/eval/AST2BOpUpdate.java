@@ -533,6 +533,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             }
 
             final ASTContainer astContainer = new ASTContainer(queryRoot);
+            /*
+             * Inherit 'RESOLVED' flag, so resolution will not be run
+             * for ASTContainer, constracted from parts of already resolved update.
+             */
+            astContainer.setProperty(ASTContainer.Annotations.RESOLVED, context.astContainer.getProperty(ASTContainer.Annotations.RESOLVED));
 
             final QuadsDataOrNamedSolutionSet insertClause = op.getInsertClause();
 

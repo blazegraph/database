@@ -1722,6 +1722,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
 
         /*
+         * Ensure that BigdataValue objects belong to the correct ValueFactory
+         * for this LexiconRelation.
+         * 
+         * FIXME Either do this or throw an exception if the ValueFactory is
+         * incorrect.
+         */
+        {
+            final BigdataValueFactory vf = getValueFactory();
+            for (int i = 0; i < numTerms; i++) {
+                values[i] = vf.asValue(values[i]);
+            }
+        }
+        
+        /*
          * Filter out inline terms from the supplied terms array and create a
          * collections of Values which will be resolved against the
          * TERM2ID/ID2TERM index and a collection of Values which will be
