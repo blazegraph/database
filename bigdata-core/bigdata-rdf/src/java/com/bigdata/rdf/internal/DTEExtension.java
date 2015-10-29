@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.impl.AbstractIV;
+import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 
 /**
  * An extension of the intrinsic types defined by {@link DTE}.
@@ -43,6 +44,11 @@ public enum DTEExtension {
 	 */
 	IPV4((byte) 0, 0/* len */, IPv4Address.class, XSD.IPV4, DTEFlags.NOFLAGS),
 
+	/**
+	 * A packed long value.
+	 */
+	PACKED_LONG((byte) 1, 0/* len */, PackedLongIV.class, PackedLongIV.PACKED_LONG, DTEFlags.NOFLAGS),
+	
 	/**
 	 * This is a place holder for extension of the intrinsic data types. Its
 	 * code corresponds to 0xff, which is to say all four bits are on. When this
@@ -97,6 +103,8 @@ public enum DTEExtension {
         switch (b) {
         case 0:
             return IPV4;
+        case 1:
+            return PACKED_LONG;            
          default:
             throw new IllegalArgumentException(Byte.toString(b));
         }
@@ -129,6 +137,8 @@ public enum DTEExtension {
         
 		if (datatype.equals(IPV4.datatypeURI))
 			return IPV4;
+		if (datatype.equals(PACKED_LONG.datatypeURI))
+		    return PACKED_LONG;		
 
 		/*
          * Not a known DTE datatype.
