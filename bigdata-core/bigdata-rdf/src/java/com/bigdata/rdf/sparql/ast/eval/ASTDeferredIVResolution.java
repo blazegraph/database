@@ -37,10 +37,11 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryHeadlessImpl;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
-import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
@@ -134,6 +135,17 @@ public class ASTDeferredIVResolution {
      */
     public static void resolveQuery(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
+        /*
+         * Prevent running IV resolution more than once.
+         * Property RESOLVED is set after resolution completed,
+         * so subsequent repetitive calls to query evaluate
+         * (for example with different bindings) would not result
+         * in running resolution again.
+         */
+        if (Boolean.TRUE.equals(ast.getProperty(Annotations.RESOLVED))) {
+        	return;
+        }
+        
     	final long beginNanos = System.nanoTime();
     	
         final QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
@@ -184,6 +196,8 @@ public class ASTDeferredIVResolution {
 
         ast.setResolveValuesTime(System.nanoTime() - beginNanos);
 
+        ast.setProperty(Annotations.RESOLVED, Boolean.TRUE);
+
     }
 
     /**
@@ -194,6 +208,17 @@ public class ASTDeferredIVResolution {
      */
     public static void resolveUpdate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
 
+        /*
+         * Prevent running IV resolution more than once.
+         * Property RESOLVED is set after resolution completed,
+         * so subsequent repetitive calls to update execute
+         * (for example with different bindings) would not result
+         * in running resolution again.
+         */
+        if (Boolean.TRUE.equals(ast.getProperty(Annotations.RESOLVED))) {
+        	return;
+        }
+        
     	final long beginNanos = System.nanoTime();
     	
         final UpdateRoot qc = (UpdateRoot)ast.getProperty(Annotations.ORIGINAL_AST);
@@ -228,16 +253,25 @@ public class ASTDeferredIVResolution {
 
         ast.setResolveValuesTime(System.nanoTime() - beginNanos);
 
+        ast.setProperty(Annotations.RESOLVED, Boolean.TRUE);
+
     }
 
     /**
      * Schedule resolution if IV in provided value, provided handler
-     * will be used to process resolved IV 
+     * will be used to process resolved IV. If provided BigdataValue was created
+     * using BigdataValueFactory bound to triple store, and has real IV already
+     * resolved (for example dataset definition), handler will be fired immediately
+     * and no value will be queued for resolution. 
      * @param value
      * @param handler
      */
     private void defer(final BigdataValue value, final Handler handler) {
         if (value!=null) {
+            if (value.getValueFactory() instanceof BigdataValueFactoryImpl && value.isRealIV()) {
+                handler.handle(value.getIV());
+                return;
+            }
             List<Handler> handlers = deferred.get(value);
             if (handlers==null) {
                 handlers = new ArrayList<>();
@@ -791,12 +825,10 @@ public class ASTDeferredIVResolution {
         /*
          * Build up the vocabulary (some key vocabulary items which correspond to syntactic sugar in SPARQL.)
          */
+        final BigdataValueFactory f = context.getAbstractTripleStore().getValueFactory();
         final List<BigdataValue> vocab = new LinkedList<>();
         {
             
-            final BigdataValueFactory f = context.getAbstractTripleStore().getValueFactory();
-
-
             // RDF Collection syntactic sugar vocabulary items.
             vocab.add(f.asValue(RDF.FIRST));
             vocab.add(f.asValue(RDF.REST));
@@ -814,9 +846,15 @@ public class ASTDeferredIVResolution {
              */
             int i = 0;
             
+            /*
+             * Adding vocab values. Note, that order of values in array is important
+             * as vocab values should be available and resolved while running handlers
+             * for values in deferred list
+             */
+            
             for (final BigdataValue v: vocab) {
 
-                final BigdataValue toBeResolved = v.getValueFactory().asValue(v);
+                final BigdataValue toBeResolved = f.asValue(v);
                 ivs[i] = TermId.mockIV(VTE.valueOf(v));
                 toBeResolved.clearInternalValue();
                 values[i++] = toBeResolved;
@@ -825,7 +863,21 @@ public class ASTDeferredIVResolution {
 
             for (final BigdataValue v: deferred.keySet()) {
 
-                final BigdataValue toBeResolved = v.getValueFactory().asValue(v);
+                /*
+                 * Ensure that BigdataValue objects belong to the headless ValueFactory
+                 */
+                if (v!=null) {
+                    BigdataValueFactory vf = v.getValueFactory();
+                    if (vf == null) {
+                        throw new RuntimeException("Invalid null valueFactory for value="+v);
+                    } else if (vf instanceof BigdataValueFactoryImpl) {
+                        throw new RuntimeException("Invalid valueFactory class "+vf.getClass().getName()+" namespace="+((BigdataValueFactoryImpl)vf).getNamespace()+" != " + ((BigdataValueFactoryImpl)f).getNamespace() + " for value="+v);
+                    } else if (!(vf instanceof BigdataValueFactoryHeadlessImpl)) {
+                        throw new RuntimeException("Invalid valueFactory class "+vf.getClass().getName()+" for value="+v);
+                    }
+                }
+
+                BigdataValue toBeResolved = f.asValue(v);
                 ivs[i] = v.getIV();
                 toBeResolved.clearInternalValue();
                 values[i++] = toBeResolved;
@@ -911,5 +963,21 @@ public class ASTDeferredIVResolution {
             r.run();
         }
 
+        /*
+         * Ensure that BigdataValue objects belong to the headless ValueFactory
+         */
+        {
+            for (IV iv: resolvedValues.values()) {
+            	BigdataValueFactory vf = iv.getValue().getValueFactory();
+                if (vf == null) {
+                	throw new RuntimeException("Invalid null valueFactory for value="+iv);
+                } else if (!(vf instanceof BigdataValueFactoryImpl)) {
+                	throw new RuntimeException("Invalid valueFactory class "+vf.getClass().getName()+" for value="+iv);
+                } else if (vf!=f) {
+                	throw new RuntimeException("Invalid valueFactory instance "+vf+"!="+f+" for value="+iv);
+                }
+            }
+        }
+        
     }
 }

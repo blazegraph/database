@@ -104,6 +104,12 @@ public class ASTContainer extends ASTBase {
 		 * {@link BigdataValue}s in the database (nanoseconds).
 		 */
         String RESOLVE_VALUES_TIME = "resolveValuesTime";
+
+		/**
+		 * Flag which indicates completed resolution of IVs.
+		 * Used to prevent running resolution again on consequent calls to query.evaluate
+		 */
+        String RESOLVED = "resolved";
     }
 
     /**
