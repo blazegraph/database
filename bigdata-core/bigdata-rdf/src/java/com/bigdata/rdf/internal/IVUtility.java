@@ -55,6 +55,7 @@ import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
@@ -740,6 +741,12 @@ public class IVUtility {
 			final IPv4Address ip = new IPv4Address(addr);
 			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
 			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
+		}
+		case PACKED_LONG: {
+
+		    final AbstractLiteralIV iv = 
+		         new PackedLongIV<>(LongPacker.unpackLong(key, 0));
+		    return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
 		}
 		default: {
 			throw new UnsupportedOperationException("dte=" + dte);
