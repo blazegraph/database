@@ -885,9 +885,9 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                     .setByteLength(1/* flags */+ 1/* termCode */+ b.length);
             return keyBuilder;
         }
-//        case Extension: {
-            // handled by IPv4AddrIV.encode()
-//        }
+        case Extension:
+            t.encode(keyBuilder);
+            break;
         default:
             throw new AssertionError(toString());
         }
