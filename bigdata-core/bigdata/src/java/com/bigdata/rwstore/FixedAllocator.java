@@ -867,18 +867,6 @@ public class FixedAllocator implements Allocator {
 		// then check for small slots
 		if (m_size <= m_store.cSmallSlot) { // it's a small slot
 			final boolean ret =  m_freeBits > m_store.cSmallSlotThreshold;
-			
-			/*
-			 * If it hasn't met the standard threshold, then a check is made
-			 * on a metric to consider free slots through all allocators of this
-			 * size and test against a reduced threshold.
-			 */
-			// Do not check on free, check lazily when finding next free allocator
-//			if (!ret && m_statsBucket != null && m_statsBucket.m_allocators > 100) {
-//				if (m_statsBucket.slotsUnused() > 0.20f) {
-//					return m_freeBits < m_store.cSmallSlotThresholdHighWaste;
-//				}
-//			}
 			return ret;
 		} else {
 			return true;
