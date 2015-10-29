@@ -202,8 +202,6 @@ import com.bigdata.rdf.model.BigdataValue;
  * normalization imposed by the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
- *          $
  * @param <V>
  *            The generic type for the RDF {@link Value} implementation.
  * @param <T>

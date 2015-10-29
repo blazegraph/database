@@ -33,7 +33,6 @@ import com.bigdata.rdf.lexicon.TestTermIVComparator;
  * Aggregates test suites into increasing dependency order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
@@ -88,7 +87,7 @@ public class TestAll extends TestCase {
 
         // unit tests for inline literals with a datatype IV.
         suite.addTestSuite(TestLiteralDatatypeIV.class);
-        
+
         // test suite for encode/decode of IVs.
         suite.addTestSuite(TestEncodeDecodeKeys.class);
 
@@ -134,7 +133,10 @@ public class TestAll extends TestCase {
 
         // Encoding/decoding of individual IV binding sets
         suite.addTest(com.bigdata.rdf.internal.encoder.TestAll.suite());
-        
+
+        // inline URI tests.
+        suite.addTest(com.bigdata.rdf.internal.impl.uri.TestAll.suite());
+
         /*
          * Note: This is an old and never finished test suite. All it does is
          * explore some of the available hash functions having more than 32 bits
