@@ -142,7 +142,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             			<include name="bigdata.war" />
         		</fileset>    
     		   </unzip>
- 		   <delete file="target/classes/war/bigdata.war" />
 		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
                  </target>
                </configuration>
@@ -178,12 +177,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 
 		<!-- copy the war files to the install war sub directory -->
                 <data>
-                  <src>${project.build.directory}/classes/war</src>
-                  <type>directory</type>
-                  <includes>**/*</includes>
+                  <src>${project.build.directory}/classes/war/bigdata.war</src>
+                  <type>file</type>
+                  <dst>blazegraph.war</dst>
                   <mapper>
                     <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${project.version}/war</prefix>
+                    <prefix>/usr/local/blazegraph-${project.version}/war/</prefix>
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
@@ -237,6 +236,30 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   </mapper>
                 </data>
 
+                <data>
+                      <src>${project.basedir}/src/deb/init.d</src>
+                      <type>directory</type>
+                      <mapper>
+                        <type>perm</type>
+                        <prefix>/etc/init.d</prefix>
+                        <filemode>755</filemode>
+                        <user>${debian.user}</user>
+                        <group>${debian.group}</group>
+                      </mapper>
+                </data>
+
+                <data>
+                      <src>${project.basedir}/src/deb/conf</src>
+                      <type>directory</type>
+                      <mapper>
+                        <type>perm</type>
+                        <prefix>/etc/blazegraph</prefix>
+                        <filemode>755</filemode>
+                        <user>${debian.user}</user>
+                        <group>${debian.group}</group>
+                      </mapper>
+                </data>
+
                 <!-- Baseline RWStore.properties -->
                 <data>
                   <src>${project.build.directory}/classes/RWStore.properties</src>
@@ -263,7 +286,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   </mapper>
                 </data>
 
-                <!-- upstart script -->
+                <!-- upstart script
                 <data>
                   <src>${basedir}/src/deb/init/blazegraph.conf</src>
                   <type>file</type>
@@ -273,7 +296,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
-                </data>
+                </data> -->
 
               </dataSet>
             </configuration>
