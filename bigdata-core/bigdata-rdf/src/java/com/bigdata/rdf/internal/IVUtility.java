@@ -744,9 +744,9 @@ public class IVUtility {
 		}
 		case PACKED_LONG: 
 		{
-		    final AbstractLiteralIV iv = 
-		        new PackedLongIV<>(LongPacker.unpackLong(key, 0));
-		        return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
+		    final long value = LongPacker.unpackLong(key, o);
+		    final AbstractLiteralIV iv = new PackedLongIV<>(value);
+		    return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
 		}		
 		default: {
 			throw new UnsupportedOperationException("dte=" + dte);

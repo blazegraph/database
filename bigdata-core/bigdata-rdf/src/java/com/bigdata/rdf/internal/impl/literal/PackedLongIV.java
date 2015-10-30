@@ -183,8 +183,8 @@ public class PackedLongIV<V extends BigdataLiteral>
     @Override
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
-        // First emit the flags byte.
-        keyBuilder.appendSigned(flags());
+        // First emit the flags byte -> this seems to break things
+//        keyBuilder.appendSigned(flags());
         
         // Second, emit the ID of the extensions
         keyBuilder.append(DTEExtension.PACKED_LONG.v());
