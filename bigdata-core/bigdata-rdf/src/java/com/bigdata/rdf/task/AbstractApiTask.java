@@ -310,39 +310,6 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
     
     /**
-    * Return a connection for the namespace. 
-    * 
-    * @return The connection.
-    * 
-    * @throws SailException
-    * @throws RepositoryException
-    * @throws DatasetNotFoundException
-    *            if the specified namespace does not exist.
-    */
-    protected BigdataSailConnection getSailConnection()
-            throws SailException, RepositoryException {
-
-        // resolve the default namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, timestamp);
-
-        if (tripleStore == null) {
-
-			throw new DatasetNotFoundException("Not found: namespace="
-					+ namespace);
-
-        }
-
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
-        
-        sail.initialize();
-        
-        return sail.getConnection();
-        
-    }
-    
-    /**
     * Submit a task and return a {@link Future} for that task. The task will be
     * run on the appropriate executor service depending on the nature of the
     * backing database and the view required by the task.

@@ -343,11 +343,14 @@ public class UpdateServlet extends BigdataRDFServlet {
             
             final AtomicLong nmodified = new AtomicLong(0L);
 
+            BigdataSailRepositoryConnection repoConn = null;
             BigdataSailConnection conn = null;
             boolean success = false;
             try {
+            	
+            	repoConn = getConnection();
         
-				conn = getSailConnection();
+				conn = repoConn.getSailConnection();
 				
 				boolean truthMaintenance = conn.getTruthMaintenance();
 				
@@ -416,9 +419,8 @@ public class UpdateServlet extends BigdataRDFServlet {
 							rdfParser
 									.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-							rdfParser.setRDFHandler(new RemoveStatementHandler(
-									getSailConnection(), nmodified,
-									defaultContextDelete));
+							rdfParser.setRDFHandler(new RemoveStatementHandler(conn,
+									nmodified, defaultContextDelete));
 
 							// Wrap as Future.
 							final FutureTask<Void> ft = new FutureTask<Void>(
@@ -515,6 +517,12 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                 }
                 
+                if (repoConn != null) {
+
+                   repoConn.close();
+
+                }
+                
             }
 
         }
@@ -593,11 +601,14 @@ public class UpdateServlet extends BigdataRDFServlet {
 
          final AtomicLong nmodified = new AtomicLong(0L);
 
+         BigdataSailRepositoryConnection repoConn = null;
          BigdataSailConnection conn = null;
          boolean success = false;
          try {
+        	 
+        	repoConn = getConnection(); 
 
-            conn = getSailConnection();
+            conn = repoConn.getSailConnection();
             
             boolean truthMaintenance = conn.getTruthMaintenance();
             
@@ -763,6 +774,12 @@ public class UpdateServlet extends BigdataRDFServlet {
                conn.close();
 
             }
+            
+            if (repoConn != null) {
+
+               repoConn.close();
+
+             }
 
          }
 
@@ -970,11 +987,14 @@ public class UpdateServlet extends BigdataRDFServlet {
             
             final AtomicLong nmodified = new AtomicLong(0L);
 
+            BigdataSailRepositoryConnection repoConn = null;
             BigdataSailConnection conn = null;
             boolean success = false;
             try {
         
-                conn = getSailConnection();
+                repoConn = getConnection();
+            	
+            	conn = repoConn.getSailConnection();
                 
                 boolean truthMaintenance = conn.getTruthMaintenance();
                 
@@ -1044,6 +1064,12 @@ public class UpdateServlet extends BigdataRDFServlet {
                         conn.rollback();
 
                     conn.close();
+
+                }
+                
+                if (repoConn != null) {
+
+                   repoConn.close();
 
                 }
                 
