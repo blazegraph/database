@@ -42,12 +42,15 @@ import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
+import com.bigdata.rdf.sparql.ast.AbstractFromToGraphManagement;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
+import com.bigdata.rdf.sparql.ast.AbstractOneGraphManagement;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
+import com.bigdata.rdf.sparql.ast.DropGraph;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -674,8 +677,15 @@ public class ASTDeferredIVResolution {
             }
         }
 
-        if (bop instanceof CreateGraph) {
-            fillInIV(context,((CreateGraph)bop).getTargetGraph());
+        if (bop instanceof AbstractOneGraphManagement) {
+            
+            fillInIV(context,((AbstractOneGraphManagement)bop).getTargetGraph());
+            
+        } if (bop instanceof AbstractFromToGraphManagement) {
+
+            fillInIV(context, ((AbstractFromToGraphManagement)bop).getSourceGraph());
+            fillInIV(context, ((AbstractFromToGraphManagement)bop).getTargetGraph());
+
         } if (bop instanceof AbstractGraphDataUpdate) {
             final AbstractGraphDataUpdate update = ((AbstractGraphDataUpdate)bop);
             // @see https://jira.blazegraph.com/browse/BLZG-1176
