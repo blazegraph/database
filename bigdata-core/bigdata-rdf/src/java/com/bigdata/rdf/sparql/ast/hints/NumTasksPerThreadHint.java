@@ -35,17 +35,17 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Sets the {@link PipelineOp.Annotations#MAX_PARALLEL} annotation of an operator.
+ * Sets the {@link PipelineOp.Annotations#NUM_TASKS_PER_THREAD} annotation of an operator.
  * 
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-final class AvgDataPointsPerThreadHint extends AbstractIntQueryHint {
+final class NumTasksPerThreadHint extends AbstractIntQueryHint {
 
-   protected AvgDataPointsPerThreadHint() {
-       super(Annotations.AVG_DATA_POINTS_PER_THREAD,
-             Annotations.DEFAULT_AVG_DATA_POINTS_PER_THREAD);
+   protected NumTasksPerThreadHint() {
+       super(Annotations.NUM_TASKS_PER_THREAD,
+             Annotations.DEFAULT_NUM_TASKS_PER_THREAD);
    }
 
    @Override
