@@ -34,7 +34,9 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.DTEExtension;
 import com.bigdata.rdf.internal.IExtensionIV;
 import com.bigdata.rdf.internal.IInlineUnicode;
 import com.bigdata.rdf.internal.IV;
@@ -138,10 +140,17 @@ import com.bigdata.rdf.model.BigdataValue;
  * </dl>
  * 
  * <pre>
+ * ---------- byte boundary (IFF DTE == DTE.Extension) ----------
+ * </pre>
+ * 
+ * If the DTE value was <code>DTE.Extension</code> was, then the next byte(s) encode
+ * the DTEExtension (extended intrinsic datatype aka primitive datatype).
+ * 
+ * <pre>
  * ---------- byte boundary ----------
  * </pre>
  * 
- * If <code>extension</code> was true, then then the next byte(s) encode
+ * If <code>extension</code> was true, then the next byte(s) encode
  * information about the source data type URI (its {@link IV}) and the key space
  * will be partitioned based on the extended data type URI.
  * 
@@ -422,6 +431,11 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
         return DTE.valueOf((byte) ((flags & DTE_MASK) & 0xff));
 
+    }
+
+    @Override
+    public DTEExtension getDTEX() {
+        return null;
     }
 
     /**
@@ -764,6 +778,18 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
         // The datatype.
         final DTE dte = getDTE();
+        final DTEExtension dtex;
+        if (dte == DTE.Extension) {
+            /*
+             * @see BLZG-1507 (Implement support for DTE extension types for
+             * URIs)
+             * 
+             * @see BLZG-1595 ( DTEExtension for compressed timestamp)
+             */
+            dtex = getDTEX();
+            keyBuilder.append(dtex.v());
+        } else
+            dtex = null;
 
         /*
          * We are dealing with some kind of inlined Literal. It may either be a
@@ -885,9 +911,17 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                     .setByteLength(1/* flags */+ 1/* termCode */+ b.length);
             return keyBuilder;
         }
-        case Extension:
-            t.encode(keyBuilder);
+        case Extension: {
+            switch(dtex) {
+            case PACKED_LONG:
+                // Third, emit the packed long's byte value
+                ((KeyBuilder) keyBuilder).pack(((Long) t.getInlineValue()).longValue());
+                break;
+            default:
+                throw new UnsupportedOperationException("DTExtension=" + dtex);
+            }
             break;
+        }
         default:
             throw new AssertionError(toString());
         }

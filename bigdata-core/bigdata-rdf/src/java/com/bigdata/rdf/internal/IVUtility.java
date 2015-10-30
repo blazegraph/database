@@ -596,7 +596,19 @@ public class IVUtility {
 
         // The data type
         final DTE dte = AbstractIV.getDTE(flags);
-        
+        final DTEExtension dtex;
+        if (dte == DTE.Extension) {
+            /*
+             * @see BLZG-1507 (Implement support for DTE extension types for
+             * URIs)
+             * 
+             * @see BLZG-1595 ( DTEExtension for compressed timestamp)
+             */
+            // The DTEExtension byte.
+            dtex = DTEExtension.valueOf(key[o++]);
+//            dtex = DTEExtension.valueOf(KeyBuilder.decodeByte(key[o++]));
+        } else dtex = null;
+
         final boolean isExtension = AbstractIV.isExtension(flags);
         
         final IV datatype; 
@@ -709,12 +721,30 @@ public class IVUtility {
         }
         case Extension: {
             /*
-			 * Handle an extension of the intrinsic data types.
-			 * 
-			 * @see BLZG-1507 (Implement support for DTE extension types for
-			 * URIs)
-			 */
-			return decodeInlineLiteralWithDTEExtension(flags, key, dte, isExtension, datatype, o);
+             * Handle an extension of the intrinsic data types.
+             * 
+             * @see BLZG-1507 (Implement support for DTE extension types for
+             * URIs)
+             * 
+             * @see BLZG-1595 ( DTEExtension for compressed timestamp)
+             */
+            switch (dtex) {
+            case IPV4: {
+                final byte[] addr = new byte[5];
+                System.arraycopy(key, o, addr, 0, 5);
+                final IPv4Address ip = new IPv4Address(addr);
+                final AbstractLiteralIV iv = new IPv4AddrIV(ip);
+                return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
+            }
+            case PACKED_LONG: {
+                final AbstractLiteralIV iv = new PackedLongIV<>(LongPacker.unpackLong(key, o));
+                return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
+            }
+            default: {
+                throw new UnsupportedOperationException("dte=" + dte);
+            }
+            }
+//			return decodeInlineLiteralWithDTEExtension(flags, key, dte, isExtension, datatype, o);
         }
         default:
             throw new UnsupportedOperationException("dte=" + dte);
@@ -722,37 +752,37 @@ public class IVUtility {
 
     }
 
-	/**
-	 * Handle an extension of the intrinsic data types.
-	 * 
-	 * @see BLZG-1507 (Implement support for DTE extension types for URIs)
-	 */
-	private static IV decodeInlineLiteralWithDTEExtension(final byte flags, final byte[] key, final DTE dte,
-			final boolean isExtension, final IV datatype, int o) {
-
-		// The DTEExtension byte.
-		final DTEExtension dtex = DTEExtension.valueOf(key[o++]);
-//		final DTEExtension dtex = DTEExtension.valueOf(KeyBuilder.decodeByte(key[o++]));
-
-		switch (dtex) {
-		case IPV4: {
-			final byte[] addr = new byte[5];
-			System.arraycopy(key, o, addr, 0, 5);
-			final IPv4Address ip = new IPv4Address(addr);
-			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
-			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
-		}
-		case PACKED_LONG: {
-
-		    final AbstractLiteralIV iv = 
-		         new PackedLongIV<>(LongPacker.unpackLong(key, 0));
-		    return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
-		}
-		default: {
-			throw new UnsupportedOperationException("dte=" + dte);
-		}
-		}
-	}
+//	/**
+//	 * Handle an extension of the intrinsic data types.
+//	 * 
+//	 * @see BLZG-1507 (Implement support for DTE extension types for URIs)
+//	 */
+//	private static IV decodeInlineLiteralWithDTEExtension(final byte flags, final byte[] key, final DTE dte,
+//			final boolean isExtension, final IV datatype, int o) {
+//
+//		// The DTEExtension byte.
+//		final DTEExtension dtex = DTEExtension.valueOf(key[o++]);
+////		final DTEExtension dtex = DTEExtension.valueOf(KeyBuilder.decodeByte(key[o++]));
+//
+//		switch (dtex) {
+//		case IPV4: {
+//			final byte[] addr = new byte[5];
+//			System.arraycopy(key, o, addr, 0, 5);
+//			final IPv4Address ip = new IPv4Address(addr);
+//			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
+//			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
+//		}
+//		case PACKED_LONG: 
+//		{
+//		    final AbstractLiteralIV iv = 
+//		        new PackedLongIV<>(LongPacker.unpackLong(key, 0));
+//		        return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
+//		}		
+//		default: {
+//			throw new UnsupportedOperationException("dte=" + dte);
+//		}
+//		}
+//	}
 
 	/**
      * Decode an inline literal which is represented as a one or two compressed

@@ -150,6 +150,9 @@ public class TestAll extends TestCase {
         // geospatial format handling.
         suite.addTest(com.bigdata.rdf.internal.gis.TestAll.suite());
 
+        // DTEExtension encoding of packed long integer representing a timestamp.
+        suite.addTestSuite(TestEncodeDecodeCompressedTimestamp.class);
+        
         return suite;
         
     }

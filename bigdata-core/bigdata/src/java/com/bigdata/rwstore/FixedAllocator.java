@@ -58,7 +58,7 @@ public class FixedAllocator implements Allocator {
     private final int cModAllocation = 1 << RWStore.ALLOCATION_SCALEUP;
     private final int cMinAllocation = cModAllocation * 1; // must be multiple of cModAllocation
 
-	volatile private int m_freeBits;
+	volatile int m_freeBits;
 	volatile private int m_freeTransients;
 
     /**
@@ -582,7 +582,7 @@ public class FixedAllocator implements Allocator {
 	void resetAllocIndex(final int start) {
 		m_allocIndex = start;
 		
-		if (m_size <= 1024) {
+		if (m_size <= m_store.cSmallSlot) {
 			for (int a = m_allocIndex/m_bitSize; a < m_allocBlocks.size(); a++) {
 				final AllocBlock ab = m_allocBlocks.get(a);
 				
@@ -847,7 +847,7 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 	
-	private void addToFreeList() {
+	void addToFreeList() {
 		assert m_freeWaiting;
 		
 		m_freeWaiting = false;
@@ -865,8 +865,9 @@ public class FixedAllocator implements Allocator {
 		}
 		
 		// then check for small slots
-		if (m_size <= m_store.cSmallSlot) { // it's a small slotSMALL_SLOT_TYPE
-			return m_freeBits > m_store.cSmallSlotThreshold;
+		if (m_size <= m_store.cSmallSlot) { // it's a small slot
+			final boolean ret =  m_freeBits > m_store.cSmallSlotThreshold;
+			return ret;
 		} else {
 			return true;
 		}
