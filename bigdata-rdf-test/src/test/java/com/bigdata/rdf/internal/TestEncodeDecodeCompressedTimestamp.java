@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.UUID;
+
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.impl.extensions.CompressedTimestampExtension;
@@ -57,15 +59,22 @@ public class TestEncodeDecodeCompressedTimestamp extends
    /**
     * Unit test for round-trip of GeoSpatial literals of lat+lon+time
     * GeoSpatial literals.
+    * 
+    * FIXME Michael, this test is using TermId:=1 for the datatype URI.
+    * So the generated key has a (1+8:=9) byte datatypeIV embedded into
+    * it.  It does not matter for the unit test, but make sure that the
+    * datatype URI is a Vocabulary item for anything else.
     */
    public void test01() throws Exception {
 
-      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
-      
+       // namespaces should never be reused in test suites.
+      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance(getName() + UUID.randomUUID());
+
       final CompressedTimestampExtension<BigdataValue> ext = 
           new CompressedTimestampExtension<BigdataValue>(
               new IDatatypeURIResolver() {
-                    public BigdataURI resolve(URI uri) {
+                    @Override
+                    public BigdataURI resolve(final URI uri) {
                        final BigdataURI buri = vf.createURI(uri.stringValue());
                        buri.setIV(newTermId(VTE.URI));
                        return buri;
@@ -87,8 +96,9 @@ public class TestEncodeDecodeCompressedTimestamp extends
           final BigdataValue val = ext.asValue((LiteralExtensionIV) e[i], vf);
           
           // verify val has been correctly round-tripped
-          System.out.println(val);
-       }
+            if (log.isInfoEnabled())
+                log.info(val);
+        }
       
        doEncodeDecodeTest(e);
    }
