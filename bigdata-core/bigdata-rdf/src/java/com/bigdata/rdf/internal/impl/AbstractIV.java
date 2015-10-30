@@ -140,10 +140,17 @@ import com.bigdata.rdf.model.BigdataValue;
  * </dl>
  * 
  * <pre>
+ * ---------- byte boundary (IFF DTE == DTE.Extension) ----------
+ * </pre>
+ * 
+ * If the DTE value was <code>DTE.Extension</code> was, then the next byte(s) encode
+ * the DTEExtension (extended intrinsic datatype aka primitive datatype).
+ * 
+ * <pre>
  * ---------- byte boundary ----------
  * </pre>
  * 
- * If <code>extension</code> was true, then then the next byte(s) encode
+ * If <code>extension</code> was true, then the next byte(s) encode
  * information about the source data type URI (its {@link IV}) and the key space
  * will be partitioned based on the extended data type URI.
  * 
