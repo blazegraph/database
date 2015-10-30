@@ -9,6 +9,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.DTEExtension;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
@@ -56,6 +57,7 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
      * delegateIV, then it will be done separately for those objects when they
      * are inserted into the termsCache.
      */
+    @Override
     public IV<V, Object> clone(final boolean clearCache) {
 
         final LiteralExtensionIV<V> tmp = new LiteralExtensionIV<V>(delegate,
@@ -92,6 +94,7 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
      * Literal interface correctly. We cannot properly interpret what the
      * delegate IV means without the materialized value.
      */
+    @Override
     public boolean needsMaterialization() {
     	return true;
     }
@@ -100,8 +103,14 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
         return delegate;
     }
     
+    @Override
     public Object getInlineValue() {
         return delegate.getInlineValue();
+    }
+
+    @Override
+    public DTEExtension getDTEX() {
+        return delegate.getDTEX();
     }
     
     /**
@@ -115,10 +124,12 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
     /**
      * Return the hash code of the long epoch value.
      */
+    @Override
     public int hashCode() {
         return delegate.hashCode();
     }
-
+    
+    @Override
     public boolean equals(final Object o) {
         if (this == o)
             return true;
@@ -129,6 +140,7 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
         return false;
     }
     
+    @Override
     @SuppressWarnings("rawtypes")
     public int _compareTo(final IV o) {
 
@@ -144,6 +156,7 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
     /**
      * Return the length of the datatype IV plus the length of the delegate IV.
      */
+    @Override
     public int byteLength() {
 
         return datatype.byteLength() + delegate.byteLength();

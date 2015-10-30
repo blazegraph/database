@@ -28,8 +28,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.DTEExtension;
@@ -58,8 +56,7 @@ public class PackedLongIV<V extends BigdataLiteral>
      *  Long.MAX_VALUE-1 is internally represented as 0111111111...
      *  -> this is the bigges value that can be handled by the LongPacker
      */
-    public static final long MAX_LONG_WITHOUT_LEADING_1 = Long.MAX_VALUE-1;
-    
+    public static final long MAX_LONG_WITHOUT_LEADING_1 = Long.MAX_VALUE-1;    
     
     /**
      * The represented value
@@ -71,7 +68,7 @@ public class PackedLongIV<V extends BigdataLiteral>
      */
     private transient V literal;
     
-
+    @Override
     public IV<V, Long> clone(final boolean clearCache) {
 
         final PackedLongIV<V> tmp = new PackedLongIV<V>(value);
@@ -112,6 +109,7 @@ public class PackedLongIV<V extends BigdataLiteral>
     /**
      * Returns the inline value.
      */
+    @Override
     public Long getInlineValue() throws UnsupportedOperationException {
         return value;
     }
@@ -132,14 +130,17 @@ public class PackedLongIV<V extends BigdataLiteral>
      * Return the byte length for the byte[] encoded representation of this
      * internal value.  Depends on the byte length of the encoded inline value.
      */
+    @Override
     public int byteLength() {
         return 1 /* flags */ + 1 /* DTEExtension */ + LongPacker.getByteLength(value);
     }
 
+    @Override
     public String toString() {
         return String.valueOf(value);
     }
     
+    @Override
     public int hashCode() {
         return (int)value;
     }
@@ -152,6 +153,7 @@ public class PackedLongIV<V extends BigdataLiteral>
     /**
      * Two {@link PackedLongIV} are equal if their InetAddresses are equal.
      */
+    @Override
     public boolean equals(final Object o) {
         if (this == o)
             return true;
@@ -161,6 +163,7 @@ public class PackedLongIV<V extends BigdataLiteral>
         return false;
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     public int _compareTo(IV o) {
 
@@ -173,27 +176,31 @@ public class PackedLongIV<V extends BigdataLiteral>
         }
 
     }
-    
-    /**
-     * Encode this internal value into the supplied key builder.  Emits the
-     * flags, following by the encoded byte[] representing the packed long.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
-        // First emit the flags byte -> this seems to break things
-//        keyBuilder.appendSigned(flags());
-        
-        // Second, emit the ID of the extensions
-        keyBuilder.append(DTEExtension.PACKED_LONG.v());
-        
-        // Third, emit the packed long's byte value
-        ((KeyBuilder)keyBuilder).pack(value);
-        
-        return keyBuilder;
-            
+    @Override
+    public DTEExtension getDTEX() {
+
+        return DTEExtension.PACKED_LONG;
+
     }
+    
+//    /**
+//     * Encode this internal value into the supplied key builder.  Emits the
+//     * flags, following by the encoded byte[] representing the packed long.
+//     * <p>
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
+//
+//        // First emit the flags byte.
+//        keyBuilder.appendSigned(flags());
+//        
+//        // Third, emit the packed long's byte value
+//        ((KeyBuilder)keyBuilder).pack(value);
+//        
+//        return keyBuilder;
+//            
+//    }
 
 }
