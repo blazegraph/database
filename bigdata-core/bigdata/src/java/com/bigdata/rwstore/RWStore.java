@@ -373,8 +373,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          */
         String SMALL_SLOT_TYPE = RWStore.class.getName() + ".smallSlotType";
 
-        // String DEFAULT_SMALL_SLOT_TYPE = "1024"; // standard default
-        String DEFAULT_SMALL_SLOT_TYPE = "0"; // initial default to no special processing
+        /**
+         * Enable the small slot optimization by default.
+         * 
+         * @see BLZG-1596 (Enable small slot optimization by default)
+         */
+         String DEFAULT_SMALL_SLOT_TYPE = "1024"; // standard default
+//        String DEFAULT_SMALL_SLOT_TYPE = "0"; // initial default to no special processing
 
         /**
          * The #of free bits required to be free in a "small slot" allocator before
