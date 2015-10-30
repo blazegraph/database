@@ -40,7 +40,6 @@ import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;

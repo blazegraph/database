@@ -79,7 +79,7 @@ public class DefaultBigdataVocabulary extends RDFSVocabulary {
                 XSD.UUID,
                 InlineUUIDURIHandler.NAMESPACE,
                 PackedLongIV.PACKED_LONG,
-                CompressedTimestampExtension.COMPRESSED_TIMESTAMP
+                CompressedTimestampExtension.COMPRESSED_TIMESTAMP                
                 ));
 
     }

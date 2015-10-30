@@ -104,7 +104,7 @@ public enum DTEExtension {
         case 0:
             return IPV4;
         case 1:
-            return PACKED_LONG;
+            return PACKED_LONG;            
          default:
             throw new IllegalArgumentException(Byte.toString(b));
         }
@@ -138,7 +138,7 @@ public enum DTEExtension {
 		if (datatype.equals(IPV4.datatypeURI))
 			return IPV4;
 		if (datatype.equals(PACKED_LONG.datatypeURI))
-		    return PACKED_LONG;
+		    return PACKED_LONG;		
 
 		/*
          * Not a known DTE datatype.
