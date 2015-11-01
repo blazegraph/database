@@ -169,6 +169,29 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
                     + astContainer.toString());
         }
     }
+    
+
+    /**
+     * Use pipelined hash join for inlined VALUES node.
+     */
+    public void testPipelinedHashJoinUsedForValues() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-values",// testURI
+                "pipelined-hashjoin-used-values.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-values.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (!BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting a PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
+    }
 
     /**
      * Use pipelined hash join for SERVICE node.
@@ -177,12 +200,6 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
-    /**
-     * Use pipelined hash join for SERVICE node.
-     */
-    public void testPipelinedHashJoinUsedForValues() throws Exception {
-
-    }
 
     /**
      * Make sure the pipelined hash join operator is not used as a standard for
@@ -284,7 +301,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
-     * Do not use pipelined hash join for ALP "+" node is no LIMIT in query.
+     * Do not use pipelined hash join for ALP "+" node if no LIMIT in query.
      */
     public void testPipelinedHashJoinNotUsedForALP02() throws Exception {
 
@@ -307,7 +324,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
-     * Use pipelined hash join for SPARQL 1.1 subquery.
+     * Do *not* use pipelined hash join for SPARQL 1.1 subquery if no LIMIT in query.
      */
     public void testPipelinedHashJoinNotUsedForSubquery() throws Exception {
 
@@ -328,12 +345,34 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         }
     }
 
+    /**
+     * Do *not* use pipelined hash join for VALUES clause if no LIMIT in query.
+     */
+    public void testPipelinedHashJoinNotUsedForValues() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-notused-values",// testURI
+                "pipelined-hashjoin-notused-values.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-values.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting no PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
+    }
 
     /**
      * Test enabling the pipelined hash join by query hint.
      */
     public void testPipelinedHashJoinUsedByQueryHint() throws Exception {
 
+        throw new RuntimeException("Needs to be implemented...");
     }
 
 }

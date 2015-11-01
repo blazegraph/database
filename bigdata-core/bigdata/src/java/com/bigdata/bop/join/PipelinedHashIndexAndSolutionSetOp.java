@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 18, 2010
+ * Created on Oct 20, 2015
  */
 
 package com.bigdata.bop.join;
@@ -99,20 +99,41 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
     @Override
     protected ChunkTaskBase createChunkTask(final BOpContext<IBindingSet> context) {
 
+        /**
+         * The operator offers two ways to generate the hash index of the input
+         * stream, either via subquery or via binding set that is passed in.
+         * Exactly one of both *must* be provided.
+         */
+        final PipelineOp subquery = 
+            (PipelineOp)getProperty(Annotations.SUBQUERY);
+        
+        final IBindingSet[] bsFromBindingsSetSource =
+            (IBindingSet[]) getProperty(Annotations.BINDING_SETS_SOURCE);
+        
+        if (subquery==null && bsFromBindingsSetSource==null) {
+            throw new IllegalArgumentException(
+                "Neither subquery nor binding set source provided.");
+        } else if (subquery!=null && bsFromBindingsSetSource!=null) {
+            throw new IllegalArgumentException(
+                "Both subquery and binding set source provided.");           
+        }
+            
         return new ChunkTask(
-           this, context,
-           (PipelineOp)getRequiredProperty(Annotations.SUBQUERY));
+           this, context, subquery, bsFromBindingsSetSource);
         
     }
     
     private static class ChunkTask extends com.bigdata.bop.join.HashIndexOp.ChunkTask {
 
         final PipelineOp subquery;
+
+        final IBindingSet[] bsFromBindingsSetSource;
         
         final IConstraint[] joinConstraints;
        
         public ChunkTask(final PipelinedHashIndexAndSolutionSetOp op,
-                final BOpContext<IBindingSet> context, final PipelineOp subquery) {
+                final BOpContext<IBindingSet> context, 
+                final PipelineOp subquery, final IBindingSet[] bsFromBindingsSetSource) {
 
             super(op, context);
             
@@ -120,7 +141,9 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
                   (IConstraint[]) op.getProperty(Annotations.CONSTRAINTS),
                   state.getConstraints());
             
+            // exactly one of the two will be non-null
             this.subquery = subquery;
+            this.bsFromBindingsSetSource = bsFromBindingsSetSource;
 
         }
         
@@ -194,7 +217,6 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
 
             final ICloseableIterator<IBindingSet[]> src;
 
-            // TODO: this is duplicate code, see HashIndexOp.acceptSolutions
             if (sourceIsPipeline) {
             
                 src = context.getSource();
@@ -212,16 +234,16 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
 
                 src = context.getAlternateSource(namedSetSourceRef);
                 
-            } else if (op.getProperty(Annotations.BINDING_SETS_SOURCE) != null) {
+            } else if (bsFromBindingsSetSource != null) {
 
-                /*
-                 * The IBindingSet[] is directly given. Just wrap it up as an
-                 * iterator. It will visit a single chunk of solutions.
+                /**
+                 * We handle the BINDINGS_SETS_SOURCE case as follows: the
+                 * binding sets on the source are treated as input. Given that
+                 * in this case no inner query is set, we consider the
+                 * BINDINGS_SETS_SOURCE as the result of the query instead.
+                 * It is extracted here and passed in as a parameter.
                  */
-                final IBindingSet[] bindingSets = (IBindingSet[]) op
-                        .getProperty(Annotations.BINDING_SETS_SOURCE);
-
-                src = new SingleValueIterator<IBindingSet[]>(bindingSets);
+                src = context.getSource();
                 
             } else {
 
@@ -232,7 +254,8 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             
             
             ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
-               unsyncBuffer, src, stats, joinConstraints, subquery);
+               unsyncBuffer, src, stats, joinConstraints, subquery,
+               bsFromBindingsSetSource);
             
             
             unsyncBuffer.flush();
