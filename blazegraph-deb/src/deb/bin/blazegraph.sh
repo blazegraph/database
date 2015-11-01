@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 if [ -z "${BLZG_HOME}" ]; then
    # set BLZG_HOME to the top-level of the installation.
@@ -15,17 +16,8 @@ fi
 
 export JETTY_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
-if [ -z "$BLZG_LOG" ] ; then
-	export BLZG_LOG=/var/log/${NAME}
-fi
-
-
-
-if [ ! -d "${BLZG_LOG}" ]; then
-  mkdir -p "${BLZG_LOG}"
-fi
-
 export DATA_DIR=${BLZG_HOME}/data
+
 if [ ! -d "${DATA_DIR}" ]; then
    mkdir -p "${DATA_DIR}"
 fi
@@ -81,8 +73,10 @@ case "$1" in
          $cmd >> $BLZG_LOG 2>&1 &
       fi
       pid=$!
+      retval=$$
       # echo "PID=$pid"
       echo "$pid">$BLZG_PID
+      exit $retval
       ;;
     stop)
 #
