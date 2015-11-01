@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 17, 2011
+ * Created on Oct 17, 2015
  */
 
 package com.bigdata.bop.join;
@@ -50,7 +50,6 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.IJVMHashIndex.Bucket;
 import com.bigdata.bop.join.IJVMHashIndex.Key;
 import com.bigdata.bop.join.IJVMHashIndex.SolutionHit;
-import com.bigdata.bop.paths.ArbitraryLengthPathTask;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -65,11 +64,21 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
+// TODO: revert changes on index classes
+// TODO: don't extend index, but instead use a fresh member to record non-matching vars
+//       -> state.toString() should report on these and other statistics
 public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
 
    private final BOpContext<IBindingSet> context;
+   
+   /**
+    * Set to true if processing binding sets are passed in via 
+    * Annotations.BINDING_SETS_SOURCE *and* these bindings sets have been added
+    * to the hash index. Used to avoid that we add them in twice.
+    */
+   private boolean bsFromBindingsSetSourceAddedToHashIndex = false;
 
    public JVMPipelinedHashJoinUtility(
       PipelineOp op, JoinTypeEnum joinType, BOpContext<IBindingSet> context,
@@ -137,9 +146,15 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
     public long acceptAndOutputSolutions(
           final UnsyncLocalOutputBuffer<IBindingSet> out,
           final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,
-          final IConstraint[] joinConstraints, final PipelineOp subquery) {
+          final IConstraint[] joinConstraints, final PipelineOp subquery,
+          final IBindingSet[] bsFromBindingsSetSource) {
+       
+        final ZeroMatchRecordingJVMHashIndex rightSolutions = 
+           (ZeroMatchRecordingJVMHashIndex) getRightSolutions();
 
-        final ZeroMatchRecordingJVMHashIndex rightSolutions = (ZeroMatchRecordingJVMHashIndex) getRightSolutions();
+        if (bsFromBindingsSetSource!=null) {
+           addBindingsSetSourceToHashIndexOnce(rightSolutions, bsFromBindingsSetSource);
+        }
 
         final QueryEngine queryEngine = this.context.getRunningQuery().getQueryEngine();
 
@@ -163,15 +178,30 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
             for (int i = 0; i < chunk.length; i++) {
 
+                /**
+                 * fast path: if we don't have a subquery but a join against
+                 * mappings passed in via binding set annotation, these mappings
+                 * can be processed immediately (the latter, 
+                 * bsFromBindingsSetSource, have been added to the index right
+                 * in the beginning of this method already).
+                 */
+                if (subquery==null) {
+                   dontRequireSubqueryEvaluation.add(chunk[i]);
+                   continue;
+                }
+               
                 // Take a distinct projection of the join variables.
                 final IBindingSet bsetDistinct = chunk[i].copy(getJoinVars());
 
-                // Find bucket in hash index for that distinct projection
-                // (bucket of solutions with the same join vars from the
-                // subquery - basically a JOIN).
+                /**
+                 *  Find bucket in hash index for that distinct projection
+                 * (bucket of solutions with the same join vars from the
+                 *  subquery - basically a JOIN).
+                 */
                 final Bucket b = rightSolutions.getBucket(bsetDistinct);
 
-                if (b != null || rightSolutions.isKeyWithoutMatch(bsetDistinct)) {
+                if (b != null || 
+                      rightSolutions.isKeyWithoutMatch(bsetDistinct)) {
                     /*
                      * Either a match in the bucket or subquery was already
                      * computed for this distinct projection but did not produce
@@ -200,7 +230,8 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
          */
         if (!dontRequireSubqueryEvaluation.isEmpty()) {
             // compute join for the fast path.
-            hashJoinAndEmit(dontRequireSubqueryEvaluation.toArray(new IBindingSet[0]), stats, out, joinConstraints);
+            hashJoinAndEmit(dontRequireSubqueryEvaluation.toArray(
+               new IBindingSet[0]), stats, out, joinConstraints);
         }
 
         if (requireSubqueryEvaluation.isEmpty()) {
@@ -208,8 +239,12 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
             return naccepted;
         }
 
+        // if we reach this code path, the subquery must be non null
+        assert(subquery!=null);
+
         /*
          * Second, process those bindings that require subquery evaluation.
+         * Note that 
          * 
          * TODO If lastPass := true, then you could avoid a subquery here if the
          * #of solutions in this list was too small to bother with.
@@ -295,10 +330,12 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
         }
 
+        
         rightSolutionCount.add(naccepted);
 
         // hash index join for the subquery path.
-        hashJoinAndEmit(requireSubqueryEvaluation.toArray(new IBindingSet[0]), stats, out, joinConstraints);
+        hashJoinAndEmit(requireSubqueryEvaluation.toArray(
+            new IBindingSet[0]), stats, out, joinConstraints);
 
         return naccepted; // TODO: check stats
 
@@ -306,6 +343,30 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
     
     /**
+     * Adds the binding sets passed in via Annotations.BINDING_SETS_SOURCE 
+     * to the hash index.
+     * 
+     * @param rightSolutions the hash index
+     * @param bsFromBindingsSetSource the solutions to add (must be non null)
+     */
+    void addBindingsSetSourceToHashIndexOnce(
+       final ZeroMatchRecordingJVMHashIndex rightSolutions,
+       final IBindingSet[] bsFromBindingsSetSource) {
+
+       if (!bsFromBindingsSetSourceAddedToHashIndex) {
+          
+          for (IBindingSet solution : bsFromBindingsSetSource) {
+
+             // add solutions to the join with the binding set to hash index.
+             rightSolutions.add(solution);
+          
+          }
+          
+          bsFromBindingsSetSourceAddedToHashIndex = true;
+       }
+   }
+
+   /**
      * Executes the hash join for the chunk of solutions that is passed in
      * over rightSolutions and outputs the solutions.
      */
