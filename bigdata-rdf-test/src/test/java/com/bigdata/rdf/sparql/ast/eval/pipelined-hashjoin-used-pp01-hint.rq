@@ -1,0 +1,6 @@
+SELECT * WHERE {
+  <http://TestCaseAuthor> <http://is> <http://Michael> .
+  <http://Michael> <http://knows>* ?knows .
+  hint:Prior hint:pipelinedHashJoin "true" .  
+  
+}

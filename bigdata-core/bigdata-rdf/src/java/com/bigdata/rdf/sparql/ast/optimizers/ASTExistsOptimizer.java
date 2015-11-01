@@ -44,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -255,6 +256,10 @@ public class ASTExistsOptimizer implements IASTOptimizer {
                      *      performance for FILTER EXISTS </a>
                      */
                     subquery.setFilterExistsMode(subqueryFunction.getFilterExistsMode());
+                    
+                    // inherit pipelined hash join annotation
+                    subquery.setProperty(QueryHints.PIPELINED_HASH_JOIN,
+                          filter.getProperty(QueryHints.PIPELINED_HASH_JOIN));
                     
                     final ProjectionNode projection = new ProjectionNode();
                     subquery.setProjection(projection);
