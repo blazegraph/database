@@ -166,8 +166,6 @@ blazegraph_sh() {
 		cd \"$BLZG_BASE\"; \
 		\"$BLZG_SH\" $@"
 
-	echo $BLZGCMD_SH
-
 	if [ "$AUTHBIND" = "yes" -a "$1" = "start" ]; then
 		BLZGCMD_SH="'$BLZGCMD_SH'"
 	fi
