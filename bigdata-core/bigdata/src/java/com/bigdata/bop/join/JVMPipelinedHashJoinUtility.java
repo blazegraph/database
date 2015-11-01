@@ -66,11 +66,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-// TODO: revert changes on index classes
 // TODO: don't extend index, but instead use a fresh member to record non-matching vars
 //       -> state.toString() should report on these and other statistics
 // TODO: support for outputDistinctJVs
-// TODO: support for Select Vars (used by names subquery include)
 // TODO: clarify handling of ASK var
 public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 

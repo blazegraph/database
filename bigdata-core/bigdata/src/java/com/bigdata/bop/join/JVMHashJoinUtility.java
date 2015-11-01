@@ -1,5 +1,4 @@
 /**
-
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
@@ -7,7 +6,7 @@ Contact:
      2501 Calvert ST NW #106
      Washington, DC 20008
      licenses@systap.com
-
+     
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; version 2 of the License.
@@ -156,8 +155,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * Note: There is no separate "joinSet". Instead, the {@link SolutionHit}
      * class provides a join hit counter.
      */
-    protected final AtomicReference<JVMHashIndex> rightSolutionsRef = 
-       new AtomicReference<JVMHashIndex>();
+    protected final AtomicReference<JVMHashIndex> rightSolutionsRef = new AtomicReference<JVMHashIndex>();
     
     /**
      * The #of solutions accepted into the hash index.
@@ -169,8 +167,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * before failing the join. This is used IFF there are no join variables.
      */
     private final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
-
-   /**
+    
+    /**
      * The #of left solutions considered for a join.
      */
     protected final CAT nleftConsidered = new CAT();
@@ -322,7 +320,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          * hash index.)
          */
 
-
         /*
          * The ordered variables for the keys in the hash index.
          * 
@@ -331,10 +328,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          * Otherwise use the [joinVars].
          */
         final IVariable<?>[] keyVars = filter ? (IVariable<?>[]) op
-              .getProperty(JoinAnnotations.SELECT) : joinVars;
-              
+                .getProperty(JoinAnnotations.SELECT) : joinVars;
+                
         initRightSolutionsRef(
-           op, keyVars, filter, indexSolutionsHavingUnboundJoinVars);
+            op, keyVars, filter, indexSolutionsHavingUnboundJoinVars);
     }
     
     /**
@@ -344,12 +341,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * @param op
      * @param filter
      * @param indexSolutionsHavingUnboundJoinVars
-     */
+    */
     protected void initRightSolutionsRef(
-       final PipelineOp op, final IVariable<?>[] keyVars, final boolean filter, 
-       final boolean indexSolutionsHavingUnboundJoinVars) {
-
-
+        final PipelineOp op, final IVariable<?>[] keyVars, final boolean filter, 
+        final boolean indexSolutionsHavingUnboundJoinVars) {
+       
        rightSolutionsRef.set(//
              new JVMHashIndex(//
                      keyVars,//
@@ -361,7 +357,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                                      HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
                      )//
              ));
-
     }
     
     @Override
@@ -394,11 +389,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         return constraints;
     }
 
-    protected long getNoJoinVarsLimit() {
-      return noJoinVarsLimit;
-    }
-
-    
     @Override
     public boolean isEmpty() {
 
@@ -406,6 +396,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
     }
 
+    protected long getNoJoinVarsLimit() {
+        return noJoinVarsLimit;
+    }
+    
     protected JVMHashIndex getRightSolutions() {
         
         return rightSolutionsRef.get();
@@ -900,7 +894,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
               // New hash bucket so new DISTINCT set.
               final HashSet<IBindingSet> distinctSet = 
-                 outputDistinctJVs ? new HashSet<IBindingSet>()
+                 outputDistinctJVs ? new HashSet<IBindingSet>()// TODO Size estimate?
                       : null;
 
               for (SolutionHit solutionHit : bucket) {
@@ -1434,7 +1428,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/508 (LIMIT causes
      *      hash join utility to log errors)
      */
-    protected RuntimeException launderThrowable(final Throwable t) {
+    private RuntimeException launderThrowable(final Throwable t) {
 
         final String msg = "cause=" + t + ", state=" + toString();
 
