@@ -194,10 +194,47 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Use pipelined hash join for SERVICE node.
+     * Do use pipelined hash join for EXISTS clause if LIMIT in query.
      */
     public void testPipelinedHashJoinUsedForExists() throws Exception {
 
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-exists",// testURI
+                "pipelined-hashjoin-used-exists.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-exists.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (!BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
+    }
+    
+    /**
+     * Do use pipelined hash join for NOT EXISTS clause if LIMIT in query.
+     */
+    public void testPipelinedHashJoinUsedForNotExists() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-notexists",// testURI
+                "pipelined-hashjoin-used-notexists.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-notexists.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (!BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
     }
 
 
@@ -355,6 +392,50 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
                 "pipelined-hashjoin-notused-values.rq", // queryURI
                 "pipelined-hashjoin.trig", // dataURI
                 "pipelined-hashjoin-values.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting no PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
+    }
+    
+    /**
+     * Do *not* use pipelined hash join for EXISTS clause if no LIMIT in query.
+     */
+    public void testPipelinedHashJoinNotUsedForExists() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-notused-exists",// testURI
+                "pipelined-hashjoin-notused-exists.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-exists.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (BOpUtility.visitAll(queryPlan,
+                PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            fail("Expecting no PipelinedHashIndexAndSolutionSetOp in the plan: "
+                    + astContainer.toString());
+        }
+    }
+    
+    /**
+     * Do *not* use pipelined hash join for NOT EXISTS clause if no LIMIT in query.
+     */
+    public void testPipelinedHashJoinNotUsedForNotExists() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-notused-notexists",// testURI
+                "pipelined-hashjoin-notused-notexists.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-notexists.srx" // resultURI
         ).runTest();
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();

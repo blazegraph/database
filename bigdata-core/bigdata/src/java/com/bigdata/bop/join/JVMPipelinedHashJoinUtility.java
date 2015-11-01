@@ -37,6 +37,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
@@ -50,6 +51,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.IJVMHashIndex.Bucket;
 import com.bigdata.bop.join.IJVMHashIndex.Key;
 import com.bigdata.bop.join.IJVMHashIndex.SolutionHit;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -67,6 +69,8 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 // TODO: revert changes on index classes
 // TODO: don't extend index, but instead use a fresh member to record non-matching vars
 //       -> state.toString() should report on these and other statistics
+// TODO: support for outputDistinctJVs
+// TODO: clarify handling of ASK var
 public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
@@ -147,7 +151,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
           final UnsyncLocalOutputBuffer<IBindingSet> out,
           final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,
           final IConstraint[] joinConstraints, final PipelineOp subquery,
-          final IBindingSet[] bsFromBindingsSetSource) {
+          final IBindingSet[] bsFromBindingsSetSource, final IVariable<?> askVar) {
        
         final ZeroMatchRecordingJVMHashIndex rightSolutions = 
            (ZeroMatchRecordingJVMHashIndex) getRightSolutions();
@@ -231,7 +235,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         if (!dontRequireSubqueryEvaluation.isEmpty()) {
             // compute join for the fast path.
             hashJoinAndEmit(dontRequireSubqueryEvaluation.toArray(
-               new IBindingSet[0]), stats, out, joinConstraints);
+               new IBindingSet[0]), stats, out, joinConstraints, askVar);
         }
 
         if (requireSubqueryEvaluation.isEmpty()) {
@@ -335,7 +339,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
         // hash index join for the subquery path.
         hashJoinAndEmit(requireSubqueryEvaluation.toArray(
-            new IBindingSet[0]), stats, out, joinConstraints);
+            new IBindingSet[0]), stats, out, joinConstraints, askVar);
 
         return naccepted; // TODO: check stats
 
@@ -374,7 +378,8 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
             final IBindingSet[] chunk,//
             final BOpStats stats,
             final IBuffer<IBindingSet> outputBuffer,//
-            final IConstraint[] joinConstraints) {
+            final IConstraint[] joinConstraints,//
+            final IVariable<?> askVar) {
 
         final ZeroMatchRecordingJVMHashIndex rightSolutions = 
            (ZeroMatchRecordingJVMHashIndex)getRightSolutions();
@@ -435,8 +440,14 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                   switch (getJoinType()) {
                   case Normal:
                   case Optional:
+                  {
+                     if (askVar!=null) {
+                        outSolution.set(
+                           askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                     }
                      outputSolution(outputBuffer, outSolution);
                      break;
+                  }
                   case Exists:
                   case NotExists:
                      break; // will be handled at the end
@@ -451,15 +462,29 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
            switch (getJoinType()) {
            case Optional:
            case NotExists:
-              if (!matchExists) {
+              if (!matchExists) {     
                  outputSolution(outputBuffer, left);
               }
               break;
+           /**
+            * TODO: rethink this strategy in general
+            * 
+            * Semantics of EXISTS is defined as follows: it only takes effect
+            * if the ASK var is not null; in that case, it has the same
+            * semantics as OPTIONAL, but binds the askVar to true or false
+            * depending on whether a match exists.
+            */
            case Exists:
-              if (matchExists) {
-                 outputSolution(outputBuffer, left);
+           {
+              if (askVar!=null) {
+                 left.set(
+                    askVar, 
+                    new Constant<XSDBooleanIV<?>>(
+                       matchExists ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE));
+                outputSolution(outputBuffer, left);
               }
               break;
+           }
            case Normal:
               // this has been fully handled already
               break;

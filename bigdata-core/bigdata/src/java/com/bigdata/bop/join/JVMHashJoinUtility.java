@@ -900,7 +900,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
               // New hash bucket so new DISTINCT set.
               final HashSet<IBindingSet> distinctSet = 
-                 outputDistinctJVs ? new HashSet<IBindingSet>()// TODO Size estimate?
+                 outputDistinctJVs ? new HashSet<IBindingSet>()
                       : null;
 
               for (SolutionHit solutionHit : bucket) {

@@ -34,6 +34,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
@@ -117,9 +118,12 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             throw new IllegalArgumentException(
                 "Both subquery and binding set source provided.");           
         }
+        
+        final IVariable<?> askVar = 
+           (IVariable<?>) getProperty(HashJoinAnnotations.ASK_VAR);
             
         return new ChunkTask(
-           this, context, subquery, bsFromBindingsSetSource);
+           this, context, subquery, bsFromBindingsSetSource, askVar);
         
     }
     
@@ -130,10 +134,14 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         final IBindingSet[] bsFromBindingsSetSource;
         
         final IConstraint[] joinConstraints;
+        
+        final IVariable<?> askVar;
        
         public ChunkTask(final PipelinedHashIndexAndSolutionSetOp op,
                 final BOpContext<IBindingSet> context, 
-                final PipelineOp subquery, final IBindingSet[] bsFromBindingsSetSource) {
+                final PipelineOp subquery, 
+                final IBindingSet[] bsFromBindingsSetSource,
+                final IVariable<?> askVar) {
 
             super(op, context);
             
@@ -144,6 +152,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             // exactly one of the two will be non-null
             this.subquery = subquery;
             this.bsFromBindingsSetSource = bsFromBindingsSetSource;
+            this.askVar = askVar;
 
         }
         
@@ -255,7 +264,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             
             ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
                unsyncBuffer, src, stats, joinConstraints, subquery,
-               bsFromBindingsSetSource);
+               bsFromBindingsSetSource, askVar);
             
             
             unsyncBuffer.flush();
