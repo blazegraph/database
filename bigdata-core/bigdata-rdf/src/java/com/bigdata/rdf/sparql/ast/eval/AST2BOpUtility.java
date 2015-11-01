@@ -1637,8 +1637,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final BindingsClause bindingsClause,
             final Set<IVariable<?>> doneSet, final AST2BOpContext ctx) {
 
-        // note: no pipelined hash join native variant available
-        final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx) ;
+        final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx, bindingsClause) ;
        
         // Convert solutions from VALUES clause to an IBindingSet[].
         final IBindingSet[] bindingSets = BOpUtility.toArray(
@@ -1929,8 +1928,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
-       // note: no pipelined hash join native variant available
-       final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx);
+       final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx, subqueryRoot);
 
         final ProjectionNode projection = subqueryRoot.getProjection();
 
@@ -2179,8 +2177,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
-        // note: no pipelined hash join native variant available
-        final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx) ;
+        final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx, subqueryRoot) ;
        
         // Only Sub-Select is supported by this code path.
         switch (subqueryRoot.getQueryType()) {
@@ -2636,8 +2633,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final ArbitraryLengthPathNode alpNode, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
-        // note: no pipelined hash join native variant available
-        final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx);
+        final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx, alpNode);
        
         /**
          * The inner operations is quite complex, we definitely want to avoid
@@ -4048,8 +4044,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 			final AST2BOpContext ctx//
 			) {
 
-	   // note: no pipelined hash join native variant available
-	   final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx) ;
+	   final boolean usePipelinedHashJoin = usePipelinedHashJoin(ctx, subgroup) ;
 	   
 		if (ctx.isCluster()
 				&& BOpUtility.visitAll((BOp) subgroup,
@@ -5765,15 +5760,34 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
    /**
     * Decides, based on the parameters, whether we prefer a pipelined hash
-    * join or not. For now, the decision is purely based on the query
-    * having a LIMIT clause, but we may TODO need to base this decision
-    * on other things such as query hints.
+    * join or not. The decision is made based on global configuration,
+    * query hints (which may override the global setting), and finally
+    * the structure of the query (LIMIT queries are good candidates for
+    * pipelined joins).
     * 
-    * @param ctx
+    * @param ctx the context
+    * @param node the node for which to possibly use the pattern 
     * @return true if a pipeled hash join is preferred
     */
-   private static boolean usePipelinedHashJoin(AST2BOpContext ctx) {
+   private static boolean usePipelinedHashJoin(
+      AST2BOpContext ctx, IGroupMemberNode node) {
 
+      // no native pipelined hash join implemented currently
+      if (ctx.nativeHashJoins)
+         return false;
+
+      // query hints override global setting
+      final Object queryHint = node.getProperty(QueryHints.PIPELINED_HASH_JOIN);
+      if (queryHint!=null) {
+         return (Boolean)queryHint;
+      }
+
+      // apply global setting if enabled
+      if (ctx.pipelinedHashJoins) {
+         return true;
+      }
+      
+      // otherwise, investigate the query plan
       final ASTContainer container = ctx.astContainer;
       final QueryRoot queryRoot = container.getOptimizedAST();
 
@@ -5789,7 +5803,6 @@ public class AST2BOpUtility extends AST2BOpRTO {
       final OrderByNode orderBy = queryRoot.getOrderBy();
       boolean noOrderBy = orderBy==null || orderBy.isEmpty();
       
-      // TODO for now, native hash joins are not supported 
-      return noOrderBy && !ctx.nativeHashJoins;
+      return noOrderBy;
    }
 }
