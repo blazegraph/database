@@ -224,6 +224,7 @@ dependencies.
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
     <module>../blazegraph-deb/</module>
+    <module>../blazegraph-rpm/</module>
   </modules>
 
 
