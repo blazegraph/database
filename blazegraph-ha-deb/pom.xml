@@ -139,7 +139,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </data>
 
                 <data>
-                      <src>${project.basedir}/src/deb/conf/blazegraph</src>
+                      <src>${project.basedir}/src/deb/conf/blazegraph-ha</src>
                       <type>file</type>
                       <mapper>
                         <type>perm</type>
@@ -148,6 +148,18 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                         <user>${debian.user}</user>
                         <group>${debian.group}</group>
                       </mapper>
+                </data>
+
+		<!-- HA Config Files -->
+                <data>
+                  <src>${project.basedir}/src/deb/ha-conf</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/usr/local/blazegraph-ha-${project.version}/conf/</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
                 </data>
 
                 <!-- Jetty.xml from the bigdata-jar -->
@@ -176,19 +188,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   </mapper>
                 </data>
 
-                <!-- logging properties files -->
-                <data>
-                  <src>${project.build.directory}/classes/war/WEB-INF/classes/log4j.properties</src>
-                  <dst>log4j.properties</dst>
-                  <type>file</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/usr/local/blazegraph-ha-${project.version}/conf/</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.group}</group>
-                  </mapper>
-                </data>
-
                 <!-- soft link to versioned software -->
                 <data>
                   <type>link</type>
@@ -196,7 +195,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <linkName>/usr/local/blazegraph-ha</linkName>
                   <linkTarget>/usr/local/blazegraph-ha-${project.version}</linkTarget>
                 </data>
-
 
                 <!-- upstart script
                 <data>
@@ -294,6 +292,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         		</fileset>    
     		   </unzip>
 		   <copy file="target/classes/jar/jetty.xml" todir="target/classes" />
+		   <copy file="target/dependency/reggie-dl-2.2.1.jar" tofile="target/dependency/reggie-dl.jar" />
+		   <copy file="target/dependency/fiddler-2.2.1.jar" tofile="target/dependency/fiddler-dl.jar" />
+		   <copy file="target/dependency/jsk-dl-2.2.1.jar" tofile="target/dependency/jsk-dl.jar" />
+		   <copy file="target/dependency/mahalo-dl-2.2.1.jar" tofile="target/dependency/mahalo-dl.jar" />
+		   <copy file="target/dependency/mercury-dl-2.2.1.jar" tofile="target/dependency/mercury-dl.jar" />
+		   <copy file="target/dependency/norm-dl-2.2.1.jar" tofile="target/dependency/norm-dl.jar" />
+		   <copy file="target/dependency/outrigger-dl-2.2.1.jar" tofile="target/dependency/outrigger-dl.jar" />
                  </target>
                </configuration>
              </execution>
@@ -388,6 +393,11 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-jini</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

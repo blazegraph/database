@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# /etc/init.d/blazegraph -- startup script for Blazegraph
+# /etc/init.d/blazegraph -- startup script for Blazegraph HA
 #
 # Modified from the tomcat7 script
 # Written by Miquel van Smoorenburg <miquels@cistron.nl>.
@@ -18,15 +18,15 @@
 # Should-Stop:       $named
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Start Blazegraph
-# Description:       Start the Blazegraph High Performance Database.
+# Short-Description: Start Blazegraph HA
+# Description:       Start the Blazegraph HA High Performance Database.
 ### END INIT INFO
 
 set -e
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
-NAME=blazegraph
-DESC="Blazegraph High Performance Database"
+NAME=blazegraph-ha
+DESC="Blazegraph HA High Performance Database"
 DEFAULT=/etc/default/$NAME
 JVM_TMP=/tmp/blazegraph-$NAME-tmp
 
@@ -114,7 +114,7 @@ if [ -f "$DEFAULT" ]; then
 	. "$DEFAULT"
 fi
 
-if [ ! -f "$BLZG_HOME/bin/blazegraph.sh" ]; then
+if [ ! -f "$BLZG_HOME/bin/${NAME}.sh" ]; then
 	log_failure_msg "$NAME is not installed"
 	exit 1
 fi
@@ -137,7 +137,7 @@ fi
 
 # Define other required variables
 BLZG_PID="/var/run/$NAME.pid"
-BLZG_SH="$BLZG_HOME/bin/blazegraph.sh"
+BLZG_SH="$BLZG_HOME/bin/${NAME}.sh"
 
 # Look for Java Secure Sockets Extension (JSSE) JARs
 if [ -z "${JSSE_HOME}" -a -r "${JAVA_HOME}/jre/lib/jsse.jar" ]; then
@@ -160,8 +160,22 @@ blazegraph_sh() {
 		BLZG_BASE=\"$BLZG_BASE\"; \
 		JAVA_OPTS=\"$JAVA_OPTS\"; \
 		BLZG_PID=\"$BLZG_PID\"; \
-		BLZG_LOG=\"$BLZG_LOG\"/blazegraph.out; \
+		BLZG_LOG=\"$BLZG_LOG\"/${NAME}.out; \
 		BLZG_TMPDIR=\"$BLZG_TMPDIR\"; \
+		FEDNAME=\"${FEDNAME}\"; \
+		FED_DIR=\"${FED_DIR}\"; \
+		LOGICAL_SERVICE_ID=\"${LOGICAL_SERVICE_ID}\"; \
+		LOCATORS=\"${LOCATORS}\"; \
+		ZK_SERVERS=\"${ZK_SERVERS}\"; \
+		REPLICATION_FACTOR=\"${REPLICATION_FACTOR}\"; \
+		GROUP_COMMIT=\"${GROUP_COMMIT}\"; \
+		LIB_DIR=\"${LIB_DIR}\"; \
+		CONFIG_DIR=\"${CONFIG_DIR}\"; \
+		JINI_CLASS_SERVER_PORT=\"${JINI_CLASS_SERVER_PORT}\"; \
+		JINI_CONFIG=\"${JINI_CONFIG}\"; \
+		POLICY_FILE=\"${POLICY_FILE}\"; \
+		LOGGING_CONFIG=\"${LOGGING_CONFIG}\"; \
+		LOG4J_CONFIG=\"${LOG4J_CONFIG}\"; \
 		LANG=\"$LANG\"; JSSE_HOME=\"$JSSE_HOME\"; \
 		cd \"$BLZG_BASE\"; \
 		\"$BLZG_SH\" $@"
@@ -172,8 +186,8 @@ blazegraph_sh() {
 
 	# Run the blazegraph.sh script as a daemon
 	set +e
-	touch "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
-	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
+	touch "$BLZG_PID" "$BLZG_LOG"/${NAME}.out
+	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/${NAME}.out
 	start-stop-daemon --start -b -u "$BLZG_USER" -g "$BLZG_GROUP" \
 		-c "$BLZG_USER" -d "$BLZG_TMPDIR" -p "$BLZG_PID" \
 		-x /bin/bash -- -c "$AUTHBIND_COMMAND $BLZGCMD_SH"
