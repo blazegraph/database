@@ -1,0 +1,9 @@
+Package: Blazegraph HA1
+Version: [[version]]
+Section: misc
+Priority: optional
+Architecture: all
+Depends: openjdk-7-jdk zookeeper
+Maintainer: Blazegraph <blazegraph@blazegraph.com>
+Description: High Performance HA1 Graph Database with RDF/SPARQL and Tinkerpop API Support
+Distribution: development
