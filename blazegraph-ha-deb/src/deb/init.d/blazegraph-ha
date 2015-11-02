@@ -157,6 +157,7 @@ blazegraph_sh() {
 	# set -a tells sh to export assigned variables to spawned shells.
 	BLZGCMD_SH="set -a; JAVA_HOME=\"$JAVA_HOME\"; source \"$DEFAULT\"; \
 		BLZG_HOME=\"$BLZG_HOME\"; \
+		BLZG_DATA=\"$BLZG_DATA\"; \
 		BLZG_BASE=\"$BLZG_BASE\"; \
 		JAVA_OPTS=\"$JAVA_OPTS\"; \
 		BLZG_PID=\"$BLZG_PID\"; \
@@ -174,6 +175,8 @@ blazegraph_sh() {
 		JINI_CLASS_SERVER_PORT=\"${JINI_CLASS_SERVER_PORT}\"; \
 		JINI_CONFIG=\"${JINI_CONFIG}\"; \
 		POLICY_FILE=\"${POLICY_FILE}\"; \
+		JETTY_PORT=\"${JETTY_PORT}\"; \
+		JETTY_HOME=\"${JETTY_HOME}\"; \
 		LOGGING_CONFIG=\"${LOGGING_CONFIG}\"; \
 		LOG4J_CONFIG=\"${LOG4J_CONFIG}\"; \
 		LANG=\"$LANG\"; JSSE_HOME=\"$JSSE_HOME\"; \

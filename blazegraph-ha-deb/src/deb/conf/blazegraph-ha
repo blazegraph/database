@@ -3,6 +3,7 @@ NAME=blazegraph-ha
 BLZG_HOME=/usr/local/${NAME}
 BLZG_CONF=$BLZG_HOME/conf
 BLZG_LOG=/var/log/${NAME}
+DATA_DIR="${BLZG_HOME}"/data
 # Run Blazegraph as this user ID and group ID
 BLZG_USER=blzg
 BLZG_GROUP=blzg
@@ -47,9 +48,10 @@ LOG4J_CONFIG=${CONFIG_DIR}/log4jHA.properties
 GROUP_COMMIT=false
 JETTY_XML="${BLZG_CONF}"/jetty.xml
 JETTY_RESOURCE_BASE="${BLZG_HOME}"/war/
+JETTY_HOME="${BLZG_HOME}"/war/
 JETTY_OPTS="-Djetty.resourceBase=$JETTY_RESOURCE_BASE -DjettyXml=$JETTY_XML"
 BLZG_NSS=com.bigdata.rdf.sail.webapp.NanoSparqlServer
-PORT=9999
+JETTY_PORT=9999
 LOGGING_CONFIG="${BLZG_CONF}"/logging.properties
 LOG4J_CONFIG="${BLZG_CONF}"/log4j.properties
 NSS="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
