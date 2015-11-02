@@ -58,7 +58,7 @@ final class PipelinedHashJoinHint extends AbstractBooleanQueryHint {
 
        if (scope == QueryHintScope.Prior && op instanceof IGroupMemberNode) {
 
-          _setAnnotation(context, scope, op, getName(), value);
+          _setQueryHint(context, scope, op, getName(), value);
 
           return;
           
