@@ -5565,8 +5565,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
        
         /** 
          * If the projection was not inlined, we need to apply it on top.
+         * Note that, for the pipelined hash join, everything is "all-in-one",
+         * so we must not project here but the projection is inlined by default.
          */
-        if (!inlineProjection) {
+        if (!inlineProjection && !usePipelinedHashJoin) {
            /*
             * Adding a projection operator before the
             * subquery plan ensures that variables which are not visible are
