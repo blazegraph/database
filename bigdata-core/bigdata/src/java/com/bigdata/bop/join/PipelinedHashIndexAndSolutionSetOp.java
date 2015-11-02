@@ -39,27 +39,148 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.SubqueryAnnotations;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
-import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**
  * Operator for pipelined hash index construction and subsequent join. Note that
  * this operator needs not to be combined with a solution set hash join, but
- * instead gets the subquery/subgroup passed as a parameter.
+ * instead gets the subquery/subgroup passed as a parameter and thus can be
+ * considered as an "all-in-one" build-hash-index-and-join operation.
  * 
- * TODO: add documentation
+ * The operator is designed for single-threaded use (as it is the case for the
+ * non-pipelined hash index & join operators). It's processing scheme is
+ * illustrated by an example in the following. Assume we have a query such as
+ * 
+ * <code>
+   SELECT * WHERE {
+     ?s <http://p1> ?o1
+     OPTIONAL {
+       ?s <http://p2> ?o2 .
+       ?s <http://p3> ?o3 .
+     }
+   } LIMIT 10
+   </code>
+   
+   to be evaluated over the data set
+   
+   <code>
+     <http://s1> <http://p1> <http://o11> .
+     <http://s1> <http://p2> <http://o12> .
+     <http://s1> <http://p3> <http://o13> .
+
+     <http://s2> <http://p1> <http://o21> .
+     <http://s2> <http://p2> <http://o22> .
+
+     <http://s1> <http://p1> <http://o11b> .
+
+   </code>
+ * 
+ * , where the OPTIONAL is considered as a complex group that is translated
+ * using a hash join pattern. The approach taken by this operator is that the
+ * OPTIONAL pattern is considered as subquery that is passed in to this operator
+ * via Annotations.SUBQUERY. The operator logically proceeds as follows:
+ * 
+ * 1. Incoming are the bindings from outside, i.e. in our example the bindings
+ *    for triple pattern "?s <http://p1> ?o1". Given the input data at hand,
+ *    this means we have the following binding set
+ *    
+ *    { 
+ *      { ?s -> <http://s1> , ?o1 -> <http://o11> },
+ *      { ?s -> <http://s2> , ?o1 -> <http://o21> } 
+ *      { ?s -> <http://s1> , ?o1 -> <http://o11b> }      
+ *    }
+ *    
+ *    coming in. For the sake of this example, assume the solutions are dropping
+ *    in one after the after (chunk size=1) s.t. we have three iterations,
+ *    but note that the implementation implements a generalized, vectored
+ *    approach processing the input chunk by chunk..
+ *    
+ *  2. The join variable set is { ?s }. We compute the distinct projection over
+ *     ?s on the incoming bindings:
+ *     
+ *     - In the 1st iteration, the distinct projection is { ?s -> <http://s1> },
+ *     - In the 2nd iteration, the distinct projection is { ?s -> <http://s2> },
+ *     - In the 3rd iteration, the distinct projection is { ?s -> <http://s1> } again.
+ *     
+ *  3. For each of these distinct projections, we decide whether the subquery
+ *     has been evaluated with the distinct projection as input before. 
+ *     If the subquery has already been evaluated, we take the fast path and 
+ *     proceed with step 5. If it has not yet been evaluated before, proceed 
+ *     to step 4 (namely its evaluation and buffering of the solution on the
+ *     hash index).
+ *     
+ *     For our example this means: in the first iteration we proceed to step
+ *     (4) with { ?s -> <http://s1> } as input; in the second iteration, we
+ *     proceed to step (4) with { ?s -> <http://s2> } as input; in the third
+ *     iteration, we can directly proceed to step (5): the distinct projection 
+ *     { ?s -> <http://s1> } has been encountered in iteration 1 already.
+ *     
+ *  4. Evaluate the subquery for the incoming binding. The result is stored in
+ *     a hash index (this hash index is used, in future, to decide whether
+ *     the result has been already computed before for the distinct projection
+ *     in step 3; note that, in addition to the hash index, we also record those
+ *     distinct projections for which the subquery has been evaluated without 
+ *     producing a result, to avoid unnecessary recomputation).
+ *     
+ *     In the first iteration, we compute the subquery result 
+ *     { ?s -> <http://s1> , ?o2 -> <http://o12> , ?o3 -> <http://o13> } for
+ *     the input binding { ?s -> <http://s1> }; in the second iteration, we
+ *     compute { ?s -> <http://s2> } for the input binding { ?s -> <http://s2> }
+ *     (i.e., OPTIONAL subquery that does not match, leaving the input
+ *     unmodified); there is no third iteration step.
+ *     
+ *  5. Join the original bindings (from which the distinct projection was 
+ *     obtained) against the hash index and output the results. The operator
+ *     supports all kinds of joins (Normal, Exists, NotExists, etc.).
+ *     
+ *     We thus obtain the following matches with the hash index:
+ *     - Iteration 1: { ?s -> <http://s1>,  ?o1 -> <http://o11>} JOIN 
+ *                    { ?s -> <http://s1> , ?o2 -> <http://o12> , ?o3 -> <http://o13> }
+ *     - Iteration 2: { ?s -> <http://s2>, ?o1 -> <http://o12> } JOIN { ?s -> <http://s2> }
+ *     - Iteration 3: { ?s -> <http://s1> , ?o1 -> <http://o11b> } JOIN 
+ *                    { ?s -> <http://s1> , ?o2 -> <http://o12> , ?o3 -> <http://o13> }
+ *                    
+ *     This gives us the expected final result:
+ *     
+ *     {
+ *       { ?s -> <http://s1>, ?o1 -> <http://o11>,  ?o2 -> <http://o12> , ?o3 -> <http://o13> },
+ *       { ?s -> <http://s2>, ?o1 -> <http://o12> },
+ *       { ?s -> <http://s2>, ?o1 -> <http://o11b>, ?o2 -> <http://o12> , ?o3 -> <http://o13> }
+ *     }
+ *     
+ *  Note that this strategy is pipelined in the sense that all results from the
+ *  left are emitted as soon as the subquery result for its distinct projection
+ *  result has been calculated.
+ *  
+ *  Further notes: the strategy sketched above illustrates how the operator
+ *  works for subqueries. An alternative way of using the operator is by
+ *  setting Annotations.BINDING_SETS_SOURCE *instead of* the subquery. This
+ *  is used when computing a hash join with a VALUES clause; in that case, the
+ *  binding sets provided by the VALUES clause are considered as "inner query";
+ *  as a notable difference, this set of values is static and does not need to
+ *  be re-evaluated each time, it is submitted once to the hash index in the
+ *  beginning and joined with every incoming binding.
+ *  
+ *  There are some more technicalities like support for ASK_VAR (which is used
+ *  by the FILTER (NOT) EXISTS translation scheme, which work in princicple in
+ *  the same way as they do for the standard hash join.
+ *  
+ *  Usage: the pipelined hash join operator is preferrably used for queries
+ *  containing LIMIT but *no* ORDER BY. It can also be globally enabled by
+ *  system parameter {@link QueryHints#PIPELINED_HASH_JOIN} and via query
+ *  hints. See {@link AST2BOpUtility#usePipelinedHashJoin} for the method
+ *  implementing its selection strategy.
  * 
  * @see JVMPipelinedHashJoinUtility for implementation
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
 public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
-
-//    static private final transient Logger log = Logger
-//            .getLogger(HashIndexOp.class);
 
     /**
      * 

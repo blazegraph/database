@@ -61,7 +61,8 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Utility class supporting a pipelined hash join. This is a variant of the
- * JVMHashJoinUtility.
+ * JVMHashJoinUtility. See {@link PipelinedHashIndexAndSolutionSetOp} for a
+ * documentation of this functionality.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
