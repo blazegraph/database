@@ -440,11 +440,13 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                   case Normal:
                   case Optional:
                   {
-                     if (askVar!=null) {
-                        outSolution.set(
-                           askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                     if (outSolution!=null) {
+                        if (askVar!=null) {
+                           outSolution.set(
+                              askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                        }
+                        outputSolution(outputBuffer, outSolution);
                      }
-                     outputSolution(outputBuffer, outSolution);
                      break;
                   }
                   case Exists:

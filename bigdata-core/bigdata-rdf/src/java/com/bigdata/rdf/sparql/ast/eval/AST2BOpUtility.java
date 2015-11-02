@@ -1703,35 +1703,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final int maxParallel = lastPass ? 1
                 : ctx.maxParallelForSolutionSetHashJoin;
 
-        final IHashJoinUtilityFactory joinUtilFactory;
-        if (ctx.nativeHashJoins) {
-            joinUtilFactory = HTreeHashJoinUtility.factory;
-        } else {
-            joinUtilFactory = JVMHashJoinUtility.factory;
-        }
-
-        // TODO: delete code once verified
-//        // Generate the hash index operator.
-//        left = applyQueryHints(new HashIndexOp(leftOrEmpty(left),//
-//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.CONTROLLER),//
-//                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
-//                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-//                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-//                new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
-//                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-//                new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
-////                    new NV(HashIndexOp.Annotations.SELECT, projectedVars),//
-//                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
-//                        joinUtilFactory),//
-//                new NV(HashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
-//                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
-//            ), bindingsClause, ctx);
-
         left = addHashIndexOp(left, ctx, bindingsClause, joinType, joinVars, 
               joinConstraints, joinVars /* projectInVars == joinVars -> inline projection */,
-              namedSolutionSet, usePipelinedHashJoin, bindingSets, null /* askVar */);
+              namedSolutionSet, usePipelinedHashJoin, bindingSets, 
+              null /* askVar */, null /* subquery */);
         
         // Generate the solution set hash join operator.
         if(ctx.nativeHashJoins) {
@@ -2000,26 +1975,25 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final int maxParallel = lastPass ? 1
                 : ctx.maxParallelForSolutionSetHashJoin;
 
-        left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
-              joinConstraints, projectedVars.toArray(new IVariable<?>[0]),
-              namedSolutionSet, usePipelinedHashJoin, null /* bindingsSetSource */,
-              null /* askVar */);
-        
-        // Append the subquery plan.
+        PipelineOp subqueryPlan = null;
         if (usePipelinedHashJoin) {
-           
            /**
             * Subquery execution is controlled by the pipelined hash join
             * itself, so for the pipelined variant we translate the subplan
             * as a standalone pipeline op and attach it to the annotation.
             */
-           final PipelineOp subqueryPlan = 
+           subqueryPlan = 
                convertQueryBase(null, subqueryRoot, doneSet, ctx);
-           left = (PipelineOp)left.setProperty(
-              PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan);
+        }
+        
+        left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
+              joinConstraints, projectedVars.toArray(new IVariable<?>[0]),
+              namedSolutionSet, usePipelinedHashJoin, null /* bindingsSetSource */,
+              null /* askVar */, subqueryPlan);
+        
+        // in case the subquery has not been inlined, append it to the pipeline
+        if (!usePipelinedHashJoin) {
            
-        } else {
-
            left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
            
         }
@@ -2249,9 +2223,24 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (askVar == null)
             throw new UnsupportedOperationException();
 
+        PipelineOp subqueryPlan = null;
+        if (usePipelinedHashJoin) {
+           /**
+            * Subquery execution is controlled by the pipelined hash join
+            * itself, so for the pipelined variant we translate the subplan
+            * as a standalone pipeline op and attach it to the annotation.
+            */
+           subqueryPlan = 
+              convertJoinGroupOrUnion(
+                 null /* standalone */, subqueryRoot.getWhereClause(),
+                 new LinkedHashSet<IVariable<?>>(doneSet)/* doneSet */, ctx);
+        } 
+
+        
         left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
               joinConstraints, joinVars, namedSolutionSet, 
-              usePipelinedHashJoin, null /* bindingsSetSource */, askVar);
+              usePipelinedHashJoin, null /* bindingsSetSource */, askVar,
+              subqueryPlan);
 
 
         // Everything is visible inside of the EXISTS graph pattern.
@@ -2278,15 +2267,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * path for EXISTS>
          */
 
-        // Append the subquery plan.
-        if (usePipelinedHashJoin) {
-           final PipelineOp subqueryPlan = 
-              convertJoinGroupOrUnion(
-                 null /* standalone */, subqueryRoot.getWhereClause(),
-                 new LinkedHashSet<IVariable<?>>(doneSet)/* doneSet */, ctx);
-           left = (PipelineOp)left.setProperty(
-              PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan);
-        } else {
+        // in case the subquery has not been inlined, append it to the pipeline
+        if (!usePipelinedHashJoin) {
            left = convertJoinGroupOrUnion(left, subqueryRoot.getWhereClause(),
                    new LinkedHashSet<IVariable<?>>(doneSet)/* doneSet */, ctx);
         }
@@ -2698,12 +2680,6 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final INamedSolutionSetRef namedSolutionSet = 
               NamedSolutionSetRefUtility.newInstance( 
               null/*ctx.queryId*/, solutionSetName, joinVars);
-
-        left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
-              joinVars, null, projectInVarsArr, namedSolutionSet,
-              usePipelinedHashJoin, null /* bindingsSetSource */,
-              null /* askVar */);
-
         
         /**
          * Next, convert the child join group into a subquery
@@ -2766,6 +2742,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             dropVars.add(v.getValueExpression());
         }
 
+        PipelineOp alpOp = null;
         if (usePipelinedHashJoin) {
 
            /**
@@ -2773,7 +2750,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             * itself, so for the pipelined variant we translate the subplan
             * as a standalone pipeline op and attach it to the annotation.
             */
-           final PipelineOp alpOp = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(null),//
+           alpOp = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(null),//
                  new NV(ArbitraryLengthPathOp.Annotations.SUBQUERY, subquery),
                  new NV(ArbitraryLengthPathOp.Annotations.LEFT_TERM, leftTerm),
                  new NV(ArbitraryLengthPathOp.Annotations.RIGHT_TERM, rightTerm),
@@ -2790,11 +2767,17 @@ public class AST2BOpUtility extends AST2BOpRTO {
                         BOpEvaluationContext.CONTROLLER)//
                  ), alpNode, ctx);
 
-           left = (PipelineOp)left.setProperty(
-              PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, alpOp);
+        }
+
+        left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
+              joinVars, null, projectInVarsArr, namedSolutionSet,
+              usePipelinedHashJoin, null /* bindingsSetSource */,
+              null /* askVar */, alpOp);
+
+        
+        // in case the alpOp has not been inlined, append it to the pipeline
+        if (!usePipelinedHashJoin) {
            
-        } else {
-           // append subquery to the subgroup
            left = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(left),//
                  new NV(ArbitraryLengthPathOp.Annotations.SUBQUERY, subquery),
                  new NV(ArbitraryLengthPathOp.Annotations.LEFT_TERM, leftTerm),
@@ -2811,10 +2794,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER)//
                  ), alpNode, ctx);
-        }
-        
-        
-        
+         }
 
         /**
          * Finally, re-join the inner result with the hash index.
@@ -4137,26 +4117,27 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 ctx.queryId, solutionSetName, joinVars);
 
         final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
-                
-        left = addHashIndexOp(left, ctx, subgroup, joinType, joinVars, 
-              joinConstraints, projectInVars, namedSolutionSet, 
-              usePipelinedHashJoin, null /* bindingsSetSource */,
-              null /* askVar */);
+           
 
+        PipelineOp subqueryPlan = null;
         if (usePipelinedHashJoin) {
-
            /**
             * Subquery execution is controlled by the pipelined hash join
             * itself, so for the pipelined variant we translate the subplan
             * as a standalone pipeline op and attach it to the annotation.
             */
-           final PipelineOp subqueryPlan = 
+           subqueryPlan = 
               convertJoinGroupOrUnion(null /* standalone */, subgroup, doneSet, ctx);
-           left = (PipelineOp)left.setProperty(
-              PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan);
            
-        } else {
-           // append subquery to the subgroup
+        } 
+        
+        left = addHashIndexOp(left, ctx, subgroup, joinType, joinVars, 
+              joinConstraints, projectInVars, namedSolutionSet, 
+              usePipelinedHashJoin, null /* bindingsSetSource */,
+              null /* askVar */, subqueryPlan);
+
+        // in case the subquery has not been inlined, append it to the pipeline
+        if (!usePipelinedHashJoin) {
            left = convertJoinGroupOrUnion(left, subgroup, doneSet, ctx);
         }
         
@@ -5499,7 +5480,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final INamedSolutionSetRef namedSolutionSet,
         final boolean usePipelinedHashJoin,
         final IBindingSet[] bindingSetsSource,
-        final IVariable<?> askVar) {
+        final IVariable<?> askVar,
+        final PipelineOp subqueryPlan) {
       
        
        final Set<IVariable<?>> joinVarsSet = new HashSet<IVariable<?>>();
@@ -5554,7 +5536,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
               new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
               new NV(HashIndexOp.Annotations.ASK_VAR, askVar),//
               new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY, joinUtilFactory),//
-              new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+              new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+              // the pipelined hash index may also contain a subquery for inner evaluation
+              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan)
           ), node, ctx);
           
        } else {
