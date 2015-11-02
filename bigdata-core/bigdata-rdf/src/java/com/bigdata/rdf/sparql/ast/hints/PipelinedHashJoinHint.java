@@ -31,6 +31,7 @@ import com.bigdata.bop.join.JVMPipelinedHashJoinUtility;
 import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -56,13 +57,25 @@ final class PipelinedHashJoinHint extends AbstractBooleanQueryHint {
             final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op, final Boolean value) {
 
-       if (scope == QueryHintScope.Prior && op instanceof IGroupMemberNode) {
-
-          _setQueryHint(context, scope, op, getName(), value);
-
-          return;
-          
-      }
+       
+       switch (scope) {
+       case Group:
+       case GroupAndSubGroups:
+       case Query:
+       case SubQuery:
+           if (op instanceof JoinGroupNode) {
+               _setAnnotation(context, scope, op, getName(), value);
+           }
+           return;
+       case Prior:
+       {
+          if (op instanceof IGroupMemberNode) {
+             _setQueryHint(context, scope, op, getName(), value);          
+          }
+       }
+       default:
+          break;
+       }
 
       throw new QueryHintException(scope, op, getName(), value);
 

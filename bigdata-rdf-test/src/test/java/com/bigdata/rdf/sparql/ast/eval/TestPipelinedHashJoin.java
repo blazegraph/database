@@ -498,7 +498,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
                 "pipelined-hashjoin-used-notexists-hint",// testURI
                 "pipelined-hashjoin-used-notexists-hint.rq", // queryURI
                 "pipelined-hashjoin.trig", // dataURI
-                "pipelined-hashjoin-exists.srx" // resultURI
+                "pipelined-hashjoin-notexists.srx" // resultURI
         ).runTest();
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
