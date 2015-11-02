@@ -143,6 +143,7 @@ import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -5756,16 +5757,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
     * @return true if a pipeled hash join is preferred
     */
    private static boolean usePipelinedHashJoin(
-      AST2BOpContext ctx, IGroupMemberNode node) {
+      AST2BOpContext ctx, QueryNodeBase node) {
 
       // no native pipelined hash join implemented currently
       if (ctx.nativeHashJoins)
          return false;
 
       // query hints override global setting
-      final Object queryHint = node.getProperty(QueryHints.PIPELINED_HASH_JOIN);
-      if (queryHint!=null) {
-         return (Boolean)queryHint;
+      final String queryHint = node.getQueryHint(QueryHints.PIPELINED_HASH_JOIN);
+      if (queryHint!=null && !queryHint.isEmpty()) {
+         return Boolean.valueOf(queryHint);
       }
 
       // apply global setting if enabled

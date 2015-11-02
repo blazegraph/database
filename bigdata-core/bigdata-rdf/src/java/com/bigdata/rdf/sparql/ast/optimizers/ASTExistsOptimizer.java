@@ -257,9 +257,13 @@ public class ASTExistsOptimizer implements IASTOptimizer {
                      */
                     subquery.setFilterExistsMode(subqueryFunction.getFilterExistsMode());
                     
-                    // inherit pipelined hash join annotation
-                    subquery.setProperty(QueryHints.PIPELINED_HASH_JOIN,
-                          filter.getProperty(QueryHints.PIPELINED_HASH_JOIN));
+                    // delegate pipelined hash join annotation to subquery
+                    final String pipelinedHashJoinHint = 
+                        filter.getQueryHint(QueryHints.PIPELINED_HASH_JOIN);
+                    if (pipelinedHashJoinHint!=null) {
+                       subquery.setQueryHint(
+                          QueryHints.PIPELINED_HASH_JOIN, pipelinedHashJoinHint);
+                    }
                     
                     final ProjectionNode projection = new ProjectionNode();
                     subquery.setProjection(projection);
