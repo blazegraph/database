@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -150,7 +149,13 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
           final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,
           final IConstraint[] joinConstraints, final PipelineOp subquery,
           final IBindingSet[] bsFromBindingsSetSource, 
-          final IVariable<?>[] projectInVars, final IVariable<?> askVar) {
+          final IVariable<?>[] projectInVars, final IVariable<?> askVar,
+          final Set<IBindingSet> distinctProjectionBuffer, 
+          final int distinctProjectionBufferThreshold,
+          final List<IBindingSet> incomingBindingsBuffer,
+          final int incomingBindingsBufferThreshold,
+          final boolean isLastInvocation) {
+
        
         final ZeroMatchRecordingJVMHashIndex rightSolutions = 
            (ZeroMatchRecordingJVMHashIndex) getRightSolutions();
@@ -164,9 +169,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         long naccepted = 0;
 
         // 1. Compute those distinct binding sets in the chunk not seen before
-        final Set<IBindingSet> distinctSet = new HashSet<IBindingSet>();
         final List<IBindingSet> dontRequireSubqueryEvaluation = new LinkedList<IBindingSet>();
-        final List<IBindingSet> requireSubqueryEvaluation = new LinkedList<IBindingSet>();
 
         // first, join the mappings that can be joined immediately and
         // calculate the remaining ones, including the
@@ -215,9 +218,10 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
                 } else {
                     // This is a new distinct projection. It will need to run
-                    // through the subquery.
-                    requireSubqueryEvaluation.add(chunk[i]);
-                    distinctSet.add(bsetDistinct);
+                    // through the subquery. We buffer the solutions in a
+                    // operator-global data structure
+                    incomingBindingsBuffer.add(chunk[i]);
+                    distinctProjectionBuffer.add(bsetDistinct);
 
                 }
 
@@ -237,21 +241,22 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                new IBindingSet[0]), stats, out, joinConstraints, askVar);
         }
 
-        if (requireSubqueryEvaluation.isEmpty()) {
+        if (distinctProjectionBuffer.isEmpty()) {
             // Nothing to do on the slow code path.
             return naccepted;
+        }
+        
+        // If this is not the last invocation and the buffer thresholds are not
+        // yet exceeded, we wait for more incoming solutions, to benefit from
+        // batch processing
+        if (!isLastInvocation && !thresholdExceeded(
+              distinctProjectionBuffer, distinctProjectionBufferThreshold,
+              incomingBindingsBuffer, incomingBindingsBufferThreshold)) {
+            return naccepted;         
         }
 
         // if we reach this code path, the subquery must be non null
         assert(subquery!=null);
-
-        /*
-         * Second, process those bindings that require subquery evaluation.
-         * Note that 
-         * 
-         * TODO If lastPass := true, then you could avoid a subquery here if the
-         * #of solutions in this list was too small to bother with.
-         */
         
         // next, we execute the subquery for the unseen distinct projections
         IRunningQuery runningSubquery = null;
@@ -259,13 +264,16 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         try {
 
             // set up a subquery for the chunk of distinct projections.
-            runningSubquery = queryEngine.eval(subquery, distinctSet.toArray(new IBindingSet[0]));
+            runningSubquery = queryEngine.eval(
+                subquery, distinctProjectionBuffer.toArray(new IBindingSet[0]));
 
             // Notify parent of child subquery.
-            ((AbstractRunningQuery) context.getRunningQuery()).addChild(runningSubquery);
+            ((AbstractRunningQuery) context.getRunningQuery()).
+                addChild(runningSubquery);
 
             // iterate over the results and store them in the index
-            final ICloseableIterator<IBindingSet[]> subquerySolutionItr = runningSubquery.iterator();
+            final ICloseableIterator<IBindingSet[]> subquerySolutionItr = 
+                runningSubquery.iterator();
 
             try {
 
@@ -284,7 +292,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                          * processed later on); This is how we discover the set
                          * of distinct projections that did not join.
                          */
-                        distinctSet.remove(solution.copy(getJoinVars()));
+                        distinctProjectionBuffer.remove(solution.copy(getJoinVars()));
 
                     }
 
@@ -297,8 +305,8 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                  * to avoid unnecessary re-computation of the subqueries for
                  * these keys
                  */
-                rightSolutions.addKeysWithoutMatch(distinctSet);
-
+                rightSolutions.addKeysWithoutMatch(distinctProjectionBuffer);
+                
             } finally {
 
                 // finished with the iterator
@@ -337,21 +345,40 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         rightSolutionCount.add(naccepted);
 
         // hash index join for the subquery path.
-        hashJoinAndEmit(requireSubqueryEvaluation.toArray(
+        hashJoinAndEmit(incomingBindingsBuffer.toArray(
             new IBindingSet[0]), stats, out, joinConstraints, askVar);
 
+        // finally, we need to clear the buffers to avoid results being
+        // processed multiple times
+        distinctProjectionBuffer.clear();
+        incomingBindingsBuffer.clear();
+        
         return naccepted; // TODO: check stats
 
+     }
+
+     /**
+      * Returns true if, for one of the buffers, the threshold has been
+      * exceeded.
+      */
+     boolean thresholdExceeded(
+         final Set<IBindingSet> distinctProjectionBuffer,
+         final int distinctProjectionBufferThreshold,
+         final List<IBindingSet> incomingBindingsBuffer,
+         final int incomingBindingsBufferThreshold) {
+        
+        return 
+            distinctProjectionBuffer.size()>=distinctProjectionBufferThreshold || 
+            incomingBindingsBuffer.size()>=incomingBindingsBufferThreshold;
     }
 
-    
     /**
-     * Adds the binding sets passed in via Annotations.BINDING_SETS_SOURCE 
-     * to the hash index.
-     * 
-     * @param rightSolutions the hash index
-     * @param bsFromBindingsSetSource the solutions to add (must be non null)
-     */
+      * Adds the binding sets passed in via Annotations.BINDING_SETS_SOURCE 
+      * to the hash index.
+      * 
+      * @param rightSolutions the hash index
+      * @param bsFromBindingsSetSource the solutions to add (must be non null)
+      */
     void addBindingsSetSourceToHashIndexOnce(
        final ZeroMatchRecordingJVMHashIndex rightSolutions,
        final IBindingSet[] bsFromBindingsSetSource) {
