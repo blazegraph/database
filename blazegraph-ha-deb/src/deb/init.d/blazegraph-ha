@@ -157,8 +157,10 @@ blazegraph_sh() {
 	# set -a tells sh to export assigned variables to spawned shells.
 	BLZGCMD_SH="set -a; JAVA_HOME=\"$JAVA_HOME\"; source \"$DEFAULT\"; \
 		BLZG_HOME=\"$BLZG_HOME\"; \
-		BLZG_DATA=\"$BLZG_DATA\"; \
 		BLZG_BASE=\"$BLZG_BASE\"; \
+		DATA_DIR=\"$DATA_DIR\"; \
+		SNAPSHOT_DIR=\"$SNAPSHOT_DIR\"; \
+		HALOG_DIR=\"$HALOG_DIR\"; \
 		JAVA_OPTS=\"$JAVA_OPTS\"; \
 		BLZG_PID=\"$BLZG_PID\"; \
 		BLZG_LOG=\"$BLZG_LOG\"/${NAME}.out; \
