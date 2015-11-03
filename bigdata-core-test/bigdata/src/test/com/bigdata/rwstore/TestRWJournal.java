@@ -1043,6 +1043,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
 						breaks++;
 					}
 					
+					if ((i+1) % 20000 == 0) {
+						// add intermediate commit to stress correct recycling
+						store.commit();
+					}
+					
 					pap = pa;
 					
 					if (recycle.size() > 5000) {
@@ -2377,7 +2382,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		/**
-		 * To stress teh sesion protection, we will allocate a batch of
+		 * To stress tthe session protection, we will allocate a batch of
 		 * addresses, then free half with protection.  Then reallocate half
 		 * again after releasing the session.
 		 * This should result in all the original batch being allocated,
