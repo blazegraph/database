@@ -27,8 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -37,7 +38,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
@@ -48,8 +48,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JVMHashIndex.Bucket;
-import com.bigdata.bop.join.JVMHashIndex.Key;
 import com.bigdata.bop.join.JVMHashIndex.SolutionHit;
+import com.bigdata.counters.CAT;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -66,13 +66,50 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-// TODO: don't extend index, but instead use a fresh member to record non-matching vars
-//       -> state.toString() should report on these and other statistics
 public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
 
+   /**
+    * Context, initialized on first call.
+    */
    private final BOpContext<IBindingSet> context;
+
+   /**
+    * The #of distinct projections from the given input bindings
+    */
+   protected final CAT nDistinctBindingSets = new CAT();
+
+   /**
+    * The #of distinct binding sets that have flown into the subquery.
+    */
+   protected final CAT nDistinctBindingSetsReleased = new CAT();
+
+   /**
+    * The #of subqueries that have been issued.
+    */
+   protected final CAT nSubqueriesIssued = new CAT();
+   
+   /**
+    * The #of results returned by the subqueries
+    */
+   protected final CAT nResultsFromSubqueries = new CAT();
+  
+
+   /**
+    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionBuffer}
+    */
+   final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
+   
+   /**
+    * See {@link PipelinedHashIndexAndSolutionSetOp#incomingBindingsBuffer}
+    */
+   final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
+ 
+   /**
+    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionsWithoutSubqueryResult}
+    */
+   final Set<IBindingSet> distinctProjectionsWithoutSubqueryResult = new HashSet<IBindingSet>();
    
    /**
     * Set to true if processing binding sets are passed in via 
@@ -87,35 +124,14 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
       
       super(op, joinType);
       
+      if (!(op instanceof PipelinedHashIndexAndSolutionSetOp)) {
+         throw new IllegalArgumentException();
+      }
+      
       this.context = context;
       
    }
-   
-   /**
-    * The pipelined hash join pattern has a special index at the right, which
-    * supports multi-threaded access (incoming bindings are written, while
-    * bindings that have been processed are removed.
-    */
-   @Override
-   protected void initRightSolutionsRef(
-      final PipelineOp op, final IVariable<?>[] keyVars, final boolean filter, 
-      final boolean indexSolutionsHavingUnboundJoinVars) {
 
-
-      rightSolutionsRef.set(//
-            new ZeroMatchRecordingJVMHashIndex(//
-                    keyVars,//
-                    indexSolutionsHavingUnboundJoinVars,//
-                    new LinkedHashMap<Key, Bucket>(op.getProperty(
-                            HashMapAnnotations.INITIAL_CAPACITY,
-                            HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                            op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                                    HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
-                    )//
-            ));
-
-   }
-    
     /**
      * Singleton {@link IHashJoinUtilityFactory} that can be used to create a 
      * new {@link JVMPipelinedHashJoinUtility}.
@@ -150,15 +166,12 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
           final IConstraint[] joinConstraints, final PipelineOp subquery,
           final IBindingSet[] bsFromBindingsSetSource, 
           final IVariable<?>[] projectInVars, final IVariable<?> askVar,
-          final Set<IBindingSet> distinctProjectionBuffer, 
+          final boolean isLastInvocation,
           final int distinctProjectionBufferThreshold,
-          final List<IBindingSet> incomingBindingsBuffer,
-          final int incomingBindingsBufferThreshold,
-          final boolean isLastInvocation) {
+          final int incomingBindingsBufferThreshold) {
 
        
-        final ZeroMatchRecordingJVMHashIndex rightSolutions = 
-           (ZeroMatchRecordingJVMHashIndex) getRightSolutions();
+        final JVMHashIndex rightSolutions = getRightSolutions();
 
         if (bsFromBindingsSetSource!=null) {
            addBindingsSetSourceToHashIndexOnce(rightSolutions, bsFromBindingsSetSource);
@@ -173,6 +186,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
         // first, join the mappings that can be joined immediately and
         // calculate the remaining ones, including the
+        final int nDistinctProjections = distinctProjectionBuffer.size();
         while (itr.hasNext()) {
 
             final IBindingSet[] chunk = itr.next();
@@ -207,7 +221,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                 final Bucket b = rightSolutions.getBucket(bsetDistinct);
 
                 if (b != null || 
-                      rightSolutions.isKeyWithoutMatch(bsetDistinct)) {
+                    distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct)) {
                     /*
                      * Either a match in the bucket or subquery was already
                      * computed for this distinct projection but did not produce
@@ -229,6 +243,9 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
             }
         }
+        
+        // record the number of distinct projections seen in the chunk
+        nDistinctBindingSets.add(distinctProjectionBuffer.size()-nDistinctProjections);
 
         /*
          * first, process those that can be processed without subquery
@@ -271,6 +288,10 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
             ((AbstractRunningQuery) context.getRunningQuery()).
                 addChild(runningSubquery);
 
+            // record statistics
+            nDistinctBindingSetsReleased.add(distinctProjectionBuffer.size());
+            nSubqueriesIssued.increment();
+            
             // iterate over the results and store them in the index
             final ICloseableIterator<IBindingSet[]> subquerySolutionItr = 
                 runningSubquery.iterator();
@@ -294,6 +315,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                          */
                         distinctProjectionBuffer.remove(solution.copy(getJoinVars()));
 
+                        nResultsFromSubqueries.increment();
                     }
 
                 }
@@ -305,7 +327,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                  * to avoid unnecessary re-computation of the subqueries for
                  * these keys
                  */
-                rightSolutions.addKeysWithoutMatch(distinctProjectionBuffer);
+                distinctProjectionsWithoutSubqueryResult.addAll(distinctProjectionBuffer);
                 
             } finally {
 
@@ -353,7 +375,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         distinctProjectionBuffer.clear();
         incomingBindingsBuffer.clear();
         
-        return naccepted; // TODO: check stats
+        return naccepted;
 
      }
 
@@ -380,7 +402,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
       * @param bsFromBindingsSetSource the solutions to add (must be non null)
       */
     void addBindingsSetSourceToHashIndexOnce(
-       final ZeroMatchRecordingJVMHashIndex rightSolutions,
+       final JVMHashIndex rightSolutions,
        final IBindingSet[] bsFromBindingsSetSource) {
 
        if (!bsFromBindingsSetSourceAddedToHashIndex) {
@@ -407,8 +429,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
             final IConstraint[] joinConstraints,//
             final IVariable<?> askVar) {
 
-        final ZeroMatchRecordingJVMHashIndex rightSolutions = 
-           (ZeroMatchRecordingJVMHashIndex)getRightSolutions();
+        final JVMHashIndex rightSolutions = getRightSolutions();
           
         if (log.isInfoEnabled()) {
             log.info("rightSolutions: #buckets=" + rightSolutions.bucketCount()
@@ -553,8 +574,38 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         
     }
 
-//    
-//    private static class AcceptAndOutputSolutionTask<E> extends Haltable<Void> implements
-//    Callable<Void>
+    /**
+     * Human readable representation of the {@link IHashJoinUtility} metadata
+     * (but not the solutions themselves).
+     */
+    @Override
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{open=" + open);
+        sb.append(",joinType="+joinType);
+        if (askVar != null)
+            sb.append(",askVar=" + askVar);
+        sb.append(",joinVars=" + Arrays.toString(joinVars));
+        sb.append(",outputDistinctJVs=" + outputDistinctJVs);        
+        if (selectVars != null)
+            sb.append(",selectVars=" + Arrays.toString(selectVars));
+        if (constraints != null)
+            sb.append(",constraints=" + Arrays.toString(constraints));
+        sb.append(",size=" + getRightSolutionCount());
+        sb.append(", distinctProjectionsWithoutSubqueryResult=" + distinctProjectionsWithoutSubqueryResult.size());
+        sb.append(", distinctBindingSets (seen/released)=" + nDistinctBindingSets + "/" + nDistinctBindingSetsReleased);
+        sb.append(", subqueriesIssued=" + nSubqueriesIssued);
+        sb.append(", resultsFromSubqueries=" + nResultsFromSubqueries);
+        sb.append(",considered(left=" + nleftConsidered + ",right="
+                + nrightConsidered + ",joins=" + nJoinsConsidered + ")");
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
 
 }

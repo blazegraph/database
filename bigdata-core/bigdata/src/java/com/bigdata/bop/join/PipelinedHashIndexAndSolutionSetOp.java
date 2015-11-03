@@ -27,11 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -208,20 +204,6 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
 
    private static final long serialVersionUID = 3473675701742394157L;
 
-   /**
-    * Buffer to collect distinct projections before passing them into the
-    * subquery. Used to avoid computation of the subquery for small binding
-    * vectors over and over again.
-    */
-   final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
-   
-   /**
-    * Buffer to collect incoming bindings for mappings for which the subquery
-    * result has not yet been computed over its distinct projection. These
-    * are the mappings from which the mappings in distinctProjectionBuffer
-    * have been derived.
-    */
-   final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
    
    public interface Annotations extends HashIndexOp.Annotations, SubqueryAnnotations {
    
@@ -274,14 +256,14 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
        int DEFAULT_INCOMING_BINDINGS_BUFFER_THRESHOLD = 1000;
 
     }
-    
+
     /**
-     * Deep copy constructor.
-     */
+      * Deep copy constructor.
+      */
     public PipelinedHashIndexAndSolutionSetOp(final PipelinedHashIndexAndSolutionSetOp op) {
        
         super(op);
-        
+
     }
     
     /**
@@ -301,7 +283,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         this(args, NV.asMap(annotations));
         
     }
-
+    
     @Override
     protected ChunkTaskBase createChunkTask(final BOpContext<IBindingSet> context) {
 
@@ -342,8 +324,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         
         return new ChunkTask(this, context, subquery, 
            bsFromBindingsSetSource, projectInVars, askVar,
-           distinctProjectionBuffer, distinctProjectionBufferThreshold,
-           incomingBindingsBuffer, incomingBindingsBufferThreshold);
+           distinctProjectionBufferThreshold, incomingBindingsBufferThreshold);
         
     }
     
@@ -362,23 +343,17 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         
         final IVariable<?>[] projectInVars;
         
-        final Set<IBindingSet> distinctProjectionBuffer;
-        
         final int distinctProjectionBufferThreshold;
         
-        final List<IBindingSet> incomingBindingsBuffer;
-        
         final int incomingBindingsBufferThreshold;
-       
+        
         public ChunkTask(final PipelinedHashIndexAndSolutionSetOp op,
                 final BOpContext<IBindingSet> context, 
                 final PipelineOp subquery, 
                 final IBindingSet[] bsFromBindingsSetSource,
                 final IVariable<?>[] projectInVars,
                 final IVariable<?> askVar,
-                final Set<IBindingSet> distinctProjectionBuffer, 
-                final int distinctProjectionBufferThreshold,
-                final List<IBindingSet> incomingBindingsBuffer,
+                final int distinctProjectionBufferThreshold, 
                 final int incomingBindingsBufferThreshold) {
 
             super(op, context);
@@ -392,10 +367,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             this.bsFromBindingsSetSource = bsFromBindingsSetSource;
             this.projectInVars = projectInVars;
             this.askVar = askVar;
-            
-            this.distinctProjectionBuffer = distinctProjectionBuffer;
             this.distinctProjectionBufferThreshold = distinctProjectionBufferThreshold;
-            this.incomingBindingsBuffer = incomingBindingsBuffer;
             this.incomingBindingsBufferThreshold = incomingBindingsBufferThreshold;
 
         }
@@ -509,9 +481,8 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
                unsyncBuffer, src, stats, joinConstraints, subquery,
                bsFromBindingsSetSource, projectInVars, askVar,
-               distinctProjectionBuffer, distinctProjectionBufferThreshold,
-               incomingBindingsBuffer, incomingBindingsBufferThreshold,
-               context.isLastInvocation());
+               context.isLastInvocation(), distinctProjectionBufferThreshold,
+               incomingBindingsBufferThreshold);
             
             
             unsyncBuffer.flush();
