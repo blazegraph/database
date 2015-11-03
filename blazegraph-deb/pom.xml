@@ -103,7 +103,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </data>
 
                 <data>
-                      <src>${project.basedir}/src/deb/logrotate.d/blazegraph</src>
+                      <src>${project.basedir}/src/deb/logrotate.d/blazegraph-ha</src>
                       <type>file</type>
                       <mapper>
                         <type>perm</type>

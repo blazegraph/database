@@ -77,8 +77,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 
 		<!-- copy the war files to the install war sub directory -->
                 <data>
-                  <src>${project.build.directory}/classes/war</src>
-                  <type>directory</type>
+                  <!--<src>${project.build.directory}/classes/war</src> -->
+                  <src>${project.build.directory}/classes/bigdata.war</src>
+                  <type>file</type>
                   <includes>**/*</includes>
                   <mapper>
                     <type>perm</type>

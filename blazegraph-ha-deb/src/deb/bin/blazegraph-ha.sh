@@ -8,6 +8,10 @@ fi
 
 export INSTALL_DIR="${BLZG_HOME}"
 
+if [ -z "${DATA_DIR}" ] ; then
+	export DATA_DIR=${BLZG_HOME}/data
+fi
+
 ##
 # HAJournalServer configuration parameter overrides (see HAJournal.config).
 #
@@ -35,12 +39,16 @@ if [ -z "${FED_DIR}" ]; then
    export FED_DIR=$INSTALL_DIR
 fi
 
+if [ -z "${JETTY_PORT}" ]; then
+   export JETTY_PORT="9999"
+fi
+
 if [ -z "${JETTY_XML}" ]; then
-   export JETTY_XML="${INSTALL_DIR}/var/jetty/jetty.xml"
+   export JETTY_XML="${BLZG_CONF}/jetty.xml"
 fi
 
 if [ -z "${JETTY_RESOURCE_BASE}" ]; then
-   export JETTY_RESOURCE_BASE="${INSTALL_DIR}/var/jetty"
+   export JETTY_RESOURCE_BASE="${BLZG_HOME}/war"
 fi
 
 if [ -z "${GROUPS}" ]; then
@@ -76,6 +84,7 @@ export HA_OPTS="\
  "-Djetty.threads.max=${JETTY_THREADS_MAX}"\
  "-Djetty.threads.timeout=${JETTY_THREADS_TIMEOUT}"\
  "-Djetty.resourceBase=${JETTY_RESOURCE_BASE}"\
+ "-Djetty.home=${JETTY_RESOURCE_BASE}"\
  "-DJETTY_XML=${JETTY_XML}"\
  -DCOLLECT_QUEUE_STATISTICS=${COLLECT_QUEUE_STATISTICS}\
  -DCOLLECT_PLATFORM_STATISTICS=${COLLECT_PLATFORM_STATISTICS}\
@@ -119,7 +128,7 @@ if [ -z "$LOGGING_CONFIG" ] ; then
 	export LOGGING_CONFIG=${CONFIG_DIR}/logging/logging.properties
 fi
 
-if [ -z "$LOG4j_CONFIG" ] ; then
+if [ -z "$LOG4J_CONFIG" ] ; then
 	export LOG4J_CONFIG=${CONFIG_DIR}/logging/log4jHA.properties
 fi
 
@@ -152,31 +161,12 @@ fi
 
 export JETTY_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
-export DATA_DIR=${BLZG_HOME}/data
 
 if [ ! -d "${DATA_DIR}" ]; then
    mkdir -p "${DATA_DIR}"/"${FEDNAME}"/"${LOGICAL_SERVICE_ID}"
 fi
 
-if [ -z "${JETTY_PORT}" ]; then
-   export JETTY_PORT="9999"
-fi
-if [ -z "${JETTY_XML}" ]; then
-   export JETTY_XML="${BLZG_CONF}/jetty.xml"
-fi
-if [ -z "${JETTY_RESOURCE_BASE}" ]; then
-   export JETTY_RESOURCE_BASE="${BLZG_HOME}/war"
-fi
-
-
-export JETTY_OPTS="\
- -Djetty.port=${JETTY_PORT}\
- -Djetty.resourceBase=${JETTY_RESOURCE_BASE}\
- -Djetty.home=${JETTY_RESOURCE_BASE}\
- -DJETTY_XML=${JETTY_XML}\
- -Djava.util.logging.config.file=${LOGGING_CONFIG}\
- -Dlog4j.configuration=${LOG4J_CONFIG}\
-"
+# -Djetty.home=${JETTY_RESOURCE_BASE}\
 
 cmd="java ${JAVA_OPTS} \
     -cp ${HAJOURNAL_CLASSPATH} \
