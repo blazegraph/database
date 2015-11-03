@@ -506,7 +506,44 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         assertPipelinedPlanOrNot(queryPlan, astContainer, true);
 
     }
+
+    /**
+     * Test query affected by 
+     * PipelinedHashIndexAndSolutionSetOp.INCOMING_BINDINGS_BUFFER_THRESHOLD.
+     */
+    public void testPipelinedHashIncomingBindingsBufferThreshold() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-threshold-incoming-bindings-buffer",// testURI
+                "pipelined-hashjoin-threshold-incoming-bindings-buffer.rq", // queryURI
+                "pipelined-hashjoin-threshold.trig", // dataURI
+                "pipelined-hashjoin-threshold-incoming-bindings-buffer.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+
+    }
     
+    /**
+     * Test query affected by 
+     * PipelinedHashIndexAndSolutionSetOp.DISTINCT_PROJECTION_BUFFER_THRESHOLD
+     */
+    public void testPipelinedHashDistinctProjectionBufferThreshold() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-threshold-distinct-projection-buffer",// testURI
+                "pipelined-hashjoin-threshold-distinct-projection-buffer.rq", // queryURI
+                "pipelined-hashjoin-threshold.trig", // dataURI
+                "pipelined-hashjoin-threshold-distinct-projection-buffer.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+
+    }    
     
     /**
      * Asserts that a PipelinedHashIndexAndSolutionSetOp is contained in the
