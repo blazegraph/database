@@ -99,12 +99,13 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.
      */
-    private final AtomicBoolean open = new AtomicBoolean(true);
-    
-    /**
+    protected final AtomicBoolean open = new AtomicBoolean(true);
+
+
+   /**
      * The type of join to be performed.
      */
-    private final JoinTypeEnum joinType;
+    protected final JoinTypeEnum joinType;
     
 //    /**
 //     * <code>true</code> iff the join is OPTIONAL.
@@ -125,29 +126,29 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * @see HashJoinAnnotations#ASK_VAR
      */
-    private final IVariable<?> askVar;
+    protected final IVariable<?> askVar;
     
     /**
      * The join variables.
      */
-    private final IVariable<?>[] joinVars;
+    protected final IVariable<?>[] joinVars;
 
     /**
      * The variables to be retained (aka projected out) (optional, all variables
      * are retained if not specified).
      */
-    private final IVariable<?>[] selectVars;
+    protected final IVariable<?>[] selectVars;
 
     /**
      * True if the hash join utility class is to output the distinct join
      * variables.
      */
-    private boolean outputDistinctJVs = false;
+    protected boolean outputDistinctJVs = false;
     
     /**
      * The join constraints (optional).
      */
-    private final IConstraint[] constraints;
+    protected final IConstraint[] constraints;
 
     /**
      * The hash index.
@@ -330,33 +331,17 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         final IVariable<?>[] keyVars = filter ? (IVariable<?>[]) op
                 .getProperty(JoinAnnotations.SELECT) : joinVars;
                 
-        initRightSolutionsRef(
-            op, keyVars, filter, indexSolutionsHavingUnboundJoinVars);
-    }
-    
-    /**
-     * Called from constructor. May be overridden in subclasses to set up a
-     * custom hash index.
-     * 
-     * @param op
-     * @param filter
-     * @param indexSolutionsHavingUnboundJoinVars
-    */
-    protected void initRightSolutionsRef(
-        final PipelineOp op, final IVariable<?>[] keyVars, final boolean filter, 
-        final boolean indexSolutionsHavingUnboundJoinVars) {
-       
-       rightSolutionsRef.set(//
-             new JVMHashIndex(//
-                     keyVars,//
-                     indexSolutionsHavingUnboundJoinVars,//
-                     new LinkedHashMap<Key, Bucket>(op.getProperty(
-                             HashMapAnnotations.INITIAL_CAPACITY,
-                             HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                             op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                                     HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
-                     )//
-             ));
+        rightSolutionsRef.set(//
+            new JVMHashIndex(//
+                keyVars,//
+                indexSolutionsHavingUnboundJoinVars,//
+                new LinkedHashMap<Key, Bucket>(op.getProperty(
+                    HashMapAnnotations.INITIAL_CAPACITY,
+                    HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
+                    op.getProperty(HashMapAnnotations.LOAD_FACTOR,
+                    HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
+                )//
+        ));
     }
     
     @Override
