@@ -21,6 +21,8 @@ EC2 Configuration
 ---------------
 Configure your DATA_DIR, SNAPSHOT_DIR, and HALOG_DIR to the correct values for your installation.
 
+`vi/emacs /etc/default/blazegraph-ha`
+
 ```
 #This is the default location for the journal.  It should be a fast disk.  Instance disk on EC2.
 DATA_DIR="${BLZG_HOME}"/data
@@ -35,7 +37,7 @@ HALOG_DIR="${BLZG_HOME}"/data
 HA3 Configuration
 -----------------
 
-1.  Install the Blazegraph HA1 debian package on three machines with a networking configuration that allows communication between the nodes.  Make a note of each of the server names or IPs.
+-  Install the Blazegraph HA1 debian package on three machines with a networking configuration that allows communication between the nodes.  Make a note of each of the server names or IPs.
 
 ```
 server1
@@ -43,7 +45,7 @@ server2
 server3
 ```
 
-2.  Configure each server.  For each server, you'll need to update the blazegraph-ha configuration and setup the zookeeper configuration.
+- Configure each server.  For each server, you'll need to update the blazegraph-ha configuration and setup the zookeeper configuration.
 
 `vi/emacs /etc/default/blazegraph-ha`
 
@@ -96,10 +98,10 @@ server3
 echo 3 > /var/lib/zookeeper/myid 
 ```
 
-3.  Restart zookeeper and Blazegraph HA
+-  Restart zookeeper and Blazegraph HA
 
 `service zookeeper restart`
 
 `service blazegraph-ha restart`
 
-4.  Enjoy!
+-  Enjoy!
