@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -125,7 +129,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *     the result has been already computed before for the distinct projection
  *     in step 3; note that, in addition to the hash index, we also record those
  *     distinct projections for which the subquery has been evaluated without 
- *     producing a result, to avoid unnecessary recomputation).
+ *     producing a result, to avoid unnecessary re-computation).
  *     
  *     In the first iteration, we compute the subquery result 
  *     { ?s -> <http://s1> , ?o2 -> <http://o12> , ?o3 -> <http://o13> } for
@@ -157,7 +161,26 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *  left are emitted as soon as the subquery result for its distinct projection
  *  result has been calculated.
  *  
- *  Further notes: the strategy sketched above illustrates how the operator
+ *  # Further notes: 
+ *  1.) Vectored processing: the implementation uses a vectored processing
+ *  approach: instead of processing the mappings one by one, we collect
+ *  unseen distinct projections and their associated incoming mappings in two
+ *  buffers, namely the distinctProjectionBuffer and the incomingBindingssBuffer. 
+ *  
+ *  Buffer size is controlled via annotations: 
+ *  incomingBindingssBufferThreshold and the Annotations.DISTINCT_PROJECTION_BUFFER_THRESHOLD. 
+ *  If, after processing a chunk, one of these thresholds is exceeded for the
+ *  respective buffer (or, alternatively, if we're in the lastPass), the
+ *  mappings in the distinctProjectionBuffer are provided as input to
+ *  the subquery "in batch" (cf. step 4.)) and subsequently the bindings from
+ *  the incomingBindingssBuffer are joined (and released). At that point, the
+ *  buffers become empty again.
+ *  
+ *  Effectively, the thresholds allow to reserve some internal buffer space. For
+ *  now, we go with default values, but we may want to expose these buffers via
+ *  query hints or the like at some point. 
+ *  
+ *  2.) Alternative source: the strategy sketched above illustrates how the op
  *  works for subqueries. An alternative way of using the operator is by
  *  setting Annotations.BINDING_SETS_SOURCE *instead of* the subquery. This
  *  is used when computing a hash join with a VALUES clause; in that case, the
@@ -166,11 +189,12 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *  be re-evaluated each time, it is submitted once to the hash index in the
  *  beginning and joined with every incoming binding.
  *  
+ *  # Other remarks:
  *  There are some more technicalities like support for ASK_VAR (which is used
- *  by the FILTER (NOT) EXISTS translation scheme, which work in princicple in
+ *  by the FILTER (NOT) EXISTS translation scheme, which work in principle in
  *  the same way as they do for the standard hash join.
  *  
- *  Usage: the pipelined hash join operator is preferrably used for queries
+ *  Usage: the pipelined hash join operator is preferably used for queries
  *  containing LIMIT but *no* ORDER BY. It can also be globally enabled by
  *  system parameter {@link QueryHints#PIPELINED_HASH_JOIN} and via query
  *  hints. See {@link AST2BOpUtility#usePipelinedHashJoin} for the method
@@ -182,13 +206,25 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  */
 public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
-    
-    public interface Annotations extends HashIndexOp.Annotations, SubqueryAnnotations {
+   private static final long serialVersionUID = 3473675701742394157L;
 
+   /**
+    * Buffer to collect distinct projections before passing them into the
+    * subquery. Used to avoid computation of the subquery for small binding
+    * vectors over and over again.
+    */
+   final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
+   
+   /**
+    * Buffer to collect incoming bindings for mappings for which the subquery
+    * result has not yet been computed over its distinct projection. These
+    * are the mappings from which the mappings in distinctProjectionBuffer
+    * have been derived.
+    */
+   final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
+   
+   public interface Annotations extends HashIndexOp.Annotations, SubqueryAnnotations {
+   
        /**
         * The variables that is projected into the inner subgroup. Typically,
         * this is identical to the join variables. There are, however, 
@@ -200,14 +236,43 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         *   OPTIONAL {
         *     ?b :knows ?c .
         *     ?c :knows ?d .
-        *     filter(?a != :paul) # Note: filter applies to variable in the outer group.
+        *     filter(?a != :paul) # Note: filter applies to *outer* variable
         *    }
         * }
         * 
         * we have joinVars={?b} and projectInVars={?a, ?b}, because variables
         * from outside are visible in the inner filter.
         */
-       String PROJECT_IN_VARS = HashJoinAnnotations.class.getName() + ".projectInVars";
+       String PROJECT_IN_VARS = 
+           PipelinedHashIndexAndSolutionSetOp.class.getName() + ".projectInVars";
+
+       /**
+        * The threshold defining when to release the distinctProjectionBuffer.
+        * Note that releasing this buffer means releasing the
+        * distinctProjectionBuffer at the same time.
+        */
+       String DISTINCT_PROJECTION_BUFFER_THRESHOLD = 
+           PipelinedHashIndexAndSolutionSetOp.class.getName() 
+           + ".distinctProjectionBufferThreshold";
+       
+       // set default to have a default's chunk size default
+       int DEFAULT_DISTINCT_PROJECTION_BUFFER_THRESHOLD = 50;
+       
+
+       /**
+        * The threshold defining when to release the incomingBindingsBuffer.
+        * Note that releasing this buffer means releasing the
+        * distinctProjectionBuffer at the same time.
+        */
+       String INCOMING_BINDINGS_BUFFER_THRESHOLD = 
+           PipelinedHashIndexAndSolutionSetOp.class.getName() 
+           + ".incomingBindingsBuffer";
+       
+       // having buffered 1000 incoming bindings, we release both buffers;
+       // this might happen if we observe 1000 incoming mappings with less
+       // than DISTINCT_PROJECTION_BUFFER_THRESHOLD distinct projections
+       int DEFAULT_INCOMING_BINDINGS_BUFFER_THRESHOLD = 1000;
+
     }
     
     /**
@@ -264,12 +329,27 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         
         final IVariable<?>[] projectInVars = 
            (IVariable<?>[]) getProperty(Annotations.PROJECT_IN_VARS);
-            
+        
+        final int distinctProjectionBufferThreshold = 
+            getProperty(
+               Annotations.DISTINCT_PROJECTION_BUFFER_THRESHOLD, 
+               Annotations.DEFAULT_DISTINCT_PROJECTION_BUFFER_THRESHOLD);
+
+        final int incomingBindingsBufferThreshold = 
+              getProperty(
+                 Annotations.INCOMING_BINDINGS_BUFFER_THRESHOLD, 
+                 Annotations.DEFAULT_INCOMING_BINDINGS_BUFFER_THRESHOLD);
+        
         return new ChunkTask(this, context, subquery, 
-           bsFromBindingsSetSource, projectInVars, askVar);
+           bsFromBindingsSetSource, projectInVars, askVar,
+           distinctProjectionBuffer, distinctProjectionBufferThreshold,
+           incomingBindingsBuffer, incomingBindingsBufferThreshold);
         
     }
     
+    /**
+     * A chunk task. See outer class for explanation of parameters.
+     */
     private static class ChunkTask extends com.bigdata.bop.join.HashIndexOp.ChunkTask {
 
         final PipelineOp subquery;
@@ -281,13 +361,25 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         final IVariable<?> askVar;
         
         final IVariable<?>[] projectInVars;
+        
+        final Set<IBindingSet> distinctProjectionBuffer;
+        
+        final int distinctProjectionBufferThreshold;
+        
+        final List<IBindingSet> incomingBindingsBuffer;
+        
+        final int incomingBindingsBufferThreshold;
        
         public ChunkTask(final PipelinedHashIndexAndSolutionSetOp op,
                 final BOpContext<IBindingSet> context, 
                 final PipelineOp subquery, 
                 final IBindingSet[] bsFromBindingsSetSource,
                 final IVariable<?>[] projectInVars,
-                final IVariable<?> askVar) {
+                final IVariable<?> askVar,
+                final Set<IBindingSet> distinctProjectionBuffer, 
+                final int distinctProjectionBufferThreshold,
+                final List<IBindingSet> incomingBindingsBuffer,
+                final int incomingBindingsBufferThreshold) {
 
             super(op, context);
             
@@ -300,6 +392,11 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             this.bsFromBindingsSetSource = bsFromBindingsSetSource;
             this.projectInVars = projectInVars;
             this.askVar = askVar;
+            
+            this.distinctProjectionBuffer = distinctProjectionBuffer;
+            this.distinctProjectionBufferThreshold = distinctProjectionBufferThreshold;
+            this.incomingBindingsBuffer = incomingBindingsBuffer;
+            this.incomingBindingsBufferThreshold = incomingBindingsBufferThreshold;
 
         }
         
@@ -411,7 +508,10 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             
             ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
                unsyncBuffer, src, stats, joinConstraints, subquery,
-               bsFromBindingsSetSource, projectInVars, askVar);
+               bsFromBindingsSetSource, projectInVars, askVar,
+               distinctProjectionBuffer, distinctProjectionBufferThreshold,
+               incomingBindingsBuffer, incomingBindingsBufferThreshold,
+               context.isLastInvocation());
             
             
             unsyncBuffer.flush();
