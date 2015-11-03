@@ -362,7 +362,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                 bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).booleanValue());
                 break;
             case XSDString:
-                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).stringValue());
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).stringValue(), dte.getDatatypeURI());
                 break;
             case XSDInteger:
                 bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).stringValue(), XMLSchema.INTEGER);
