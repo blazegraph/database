@@ -1,11 +1,12 @@
 Blazegraph Debian Deployer
 -----------------
 
+This by default installs and starts a Blazegraph HA1 configuration.   See below for EC2 tuning and HA3 setup.
+
 ```
 apt-get install zookeeperd
 mvn package
 dpkg --install target/blazegraph-ha-deb-1.6.0-master-SNAPSHOT.deb
-service blazegraph-ha start
 ```
 
 This will start a Blazegraph instance running on port 9999 on localhost host.
@@ -16,3 +17,89 @@ Changing the configuration
 
 The blazegraph configuration is stored in `/usr/local/blazegraph/conf`.  The system configuration is in `/etc/default/blazegraph`.
 
+EC2 Configuration
+---------------
+Configure your DATA_DIR, SNAPSHOT_DIR, and HALOG_DIR to the correct values for your installation.
+
+```
+#This is the default location for the journal.  It should be a fast disk.  Instance disk on EC2.
+DATA_DIR="${BLZG_HOME}"/data
+
+#This is where to store snapshots.  It should be durable.  EBS disk on EC2.
+SNAPSHOT_DIR="${BLZG_HOME}"/data
+
+#This is where to store logs.  It should be durable.  EBS disk on EC2.
+HALOG_DIR="${BLZG_HOME}"/data
+```
+
+HA3 Configuration
+-----------------
+
+1.  Install the Blazegraph HA1 debian package on three machines with a networking configuration that allows communication between the nodes.  Make a note of each of the server names or IPs.
+
+```
+server1
+server2
+server3
+```
+
+2.  Configure each server.  For each server, you'll need to update the blazegraph-ha configuration and setup the zookeeper configuration.
+
+`vi/emacs /etc/default/blazegraph-ha`
+
+```
+#Enter the name of your federation
+FEDNAME=blazegraph-ha-3
+
+# Name of the replication cluster to which this HAJournalServer will belong.
+LOGICAL_SERVICE_ID=HA-Replication-Cluster-3
+
+# Where to find the Apache River service registrars (can also use multicast).
+#HA3 example
+export LOCATORS="jini://server1/,jini://server2/,jini://server3/"
+
+# Where to find the Apache Zookeeper ensemble.
+#Use for a multiple ZK configuration
+ZK_SERVERS="server1:2181,server2:2181,server3:2181"
+
+#Replication Factor (set to 3 for HA3) configuration
+REPLICATION_FACTOR=3
+```
+
+`vi/emacs /opt/zookeeper/conf/zoo.cfg`
+
+Update the servers in the zookeeper configuration
+
+```
+# specify all zookeeper servers
+# The fist port is used by followers to connect to the leader
+# The second one is used for leader election
+server.1=server1:2888:3888
+server.2=server2:2888:3888
+server.3=server3:2888:3888 
+``` 
+
+Each server must have a unique id in the zooData directory myid file.  Assuming you have default install with zooDatadir set to /var/lib/zookeeper/ an example is below.
+
+server1
+```
+echo 1 > /var/lib/zookeeper/myid 
+```
+
+server2
+```
+echo 2 > /var/lib/zookeeper/myid 
+```
+
+server3
+```
+echo 3 > /var/lib/zookeeper/myid 
+```
+
+3.  Restart zookeeper and Blazegraph HA
+
+`service zookeeper restart`
+
+`service blazegraph-ha restart`
+
+4.  Enjoy!
