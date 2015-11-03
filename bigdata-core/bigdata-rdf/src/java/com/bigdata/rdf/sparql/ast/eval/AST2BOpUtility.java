@@ -1704,9 +1704,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final int maxParallel = lastPass ? 1
                 : ctx.maxParallelForSolutionSetHashJoin;
 
-        left = addHashIndexOp(left, ctx, bindingsClause, joinType, joinVars, 
-              joinConstraints, joinVars /* projectInVars == joinVars -> inline projection */,
-              namedSolutionSet, usePipelinedHashJoin, bindingSets, 
+        left = addHashIndexOp(left, usePipelinedHashJoin, ctx, bindingsClause, 
+              joinType, joinVars,  joinConstraints, 
+              joinVars /* projectInVars == joinVars -> inline projection */,
+              namedSolutionSet, bindingSets,
               null /* askVar */, null /* subquery */);
         
         // Generate the solution set hash join operator.
@@ -1987,9 +1988,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
                convertQueryBase(null, subqueryRoot, doneSet, ctx);
         }
         
-        left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
+        left = addHashIndexOp(left, usePipelinedHashJoin, ctx, subqueryRoot, 
+              joinType, joinVars, 
               joinConstraints, projectedVars.toArray(new IVariable<?>[0]),
-              namedSolutionSet, usePipelinedHashJoin, null /* bindingsSetSource */,
+              namedSolutionSet, null /* bindingsSetSource */,
               null /* askVar */, subqueryPlan);
         
         // in case the subquery has not been inlined, append it to the pipeline
@@ -2238,10 +2240,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
         } 
 
         
-        left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
-              joinConstraints, joinVars, namedSolutionSet, 
-              usePipelinedHashJoin, null /* bindingsSetSource */, askVar,
-              subqueryPlan);
+        left = addHashIndexOp(left, usePipelinedHashJoin, ctx, subqueryRoot, 
+              joinType, joinVars, joinConstraints, joinVars, namedSolutionSet, 
+              null /* bindingsSetSource */, askVar, subqueryPlan);
 
 
         // Everything is visible inside of the EXISTS graph pattern.
@@ -2770,9 +2771,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         }
 
-        left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
-              joinVars, null, projectInVarsArr, namedSolutionSet,
-              usePipelinedHashJoin, null /* bindingsSetSource */,
+        left = addHashIndexOp(left, usePipelinedHashJoin, ctx, alpNode, 
+              JoinTypeEnum.Normal, joinVars, null, projectInVarsArr, 
+              namedSolutionSet, null /* bindingsSetSource */,
               null /* askVar */, alpOp);
 
         
@@ -4132,9 +4133,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
            
         } 
         
-        left = addHashIndexOp(left, ctx, subgroup, joinType, joinVars, 
-              joinConstraints, projectInVars, namedSolutionSet, 
-              usePipelinedHashJoin, null /* bindingsSetSource */,
+        left = addHashIndexOp(left, usePipelinedHashJoin, ctx, subgroup, 
+              joinType, joinVars, joinConstraints, projectInVars, 
+              namedSolutionSet, null /* bindingsSetSource */,
               null /* askVar */, subqueryPlan);
 
         // in case the subquery has not been inlined, append it to the pipeline
@@ -5457,6 +5458,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
     /**
      * 
      * @param left the left-side pipeline op
+     * @param usePipelinedHashJoin whether or not to use the 
+     *            {@link PipelinedHashIndexAndSolutionSetOp} or not
      * @param ctx the evaluation context
      * @param node current query node
      * @param joinType type of the join
@@ -5467,11 +5470,17 @@ public class AST2BOpUtility extends AST2BOpRTO {
      *            set will be returned by the hash index op
      * @param namedSolutionSet the named solution set
      * @param bindingSetsSource bindings sets to be consumed by the hash index
-     *         (may be null, set as HashIndexOp.Annotations.BINDING_SETS_SOURCE)
+     *           (may be null, set as HashIndexOp.Annotations.BINDING_SETS_SOURCE)
+     * @param an additional ASK var, to be bound for the EXISTS case indicating
+     *        whether the returned result matched or not
+     * @param subqueryPlan the subquery plan, to be inlined if
+     *           usePipelinedHashJoin equals <code>true</code> only
+     * 
      * @return the new pipeline op
      */
     private static PipelineOp addHashIndexOp(
         PipelineOp left,
+        final boolean usePipelinedHashJoin,
         final AST2BOpContext ctx,
         final ASTBase node,
         final JoinTypeEnum joinType,
@@ -5479,7 +5488,6 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final IConstraint[] joinConstraints,
         final IVariable<?>[] projectInVars,
         final INamedSolutionSetRef namedSolutionSet,
-        final boolean usePipelinedHashJoin,
         final IBindingSet[] bindingSetsSource,
         final IVariable<?> askVar,
         final PipelineOp subqueryPlan) {
@@ -5532,12 +5540,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
               new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
               new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
               new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-              // for the pipelined hash index op, the projection is handled inline,
-              // so we need to pass in this information; note that, for this 
-              // variant, there is no projection at the end of this method
-              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.PROJECT_IN_VARS, projectInVars),//
               new NV(HashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSetsSource),
-              new NV(HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
+              /**
+               * For the pipelined hash index op, the projection is handled inline,
+               * so we need to pass in this information; note that, for this 
+               * variant, there is no projection at the end of this method.
+               * Note that, in turn, this operator does not support the 
+               * OUTPUT_DISTINCT_JVs annotation, since this is a "built-in"
+               * functionality of the operator.
+               */
+              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.PROJECT_IN_VARS, projectInVars),//
               new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
               new NV(HashIndexOp.Annotations.ASK_VAR, askVar),//
               new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY, joinUtilFactory),//
