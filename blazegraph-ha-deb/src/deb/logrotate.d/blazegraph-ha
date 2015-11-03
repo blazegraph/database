@@ -1,4 +1,4 @@
-/var/log/blazegraph/blazegraph.out {
+/var/log/blazegraph-ha/HAJournalServer.log /var/log/blazegraph-ha/blazegraph-ha.out {
   copytruncate
   weekly
   rotate 52
