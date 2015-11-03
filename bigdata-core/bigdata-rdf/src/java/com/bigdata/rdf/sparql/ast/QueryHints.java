@@ -725,6 +725,6 @@ public interface QueryHints {
 
    // TODO: reset to false
    boolean DEFAULT_PIPELINED_HASH_JOIN = Boolean.valueOf(System.getProperty(
-           QueryHints.class.getName() + "." + PIPELINED_HASH_JOIN, "false"));
+           QueryHints.class.getName() + "." + PIPELINED_HASH_JOIN, "true"));
 
 }
