@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -189,6 +190,25 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
     
     public interface Annotations extends HashIndexOp.Annotations, SubqueryAnnotations {
 
+       /**
+        * The variables that is projected into the inner subgroup. Typically,
+        * this is identical to the join variables. There are, however, 
+        * exceptions where we need to project in a superset. For instance, for
+        * the query 
+        * 
+        * select * where {
+        * ?a :knows ?b .
+        *   OPTIONAL {
+        *     ?b :knows ?c .
+        *     ?c :knows ?d .
+        *     filter(?a != :paul) # Note: filter applies to variable in the outer group.
+        *    }
+        * }
+        * 
+        * we have joinVars={?b} and projectInVars={?a, ?b}, because variables
+        * from outside are visible in the inner filter.
+        */
+       String PROJECT_IN_VARS = HashJoinAnnotations.class.getName() + ".projectInVars";
     }
     
     /**
@@ -242,9 +262,13 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         
         final IVariable<?> askVar = 
            (IVariable<?>) getProperty(HashJoinAnnotations.ASK_VAR);
+        
+        @SuppressWarnings("unchecked")
+        final IVariable<?>[] projectInVars = 
+           (IVariable<?>[]) getProperty(Annotations.PROJECT_IN_VARS);
             
-        return new ChunkTask(
-           this, context, subquery, bsFromBindingsSetSource, askVar);
+        return new ChunkTask(this, context, subquery, 
+           bsFromBindingsSetSource, projectInVars, askVar);
         
     }
     
@@ -257,11 +281,14 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         final IConstraint[] joinConstraints;
         
         final IVariable<?> askVar;
+        
+        final IVariable<?>[] projectInVars;
        
         public ChunkTask(final PipelinedHashIndexAndSolutionSetOp op,
                 final BOpContext<IBindingSet> context, 
                 final PipelineOp subquery, 
                 final IBindingSet[] bsFromBindingsSetSource,
+                final IVariable<?>[] projectInVars,
                 final IVariable<?> askVar) {
 
             super(op, context);
@@ -273,6 +300,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             // exactly one of the two will be non-null
             this.subquery = subquery;
             this.bsFromBindingsSetSource = bsFromBindingsSetSource;
+            this.projectInVars = projectInVars;
             this.askVar = askVar;
 
         }
@@ -385,7 +413,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             
             ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
                unsyncBuffer, src, stats, joinConstraints, subquery,
-               bsFromBindingsSetSource, askVar);
+               bsFromBindingsSetSource, projectInVars, askVar);
             
             
             unsyncBuffer.flush();
