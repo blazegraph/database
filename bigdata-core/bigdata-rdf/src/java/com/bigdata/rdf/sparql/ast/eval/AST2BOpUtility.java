@@ -5532,6 +5532,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
               new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
               new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
               new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+              // for the pipelined hash index op, the projection is handled inline,
+              // so we need to pass in this information; note that, for this 
+              // variant, there is no projection at the end of this method
+              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.PROJECT_IN_VARS, projectInVars),//
               new NV(HashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSetsSource),
               new NV(HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
               new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//

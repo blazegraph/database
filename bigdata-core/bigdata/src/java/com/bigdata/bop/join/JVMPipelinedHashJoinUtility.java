@@ -150,7 +150,8 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
           final UnsyncLocalOutputBuffer<IBindingSet> out,
           final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,
           final IConstraint[] joinConstraints, final PipelineOp subquery,
-          final IBindingSet[] bsFromBindingsSetSource, final IVariable<?> askVar) {
+          final IBindingSet[] bsFromBindingsSetSource, 
+          final IVariable<?>[] projectInVars, final IVariable<?> askVar) {
        
         final ZeroMatchRecordingJVMHashIndex rightSolutions = 
            (ZeroMatchRecordingJVMHashIndex) getRightSolutions();
@@ -194,7 +195,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
                 }
                
                 // Take a distinct projection of the join variables.
-                final IBindingSet bsetDistinct = chunk[i].copy(getJoinVars());
+                final IBindingSet bsetDistinct = chunk[i].copy(projectInVars);
 
                 /**
                  *  Find bucket in hash index for that distinct projection
