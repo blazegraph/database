@@ -70,7 +70,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 // TODO: don't extend index, but instead use a fresh member to record non-matching vars
 //       -> state.toString() should report on these and other statistics
 // TODO: support for outputDistinctJVs
-// TODO: clarify handling of ASK var
 public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);

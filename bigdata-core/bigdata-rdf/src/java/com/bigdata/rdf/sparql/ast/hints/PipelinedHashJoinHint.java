@@ -72,6 +72,7 @@ final class PipelinedHashJoinHint extends AbstractBooleanQueryHint {
           if (op instanceof IGroupMemberNode) {
              _setQueryHint(context, scope, op, getName(), value);          
           }
+          return;
        }
        default:
           break;
