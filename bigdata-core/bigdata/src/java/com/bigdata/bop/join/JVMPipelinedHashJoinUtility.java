@@ -69,7 +69,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  */
 // TODO: don't extend index, but instead use a fresh member to record non-matching vars
 //       -> state.toString() should report on these and other statistics
-// TODO: support for outputDistinctJVs
 public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
 
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
@@ -469,8 +468,6 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
               }
               break;
            /**
-            * TODO: rethink this strategy in general
-            * 
             * Semantics of EXISTS is defined as follows: it only takes effect
             * if the ASK var is not null; in that case, it has the same
             * semantics as OPTIONAL, but binds the askVar to true or false

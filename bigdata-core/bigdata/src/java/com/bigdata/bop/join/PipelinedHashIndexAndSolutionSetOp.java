@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Map;
-import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -263,7 +262,6 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         final IVariable<?> askVar = 
            (IVariable<?>) getProperty(HashJoinAnnotations.ASK_VAR);
         
-        @SuppressWarnings("unchecked")
         final IVariable<?>[] projectInVars = 
            (IVariable<?>[]) getProperty(Annotations.PROJECT_IN_VARS);
             
