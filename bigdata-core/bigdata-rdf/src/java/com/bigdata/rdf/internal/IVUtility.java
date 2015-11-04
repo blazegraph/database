@@ -54,6 +54,8 @@ import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
@@ -67,7 +69,6 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
-import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
@@ -739,6 +740,20 @@ public class IVUtility {
             case PACKED_LONG: {
                 final AbstractLiteralIV iv = new PackedLongIV<>(LongPacker.unpackLong(key, o));
                 return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
+            }
+            case ARRAY: {
+                final int n = KeyBuilder.decodeByte(key[o++]);
+                final IV[] ivs = decode(key, o, n);
+                final InlineLiteralIV[] args = new InlineLiteralIV[n];
+                for (int i = 0; i < n; i++) {
+                    if (ivs[i] instanceof InlineLiteralIV) {
+                        args[i] = (InlineLiteralIV) ivs[i];
+                    } else {
+                        throw new UnsupportedOperationException("InlineArrayIV only supports InlineLiteralIV delegates");
+                    }
+                }
+                final LiteralArrayIV iv = new LiteralArrayIV(args);
+                return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
             }
             default: {
                 throw new UnsupportedOperationException("dte=" + dte);

@@ -39,15 +39,18 @@ import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.DTEExtension;
 import com.bigdata.rdf.internal.IExtensionIV;
 import com.bigdata.rdf.internal.IInlineUnicode;
+import com.bigdata.rdf.internal.IPv4Address;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUnicode;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.InlineLiteralIV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
@@ -913,10 +916,30 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         }
         case Extension: {
             switch(dtex) {
-            case PACKED_LONG:
+            case IPV4: {
+                // Append the IPv4Address
+                keyBuilder.append(((IPv4Address) t.getInlineValue()).getBytes());
+                break;
+            }
+            case PACKED_LONG: {
                 // Third, emit the packed long's byte value
                 ((KeyBuilder) keyBuilder).pack(((Long) t.getInlineValue()).longValue());
                 break;
+            }
+            case ARRAY: {
+                final InlineLiteralIV[] ivs = ((LiteralArrayIV) t).getIVs();
+                /*
+                 * Append the length of the array. (Supports up to 127 elements) 
+                 */
+                keyBuilder.appendSigned((byte) ivs.length);
+                /*
+                 * Then append the ivs one by one.
+                 */
+                for (InlineLiteralIV<?,?> iv : ivs) {
+                    iv.encode(keyBuilder);
+                }
+                break;
+            }
             default:
                 throw new UnsupportedOperationException("DTExtension=" + dtex);
             }
