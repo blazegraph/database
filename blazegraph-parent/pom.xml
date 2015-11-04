@@ -223,6 +223,7 @@ dependencies.
     <module>../bigdata-zookeeper-test</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
+    <module>../blazegraph-deb/</module>
   </modules>
 
 
