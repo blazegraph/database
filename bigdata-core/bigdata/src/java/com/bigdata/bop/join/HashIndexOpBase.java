@@ -162,6 +162,8 @@ abstract public class HashIndexOpBase extends PipelineOp implements ISingleThrea
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
+        getRequiredProperty(Annotations.RELATION_NAME);
+        
         for (IVariable<?> var : joinVars) {
 
             if (var == null)
