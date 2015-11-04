@@ -43,12 +43,17 @@ public enum DTEExtension {
 	 * An IPV4 address. 
 	 */
 	IPV4((byte) 0, 0/* len */, IPv4Address.class, XSD.IPV4, DTEFlags.NOFLAGS),
-
+	
 	/**
 	 * A packed long value.
 	 */
 	PACKED_LONG((byte) 1, 0/* len */, PackedLongIV.class, PackedLongIV.PACKED_LONG, DTEFlags.NOFLAGS),
 	
+    /**
+     * An array of inline IVs.
+     */
+    ARRAY((byte) 2, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS),
+
 	/**
 	 * This is a place holder for extension of the intrinsic data types. Its
 	 * code corresponds to 0xff, which is to say all four bits are on. When this
@@ -105,6 +110,8 @@ public enum DTEExtension {
             return IPV4;
         case 1:
             return PACKED_LONG;            
+        case 2:
+            return ARRAY;
          default:
             throw new IllegalArgumentException(Byte.toString(b));
         }

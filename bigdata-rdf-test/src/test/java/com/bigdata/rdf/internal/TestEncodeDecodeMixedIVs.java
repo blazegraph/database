@@ -109,8 +109,8 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
      */
     static private boolean fullyInlineUnicode = true;
     
-    public void test_encodeDecode_comparator() throws DatatypeConfigurationException {
-
+    protected List<IV<?,?>> prepareIVs() throws DatatypeConfigurationException {
+        
         final Random r = new Random();
 
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance(getName());
@@ -902,7 +902,15 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
             }
 
         }
+        
+        return ivs;
 
+    }
+    
+    public void test_encodeDecode_comparator() throws DatatypeConfigurationException {
+
+        final List<IV<?,?>> ivs = prepareIVs();
+        
         final IV<?, ?>[] e = ivs.toArray(new IV[0]);
 
         AbstractEncodeDecodeKeysTestCase.doEncodeDecodeTest(e);
