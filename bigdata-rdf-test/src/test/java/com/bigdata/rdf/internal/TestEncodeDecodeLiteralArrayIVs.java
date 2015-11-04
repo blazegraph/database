@@ -25,11 +25,11 @@ package com.bigdata.rdf.internal;
 import java.util.LinkedList;
 import java.util.List;
 
-import javax.xml.datatype.DatatypeConfigurationException;
-
 import org.apache.log4j.Logger;
 import org.junit.Test;
 
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
@@ -42,7 +42,7 @@ import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
  * @author <a href="mailto:mike@systap.com">Mike Personick</a>
  * @version $Id$
  */
-public class TestEncodeDecodeLiteralArrayIVs extends TestEncodeDecodeMixedIVs {
+public class TestEncodeDecodeLiteralArrayIVs extends AbstractEncodeDecodeMixedIVsTest {
 
     private static final transient Logger log = Logger.getLogger(TestEncodeDecodeLiteralArrayIVs.class);
     
@@ -64,7 +64,7 @@ public class TestEncodeDecodeLiteralArrayIVs extends TestEncodeDecodeMixedIVs {
      */
     @Test
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void test01() throws Exception {
+    public void testRoundTripLiteralArrayIV() throws Exception {
 
         final List<IV<?,?>> mixed = super.prepareIVs();
         
@@ -89,14 +89,16 @@ public class TestEncodeDecodeLiteralArrayIVs extends TestEncodeDecodeMixedIVs {
                 }
                 
             }
+            
+            if (i > 0) {
+                final InlineLiteralIV[] tmp = new InlineLiteralIV[i];
+                System.arraycopy(inlines, 0, tmp, 0, i);
+                arrays.add(new LiteralArrayIV(tmp));
+            }
         }
         
         final AbstractLiteralIV[] ivs = arrays.toArray(new AbstractLiteralIV[arrays.size()]);
         
-        if (log.isDebugEnabled()) {
-            log.debug(ivs.length);
-        }
-
         byte vocab = 1;
 
         final LiteralExtensionIV[] lits = new LiteralExtensionIV[ivs.length];
@@ -118,8 +120,45 @@ public class TestEncodeDecodeLiteralArrayIVs extends TestEncodeDecodeMixedIVs {
 
     }
 
-    public void test_encodeDecode_comparator() throws DatatypeConfigurationException {
+    public void testRoundTripAsByte() {
+        
+        testRoundTripAsByte(1);
+        testRoundTripAsByte(10);
+        testRoundTripAsByte(200);
+        testRoundTripAsByte(256);
+        
+        testRoundTripAsByte(-1);
+        testRoundTripAsByte(0);
+        testRoundTripAsByte(257);
+        
+    }
+    
+    private void testRoundTripAsByte(final int i) {
         // no need to re-test this
+
+        final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+        
+//        System.out.println(i);
+    
+        // int(1...256) --> byte(0...255)
+        final byte len = (byte) (i-1);
+        keyBuilder.appendSigned(len);
+//        System.out.println(len);
+        
+        final byte[] key = keyBuilder.getKey();
+        
+        assertEquals(1, key.length);
+        
+        // byte(0...255) --> int(1...256) 
+        final int n = ((int) KeyBuilder.decodeByte(key[0]) & 0xFF) + 1;
+//        System.out.println(n);
+        
+        if (i >= 1 && i <= 256) {
+            assertEquals(i, n);
+        } else {
+            assertFalse(i == n);
+        }
+        
     }
 
 }
