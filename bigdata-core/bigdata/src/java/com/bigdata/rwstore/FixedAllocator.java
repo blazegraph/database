@@ -71,6 +71,13 @@ public class FixedAllocator implements Allocator {
 	volatile private int m_index;
 	
 	Bucket m_statsBucket = null;
+	
+	/**
+	 * If an allocator is selected in a smallSlotHighWaste scenario, then the sparseness test
+	 * for allocation must be relaxed or there is a risk that no allocation would be made
+	 * from a "free" allocator.
+	 */
+	boolean m_smallSlotHighWaste = false;
 
 	public void setIndex(final int index) {
 		final AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
@@ -583,12 +590,6 @@ public class FixedAllocator implements Allocator {
 		m_allocIndex = start;
 		
 		if (m_size <= m_store.cSmallSlot) {
-			/*
-			 * If small slots are in a high waste scenario, then do not check for extra
-			 * locality in uncommitted state
-			 */
-	    	final boolean highWaste = m_statsBucket.m_allocators >= m_store.cSmallSlotWasteCheckAllocators
-	    				&& m_statsBucket.slotsUnused() >= m_store.cSmallSlotHighWaste;
 	    	
 			for (int a = m_allocIndex/m_bitSize; a < m_allocBlocks.size(); a++) {
 				final AllocBlock ab = m_allocBlocks.get(a);
@@ -598,8 +599,11 @@ public class FixedAllocator implements Allocator {
 				for (int i = (m_allocIndex%m_bitSize); i < m_bitSize; i++) {
 					// first check if transients are already full
 					if (ab.m_transients[i] != 0xFFFFFFFF) {
-						// then check maximum 50% commit allocated || highWaste
-						if (highWaste || Integer.bitCount(ab.m_commit[i]) < 16) { 
+						/*
+						 * If small slots are in a high waste scenario, then do not check for extra
+						 * locality in uncommitted state
+						 */
+						if (m_smallSlotHighWaste || Integer.bitCount(ab.m_commit[i]) < 16) { 
 							final AllocBlock abr = m_allocBlocks.get(m_allocIndex/m_bitSize);
 							assert abr == ab;
 							

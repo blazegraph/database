@@ -2910,8 +2910,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      		}
     	}
     	
-    	if (candidate != null && log.isDebugEnabled()) {
-    		log.debug("Found candidate small slot allocator");
+    	if (candidate != null) {
+    		candidate.m_smallSlotHighWaste = true;
+    		if (log.isDebugEnabled()) {
+    			log.debug("Found candidate small slot allocator");
+    		}
     	}
     	
     	return candidate;   	
