@@ -38,42 +38,42 @@ import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
  * TODO add a variable length nibble encoding of a byte[]?
  */
 public enum DTEExtension {
-	
-	/**
-	 * An IPV4 address. 
-	 */
-	IPV4((byte) 0, 0/* len */, IPv4Address.class, XSD.IPV4, DTEFlags.NOFLAGS),
-	
-	/**
-	 * A packed long value.
-	 */
-	PACKED_LONG((byte) 1, 0/* len */, PackedLongIV.class, PackedLongIV.PACKED_LONG, DTEFlags.NOFLAGS),
-	
+    
+    /**
+     * An IPV4 address. 
+     */
+    IPV4((byte) 0, 0/* len */, IPv4Address.class, XSD.IPV4, DTEFlags.NOFLAGS),
+    
+    /**
+     * A packed long value.
+     */
+    PACKED_LONG((byte) 1, 0/* len */, Long.class, PackedLongIV.PACKED_LONG, DTEFlags.NOFLAGS),
+    
     /**
      * An array of inline IVs.
      */
     ARRAY((byte) 2, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS),
 
-	/**
-	 * This is a place holder for extension of the intrinsic data types. Its
-	 * code corresponds to 0xff, which is to say all four bits are on. When this
-	 * code is used, the next byte(s) must be examined to determine the actual
-	 * intrinsic data type.
-	 * <p>
-	 * Note: This is NOT the same as the {@link AbstractIV#isExtension()} bit.
-	 * The latter <strong>always</strong> indicates that an {@link IV} follows
-	 * the <code>flags</code> byte and indicates the actual datatype URI. In
-	 * contrast, {@link #RESERVED} is a placeholder that could give us another
-	 * byte to handle additional "intrinsic" types.
-	 * 
-	 * @see BLZG-1507 (Implement support for DTE extension types for URIs)
-	 * 
-	 *      TODO If we wind up extending things again, it would perhaps be nicer
-	 *      to have an extension mechanism for non-intrinsic data types (ones
-	 *      that can be registered without having to explicitly create them in
-	 *      the code).
-	 */
-	RESERVED((byte) 255, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS);
+    /**
+     * This is a place holder for extension of the intrinsic data types. Its
+     * code corresponds to 0xff, which is to say all four bits are on. When this
+     * code is used, the next byte(s) must be examined to determine the actual
+     * intrinsic data type.
+     * <p>
+     * Note: This is NOT the same as the {@link AbstractIV#isExtension()} bit.
+     * The latter <strong>always</strong> indicates that an {@link IV} follows
+     * the <code>flags</code> byte and indicates the actual datatype URI. In
+     * contrast, {@link #RESERVED} is a placeholder that could give us another
+     * byte to handle additional "intrinsic" types.
+     * 
+     * @see BLZG-1507 (Implement support for DTE extension types for URIs)
+     * 
+     *      TODO If we wind up extending things again, it would perhaps be nicer
+     *      to have an extension mechanism for non-intrinsic data types (ones
+     *      that can be registered without having to explicitly create them in
+     *      the code).
+     */
+    RESERVED((byte) 255, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS);
 
     /**
      * @param v
@@ -83,7 +83,7 @@ public enum DTEExtension {
      *            a variable length (xsd:integer, xsd:decimal).
      * @param cls
      *            The class of the Java object used to represent instances of
-     *            the coded data type.
+     *            the coded data type. (The inline object.)
      * @param datatype
      *            The well-known URI for the data type.
      * @param flags
@@ -118,15 +118,15 @@ public enum DTEExtension {
     }
 
     /**
-	 * Return the {@link DTEExtension} for the datatype {@link URI}.
-	 * 
-	 * @param datatype
-	 *            The datatype {@link URI}.
-	 * 
-	 * @return The {@link DTEException} for that datatype -or- <code>null</code>
-	 *         if the datatype {@link URI} is none of the datatypes for which
-	 *         native support is provided.
-	 */
+     * Return the {@link DTEExtension} for the datatype {@link URI}.
+     * 
+     * @param datatype
+     *            The datatype {@link URI}.
+     * 
+     * @return The {@link DTEException} for that datatype -or- <code>null</code>
+     *         if the datatype {@link URI} is none of the datatypes for which
+     *         native support is provided.
+     */
     static final public DTEExtension valueOf(final URI datatype) {
         /*
          * Note: This switch MUST correspond to the declarations above (you can
@@ -142,12 +142,12 @@ public enum DTEExtension {
             return null;
         }
         
-		if (datatype.equals(IPV4.datatypeURI))
-			return IPV4;
-		if (datatype.equals(PACKED_LONG.datatypeURI))
-		    return PACKED_LONG;		
+        if (datatype.equals(IPV4.datatypeURI))
+            return IPV4;
+        if (datatype.equals(PACKED_LONG.datatypeURI))
+            return PACKED_LONG;        
 
-		/*
+        /*
          * Not a known DTE datatype.
          */
         return null;
@@ -166,7 +166,7 @@ public enum DTEExtension {
 
     /**
      * The class of the Java object used to represent instances of the coded
-     * data type.
+     * data type.  (The inline object.)
      */
     private final Class<?> cls;
 

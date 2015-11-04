@@ -929,9 +929,12 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             case ARRAY: {
                 final InlineLiteralIV[] ivs = ((LiteralArrayIV) t).getIVs();
                 /*
-                 * Append the length of the array. (Supports up to 127 elements) 
+                 * Append the length of the array as a byte. InlineLiteralIV
+                 * only supports arrays of length (1...256).
                  */
-                keyBuilder.appendSigned((byte) ivs.length);
+                // int(1...256) --> byte(0...255)
+                final byte len = (byte) (ivs.length-1);
+                keyBuilder.appendSigned(len);
                 /*
                  * Then append the ivs one by one.
                  */
