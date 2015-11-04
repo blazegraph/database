@@ -2185,6 +2185,34 @@ public class AST2BOpUtility extends AST2BOpRTO {
         @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
 
+        /**
+         * Compute the set of variables we need to project in. This is typically
+         * identical to the set of join vars, but my differ for queries such
+         * as
+         * 
+         * <code>
+            SELECT * WHERE {
+              ?a :p ?n
+              FILTER NOT EXISTS {
+                ?a :q ?m .
+                FILTER(?n = ?m)
+              }
+            }
+           </code>
+         *
+         * , where we join on ?a, but need to project in ?n as well (since
+         * the scope of the FILTER includes the outer scope).
+         */
+        final Set<IVariable<?>> projectInVars = ctx.sa.getMaybeIncomingBindings(
+              subqueryRoot, new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> spannedVars = 
+              ctx.sa.getSpannedVariables(subqueryRoot, new HashSet<IVariable<?>>());
+//        projectInVars.retainAll(alpVars);
+        projectInVars.retainAll(spannedVars);
+        final IVariable<?>[] projectInVarsArr =
+              projectInVars.toArray(new IVariable<?>[projectInVars.size()]);
+        
+        
         final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
@@ -2241,7 +2269,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         
         left = addHashIndexOp(left, usePipelinedHashJoin, ctx, subqueryRoot, 
-              joinType, joinVars, joinConstraints, joinVars, namedSolutionSet, 
+              joinType, joinVars, joinConstraints, projectInVarsArr, namedSolutionSet, 
               null /* bindingsSetSource */, askVar, subqueryPlan);
 
 
