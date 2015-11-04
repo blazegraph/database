@@ -485,6 +485,10 @@ public class ServiceRegistry {
      */
     public ServiceFactory getServiceFactoryByServiceURI(URI serviceUri) {
        
+       if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceUri)) {
+          throw new IllegalArgumentException("Service URI " + serviceUri + " is not allowed");
+       }
+       
        final ServiceFactory serviceFactory = 
           serviceUri==null ? 
           getDefaultServiceFactory() : services.get(serviceUri);
