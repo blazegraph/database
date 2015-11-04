@@ -1499,7 +1499,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                             new NV(HashIndexOp.Annotations.NAMED_SET_SOURCE_REF,
                                     sourceSet),//
                             new NV(HashIndexOp.Annotations.NAMED_SET_REF,
-                                    generatedSet)//
+                                    generatedSet),//
+                            new NV(IPredicate.Annotations.RELATION_NAME, 
+                                    new String[]{ctx.getLexiconNamespace()})
                         ), nsi, ctx);
 
                 // true since we are building the hash index.
@@ -3525,7 +3527,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
     //                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                         joinUtilFactory),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef),//
+                new NV(IPredicate.Annotations.RELATION_NAME, 
+                      new String[]{ctx.getLexiconNamespace()})
             ), joinGroup, ctx);
         }
         
@@ -5602,7 +5606,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
                 new NV(HashIndexOp.Annotations.ASK_VAR, askVar),//
                 new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY, joinUtilFactory),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(IPredicate.Annotations.RELATION_NAME, 
+                      new String[]{ctx.getLexiconNamespace()})
             ), node, ctx);
 
        }
