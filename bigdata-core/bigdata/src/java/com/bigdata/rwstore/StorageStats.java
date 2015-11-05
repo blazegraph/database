@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 import com.bigdata.rwstore.sector.SectorAllocator;
 
@@ -342,6 +343,10 @@ public class StorageStats {
 		 * BytesReserved: The space reserved on the backing file for those allocation slots (AllocatorSlots * SlotsReserved). */
 		public long reservedStore() {
 			return m_size * m_totalSlots;
+		}
+		
+		public long reservedSlots() {
+			return m_totalSlots;
 		}
 		
 		public void addAlocator() {
@@ -721,5 +726,9 @@ public class StorageStats {
 		for (BlobBucket b: m_blobBuckets) {
 			b.reset();
 		}
+	}
+	
+	public Iterator<Bucket> getBuckets() {
+		return m_buckets.iterator();
 	}
 }

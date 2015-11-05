@@ -71,6 +71,7 @@ import com.bigdata.journal.VerifyCommitRecordIndex;
 import com.bigdata.util.Bytes;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PseudoRandom;
@@ -2382,16 +2383,19 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		/**
-		 * To stress tthe session protection, we will allocate a batch of
+		 * To stress the session protection, we will allocate a batch of
 		 * addresses, then free half with protection.  Then reallocate half
 		 * again after releasing the session.
 		 * This should result in all the original batch being allocated,
 		 * exercising both session protection and write cache clearing
 		 */
 		public void test_stressSessionProtection() {
-			// Sequential logic
+			stressSessionProtection(0); // no small slots
+			stressSessionProtection(1024); // standard small slots
+		}
 
-			final Journal store = (Journal) getStore();
+		void stressSessionProtection(final int smallSlotSize) {
+			final Journal store = (Journal) getSmallSlotStore(smallSlotSize);
 			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 			final RWStore rw = bs.getStore();
@@ -2407,42 +2411,101 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// We just want to stress a single allocator, so make 5000
 			// allocations to force multiple allocBlocks.
 			
-			for (int i = 0; i < 5000; i++) {
+			for (int i = 0; i < 10000; i++) {
 				addrs.add(bs.write(bb));
 				bb.flip();
 			}
+			
+			final Bucket bucket =  findBucket(rw, buf.length+4); // allow for checksum
+			
+			store.commit();
 
-			for (int i = 0; i < 5000; i+=2) {
+			for (int i = 0; i < addrs.size(); i+=2) {
 				bs.delete(addrs.get(i));
+			}
+
+			store.commit();
+
+			for (int i = 0; i < addrs.size(); i++) {
+				bs.write(bb);
+				bb.flip();
+			}
+
+			
+			{
+				long used = bucket.usedSlots();
+				long reserved = bucket.reservedSlots();
+	
+				assertTrue(reserved > used);
+				assertTrue(reserved-used > (addrs.size()/2)); // must not have reclaimed recycled slots
 			}
 
 			// now release session to make addrs reavailable
 			tx.close();
-
-
-			for (int i = 0; i < 5000; i+=2) {
+			
+			store.commit();
+			
+			for (int i = 0; i < addrs.size(); i++) {
 				bs.write(bb);
 				bb.flip();
 			}
 
 			store.commit();
+			
+			{
+				long used = bucket.usedSlots();
+				long reserved = bucket.reservedSlots();
+	
+				if (smallSlotSize == 0) { // check not guaranteed with small slots
+					assertTrue(reserved > used);
+					assertTrue(reserved-used < (addrs.size()/2)); // must have reclaimed recycled slots
+				}
+			}
 
-			// FIXME: The test assumptions are not valid under small slot conditions			
-//			bb.position(0);
-//
-//			for (int i = 0; i < 3000; i++) {
-//				bb.position(0);
-//				
-//				ByteBuffer rdBuf = bs.read(addrs.get(i));
-//
-//				// should be able to
-//				assertEquals(bb, rdBuf);
-//			}
-//
-//			store.commit();
 			} finally {
 			    store.destroy();
 			}
+		}
+		
+		private Bucket findBucket(RWStore rws, final int dataSize) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			while (buckets.hasNext()) {
+				final Bucket bucket = buckets.next();
+				
+				if (bucket.m_size > dataSize) {
+					return bucket;
+				}
+			}
+			
+			return null;
+		}
+		
+		private int getTotalAllocatedSlots(RWStore rws) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			
+			int allocated = 0;
+			while (buckets.hasNext()) {
+				allocated += buckets.next().usedSlots();
+			}
+			
+			return allocated;
+		}
+		
+		private int getTotalReservedSlots(RWStore rws) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			
+			int reserved = 0;
+			while (buckets.hasNext()) {
+				reserved += buckets.next().reservedSlots();
+			}
+			
+			return reserved;
 		}
 		
 		/**
