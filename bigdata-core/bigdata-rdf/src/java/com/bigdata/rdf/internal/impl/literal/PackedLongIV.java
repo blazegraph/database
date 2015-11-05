@@ -36,12 +36,12 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
- * Internal value representing a packed long. The value must be a
- * positive long value smaller than Long.MAX_VALUE-1 (otherwise an
- * {@link IllegalArgumentException} is thrown at construction time.
- * It is packed using the {@link LongPacker} utilities in an order
- * preserving way.
- */
+ * Internal value representing a packed long in the range [0;72057594037927935L].
+ * Note that this is not the full range of long (negative values are not
+ * supported and positive long values in [72057594037927936L;Long.MAX]
+ * are not supported), the reason being that the compression technique
+ * we're using is order preserving only for the valid range.
+*/
 public class PackedLongIV<V extends BigdataLiteral> 
         extends AbstractLiteralIV<V, Long>
             implements Serializable, Literal {
@@ -52,11 +52,24 @@ public class PackedLongIV<V extends BigdataLiteral>
 
     public static final URI PACKED_LONG = new URIImpl("http://www.bigdata.com/rdf/datatype#packedLong");
 
+
     /**
-     *  Long.MAX_VALUE-1 is internally represented as 0111111111...
-     *  -> this is the bigges value that can be handled by the LongPacker
+     *  The {@link PackedLongIV} uses the {@link LongPacker} to compress values.
+     *  {@link LongPacker#packLong(long, byte[], com.bigdata.io.LongPacker.IByteBuffer)}
+     *  is order preserving whenever the first byte is 0. Since the IV relies on an
+     *  order preserving encoding, we restrict the supported range to values in
+     *  [0;MAX_POS_LONG_WITH_LEADING_ZERO_BYTE], where MAX_POS_LONG_WITH_LEADING_ZERO_BYTE
+     *  corresponds to the 64bit string 00000000111111111111111..., which equals
+     *  72057594037927935L. The value was (statically) verified as follows:
+     *  <code>
+          long v1 = 72057594037927935L;
+          long v2 = 72057594037927936L;
+          System.out.println(( ( v1 >> 56 ) != 0 )); // condition used in LongPacker
+          System.out.println(( ( v2 >> 56 ) != 0 )); // condition used in LongPacker
+       </code>
+     * outputs "false" followed by "true".
      */
-    public static final long MAX_LONG_WITHOUT_LEADING_1 = Long.MAX_VALUE-1;    
+    public static final long MAX_POS_LONG_WITH_LEADING_ZERO_BYTE = 72057594037927935L;
     
     /**
      * The represented value
@@ -99,7 +112,7 @@ public class PackedLongIV<V extends BigdataLiteral>
 
         super(DTE.Extension);
 
-        if (value<0 || value>MAX_LONG_WITHOUT_LEADING_1) {
+        if (value<0 || value>MAX_POS_LONG_WITH_LEADING_ZERO_BYTE) {
             throw new IllegalArgumentException("long value out of range: " + value);
         }
         this.value = value;

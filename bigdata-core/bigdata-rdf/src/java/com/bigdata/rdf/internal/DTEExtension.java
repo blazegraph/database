@@ -45,7 +45,11 @@ public enum DTEExtension {
     IPV4((byte) 0, 0/* len */, IPv4Address.class, XSD.IPV4, DTEFlags.NOFLAGS),
     
     /**
-     * A packed long value.
+     * A packed long value, restricted to the range [0;72057594037927935L].
+     * Note that this is not the full range of long (negative values are not
+     * supported and positive long values in [72057594037927936L;Long.MAX]
+     * are not supported), the reason being that the compression technique
+     * we're using is order preserving only for the valid range.
      */
     PACKED_LONG((byte) 1, 0/* len */, Long.class, PackedLongIV.PACKED_LONG, DTEFlags.NOFLAGS),
     

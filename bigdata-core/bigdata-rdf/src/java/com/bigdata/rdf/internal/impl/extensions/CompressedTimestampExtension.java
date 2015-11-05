@@ -42,6 +42,15 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 /**
  * Effective, packed representation of timestamps typed as
  * <code><http://www.bigdata.com/rdf/datatype#compressedTimestamp></code>.
+ * Builds on the {@link PackedLongIV} datatype for representing timestamps,
+ * thus supporting the range [0;72057594037927935L].
+ * 
+ * The datatype is recommended for use with timestamps specified in seconds
+ * and milliseconds; you should not run into any range issues there at all. 
+ * 
+ * Using the datatype for timestamps in microseconds or smaller is discouraged: 
+ * in the microseconds case the value 72057594037927935 corresponds to Fri, 
+ * 04 May 2198 23:50:03 GMT, so you couldn't represent dates beyond that time.
  */
 @SuppressWarnings("rawtypes")
 public class CompressedTimestampExtension<V extends BigdataValue> implements IExtension<V> {

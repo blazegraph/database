@@ -796,10 +796,10 @@ public class LexiconConfiguration<V extends BigdataValue>
 					 */
 					return new IPv4AddrIV<BigdataLiteral>(v);
 				 case PACKED_LONG:
-					/*
-					 * Extension for packed long.
-					 */
-					return new PackedLongIV<BigdataLiteral>(v);					
+				    /*
+				     * Extension for packed long value in the range [0;72057594037927935L].
+				     */
+				    return new PackedLongIV<BigdataLiteral>(v);					
 				default:
 					// Not handled.
 					return null;
