@@ -743,7 +743,7 @@ public class IVUtility {
             }
             case ARRAY: {
                 // byte(0...255) --> int(1...256) 
-                final int n = ((int) KeyBuilder.decodeByte(key[o++]) & 0xFF) + 1;
+                final int n = ((int) key[o++] & 0xFF) + 1;
                 final IV[] ivs = decode(key, o, n);
                 final InlineLiteralIV[] args = new InlineLiteralIV[n];
                 for (int i = 0; i < n; i++) {
