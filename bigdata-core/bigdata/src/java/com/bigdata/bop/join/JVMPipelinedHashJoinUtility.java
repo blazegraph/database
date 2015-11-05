@@ -71,11 +71,6 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
 
    /**
-    * Context, initialized on first call.
-    */
-   private final BOpContext<IBindingSet> context;
-
-   /**
     * The #of distinct projections from the given input bindings
     */
    protected final CAT nDistinctBindingSets = new CAT();
@@ -128,8 +123,6 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
          throw new IllegalArgumentException();
       }
       
-      this.context = context;
-      
    }
 
     /**
@@ -168,7 +161,8 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
           final IVariable<?>[] projectInVars, final IVariable<?> askVar,
           final boolean isLastInvocation,
           final int distinctProjectionBufferThreshold,
-          final int incomingBindingsBufferThreshold) {
+          final int incomingBindingsBufferThreshold,
+          final BOpContext<IBindingSet> context) {
 
        
         final JVMHashIndex rightSolutions = getRightSolutions();
@@ -177,7 +171,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
            addBindingsSetSourceToHashIndexOnce(rightSolutions, bsFromBindingsSetSource);
         }
 
-        final QueryEngine queryEngine = this.context.getRunningQuery().getQueryEngine();
+        final QueryEngine queryEngine = context.getRunningQuery().getQueryEngine();
 
         long naccepted = 0;
 
@@ -353,7 +347,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
             final Throwable cause = (runningSubquery != null && runningSubquery.getCause() != null)
                     ? runningSubquery.getCause() : t;
 
-            throw new RuntimeException(this.context.getRunningQuery().halt(cause));
+            throw new RuntimeException(context.getRunningQuery().halt(cause));
 
         } finally {
 
