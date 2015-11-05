@@ -5587,7 +5587,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
               new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY, joinUtilFactory),//
               new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
               // the pipelined hash index may also contain a subquery for inner evaluation
-              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan)
+              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan),
+              new NV(IPredicate.Annotations.RELATION_NAME, 
+                    new String[]{ctx.getLexiconNamespace()})              
           ), node, ctx);
           
        } else {
