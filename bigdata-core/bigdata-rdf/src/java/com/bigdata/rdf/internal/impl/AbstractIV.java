@@ -934,7 +934,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                  */
                 // int(1...256) --> byte(0...255)
                 final byte len = (byte) (ivs.length-1);
-                keyBuilder.appendSigned(len);
+                keyBuilder.append(len);
                 /*
                  * Then append the ivs one by one.
                  */

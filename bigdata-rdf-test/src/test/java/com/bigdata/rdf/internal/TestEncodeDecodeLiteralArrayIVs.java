@@ -142,7 +142,7 @@ public class TestEncodeDecodeLiteralArrayIVs extends AbstractEncodeDecodeMixedIV
     
         // int(1...256) --> byte(0...255)
         final byte len = (byte) (i-1);
-        keyBuilder.appendSigned(len);
+        keyBuilder.append(len);
 //        System.out.println(len);
         
         final byte[] key = keyBuilder.getKey();
@@ -150,7 +150,7 @@ public class TestEncodeDecodeLiteralArrayIVs extends AbstractEncodeDecodeMixedIV
         assertEquals(1, key.length);
         
         // byte(0...255) --> int(1...256) 
-        final int n = ((int) KeyBuilder.decodeByte(key[0]) & 0xFF) + 1;
+        final int n = ((int) key[0] & 0xFF) + 1;
 //        System.out.println(n);
         
         if (i >= 1 && i <= 256) {
