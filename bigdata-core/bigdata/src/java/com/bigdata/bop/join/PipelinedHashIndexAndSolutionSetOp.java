@@ -482,7 +482,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
                unsyncBuffer, src, stats, joinConstraints, subquery,
                bsFromBindingsSetSource, projectInVars, askVar,
                context.isLastInvocation(), distinctProjectionBufferThreshold,
-               incomingBindingsBufferThreshold);
+               incomingBindingsBufferThreshold, context);
             
             
             unsyncBuffer.flush();
