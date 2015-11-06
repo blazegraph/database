@@ -228,7 +228,11 @@ public class PipelineJoin<E> extends PipelineOp implements
         public String MIN_DATAPOINTS_PER_TASK = 
                 (PipelineJoin.class.getName() + ".minDatapointsPerTask").intern();
              
-        public int DEFAULT_MIN_DATAPOINTS_PER_TASK = 10000;
+        // note: the default might be a bit high, it is used for the GeoSpatial stuff only, where
+        //       we effectively only investigate a small part of the range; we may decrease for
+        //       normal access paths and, in turn, add an adjustment factor for usage in the geospatial
+        //       context
+        public int DEFAULT_MIN_DATAPOINTS_PER_TASK = 100000;
 
         
         /**
