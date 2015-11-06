@@ -716,5 +716,13 @@ public interface QueryHints {
 
    boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
          System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "false"));
+   
+   /**
+    * 
+    */
+   String PIPELINED_HASH_JOIN = "pipelinedHashJoin";
+
+   boolean DEFAULT_PIPELINED_HASH_JOIN = Boolean.valueOf(System.getProperty(
+           QueryHints.class.getName() + "." + PIPELINED_HASH_JOIN, "false"));
 
 }
