@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Nov 6, 2015
+ * Created on Oct 22, 2015
  */
 
 package com.bigdata.rdf.sparql.ast.hints;
@@ -35,17 +35,16 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Sets the {@link PipelineOp.Annotations#NUM_TASKS_PER_THREAD} annotation of an operator.
- * 
+ * Sets the {@link PipelineOp.Annotations#MIN_DATAPOINTS_PER_TASK} annotation of an operator.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-final class NumTasksPerThreadHint extends AbstractIntQueryHint {
+final class MinDatapointsPerTaskHint extends AbstractIntQueryHint {
 
-   protected NumTasksPerThreadHint() {
-       super(Annotations.NUM_TASKS_PER_THREAD,
-               Annotations.DEFAULT_NUM_TASKS_PER_THREAD);       
+   protected MinDatapointsPerTaskHint() {
+       super(Annotations.MIN_DATAPOINTS_PER_TASK,
+               Annotations.DEFAULT_MIN_DATAPOINTS_PER_TASK);
    }
 
    @Override

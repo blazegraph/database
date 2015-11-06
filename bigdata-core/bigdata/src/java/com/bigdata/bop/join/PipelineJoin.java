@@ -222,12 +222,26 @@ public class PipelineJoin<E> extends PipelineOp implements
         boolean DEFAULT_REORDER_ACCESS_PATHS = true;
 
         /**
-         * Default number of access path tasks generated per thread. The default is one task per thread,
-         * which is a good choice if there's not much skew in the data. If there's a lot of skew, it
-         * might be beneficial to increase this parameter to avoid a situation where a certain thread
-         * gets assigned longer-running tasks s.t. other threads are finished earlier (leading to,
-         * effectively, decreased parallelism). On the downside, increasing this parameter leads to
-         * overhead in setting up additional subtasks, so values >5 are generally discouraged.
+         * The minimum number of (estimated) data points assigned to a task. This basically
+         * defines the threshold upon which parallelization starts to pay out.
+         */
+        public String MIN_DATAPOINTS_PER_TASK = 
+                (PipelineJoin.class.getName() + ".minDatapointsPerTask").intern();
+             
+        public int DEFAULT_MIN_DATAPOINTS_PER_TASK = 10000;
+
+        
+        /**
+         * Desired number of access path tasks generated per thread in case the range is large enough. 
+         * The default is one task per thread, which is a good choice if there's not much skew in
+         * the data. If there's a lot of skew, it might be beneficial to increase this parameter to 
+         * avoid a situation where a certain thread gets assigned longer-running tasks s.t. other
+         * threads are finished earlier (leading to, effectively, decreased parallelism). On the downside,
+         * increasing this parameter leads to overhead in setting up additional subtasks, 
+         * so values >5 are generally discouraged.
+         * 
+         * Note that this is an upper bound only: we always consider the MIN_DATAPOINTS_PER_TASK
+         * threshold in order to avoid generating threads with a low workload.
          * 
          * Must be a value >= 1.
          */
@@ -235,6 +249,7 @@ public class PipelineJoin<E> extends PipelineOp implements
            (PipelineJoin.class.getName() + ".numTasksPerThread").intern();
         
         public int DEFAULT_NUM_TASKS_PER_THREAD = 1;
+        
 
 	}
 

@@ -119,6 +119,7 @@ public class QueryHintRegistry {
         add(new AccessPathSampleLimitHint());
         add(new AccessPathScanAndFilterHint());
         add(new NumTasksPerThreadHint());
+        add(new MinDatapointsPerTaskHint());
         
         // DESCRIBE
         add(new DescribeModeHint());

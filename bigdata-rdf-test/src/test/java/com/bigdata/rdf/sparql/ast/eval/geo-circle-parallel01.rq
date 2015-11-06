@@ -13,5 +13,6 @@ SELECT * WHERE {
   hint:Prior <http://www.bigdata.com/queryHints#maxParallel> "5" .
   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity> "5" .
   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.IBuffer.chunkCapacity> "10" .
-  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.avgDataPointsPerThread> "3" .  
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.numTasksPerThread> "1" .  
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.minDatapointsPerTask> "1" .  
 } 
