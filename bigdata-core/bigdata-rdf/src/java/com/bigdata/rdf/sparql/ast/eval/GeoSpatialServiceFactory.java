@@ -860,6 +860,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
             
+            System.out.println("===============");
+            System.out.println("totalPointsInRange=" + totalPointsInRange);
+            System.out.println("minDatapointsPerTask=" + minDatapointsPerTask);
+            System.out.println("desiredNumTasks=" + desiredNumTasks);
+            System.out.println("nrSubRanges=" + nrSubRanges);
+            
             LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
             LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
             
