@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.impl.AbstractIV;
+import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 
 /**
  * An extension of the intrinsic types defined by {@link DTE}.
@@ -42,6 +43,20 @@ public enum DTEExtension {
 	 * An IPV4 address. 
 	 */
 	IPV4((byte) 0, 0/* len */, IPv4Address.class, XSD.IPV4, DTEFlags.NOFLAGS),
+    
+    /**
+     * A packed long value, restricted to the range [0;72057594037927935L].
+     * Note that this is not the full range of long (negative values are not
+     * supported and positive long values in [72057594037927936L;Long.MAX]
+     * are not supported), the reason being that the compression technique
+     * we're using is order preserving only for the valid range.
+     */
+    PACKED_LONG((byte) 1, 0/* len */, Long.class, PackedLongIV.PACKED_LONG, DTEFlags.NOFLAGS),
+    
+    /**
+     * An array of inline IVs.
+     */
+    ARRAY((byte) 2, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS),
 
 	/**
 	 * This is a place holder for extension of the intrinsic data types. Its
@@ -72,7 +87,7 @@ public enum DTEExtension {
      *            a variable length (xsd:integer, xsd:decimal).
      * @param cls
      *            The class of the Java object used to represent instances of
-     *            the coded data type.
+     *            the coded data type. (The inline object.)
      * @param datatype
      *            The well-known URI for the data type.
      * @param flags
@@ -97,6 +112,10 @@ public enum DTEExtension {
         switch (b) {
         case 0:
             return IPV4;
+        case 1:
+            return PACKED_LONG;            
+        case 2:
+            return ARRAY;
          default:
             throw new IllegalArgumentException(Byte.toString(b));
         }
@@ -127,8 +146,10 @@ public enum DTEExtension {
             return null;
         }
         
-		if (datatype.equals(IPV4.datatypeURI))
+	if (datatype.equals(IPV4.datatypeURI))
 			return IPV4;
+        if (datatype.equals(PACKED_LONG.datatypeURI))
+            return PACKED_LONG;        
 
 		/*
          * Not a known DTE datatype.
@@ -149,7 +170,7 @@ public enum DTEExtension {
 
     /**
      * The class of the Java object used to represent instances of the coded
-     * data type.
+     * data type.  (The inline object.)
      */
     private final Class<?> cls;
 
