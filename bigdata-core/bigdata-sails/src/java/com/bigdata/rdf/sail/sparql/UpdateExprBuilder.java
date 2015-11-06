@@ -60,10 +60,14 @@ import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
 import com.bigdata.rdf.sail.sparql.ast.ASTCreate;
+import com.bigdata.rdf.sail.sparql.ast.ASTCreateEntailments;
 import com.bigdata.rdf.sail.sparql.ast.ASTDeleteClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTDeleteData;
 import com.bigdata.rdf.sail.sparql.ast.ASTDeleteWhere;
+import com.bigdata.rdf.sail.sparql.ast.ASTDisableEntailments;
 import com.bigdata.rdf.sail.sparql.ast.ASTDrop;
+import com.bigdata.rdf.sail.sparql.ast.ASTDropEntailments;
+import com.bigdata.rdf.sail.sparql.ast.ASTEnableEntailments;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphOrDefault;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphRefAll;
@@ -83,10 +87,14 @@ import com.bigdata.rdf.sparql.ast.AddGraph;
 import com.bigdata.rdf.sparql.ast.ClearGraph;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
+import com.bigdata.rdf.sparql.ast.CreateEntailments;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
 import com.bigdata.rdf.sparql.ast.DeleteData;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
+import com.bigdata.rdf.sparql.ast.DisableEntailments;
+import com.bigdata.rdf.sparql.ast.DropEntailments;
 import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.EnableEntailments;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.InsertData;
@@ -1094,5 +1102,29 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         return c;
 
     }
-
+    
+	@Override
+	public DropEntailments visit(ASTDropEntailments node, Object data)
+			throws VisitorException {
+		return new DropEntailments();
+	}
+	
+	@Override
+	public CreateEntailments visit(ASTCreateEntailments node, Object data)
+			throws VisitorException {
+		return new CreateEntailments();
+	}
+	
+	@Override
+	public EnableEntailments visit(ASTEnableEntailments node, Object data)
+			throws VisitorException {
+		return new EnableEntailments();
+	}
+	
+	@Override
+	public DisableEntailments visit(ASTDisableEntailments node, Object data)
+			throws VisitorException {
+		return new DisableEntailments();
+	}
+	
 }
