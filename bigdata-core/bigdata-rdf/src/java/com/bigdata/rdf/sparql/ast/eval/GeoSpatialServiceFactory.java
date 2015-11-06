@@ -839,6 +839,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final AccessPath<ISPO> accessPath = getAccessPath(lowerBorderComponents, upperBorderComponents);
             final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
             
+            // TODO: rangeCount() returns quite strange results, e.g. for 3.3.1 we get >1M although the range
+            // is quite small; need to check what's going on there...
+            
             stats.accessPathRangeCount.add(totalPointsInRange);
 
             /**
@@ -859,12 +862,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final long desiredNumTasks = Math.max(numTasks, 1); /* at least one subrange */
             
             long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
-            
-            System.out.println("===============");
-            System.out.println("totalPointsInRange=" + totalPointsInRange);
-            System.out.println("minDatapointsPerTask=" + minDatapointsPerTask);
-            System.out.println("desiredNumTasks=" + desiredNumTasks);
-            System.out.println("nrSubRanges=" + nrSubRanges);
             
             LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
             LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
