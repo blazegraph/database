@@ -29,8 +29,8 @@ package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -48,8 +48,8 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.constraints.DateTimeUtility;
-import com.bigdata.rdf.internal.constraints.IMathOpHandler;
 import com.bigdata.rdf.internal.constraints.MathUtility;
+import com.bigdata.rdf.internal.constraints.IMathOpHandler;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
@@ -57,9 +57,7 @@ import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
-import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
-import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
@@ -70,6 +68,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -795,11 +794,6 @@ public class LexiconConfiguration<V extends BigdataValue>
 					 * parseable as an IPv4.
 					 */
 					return new IPv4AddrIV<BigdataLiteral>(v);
-				 case PACKED_LONG:
-				    /*
-				     * Extension for packed long value in the range [0;72057594037927935L].
-				     */
-				    return new PackedLongIV<BigdataLiteral>(v);					
 				default:
 					// Not handled.
 					return null;

@@ -141,15 +141,6 @@ public class TestAll extends TestCase {
         // xpath abs(), ceil(), floor(), and round()
         suite.addTestSuite(TestXPathFunctions.class);
         
-        // DTEExtension encoding of packed long integer representing a timestamp.
-        suite.addTestSuite(TestEncodeDecodeCompressedTimestamp.class);
-        
-        // DTEExtension.IPV4
-        suite.addTestSuite(TestEncodeDecodeIPv4AddrIV.class);
-        
-        // DTEExtension.ARRAY
-        suite.addTestSuite(TestEncodeDecodeLiteralArrayIVs.class);
-        
         return suite;
         
     }

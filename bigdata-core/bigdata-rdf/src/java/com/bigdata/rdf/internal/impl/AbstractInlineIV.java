@@ -62,7 +62,6 @@ abstract public class AbstractInlineIV<V extends BigdataValue, T>
     /**
      * Always returns <code>true</code> since the value is inline.
      */
-    @Override
     final public boolean isInline() {
         return true;
     }
