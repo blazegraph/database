@@ -27,8 +27,6 @@ package com.bigdata.rdf.vocab;
 import com.bigdata.rdf.internal.InlineIPv4URIHandler;
 import com.bigdata.rdf.internal.InlineUUIDURIHandler;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.impl.extensions.CompressedTimestampExtension;
-import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 
@@ -75,9 +73,7 @@ public class DefaultBigdataVocabulary extends RDFSVocabulary {
                 XSD.IPV4,//
                 InlineIPv4URIHandler.NAMESPACE,
                 XSD.UUID,
-                InlineUUIDURIHandler.NAMESPACE,
-                PackedLongIV.PACKED_LONG, // supported range: [0;72057594037927935L].
-                CompressedTimestampExtension.COMPRESSED_TIMESTAMP                
+                InlineUUIDURIHandler.NAMESPACE
                 ));
 
     }

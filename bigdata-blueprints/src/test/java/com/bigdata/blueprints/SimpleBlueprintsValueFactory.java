@@ -34,7 +34,7 @@ import java.util.regex.Matcher;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
+import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 
 public class SimpleBlueprintsValueFactory extends DefaultBlueprintsValueFactory {
 

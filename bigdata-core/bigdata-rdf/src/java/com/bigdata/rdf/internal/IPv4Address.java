@@ -23,23 +23,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal;
 
-import java.io.Serializable;
 import java.util.Arrays;
 
-import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Class models an IPv4 address.
  */
-public class IPv4Address implements Serializable, Comparable<IPv4Address> {
+public class IPv4Address {
 
-	/**
-     * 
-     */
-    private static final long serialVersionUID = 8707927477744805951L;
-    
-    final private byte[] address;
+	final private byte[] address;
 
 	public IPv4Address(final byte[] address) {
 		this.address = address;
@@ -133,10 +126,5 @@ public class IPv4Address implements Serializable, Comparable<IPv4Address> {
 
 		return new IPv4Address(address);
 	}
-
-    @Override
-    public int compareTo(IPv4Address other) {
-        return UnsignedByteArrayComparator.INSTANCE.compare(address, other.address);
-    }
 
 }
