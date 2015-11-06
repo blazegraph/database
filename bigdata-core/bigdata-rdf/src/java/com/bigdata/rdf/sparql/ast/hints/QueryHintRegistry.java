@@ -178,6 +178,11 @@ public class QueryHintRegistry {
          */
         add(new HistoryHint());
         
+        /*
+         * Selectively enable/disbale usage of pipelined hash joins.
+         */
+        add(new PipelinedHashJoinHint());
+        
     }
 
 }
