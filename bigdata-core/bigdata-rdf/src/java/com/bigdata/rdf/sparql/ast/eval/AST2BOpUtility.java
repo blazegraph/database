@@ -5568,7 +5568,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
               new NV(BOp.Annotations.EVALUATION_CONTEXT,
                      BOpEvaluationContext.CONTROLLER),//
               new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
-              new NV(PipelineOp.Annotations.LAST_PASS, true),// required TODO: is this needed?
+              new NV(PipelineOp.Annotations.LAST_PASS, true),// required
               new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
               new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
               new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
