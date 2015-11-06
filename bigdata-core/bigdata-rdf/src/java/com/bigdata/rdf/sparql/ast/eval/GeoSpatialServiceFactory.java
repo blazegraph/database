@@ -207,6 +207,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          serviceNode.getQueryHintAsInteger(
             PipelineOp.Annotations.MAX_PARALLEL, 
             PipelineOp.Annotations.DEFAULT_MAX_PARALLEL);
+      final Integer minDatapointsPerTask =
+         serviceNode.getQueryHintAsInteger(
+            Annotations.MIN_DATAPOINTS_PER_TASK, 
+            Annotations.DEFAULT_MIN_DATAPOINTS_PER_TASK);              
       final Integer numTasksPerThread = 
          serviceNode.getQueryHintAsInteger(
             Annotations.NUM_TASKS_PER_THREAD, 
@@ -233,9 +237,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        */
       return new GeoSpatialServiceCall(searchVar, statementPatterns,
             getServiceOptions(), dflts, store, maxParallel, 
-            numTasksPerThread*maxParallel /* num tasks to generate */, 
-            threadLocalBufferCapacity, globalBufferChunkOfChunksCapacity,
-            createParams.getStats());
+            numTasksPerThread*maxParallel /* max num tasks to generate */, 
+            minDatapointsPerTask, threadLocalBufferCapacity, 
+            globalBufferChunkOfChunksCapacity, createParams.getStats());
 
    }
 
@@ -443,6 +447,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final GeoSpatialCounters geoSpatialCounters;
       
       private final int numTasks;
+      private final int minDatapointsPerTask;      
       private final int threadLocalBufferCapacity;
       private final int globalBufferChunkOfChunksCapacity;
       
@@ -461,6 +466,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final IServiceOptions serviceOptions,
             final GeoSpatialDefaults dflts, final AbstractTripleStore kb,
             final int maxParallel, final int numTasks,
+            final int minDatapointsPerTask,
             final int threadLocalBufferCapacity, 
             final int globalBufferChunkOfChunksCapacity,
             final BaseJoinStats stats) {
@@ -564,6 +570,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                kb.getIndexManager()).getGeoSpatialCounters();
             
          this.numTasks = numTasks;
+         this.minDatapointsPerTask = minDatapointsPerTask;         
          this.threadLocalBufferCapacity = threadLocalBufferCapacity;
          this.globalBufferChunkOfChunksCapacity = globalBufferChunkOfChunksCapacity;
          
@@ -629,7 +636,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final FutureTask<Void> ft = 
             new FutureTask<Void>(new GeoSpatialServiceCallTask(
                buffer, query, kb, vars, context, globals, vf, geoSpatialCounters, 
-               executor, numTasks, threadLocalBufferCapacity, stats));
+               executor, numTasks, minDatapointsPerTask, threadLocalBufferCapacity, stats));
          
          buffer.setFuture(ft); // set the future on the buffer
          kb.getIndexManager().getExecutorService().submit(ft);
@@ -669,6 +676,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private  GeoSpatialLiteralExtension<BigdataValue> litExt;
          
          private final int numTasks;
+         private final int minDatapointsPerTask;
          private final int threadLocalBufferCapacity;
 
          private final BaseJoinStats stats;
@@ -689,8 +697,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final BOpContextBase context,
             final GlobalAnnotations globals, final BigdataValueFactory vf,
             final GeoSpatialCounters geoSpatialCounters, final Executor executor,
-            final int numTasks, final int threadLocalBufferCapacity,
-            final BaseJoinStats stats) {
+            final int numTasks, final int minDatapointsPerTask, 
+            final int threadLocalBufferCapacity, final BaseJoinStats stats) {
             
             this.buffer = buffer;
             this.query = query;
@@ -707,6 +715,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.litExt = new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation());
 
             this.numTasks = numTasks;
+            this.minDatapointsPerTask = minDatapointsPerTask;
             this.threadLocalBufferCapacity = threadLocalBufferCapacity;
             
             this.stats = stats;
@@ -828,12 +837,29 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              * 4.) For each of these subranges, we set up a subtask to process the subrange
              */
             final AccessPath<ISPO> accessPath = getAccessPath(lowerBorderComponents, upperBorderComponents);
-            final long totalPointInRange = accessPath.rangeCount(false/* exact */);
+            final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
             
-            stats.accessPathRangeCount.add(totalPointInRange);
+            stats.accessPathRangeCount.add(totalPointsInRange);
 
-            final long nrSubRanges = Math.max(numTasks, 1); /* at least one subrange */
-
+            /**
+             * The number of subtasks is calculated based on two parameters. First, there is a
+             * minumum number of datapoints per task, which is considered a hard limit. This means,
+             * we generate *at most* (totalPointsInRange/minDatapointsPerTask) tasks.
+             * 
+             * The second parameter is the numTasks parameter, which tells us the "desired"
+             * number of tasks. 
+             * 
+             * The number of subranges is then defined as follows:
+             * - If the desired number of tasks is larger than the hard limit, we choose the hard limit
+             * - Otherwise, we choose the desired number of tasks
+             * 
+             * Effectively, this means choosing the smaller of the two values (MIN).
+             */
+            final long maxTasksByDatapointRestriction = totalPointsInRange/minDatapointsPerTask;
+            final long desiredNumTasks = Math.max(numTasks, 1); /* at least one subrange */
+            
+            long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
+            
             LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
             LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
             

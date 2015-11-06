@@ -12,5 +12,6 @@ SELECT ?res WHERE {
   hint:Prior <http://www.bigdata.com/queryHints#maxParallel> "1" .
   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity> "10" .
   hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.IBuffer.chunkCapacity> "100" .
-  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.avgDataPointsPerThread> "10" .
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.numTasksPerThread> "10" .
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.minDatapointsPerTask> "1" .
 } 
