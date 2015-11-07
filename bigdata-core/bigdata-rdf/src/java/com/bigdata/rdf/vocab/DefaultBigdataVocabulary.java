@@ -78,9 +78,7 @@ public class DefaultBigdataVocabulary extends RDFSVocabulary {
                 XSD.IPV4,//
                 InlineIPv4URIHandler.NAMESPACE,
                 XSD.UUID,
-                InlineUUIDURIHandler.NAMESPACE,
-                PackedLongIV.PACKED_LONG, // supported range: [0;72057594037927935L].
-                CompressedTimestampExtension.COMPRESSED_TIMESTAMP                
+                InlineUUIDURIHandler.NAMESPACE
                 ));
 
     }
