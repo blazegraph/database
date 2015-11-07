@@ -27,8 +27,6 @@ package com.bigdata.rdf.vocab;
 import com.bigdata.rdf.internal.InlineIPv4URIHandler;
 import com.bigdata.rdf.internal.InlineUUIDURIHandler;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.impl.extensions.CompressedTimestampExtension;
-import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 
