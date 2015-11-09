@@ -1493,11 +1493,27 @@ the clear/dirty list threshold)
                 if (log.isDebugEnabled())
                     log.debug("Writing to file: " + cache.toString());
 
-                // Flush WriteCache buffer to channel (write on disk)
-                cache.flush(false/* force */);
+                final long begin = System.nanoTime();
+                final long nrecs = cache.recordMap.size(); // #of records in the write cache block.
 
-                counters.get().nbufferEvictedToChannel++;
+                try {
+                
+                    // Flush WriteCache buffer to channel (write on disk)
+                    cache.flush(false/* force */);
+                    
+                } finally {
 
+                    // See BLZG-1589 (new latency-oriented counters)
+                    final long elapsed = System.nanoTime() - begin;
+                    
+                    final WriteCacheServiceCounters c = counters.get();
+                    
+                    c.nbufferEvictedToChannel++;
+                    c.nrecordsEvictedToChannel += nrecs;
+                    c.elapsedBufferEvictedToChannelNanos += elapsed;
+    
+                }
+                
             }
 
             /*
@@ -2347,6 +2363,7 @@ the clear/dirty list threshold)
 
     }
 
+    @Override
     public boolean write(final long offset, final ByteBuffer data, final int chk)
             throws InterruptedException, IllegalStateException {
      
@@ -2391,9 +2408,33 @@ the clear/dirty list threshold)
      *       that buffer first. This might provide better throughput for the RW
      *       store but would require an override of this method specific to that
      *       implementation.
+     *       
+     * See BLZG-1589 (new latency-oriented counters)
      */
     public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum,final int latchedAddr)
             throws InterruptedException, IllegalStateException {
+
+        final long begin = System.nanoTime();
+        
+        try {
+
+            return write_timed(offset, data, chk, useChecksum, latchedAddr);
+            
+        } finally {
+            
+            final long elapsed = System.nanoTime() - begin;
+            
+            final WriteCacheServiceCounters c = counters.get();
+            
+            c.ncacheWrites++; // maintain nwrites
+            c.elapsedCacheWriteNanos += elapsed;
+            
+        }
+        
+    }
+    
+    private boolean write_timed(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum,final int latchedAddr)
+                throws InterruptedException, IllegalStateException {
 
       	if (log.isTraceEnabled()) {
             log.trace("offset: " + offset + ", length: " + data.limit()
@@ -2409,9 +2450,6 @@ the clear/dirty list threshold)
         if (data == null)
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_NULL);
-
-        // maintain nwrites
-        counters.get().ncacheWrites++;
 
         // #of bytes in the record.
         final int remaining = data.remaining();
