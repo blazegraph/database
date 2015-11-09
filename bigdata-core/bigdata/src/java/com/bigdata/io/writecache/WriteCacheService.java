@@ -516,9 +516,21 @@ abstract public class WriteCacheService implements IWriteCache {
              * Setup a reasonable default if no value was specified.
              * Just need to make sure we have a few spare buffers to
              * prevent latency on acquiring a clean buffer for writing.
+	     *
+	     * The default here is 5% of the write cache buffers. This
+	     * is based on historical experience that we do better with
+	     * 50MB of dirty list when there are 2000 write cache buffers,
+	     * which is 2.5%.  It seems a reasonable thing to give over
+	     * 5%.  If you want more write elision, then just increase
+	     * the number of write cache buffers.  95% of them will be 
+	     * used to defer writes and elide writes.  5% of them will
+	     * be available to drive the disk with random write IOs.
+	     *
+	     * See BLZG-1589 (Modify the default behavior for setting
+the clear/dirty list threshold)
              */
             
-            minCleanListSize = Math.min(4, nwriteBuffers);
+            minCleanListSize = Math.min(4, (int) (nwriteBuffers*.05));
 
         }
         
