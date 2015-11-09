@@ -1,5 +1,9 @@
 package com.bigdata.counters.osx;
 
+import com.bigdata.counters.*;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.regex.Pattern;
 
 /**
@@ -254,5 +258,53 @@ public class TestParse_iostat extends AbstractParserTestCase {
 		}
 
 	}
-	
+    public void test_iostat_collector_correct() throws IOException, InterruptedException {
+        String output =
+                "           disk0           disk1           disk2           disk3           disk4       cpu\n" +
+                "     KB/t tps  MB/s     KB/t tps  MB/s     KB/t tps  MB/s     KB/t tps  MB/s     KB/t tps  MB/s  us sy id\n" +
+                "   197.14  26  5.10    79.10   1  0.07     3.74   0  0.00    41.31   0  0.00    13.03   0  0.00  31  6 63\n" +
+                "     0.00   5  0.00     0.00   5  0.00     0.00   0  0.00     0.00   0  0.00     0.00   0  0.00  53  4 43\n";
+        test_iostat_collector(output);
+    }
+
+    protected void test_iostat_collector(String output) throws IOException, InterruptedException {
+
+        final IOStatCollector ioStatCollector = new IOStatCollector(1, true) {
+            @Override
+            public AbstractProcessReader getProcessReader() {
+                return new IOStatReader() {
+                    @Override
+                protected ActiveProcess getActiveProcess() {
+                        return new ActiveProcess() {
+                            @Override
+                            public boolean isAlive() {
+                                return true;
+                            }
+                        };
+                    }
+                };
+            }
+        };
+        final IOStatCollector.IOStatReader ioStatReader = (IOStatCollector.IOStatReader) ioStatCollector.getProcessReader();
+        ioStatReader.start(new ByteArrayInputStream(output.getBytes()));
+        Thread t = new Thread(ioStatReader);
+        t.start();
+        Thread.sleep(1000);
+        CounterSet counterSet = ioStatCollector.getCounters();
+        double cpu_usr = (Double)((ICounter) counterSet.getChild(IProcessCounters.CPU).getChild("% User Time")).getInstrument().getValue();
+        double tps = (Double)((ICounter) counterSet.getChild(IProcessCounters.PhysicalDisk).getChild("Transfers Per Second")).getInstrument().getValue();
+        t.interrupt();
+
+
+        assertEquals(0.53, cpu_usr);
+        assertEquals(tps, 10.0);
+
+
+
+        /*Iterator<ICounter> counters = counterSet.getCounters(Pattern.compile(".*"));
+        while (counters.hasNext()) {
+            System.err.println(counters.next().getInstrument().getValue().toString());
+        }*/
+
+    }
 }
