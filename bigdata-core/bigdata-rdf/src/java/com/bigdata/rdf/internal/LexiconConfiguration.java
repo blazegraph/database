@@ -202,21 +202,26 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     /**
      * The set of registered {@link IMathOpHandler}s.
+     * 
+     * @see BLZG-1592 (ConcurrentModificationException in MathBOp when using expression in BIND)
      */
-    private static final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
+    private final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
 
+    @Override
     public final BigdataValueFactory getValueFactory() {
 
         return valueFactory;
 
     }
 
+    @Override
     public int getMaxInlineStringLength() {
 
         return maxInlineTextLength;
 
     }
 
+    @Override
     public boolean isInlineTextLiterals() {
 
         return inlineTextLiterals;
@@ -263,6 +268,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         
     }
 
+    @Override
     public String toString() {
 
     	final StringBuilder sb = new StringBuilder();
@@ -370,6 +376,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public void initExtensions(final IDatatypeURIResolver resolver) {
 
@@ -407,6 +414,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         typeHandlers.add(new MathUtility());
     }
 
+    @Override
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public V asValue(final LiteralExtensionIV<?> iv
 //            ,final BigdataValueFactory vf
@@ -425,6 +433,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public V asValueFromVocab(final IV<?, ?> iv) {
 
