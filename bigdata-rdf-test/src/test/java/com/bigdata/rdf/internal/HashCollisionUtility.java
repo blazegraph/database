@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -74,6 +75,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rwstore.sector.IMemoryManager;
@@ -924,8 +926,16 @@ public class HashCollisionUtility {
 
 		vf = BigdataValueFactoryImpl.getInstance("test");
 		
-		final BaseVocabulary vocab = new DefaultBigdataVocabulary(vf.getNamespace());
+		final BaseVocabulary vocab;
+        try {
+            vocab = (BaseVocabulary) Class.forName(
+                             AbstractTripleStore.Options.DEFAULT_VOCABULARY_CLASS)
+                    .getDeclaredConstructor(String.class)
+                    .newInstance(vf.getNamespace());
 		vocab.init();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 		
 		// factory does not support any extensions.
 		final IExtensionFactory xFactory = new IExtensionFactory() {

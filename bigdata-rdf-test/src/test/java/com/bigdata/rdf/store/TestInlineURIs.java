@@ -24,7 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
+import java.util.StringTokenizer;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -33,6 +36,7 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.InlineLiteralIV;
 import com.bigdata.rdf.internal.InlineSignedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlineURIFactory;
 import com.bigdata.rdf.internal.InlineURIHandler;
@@ -41,9 +45,11 @@ import com.bigdata.rdf.internal.InlineUnsignedIntegerURIHandler;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
+import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -52,6 +58,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151106;
 
 /**
  * Integration test suite for {@link InlineURIFactory} (the inline IVs are also
@@ -361,16 +368,92 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
 		}
         
     }
+    
+    public void testInlineArray() throws Exception {
+        
+        final Properties props = new Properties(getProperties());
+        
+        props.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, 
+                CustomVocab.class.getName());
+        props.setProperty(AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS, 
+                InlineArrayFactory.class.getName());
+        
+        /*
+         * The bigdata store, backed by a temporary journal file.
+         */
+        final AbstractTripleStore store = getStore(props);
+
+        try {
+
+            final BigdataValueFactory vf = store.getValueFactory();
+
+            final Object[] array = new Object[] {
+                    UUID.randomUUID(),
+                    "1",
+                    Short.MAX_VALUE,
+                    Integer.MAX_VALUE,
+                    Long.MAX_VALUE,
+                    "2.3",
+                    "foo"
+            };
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append(ARRAY);
+            for (Object o : array) {
+                sb.append(o);
+                sb.append(':');
+            }
+            sb.setLength(sb.length()-1);
+            
+            final BigdataURI uri1 = vf.createURI(sb.toString());
+
+            {
+                final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(store,
+                        10/* capacity */);
+                buf.add(uri1, RDF.TYPE, RDFS.RESOURCE);
+                buf.flush();
+                store.commit();
+
+                if (log.isDebugEnabled())
+                    log.debug(store.dumpStore());
+            }
+
+            for (BigdataURI uri : new BigdataURI[] { uri1 }) {
+
+                assertTrue(uri.getIV().isInline());
+                
+            }
+            
+            assertEquals(DTE.Extension, uri1.getIV().getDTE());
+            
+            final InlineLiteralIV[] ivs = ((LiteralArrayIV) ((URIExtensionIV) uri1.getIV()).getLocalNameIV()).getIVs();
+            
+            assertEquals(DTE.UUID, ivs[0].getDTE());
+            assertEquals(DTE.XSDByte, ivs[1].getDTE());
+            assertEquals(DTE.XSDShort, ivs[2].getDTE());
+            assertEquals(DTE.XSDInt, ivs[3].getDTE());
+            assertEquals(DTE.XSDLong, ivs[4].getDTE());
+            assertEquals(DTE.XSDDouble, ivs[5].getDTE());
+            assertEquals(DTE.XSDString, ivs[6].getDTE());
+
+        } finally {
+            store.__tearDownUnitTest();
+        }
+        
+    }
+    
+    
 
     private static final String CUSTOM_NAMESPACE = "application:id:";
     private static final String SIGNED_INT_NAMESPACE = "http://example.com/int/";
     private static final String UNSIGNED_INT_NAMESPACE = "http://example.com/uint/";
     private static final String SUFFIXED_INT_NAMESPACE = "http://example.com/intsuf/";
+    private static final String ARRAY = "myapp:array:";
     
     /**
      * Note: Must be public for access patterns.
      */
-    public static class CustomVocab extends DefaultBigdataVocabulary {
+    public static class CustomVocab extends BigdataCoreVocabulary_v20151106 {
         
         public CustomVocab() {
             super();
@@ -388,6 +471,7 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
             addDecl(new BaseVocabularyDecl(SIGNED_INT_NAMESPACE));
             addDecl(new BaseVocabularyDecl(UNSIGNED_INT_NAMESPACE));
             addDecl(new BaseVocabularyDecl(SUFFIXED_INT_NAMESPACE));
+            addDecl(new BaseVocabularyDecl(ARRAY));
         }        
         
     }
@@ -498,5 +582,58 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
 			return super.getLocalNameFromDelegate(delegate) + suffix;
 		}
 	}
+
+    public static class InlineArrayFactory extends InlineURIFactory {
+        
+        public InlineArrayFactory() {
+            super();
+            addHandler(new InlineArrayHandler(ARRAY));
+        }
+        
+    }
+
+    @SuppressWarnings("rawtypes")
+    public static class InlineArrayHandler extends MultipurposeInlineIDHandler {
+        
+        public InlineArrayHandler(final String namespace) {
+            super(namespace);
+        }
+
+        @Override
+        protected AbstractLiteralIV createInlineIV(final String localName) {
+
+            final List<AbstractLiteralIV> list = new LinkedList<>();
+            
+            final StringTokenizer st = new StringTokenizer(localName, ":");
+            while (st.hasMoreTokens()) {
+                list.add(super.createInlineIV(st.nextToken()));
+            }
+            
+            if (list.isEmpty()) {
+                throw new IllegalArgumentException();
+            }
+            
+            return new LiteralArrayIV(list.toArray(new AbstractLiteralIV[list.size()]));
+            
+        }
+        
+        @Override
+        public String getLocalNameFromDelegate(
+                final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+            
+            final StringBuilder sb = new StringBuilder();
+            
+            final LiteralArrayIV array = (LiteralArrayIV) delegate;
+            
+            for (InlineLiteralIV iv : array.getIVs()) {
+               sb.append(iv.getInlineValue());
+               sb.append(':');
+            }
+            sb.setLength(sb.length()-1);
+            
+            return sb.toString();
+            
+        }
+    }
 
 }
