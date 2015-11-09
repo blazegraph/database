@@ -28,24 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.osx;
 
+import com.bigdata.counters.*;
+import com.bigdata.util.Bytes;
+
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
-
-import com.bigdata.counters.AbstractProcessCollector;
-import com.bigdata.counters.AbstractProcessReader;
-import com.bigdata.counters.ActiveProcess;
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterHierarchy;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IHostCounters;
-import com.bigdata.counters.IInstrument;
-import com.bigdata.counters.IRequiredHostCounters;
-import com.bigdata.counters.ProcessReaderHelper;
-import com.bigdata.util.Bytes;
 
 /**
  * Collects some counters using <code>iostat</code> under OSX. Unfortunately,
@@ -195,8 +187,8 @@ public class IOStatCollector extends AbstractProcessCollector implements
 		command.add("999");
 		
 		// report CPU stats (explicitly request, so in addition to device stats).
-		command.add("-C");
-		
+        command.add("-C");
+
 		// Note: The configured interval in seconds between reports.
 		command.add("-w");
 		command.add("" + getInterval());
@@ -297,8 +289,10 @@ public class IOStatCollector extends AbstractProcessCollector implements
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
 	 */
-    private class IOStatReader extends ProcessReaderHelper {
-        
+    protected class IOStatReader extends ProcessReaderHelper {
+
+        public static final int IOSTAT_CPU_FIELDS_NUM = 3;
+
         @Override
         protected ActiveProcess getActiveProcess() {
             
@@ -336,25 +330,28 @@ public class IOStatCollector extends AbstractProcessCollector implements
             // 1st header. this has the "disk#" metadata, which we are ignoring.
             {
 
-                final String h0;
-                h0 = readLine();
 
-				if (log.isInfoEnabled())
-					log.info("header: " + h0);
 
 			}
 
 			/*
-			 * Read 2nd header. this is also ignored, but we spot check a few
+			 * Read headers. this is also ignored, but we spot check a few
 			 * things.
 			 * 
 			 * Note: We have to recompute the #of devices for each data line as
 			 * devices may be connected and disconnected at any time.
 			 */
 			final int ncpuFields = cpuStats ? 3 : 0; // us sy id
-			final int nfieldsPerDevice = 3; // KB/t tps MB/s
+			final int nfieldsPerDevice; // KB/t tps MB/s
+            final Map<String, Integer> deviceFields = new HashMap<>();
+            final Map<String, Integer> cpuFields = new HashMap<>();
 			String header1 = null;
             {
+                final String h0;
+                h0 = readLine();
+
+                if (log.isInfoEnabled())
+                    log.info("header: " + h0);
 
                 final String h1;
                 header1 = h1 = readLine();
@@ -362,33 +359,23 @@ public class IOStatCollector extends AbstractProcessCollector implements
                 if (log.isInfoEnabled())
                     log.info("header: " + h1);
 
+                int ndevices = pattern.split(h0.trim(), 0).length - 1/* cpu */;
+
 				final String[] fields = pattern
 						.split(h1.trim(), 0/* limit */);
 
 				final int nfields = fields.length;
-				final int ndeviceFields = fields.length - ncpuFields;
-				final int ndevices = ndeviceFields / nfieldsPerDevice;
+				final int ndeviceFields = fields.length - IOSTAT_CPU_FIELDS_NUM;
+                nfieldsPerDevice = ndeviceFields/ndevices;
 
-				if (ndevices * nfieldsPerDevice != ndeviceFields) {
-					// There should be an even multiple of fields per device,
-					// otherwise the format has changed.
-					throw new RuntimeException("Unexpected #of device fields: "
-							+ h1);
-				}
+                for (int i = 0; i < nfieldsPerDevice; i++) {
+                    deviceFields.put(fields[i], i);
+                }
 
-				if (ndevices > 0) {
-					// at least one device.
-					assertField(0, fields, "KB/t");
-					assertField(1, fields, "tps");
-					assertField(2, fields, "MB/s");
-				}
-				
-				if (cpuStats) {
-					assertField(nfields - 3, fields, "us");
-					assertField(nfields - 2, fields, "sy");
-					assertField(nfields - 1, fields, "id");
-				}
-				
+                for (int i = ndeviceFields; i < nfields; i++) {
+                    cpuFields.put(fields[i], i-ndeviceFields);
+                }
+
 				if (log.isInfoEnabled()) {
 					log.info("ndevices=" + ndevices);
 				}
@@ -433,31 +420,29 @@ public class IOStatCollector extends AbstractProcessCollector implements
 							.split(data.trim(), 0/* limit */);
                     
     				final int nfields = fields.length;
-    				final int ndeviceFields = fields.length - ncpuFields;
+    				final int ndeviceFields = fields.length - IOSTAT_CPU_FIELDS_NUM;
     				final int ndevices = ndeviceFields / nfieldsPerDevice;
 
 					if (cpuStats) {
-						
-						final String us = fields[nfields - 3];
-						final String sy = fields[nfields - 2];
-						final String id = fields[nfields - 1];
-						if (cpuStats) {
 
-							vals.put(IHostCounters.CPU_PercentUserTime,
-									Double.parseDouble(us));
+                        final String us = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get("us")];
+                        final String sy = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get("sy")];
+                        final String id = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get("id")];
 
-							vals.put(IHostCounters.CPU_PercentSystemTime,
-									Double.parseDouble(sy));
+                        vals.put(IHostCounters.CPU_PercentUserTime,
+                                Double.parseDouble(us));
 
-							// Note: NOT reported by iostat under OSX.
+                        vals.put(IHostCounters.CPU_PercentSystemTime,
+                                Double.parseDouble(sy));
+
+                        // Note: NOT reported by iostat under OSX.
 //							vals.put(IHostCounters.CPU_PercentIOWait,
 //									Double.parseDouble(iowait));
 
-							vals.put(
-									IRequiredHostCounters.CPU_PercentProcessorTime,
-									(100d - Double.parseDouble(id)));
+                        vals.put(
+                                IRequiredHostCounters.CPU_PercentProcessorTime,
+                                (100d - Double.parseDouble(id)));
 
-						}
 
 					}
 
@@ -469,9 +454,9 @@ public class IOStatCollector extends AbstractProcessCollector implements
 
 						final int off = i * nfieldsPerDevice;
 
-						final String kbPerXfer = fields[off + 0]; // KB/t
-						final String xferPerSec = fields[off + 1]; // tps
-						final String mbPerSec = fields[off + 2]; // MB/s
+						final String kbPerXfer = fields[off + deviceFields.get("KB/t")]; // KB/t
+						final String xferPerSec = fields[off + deviceFields.get("tps")]; // tps
+						final String mbPerSec = fields[off + deviceFields.get("MB/s")]; // MB/s
 
 						final double _kbPerXFer = Double.parseDouble(kbPerXfer);
 						final double _xferPerSec = Double
