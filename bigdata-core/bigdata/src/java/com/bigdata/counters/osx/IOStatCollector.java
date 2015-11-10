@@ -292,6 +292,12 @@ public class IOStatCollector extends AbstractProcessCollector implements
     protected class IOStatReader extends ProcessReaderHelper {
 
         public static final int IOSTAT_CPU_FIELDS_NUM = 3;
+        public static final String IOSTAT_FIELD_KB_T = "KB/t";
+        public static final String IOSTAT_FIELD_TPS = "tps";
+        public static final String IOSTAT_FIELD_MB_S = "MB/s";
+        public static final String IOSTAT_FIELD_CPU_US = "us";
+        public static final String IOSTAT_FIELD_CPU_SY = "sy";
+        public static final String IOSTAT_FIELD_CPU_ID = "id";
 
         @Override
         protected ActiveProcess getActiveProcess() {
@@ -425,9 +431,9 @@ public class IOStatCollector extends AbstractProcessCollector implements
 
 					if (cpuStats) {
 
-                        final String us = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get("us")];
-                        final String sy = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get("sy")];
-                        final String id = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get("id")];
+                        final String us = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get(IOSTAT_FIELD_CPU_US)];
+                        final String sy = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get(IOSTAT_FIELD_CPU_SY)];
+                        final String id = fields[nfields - IOSTAT_CPU_FIELDS_NUM + cpuFields.get(IOSTAT_FIELD_CPU_ID)];
 
                         vals.put(IHostCounters.CPU_PercentUserTime,
                                 Double.parseDouble(us));
@@ -454,9 +460,9 @@ public class IOStatCollector extends AbstractProcessCollector implements
 
 						final int off = i * nfieldsPerDevice;
 
-						final String kbPerXfer = fields[off + deviceFields.get("KB/t")]; // KB/t
-						final String xferPerSec = fields[off + deviceFields.get("tps")]; // tps
-						final String mbPerSec = fields[off + deviceFields.get("MB/s")]; // MB/s
+						final String kbPerXfer = fields[off + deviceFields.get(IOSTAT_FIELD_KB_T)]; // KB/t
+						final String xferPerSec = fields[off + deviceFields.get(IOSTAT_FIELD_TPS)]; // tps
+						final String mbPerSec = fields[off + deviceFields.get(IOSTAT_FIELD_MB_S)]; // MB/s
 
 						final double _kbPerXFer = Double.parseDouble(kbPerXfer);
 						final double _xferPerSec = Double

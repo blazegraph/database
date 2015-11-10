@@ -276,7 +276,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
       }
 
-      Pattern pageSizePattern = Pattern.compile("size of (\\d+) ");
+      private final Pattern pageSizePattern = Pattern.compile("size of (\\d+) ");
 
       /**
        * The index of the field associated with the "free" counter.
