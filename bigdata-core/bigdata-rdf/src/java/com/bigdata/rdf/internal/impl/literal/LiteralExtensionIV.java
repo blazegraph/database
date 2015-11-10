@@ -13,6 +13,7 @@ import com.bigdata.rdf.internal.DTEExtension;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.InlineLiteralIV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
@@ -37,7 +38,7 @@ import com.bigdata.rdf.model.BigdataURI;
  */
 public class LiteralExtensionIV<V extends BigdataLiteral> 
     	extends AbstractInlineExtensionIV<V, Object> 
-		implements Literal { 
+		implements Literal, InlineLiteralIV<V, Object> { 
 
     /**
      * 

@@ -21,13 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.internal.impl.uri;
+package com.bigdata.rdf.internal.impl.literal;
 
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
-import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.net.UnknownHostException;
 import java.util.regex.Matcher;
@@ -36,21 +31,17 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.DTEExtension;
 import com.bigdata.rdf.internal.IPv4Address;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.util.BytesUtil;
-import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
- * Internal value representing an inline IP address. Uses the InetAddress class
+ * Internal value representing an inline IP address. Uses the IPv4Address class
  * to represent the IP address and perform the translation to and from a
  * <code>byte[]</code>, which is then used directly in the IV key (after the
  * flags).
@@ -83,11 +74,6 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	private transient String hostAddress;
 	
 	/**
-	 * The cached byte[] key for the encoding of this IV.
-	 */
-	private transient byte[] key;
-	
-	/**
 	 * The cached materialized BigdataValue for this InetAddress.
 	 */
 	private transient V uri;
@@ -97,9 +83,6 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 
         final IPv4AddrIV<V> tmp = new IPv4AddrIV<V>(value);
 
-        // Propagate the cached byte[] key.
-        tmp.key = key;
-        
         // Propagate the cached BigdataValue.
         tmp.uri = uri;
         
@@ -187,7 +170,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	        if (log.isDebugEnabled()) {
                 log.debug(value);
                 log.debug(byteLength());
-                log.debug(BytesUtil.toString(key()));
+                log.debug(BytesUtil.toString(value.getBytes()));
     		}
 	        
 		} else {
@@ -202,6 +185,11 @@ public class IPv4AddrIV<V extends BigdataLiteral>
     }
 
 	@Override
+    public DTEExtension getDTEX() {
+        return DTEExtension.IPV4;
+    }
+    
+    @Override
 	public IPv4Address getInlineValue() throws UnsupportedOperationException {
 		return value;
 	}
@@ -218,7 +206,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 
 	@Override
 	public int byteLength() {
-		return 1 /* flags */ + 1 /* DTEExtension */ + key().length;
+        return 1 /* flags */ + 1 /* DTEExtension */ + value.getBytes().length;
 	}
 
 	@Override
@@ -253,101 +241,13 @@ public class IPv4AddrIV<V extends BigdataLiteral>
         return false;
 	}
 
+        @Override
 	@SuppressWarnings("rawtypes")
-	@Override
 	public int _compareTo(final IV o) {
-
-	    /*
-	     * Note: This works, but it might be more expensive.
-	     */
-	    return UnsignedByteArrayComparator.INSTANCE.compare(key(), ((IPv4AddrIV)o).key());
-
-	}
-	
-    /**
-	 * Encode this internal value into the supplied key builder. Emits the
-	 * flags, {@link DTEExtension#IPV4}, and then the encoded byte[]
-	 * representing the IPv4 address.
-	 * <p>
-	 * {@inheritDoc}
-	 */
-	@Override
-    public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
-
-        // First emit the flags byte.
-        keyBuilder.appendSigned(flags());
-       
-        // The DTEExtension value for this intrinsic type.
-        keyBuilder.append(DTEExtension.IPV4.v());
-		
-		// Then append the InetAddress byte[] and the prefix.
-        keyBuilder.append(key());
-        
-        return keyBuilder;
-            
+        return value.compareTo(((IPv4AddrIV) o).value);
     }
     
-    private byte[] key() {
-
-        if (key == null) {
-        	key = value.getBytes();
-        }
-
-        return key;
-        
-    }
-
-    /**
-	 * Object provides serialization for {@link IPv4AddrIV} via the
-	 * write-replace and read-replace pattern.
-	 * <p>
-	 * Note: Only the IPv4 address is written (not the flags,
-	 * {@link DTEExtension}, etc.).
-	 */
-    private static class IPAddrIVState implements Externalizable {
-
-        private static final long serialVersionUID = -1L;
-
-        private byte[] key;
-        
-        /**
-         * De-serialization constructor.
-         */
-        public IPAddrIVState() {
-            
-        }
-        
-        private IPAddrIVState(@SuppressWarnings("rawtypes") final IPv4AddrIV iv) {
-//            this.flags = flags;
-            this.key = iv.key();
-        }
-        
-        @Override
-        public void readExternal(final ObjectInput in) throws IOException,
-                ClassNotFoundException {
-            final int nbytes = LongPacker.unpackInt(in);
-            key = new byte[nbytes];
-            in.readFully(key);
-        }
-
-        @Override
-        public void writeExternal(final ObjectOutput out) throws IOException {
-            LongPacker.packLong(out, key.length);
-            out.write(key);
-        }
-        
-        private Object readResolve() throws ObjectStreamException {
-	        return new IPv4Address(key);
-        }
-
-    }
-    
-    private Object writeReplace() throws ObjectStreamException {
-        return new IPAddrIVState(this);
-    }
-    
-    public static Matcher getIPv4Matcher(String addr)
-    {
+    public static Matcher getIPv4Matcher(String addr) {
     	return IPv4AddrIV.pattern.matcher(addr);
     }
 

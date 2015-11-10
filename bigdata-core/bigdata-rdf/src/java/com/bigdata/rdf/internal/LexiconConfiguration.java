@@ -57,6 +57,7 @@ import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
@@ -69,7 +70,6 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
-import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -215,21 +215,26 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     /**
      * The set of registered {@link IMathOpHandler}s.
+     * 
+     * @see BLZG-1592 (ConcurrentModificationException in MathBOp when using expression in BIND)
      */
-    private static final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
+    private final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
 
+    @Override
     public final BigdataValueFactory getValueFactory() {
 
         return valueFactory;
 
     }
 
+    @Override
     public int getMaxInlineStringLength() {
 
         return maxInlineTextLength;
 
     }
 
+    @Override
     public boolean isInlineTextLiterals() {
 
         return inlineTextLiterals;
@@ -289,6 +294,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         
     }
 
+    @Override
     public String toString() {
 
     	final StringBuilder sb = new StringBuilder();
@@ -400,6 +406,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public void initExtensions(final IDatatypeURIResolver resolver) {
 
@@ -437,6 +444,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         typeHandlers.add(new MathUtility());
     }
 
+    @Override
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public V asValue(final LiteralExtensionIV<?> iv
 //            ,final BigdataValueFactory vf
@@ -455,6 +463,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public V asValueFromVocab(final IV<?, ?> iv) {
 
@@ -825,11 +834,11 @@ public class LexiconConfiguration<V extends BigdataValue>
 					 * parseable as an IPv4.
 					 */
 					return new IPv4AddrIV<BigdataLiteral>(v);
-				case PACKED_LONG:
+                case PACKED_LONG:
 				    /*
-				     * Extension for packed long.
+				     * Extension for packed long value in the range [0;72057594037927935L].
 				     */
-				    return new PackedLongIV<BigdataLiteral>(v);
+				    return new PackedLongIV<BigdataLiteral>(v);					
 				default:
 					// Not handled.
 					return null;

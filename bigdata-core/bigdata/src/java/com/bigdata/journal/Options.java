@@ -246,9 +246,9 @@ public interface Options {
     /**
      * Option may be used to control the maximum number of buffers on the
      * {@link WriteCacheService} dirty list (default
-     * {@value #DEFAULT_WRITE_CACHE_MIN_CLEAN_LIST_SIZE}). This effectively
-     * controls the maximum number of buffers that are clean and available for
-     * writes.
+     * {@value #DEFAULT_WRITE_CACHE_MIN_CLEAN_LIST_SIZE}, which means that an
+     * intelligent policy used). This effectively controls the maximum number of
+     * buffers that are clean and available for writes.
      * <p>
      * Note: This option has no effect for a WORM mode journal.
      */
@@ -666,7 +666,7 @@ public interface Options {
     /**
      * @see #WRITE_CACHE_MIN_CLEAN_LIST_SIZE
      */
-    String DEFAULT_WRITE_CACHE_MIN_CLEAN_LIST_SIZE = "3";
+    String DEFAULT_WRITE_CACHE_MIN_CLEAN_LIST_SIZE = "0";
     
     /**
      * @see #WRITE_CACHE_COMPACTION_THRESHOLD

@@ -22,29 +22,28 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-package com.bigdata.rdf.vocab;
+package com.bigdata.rdf.vocab.core;
 
-import com.bigdata.rdf.internal.InlineIPv4URIHandler;
-import com.bigdata.rdf.internal.InlineUUIDURIHandler;
-import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.extensions.CompressedTimestampExtension;
+import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
+import com.bigdata.rdf.vocab.BaseVocabularyDecl;
+import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
+import com.bigdata.rdf.vocab.decls.GeoSpatialVocabularyDecl;
 
 /**
- * Extended vocabulary to include some new declarations. 
- * Note: Do not modify this class.  Create an entirely new vocabulary and edit
+ * Core Bigdata vocabulary.
+ *  
+ * Note: Do not modify this class.  Create an entirely new vocabulary that
+ * extends this one and edit
  * {@link AbstractTripleStore.Options#DEFAULT_VOCABULARY_CLASS}.
- * 
- * NOTE: Default is a terrible name for this class.  The core vocabulary
- * will naturally evolve over time.  This version of this class was the default
- * vocabulary for journals created prior to 11/6/2015.  -MP
  */
-public class DefaultBigdataVocabulary extends RDFSVocabulary {
+public class BigdataCoreVocabulary_v20151106 extends DefaultBigdataVocabulary {
 
     /**
      * De-serialization ctor.
      */
-    public DefaultBigdataVocabulary() {
+    public BigdataCoreVocabulary_v20151106() {
         
         super();
         
@@ -56,7 +55,7 @@ public class DefaultBigdataVocabulary extends RDFSVocabulary {
      * @param namespace
      *            The namespace of the KB instance.
      */
-    public DefaultBigdataVocabulary(final String namespace) {
+    public BigdataCoreVocabulary_v20151106(final String namespace) {
 
         super(namespace);
         
@@ -66,17 +65,14 @@ public class DefaultBigdataVocabulary extends RDFSVocabulary {
     protected void addValues() {
 
         super.addValues();
+        addDecl(new GeoSpatialVocabularyDecl());
         
-        addDecl(new VoidVocabularyDecl());
-
         /*
          * Some new URIs for inline URI handling.
          */
         addDecl(new BaseVocabularyDecl(
-                XSD.IPV4,//
-                InlineIPv4URIHandler.NAMESPACE,
-                XSD.UUID,
-                InlineUUIDURIHandler.NAMESPACE
+                PackedLongIV.PACKED_LONG, // supported range: [0;72057594037927935L].
+                CompressedTimestampExtension.COMPRESSED_TIMESTAMP                
                 ));
 
     }
