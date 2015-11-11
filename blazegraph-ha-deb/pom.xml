@@ -356,6 +356,37 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-ha</artifactId>
       <version>${project.version}</version>
+      <!-- Pull in these dependencies from the bigdata-runtime -->
+      <exclusions>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-jini</artifactId>
+      <version>${project.version}</version>
+      <!-- Pull in these dependencies from the bigdata-runtime -->
+      <exclusions>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-zookeeper</artifactId>
+      <version>${project.version}</version>
+      <!-- Pull in these dependencies from the bigdata-runtime -->
+      <exclusions>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- External and third party dependencies -->
     <dependency>

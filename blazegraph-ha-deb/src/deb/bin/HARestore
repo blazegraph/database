@@ -1,31 +1,32 @@
 #!/bin/bash
 
 #
-# This script has been developed for the "systap-aws-bigdata-ha" cluster
-# deployment package.
-#
-# The HARestore script will recreate the Bigdata HA journal file as of
+# The HARestore script will recreate the Blazegraph HA journal file as of
 # the most recent commit point from log and snapshot files.  The
 # intended use of the script is to restore a journal file that resides
 # on an ephemeral storage media (especially, an SSD instance disk)
 # from a combination of full backups and transaction logs on durable
 # media (e.g., EBS) following a system reboot.  The script should not
-# be executed while Bigdata is running (it requires exclusive access
+# be executed while Blazegraph is running (it requires exclusive access
 # to the journal and will not be able to run if bigdata is already
 # running).
 #
-# HARestore takes no arguments and assumes the Bigdata journal filename\
+# HARestore takes no arguments and assumes the Blazegraph journal filename\
 # convention: "bigdata-ha.jnl".
 #
 
 source /etc/default/blazegraph-ha
 
 SERVICE_DIR="$FED_DIR/$FEDNAME/$LOGICAL_SERVICE_ID/HAJournalServer"
-LIB_DIR="$FED_DIR/lib"
+LIB_DIR="$BLZG_HOME/lib"
 
-java -cp $LIB_DIR/bigdata.jar:$LIB_DIR/commons-logging.jar:$LIB_DIR/log4j.jar:$LIB_DIR/highscalelib.jar:$LIB_DIR/fastutil.jar:$LIB_DIR/dsiutils.jar:$LIB_DIR/lgplutils.jar:$LIB_DIR/icu4j.jar\
-     -Dlog4j.configuration=file:var/config/logging/log4j.properties\
-     com.bigdata.journal.jini.ha.HARestore\
-     -o $DATA_DIR/bigdata-ha.jnl\
-     $SERVICE_DIR/snapshot\
-     $SERVICE_DIR/HALog
+# TODO Explicitly enumerate JARs so we can control order if necessary and
+# deploy on OS without find and tr.
+export HAJOURNAL_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
+
+java -cp ${HAJOURNAL_CLASSPATH} \
+     -Dlog4j.configuration=file:"${BLZG_HOME}/conf/log4jHA.properties \
+     com.bigdata.journal.jini.ha.HARestore \
+     -o "$DATA_DIR"/bigdata-ha.jnl \
+     "$SNAPSHOT_DIR" \
+     "$HALOG_DIR" \
