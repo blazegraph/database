@@ -579,11 +579,6 @@ ga('send', 'pageview');
 	       <version>${blueprints.version}</version>
         </dependency>
         <dependency>
-	       <groupId>com.tinkerpop.blueprints</groupId>
-	       <artifactId>blueprints-test</artifactId>
-	       <version>${blueprints.version}</version>
-        </dependency>
-        <dependency>
 	       <groupId>com.tinkerpop.rexster</groupId>
 	       <artifactId>rexster-core</artifactId>
 	       <version>${rexster.version}</version>
