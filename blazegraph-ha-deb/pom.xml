@@ -88,12 +88,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   </mapper>
                 </data>
 
-                <!-- create the data directories, log directories -->
+                <!-- create the data, log, snapshots, and halog directories -->
                 <data>
                   <type>template</type>
                   <paths>
                     <path>/var/log/blazegraph-ha</path>
                     <path>/usr/local/blazegraph-ha-${project.version}/data/</path>
+                    <path>/usr/local/blazegraph-ha-${project.version}/snapshots/</path>
+                    <path>/usr/local/blazegraph-ha-${project.version}/halog/</path>
                   </paths>
                   <mapper>
                     <type>perm</type>
