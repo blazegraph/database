@@ -8,10 +8,10 @@ BLZG_LOG=/var/log/${NAME}
 DATA_DIR="${BLZG_HOME}"/data
 
 #This is where to store snapshots.  It should be durable.  EBS disk on EC2.
-SNAPSHOT_DIR="${BLZG_HOME}"/data
+SNAPSHOT_DIR="${BLZG_HOME}"/snapshot
 
 #This is where to store logs.  It should be durable.  EBS disk on EC2.
-HALOG_DIR="${BLZG_HOME}"/data
+HALOG_DIR="${BLZG_HOME}"/halog
 
 # Run Blazegraph as this user ID and group ID
 BLZG_USER=blzg

@@ -8,8 +8,23 @@ fi
 
 export INSTALL_DIR="${BLZG_HOME}"
 
+#Setup defaults for data, snapshots, and halog directories
+
 if [ -z "${DATA_DIR}" ] ; then
 	export DATA_DIR=${BLZG_HOME}/data
+fi
+
+if [ -z "${SNAPSHOT_DIR}" ] ; then
+	export SNAPSHOT_DIR=${BLZG_HOME}/snapshots
+fi
+
+if [ -z "${HALOG_DIR}" ] ; then
+	export HALOG_DIR=${BLZG_HOME}/halog
+fi
+
+#Default to group commit OFF
+if [ -z "${GROUP_COMMIT}" ] ; then
+    export GROUP_COMMIT=false
 fi
 
 ##
@@ -70,6 +85,8 @@ export HA_OPTS="\
  -DLOGICAL_SERVICE_ID=${LOGICAL_SERVICE_ID}\
  -DFED_DIR=${FED_DIR}\
  -DDATA_DIR=${DATA_DIR}\
+ -DSNAPSHOT_DIR=${SNAPSHOT_DIR}\
+ -DHALOG_DIR=${HALOG_DIR}\
  -DREPLICATION_FACTOR=${REPLICATION_FACTOR}\
  -DGROUPS=${GROUPS}\
  -DLOCATORS=${LOCATORS}\
