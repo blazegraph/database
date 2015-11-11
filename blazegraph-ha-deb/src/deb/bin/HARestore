@@ -18,7 +18,7 @@
 # convention: "bigdata-ha.jnl".
 #
 
-source /etc/default/bigdataHA
+source /etc/default/blazegraph-ha
 
 SERVICE_DIR="$FED_DIR/$FEDNAME/$LOGICAL_SERVICE_ID/HAJournalServer"
 LIB_DIR="$FED_DIR/lib"
