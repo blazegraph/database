@@ -1,7 +1,13 @@
 #!/bin/bash
 
-# Setup the environment.                                                                                                                       
-source src/resources/HAJournal/HAJournal.env
+# Setup the source environment.
+source /etc/default/blazegraph-ha
+
+LIB_DIR="$BLZG_HOME/lib"
+
+# TODO Explicitly enumerate JARs so we can control order if necessary and
+# deploy on OS without find and tr.
+export CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
 # Uncomment to enable profiler.
 #profilerAgent=-agentpath:/nas/install/yjp-12.0.6/bin/linux-x86-64/libyjpagent.so
