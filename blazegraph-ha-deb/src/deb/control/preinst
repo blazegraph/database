@@ -1,7 +1,7 @@
 #Add the blazgraph group
 addgroup --system --quiet blzg
 #Add the blazegraph user with the home directory
-adduser --system --home /usr/local/blazegraph --quiet blzg
+adduser --system --home /usr/local/blazegraph-ha --quiet blzg
 #Enable TCP_TW_REUSE
 echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 #Set VM swappiness to 0
