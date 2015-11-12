@@ -46,6 +46,16 @@ cd /usr/local/blazegraph-ha/bin/
 ./HARestore
 ```
 
+Taking a snapshot
+-----------------
+A snapshot will force a full backup.  See https://wiki.blazegraph.com/wiki/index.php/HAJournalServer#Requesting_a_Snapshot.  There is a utility script in `/usr/local/blazegraph-ha/bin/snapshot.sh`, which may be used to force a snapshot or configured as a cronjob to run at a particular time.
+
+Example crontab entry for daily snapshot
+```
+#Take a full snapshot at 0200 every day
+0 2 * * * /usr/local/blazegraph-ha/bin/snapshot.sh 2>&1 >& /dev/null
+```
+
 HA3 Configuration
 -----------------
 
