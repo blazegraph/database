@@ -20,6 +20,9 @@ source /etc/default/blazegraph-ha
 SERVICE_DIR="$FED_DIR/$FEDNAME/$LOGICAL_SERVICE_ID/HAJournalServer"
 LIB_DIR="$BLZG_HOME/lib"
 
+#Default HA journal file name
+JNL_FILE="bigdata-ha.jnl"
+
 # TODO Explicitly enumerate JARs so we can control order if necessary and
 # deploy on OS without find and tr.
 export HAJOURNAL_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
@@ -27,6 +30,8 @@ export HAJOURNAL_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 java -cp ${HAJOURNAL_CLASSPATH} \
      -Dlog4j.configuration=file:"${BLZG_HOME}"/conf/log4jHA.properties \
      com.bigdata.journal.jini.ha.HARestore \
-     -o "$DATA_DIR"/bigdata-ha.jnl \
+     -o "$DATA_DIR"/"$JNL_FILE" \
      "$SNAPSHOT_DIR" \
      "$HALOG_DIR" \
+
+chown $BLZG_USER:BLZG_GROUP "$DATA_DIR"/"$JNL_FILE"
