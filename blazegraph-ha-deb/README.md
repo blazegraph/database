@@ -36,6 +36,16 @@ SNAPSHOT_DIR="${BLZG_HOME}"/data
 HALOG_DIR="${BLZG_HOME}"/data
 ```
 
+Restoring a Journal from Snapshots and the HALogs
+-------------------------------------------------
+The script in `/usr/local/blazegraph-ha/bin/HARestore` may be used to restore a journal file from snapshots and the HALogs.   It uses the properties in /etc/default/blazegraph-ha to determine where to find the HALogs, snapshots, and place the new journal.  The journal file in the BlZG_HOME/data directory must not exist or the restore utility will fail.
+
+
+```
+cd /usr/local/blazegraph-ha/bin/
+./HARestore
+```
+
 HA3 Configuration
 -----------------
 
