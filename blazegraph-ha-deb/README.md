@@ -58,8 +58,8 @@ Example crontab entry for daily snapshot
 
 HA3 Configuration
 -----------------
-
--  Install the Blazegraph HA1 debian package on three machines with a networking configuration that allows communication between the nodes.  Make a note of each of the server names or IPs.
+- Setup a VPC or other networking environment for three servers such that they may communicate internally without firewall restrictions, etc.
+-  Install the Blazegraph HA1 debian package on three machines with a networking configuration that allows communication between the nodes.  Make a note of each of the server names or IPs.  You will need to use the internal IPs for the servers in the VPC.
 
 ```
 server1
