@@ -151,7 +151,8 @@ public class TestAll extends TestCase {
         suite.addTest(com.bigdata.rdf.internal.gis.TestAll.suite());
 
         // DTEExtension encoding of packed long integer representing a timestamp.
-        suite.addTestSuite(TestEncodeDecodeCompressedTimestamp.class);
+        suite.addTestSuite(TestEncodeDecodePackedLongIVs.class);
+        suite.addTestSuite(TestPackedLongIVs.class);
         
         // DTEExtension.IPV4
         suite.addTestSuite(TestEncodeDecodeIPv4AddrIV.class);
