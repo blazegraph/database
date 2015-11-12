@@ -25,7 +25,7 @@ LIB_DIR="$BLZG_HOME/lib"
 export HAJOURNAL_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
 java -cp ${HAJOURNAL_CLASSPATH} \
-     -Dlog4j.configuration=file:"${BLZG_HOME}/conf/log4jHA.properties \
+     -Dlog4j.configuration=file:"${BLZG_HOME}"/conf/log4jHA.properties \
      com.bigdata.journal.jini.ha.HARestore \
      -o "$DATA_DIR"/bigdata-ha.jnl \
      "$SNAPSHOT_DIR" \

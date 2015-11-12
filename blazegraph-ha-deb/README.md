@@ -4,9 +4,11 @@ Blazegraph Debian Deployer
 This by default installs and starts a Blazegraph HA1 configuration.   See below for EC2 tuning and HA3 setup.
 
 ```
-apt-get install zookeeperd
+apt-get update #Update to the latest
+cd blazegraph-ha-deb
 mvn package
 dpkg --install target/blazegraph-ha-deb-1.6.0-master-SNAPSHOT.deb
+apt-get install -f -y #force install of dependencies without prompting for updates
 ```
 
 This will start a Blazegraph instance running on port 9999 on localhost host.

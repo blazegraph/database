@@ -475,6 +475,16 @@ ga('send', 'pageview');
            <version>${colt.version}</version>
        </dependency>
        <dependency>
+          <groupId>it.unimi.dsi</groupId>
+          <artifactId>fastutil</artifactId>
+          <version>${fastutil.version}</version>
+       </dependency>
+       <dependency>
+          <groupId>it.unimi.dsi</groupId>
+          <artifactId>dsiutils</artifactId>
+          <version>1.0.10</version>
+       </dependency>
+       <dependency>
            <groupId>org.apache.lucene</groupId>
            <artifactId>lucene-core</artifactId>
            <version>${lucene.version}</version>

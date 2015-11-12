@@ -1,1 +1,1 @@
-service blazegraph-ha stop
+service blazegraph-ha stop || true
