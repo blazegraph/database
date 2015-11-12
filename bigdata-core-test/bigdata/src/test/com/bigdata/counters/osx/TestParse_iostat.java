@@ -288,13 +288,17 @@ public class TestParse_iostat extends AbstractParserTestCase {
         final IOStatCollector.IOStatReader ioStatReader = (IOStatCollector.IOStatReader) ioStatCollector.getProcessReader();
         ioStatReader.start(new ByteArrayInputStream(output.getBytes()));
         Thread t = new Thread(ioStatReader);
-        t.start();
-        Thread.sleep(1000);
-        CounterSet counterSet = ioStatCollector.getCounters();
+        CounterSet counterSet;
+        try {
+            t.start();
+            Thread.sleep(100);
+            counterSet = ioStatCollector.getCounters();
+        } finally {
+            t.interrupt();
+        }
+
         double cpu_usr = (Double)((ICounter) counterSet.getChild(IProcessCounters.CPU).getChild("% User Time")).getInstrument().getValue();
         double tps = (Double)((ICounter) counterSet.getChild(IProcessCounters.PhysicalDisk).getChild("Transfers Per Second")).getInstrument().getValue();
-        t.interrupt();
-
 
         assertEquals(0.53, cpu_usr);
         assertEquals(tps, 10.0);

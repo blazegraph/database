@@ -258,13 +258,16 @@ Mach Virtual Memory Statistics: (page size of 4096 bytes)
         final VMStatCollector.VMStatReader vmStatReader = (VMStatCollector.VMStatReader) vmStatCollector.getProcessReader();
         vmStatReader.start(new ByteArrayInputStream(output.getBytes()));
         Thread t = new Thread(vmStatReader);
-        t.start();
-        Thread.sleep(1000);
-        CounterSet counterSet = vmStatCollector.getCounters();
-        double bytes_free = (Double)((ICounter) counterSet.getChild(IProcessCounters.Memory).getChild("Bytes Free")).getInstrument().getValue();
-        t.interrupt();
+        CounterSet counterSet;
+        try {
+            t.start();
+            Thread.sleep(100);
+            counterSet = vmStatCollector.getCounters();
+        } finally {
+            t.interrupt();
+        }
 
-
+        double bytes_free = (Double) ((ICounter) counterSet.getChild(IProcessCounters.Memory).getChild("Bytes Free")).getInstrument().getValue();
         assertEquals(404670*4096, bytes_free);
 
 
