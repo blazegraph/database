@@ -336,6 +336,20 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
+  <repositories>
+    <repository>
+      <id>bigdata.releases</id>
+      <url>http://www.systap.com/maven/releases/</url>
+    </repository>
+    <repository>
+      <id>bigdata.snapshots</id>
+      <url>http://www.systap.com/maven/snapshots/</url>
+    </repository>
+    <repository>
+    <id>repo-for-dsiutils</id>
+    <url>http://ir.dcs.gla.ac.uk/~bpiwowar/maven/</url>
+    </repository>
+  </repositories>
   <dependencies>
     <!-- only use the runtime jar here to make it straightforward to upgrade in place -->
     <dependency>
