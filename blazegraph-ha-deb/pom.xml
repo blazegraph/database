@@ -345,18 +345,140 @@ ga('send', 'pageview');
   </reporting>
   
   <dependencies>
-    <!-- only use the runtime jar here to make it straightforward to upgrade in place -->
+    <!-- 1.5.3 and earlier; The jini config files need to be updated for the changes to ConfigMath 
+    <dependency>
+      <groupId>com.bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+      <version>1.5.3</version>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jini-ext</artifactId>
+        <version>2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-lib</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-platform</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-resources</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>start</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>tools</artifactId>
+        <version>2.2.2</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>com.sun.jini</groupId>
+	    <artifactId>sun-util</artifactId>
+	    <version>2.1</version>
+    </dependency>
+    -->
+    <!-- Post maven -->
+    <!-- only use the runtime jar here to make it straightforward to upgrade in place 
+    -->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-runtime</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Pull in these dependencies from the bigdata-runtime -->
     <!-- Blazegraph HA -->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-ha</artifactId>
       <version>${project.version}</version>
-      <!-- Pull in these dependencies from the bigdata-runtime -->
       <exclusions>
         <exclusion>
           <groupId>com.blazegraph</groupId>
@@ -368,7 +490,6 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-jini</artifactId>
       <version>${project.version}</version>
-      <!-- Pull in these dependencies from the bigdata-runtime -->
       <exclusions>
         <exclusion>
           <groupId>com.blazegraph</groupId>
@@ -380,7 +501,6 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-zookeeper</artifactId>
       <version>${project.version}</version>
-      <!-- Pull in these dependencies from the bigdata-runtime -->
       <exclusions>
         <exclusion>
           <groupId>com.blazegraph</groupId>
