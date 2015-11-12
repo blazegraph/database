@@ -8,7 +8,7 @@ BLZG_LOG=/var/log/${NAME}
 DATA_DIR="${BLZG_HOME}"/data
 
 #This is where to store snapshots.  It should be durable.  EBS disk on EC2.
-SNAPSHOT_DIR="${BLZG_HOME}"/snapshot
+SNAPSHOT_DIR="${BLZG_HOME}"/snapshots
 
 #This is where to store logs.  It should be durable.  EBS disk on EC2.
 HALOG_DIR="${BLZG_HOME}"/halog
