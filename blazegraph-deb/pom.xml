@@ -574,5 +574,15 @@ ga('send', 'pageview');
 	       <artifactId>commons-configuration</artifactId>
 	       <version>${apache.commons_configuration.version}</version>
         </dependency> 
+        <dependency>
+          <groupId>it.unimi.dsi</groupId>
+          <artifactId>fastutil</artifactId>
+          <version>${fastutil.version}</version>
+       </dependency>
+       <dependency>
+          <groupId>it.unimi.dsi</groupId>
+          <artifactId>dsiutils</artifactId>
+          <version>1.0.10</version>
+       </dependency>
    </dependencies>
 </project>

@@ -24,6 +24,7 @@ export CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
 java ${JAVA_OPTS} \
     -cp ${CLASSPATH} \
+    -Dlog4j.configuration=file:"${BLZG_HOME}"/conf/log4jHA.properties \
     -Djava.security.policy=${POLICY_FILE}\
     com.bigdata.journal.DumpJournal \
     $*

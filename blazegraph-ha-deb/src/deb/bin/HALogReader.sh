@@ -16,5 +16,6 @@ export CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 java ${JAVA_OPTS} \
 	-cp ${CLASSPATH} \
     -Djava.security.policy=${POLICY_FILE}\
+    -Dlog4j.configuration=file:"${BLZG_HOME}"/conf/log4jHA.properties \
     com.bigdata.ha.halog.HALogReader \
     $*
