@@ -211,7 +211,7 @@ public class TestVirtualGraphs extends AbstractBigdataExprBuilderTestCase {
                 dataset.addDefaultGraph(uri1);
                 dataset.addNamedGraph(alice);
                 dataset.addNamedGraph(bob);
-                final DatasetNode datasetNode = new DatasetNode(dataset, false/* update */);
+                final DatasetNode datasetNode = new DatasetNode(dataset, false/* update */, tripleStore.getValueFactory());
                 expected.setDataset(datasetNode);
             }
 
