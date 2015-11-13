@@ -32,7 +32,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>blazegraph-deb</artifactId>
+  <artifactId>blazegraph-ha-deb</artifactId>
   <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph Debian Package</name>
   <url>http://maven.apache.org</url>
@@ -62,14 +62,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             <configuration>
               <deb>${project.build.directory}/${artifactId}-${project.version}.deb</deb>
               <dataSet>
-                <!-- dependencies go in /usr/local/blazegraph-[version]/lib -->
+                <!-- dependencies go in /usr/local/blazegraph-ha-[version]/lib -->
                 <data>
                   <src>${project.build.directory}/dependency</src>
                   <type>directory</type>
                   <includes>*.jar</includes>
                   <mapper>
                     <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${project.version}/lib</prefix>
+                    <prefix>/usr/local/blazegraph-ha-${project.version}/lib</prefix>
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
@@ -82,18 +82,20 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <includes>**/*</includes>
                   <mapper>
                     <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${project.version}/war/</prefix>
+                    <prefix>/usr/local/blazegraph-ha-${project.version}/war/</prefix>
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
                 </data>
 
-                <!-- create the data directories, log directories -->
+                <!-- create the data, log, snapshots, and halog directories -->
                 <data>
                   <type>template</type>
                   <paths>
-                    <path>/var/log/blazegraph</path>
-                    <path>/usr/local/blazegraph-${project.version}/data/</path>
+                    <path>/var/log/blazegraph-ha</path>
+                    <path>/usr/local/blazegraph-ha-${project.version}/data/</path>
+                    <path>/usr/local/blazegraph-ha-${project.version}/snapshots/</path>
+                    <path>/usr/local/blazegraph-ha-${project.version}/halog/</path>
                   </paths>
                   <mapper>
                     <type>perm</type>
@@ -103,7 +105,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </data>
 
                 <data>
-                      <src>${project.basedir}/src/deb/logrotate.d/blazegraph</src>
+                      <src>${project.basedir}/src/deb/logrotate.d/blazegraph-ha</src>
                       <type>file</type>
                       <mapper>
                         <type>perm</type>
@@ -131,7 +133,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                       <type>directory</type>
                       <mapper>
                         <type>perm</type>
-                    	<prefix>/usr/local/blazegraph-${project.version}/bin/</prefix>
+                    	<prefix>/usr/local/blazegraph-ha-${project.version}/bin/</prefix>
                         <filemode>755</filemode>
                         <user>${debian.user}</user>
                         <group>${debian.group}</group>
@@ -139,7 +141,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </data>
 
                 <data>
-                      <src>${project.basedir}/src/deb/conf/blazegraph</src>
+                      <src>${project.basedir}/src/deb/conf/blazegraph-ha</src>
                       <type>file</type>
                       <mapper>
                         <type>perm</type>
@@ -150,6 +152,18 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                       </mapper>
                 </data>
 
+		<!-- HA Config Files -->
+                <data>
+                  <src>${project.basedir}/src/deb/ha-conf</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/usr/local/blazegraph-ha-${project.version}/conf/</prefix>
+                    <user>${debian.user}</user>
+                    <group>${debian.group}</group>
+                  </mapper>
+                </data>
+
                 <!-- Jetty.xml from the bigdata-jar -->
                 <data>
                   <src>${project.build.directory}/classes/jetty.xml</src>
@@ -157,7 +171,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <type>file</type>
                   <mapper>
                     <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${project.version}/conf/</prefix>
+                    <prefix>/usr/local/blazegraph-ha-${project.version}/conf/</prefix>
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
@@ -170,20 +184,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <type>file</type>
                   <mapper>
                     <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${project.version}/conf/</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.group}</group>
-                  </mapper>
-                </data>
-
-                <!-- logging properties files -->
-                <data>
-                  <src>${project.build.directory}/classes/war/WEB-INF/classes/log4j.properties</src>
-                  <dst>log4j.properties</dst>
-                  <type>file</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${project.version}/conf/</prefix>
+                    <prefix>/usr/local/blazegraph-ha-${project.version}/conf/</prefix>
                     <user>${debian.user}</user>
                     <group>${debian.group}</group>
                   </mapper>
@@ -193,14 +194,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <data>
                   <type>link</type>
                   <symlink>true</symlink>
-                  <linkName>/usr/local/blazegraph</linkName>
-                  <linkTarget>/usr/local/blazegraph-${project.version}</linkTarget>
+                  <linkName>/usr/local/blazegraph-ha</linkName>
+                  <linkTarget>/usr/local/blazegraph-ha-${project.version}</linkTarget>
                 </data>
-
 
                 <!-- upstart script
                 <data>
-                  <src>${basedir}/src/deb/init/blazegraph.conf</src>
+                  <src>${basedir}/src/deb/init/blazegraph-ha.conf</src>
                   <type>file</type>
                   <mapper>
                     <type>perm</type>
@@ -294,6 +294,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         		</fileset>    
     		   </unzip>
 		   <copy file="target/classes/jar/jetty.xml" todir="target/classes" />
+		   <copy file="target/dependency/reggie-dl-2.2.1.jar" tofile="target/dependency/reggie-dl.jar" />
+		   <copy file="target/dependency/fiddler-2.2.1.jar" tofile="target/dependency/fiddler-dl.jar" />
+		   <copy file="target/dependency/jsk-dl-2.2.1.jar" tofile="target/dependency/jsk-dl.jar" />
+		   <copy file="target/dependency/mahalo-dl-2.2.1.jar" tofile="target/dependency/mahalo-dl.jar" />
+		   <copy file="target/dependency/mercury-dl-2.2.1.jar" tofile="target/dependency/mercury-dl.jar" />
+		   <copy file="target/dependency/norm-dl-2.2.1.jar" tofile="target/dependency/norm-dl.jar" />
+		   <copy file="target/dependency/outrigger-dl-2.2.1.jar" tofile="target/dependency/outrigger-dl.jar" />
                  </target>
                </configuration>
              </execution>
@@ -349,13 +356,170 @@ ga('send', 'pageview');
     <id>repo-for-dsiutils</id>
     <url>http://ir.dcs.gla.ac.uk/~bpiwowar/maven/</url>
     </repository>
-  </repositories>
+  </repositories> 
   <dependencies>
-    <!-- only use the runtime jar here to make it straightforward to upgrade in place -->
+    <!-- 1.5.3 and earlier; The jini config files need to be updated for the changes to ConfigMath 
+    <dependency>
+      <groupId>com.bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+      <version>1.5.3</version>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jini-ext</artifactId>
+        <version>2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-lib</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-platform</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jsk-resources</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm-dl</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>start</artifactId>
+        <version>${jini.version}</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>tools</artifactId>
+        <version>2.2.2</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>com.sun.jini</groupId>
+	    <artifactId>sun-util</artifactId>
+	    <version>2.1</version>
+    </dependency>
+    -->
+    <!-- Post maven -->
+    <!-- only use the runtime jar here to make it straightforward to upgrade in place 
+    -->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-runtime</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <!-- Pull in these dependencies from the bigdata-runtime -->
+    <!-- Blazegraph HA -->
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-ha</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-jini</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-zookeeper</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- External and third party dependencies -->
     <dependency>
@@ -442,6 +606,16 @@ ga('send', 'pageview');
            <groupId>colt</groupId>
            <artifactId>colt</artifactId>
            <version>${colt.version}</version>
+       </dependency>
+       <dependency>
+          <groupId>it.unimi.dsi</groupId>
+          <artifactId>fastutil</artifactId>
+          <version>${fastutil.version}</version>
+       </dependency>
+       <dependency>
+          <groupId>it.unimi.dsi</groupId>
+          <artifactId>dsiutils</artifactId>
+          <version>1.0.10</version>
        </dependency>
        <dependency>
            <groupId>org.apache.lucene</groupId>
@@ -569,6 +743,11 @@ ga('send', 'pageview');
            <version>${sesame.version}</version>
         </dependency>
         <dependency>
+           <groupId>org.apache.zookeeper</groupId>
+           <artifactId>zookeeper</artifactId>
+           <version>${zookeeper.version}</version>
+        </dependency>
+        <dependency>
 	       <groupId>com.tinkerpop.blueprints</groupId>
 	       <artifactId>blueprints-core</artifactId>
 	       <version>${blueprints.version}</version>
@@ -588,15 +767,5 @@ ga('send', 'pageview');
 	       <artifactId>commons-configuration</artifactId>
 	       <version>${apache.commons_configuration.version}</version>
         </dependency> 
-        <dependency>
-          <groupId>it.unimi.dsi</groupId>
-          <artifactId>fastutil</artifactId>
-          <version>${fastutil.version}</version>
-       </dependency>
-       <dependency>
-          <groupId>it.unimi.dsi</groupId>
-          <artifactId>dsiutils</artifactId>
-          <version>1.0.10</version>
-       </dependency>
-   </dependencies>
-</project>
+      </dependencies>
+  </project>

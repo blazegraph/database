@@ -160,6 +160,12 @@ public class TestAll extends TestCase {
         // DTEExtension.ARRAY
         suite.addTestSuite(TestEncodeDecodeLiteralArrayIVs.class);
         
+        // DTEExtension.IPV4
+        suite.addTestSuite(TestEncodeDecodeIPv4AddrIV.class);
+        
+        // DTEExtension.ARRAY
+        suite.addTestSuite(TestEncodeDecodeLiteralArrayIVs.class);
+        
         return suite;
         
     }
