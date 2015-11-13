@@ -245,7 +245,7 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
             @Override
             public void sample() {
                 if (nbufferEvictedToChannel > 0) {
-                    final double d = nbufferEvictedToChannel / elapsedBufferEvictedToChannelNanos;
+                    final double d = elapsedBufferEvictedToChannelNanos / nbufferEvictedToChannel;
                     setValue(((long) (d * 100)) / 100d);
                 }
             }
@@ -267,7 +267,7 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
                      * we use the same divisor here as we do for the
                      * AVERAGE_BUFFER_EVICTED_TO_CHANNEL_NANOS.
                      */
-                    final double d = nrecordsEvictedToChannel / elapsedBufferEvictedToChannelNanos;
+                    final double d = elapsedBufferEvictedToChannelNanos / nrecordsEvictedToChannel;
                     setValue(((long) (d * 100)) / 100d);
                 }
             }
@@ -283,8 +283,8 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
                      * AVERAGE_BUFFER_EVICTED_TO_CHANNEL_NANOS.
                      */
                     // records written / second.
-                    final double d = ((double) nrecordsEvictedToChannel)
-                            / TimeUnit.NANOSECONDS.toSeconds(elapsedBufferEvictedToChannelNanos);
+                    final double d = TimeUnit.NANOSECONDS.toSeconds(elapsedBufferEvictedToChannelNanos)
+                            / ((double) nrecordsEvictedToChannel);
                     // two decimal places of precision.
                     final double v = ((long) (d * 100)) / 100d;
                     setValue(v);
@@ -317,7 +317,7 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
             @Override
             public void sample() {
                 if (ncacheWrites > 0) {
-                    final double d = ncacheWrites/elapsedCacheWriteNanos;
+                    final double d = elapsedCacheWriteNanos / ncacheWrites;
                     setValue(((long) (d * 100)) / 100d);
                 }
             }

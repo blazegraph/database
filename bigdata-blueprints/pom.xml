@@ -121,31 +121,31 @@ ga('send', 'pageview');
       <version>${junit-ext.version}</version>
     </dependency>
     <dependency>
-	<groupId>com.tinkerpop.blueprints</groupId>
-	<artifactId>blueprints-core</artifactId>
-	<version>${blueprints.version}</version>
+       <groupId>com.tinkerpop.blueprints</groupId>
+       <artifactId>blueprints-core</artifactId>
+       <version>${blueprints.version}</version>
     </dependency>
     <dependency>
-	<groupId>com.tinkerpop.blueprints</groupId>
-	<artifactId>blueprints-test</artifactId>
-	<version>${blueprints.version}</version>
+      <groupId>com.tinkerpop.blueprints</groupId>
+      <artifactId>blueprints-test</artifactId>
+      <version>${blueprints.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
-	<groupId>com.tinkerpop.rexster</groupId>
-	<artifactId>rexster-core</artifactId>
-	<version>${rexster.version}</version>
-     </dependency>
-     <dependency>
-	<groupId>org.codehaus.jettison</groupId>
-	<artifactId>jettison</artifactId>
-	<version>${jettison.version}</version>
+      <groupId>com.tinkerpop.rexster</groupId>
+      <artifactId>rexster-core</artifactId>
+      <version>${rexster.version}</version>
     </dependency>
     <dependency>
-	<groupId>commons-configuration</groupId>
-	<artifactId>commons-configuration</artifactId>
-	<!--<version>${apache.commons_configuration.version}</version>-->
-	<version>1.10</version>
-    </dependency> 
+      <groupId>org.codehaus.jettison</groupId>
+      <artifactId>jettison</artifactId>
+      <version>${jettison.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-configuration</groupId>
+      <artifactId>commons-configuration</artifactId>
+      <version>${apache.commons_configuration.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>

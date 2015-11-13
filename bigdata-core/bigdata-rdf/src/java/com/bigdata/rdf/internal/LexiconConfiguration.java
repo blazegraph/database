@@ -218,7 +218,7 @@ public class LexiconConfiguration<V extends BigdataValue>
      * 
      * @see BLZG-1592 (ConcurrentModificationException in MathBOp when using expression in BIND)
      */
-    private final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
+    private static final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
 
     @Override
     public final BigdataValueFactory getValueFactory() {
