@@ -35,6 +35,7 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.InlineLiteralIV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -54,7 +55,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  *          thompsonbry $
  */
 abstract public class AbstractLiteralIV<V extends BigdataLiteral, T>
-        extends AbstractInlineIV<V, T> implements Literal {
+        extends AbstractInlineIV<V, T> implements Literal, InlineLiteralIV<V, T> {
 
     /**
      * 
@@ -188,6 +189,7 @@ abstract public class AbstractLiteralIV<V extends BigdataLiteral, T>
 		return XMLDatatypeUtil.parseCalendar(getLabel());
 	}
 	
+    @Override
     public String toString() {
         return super.getDTE() + "(" + stringValue() + ")";
     }

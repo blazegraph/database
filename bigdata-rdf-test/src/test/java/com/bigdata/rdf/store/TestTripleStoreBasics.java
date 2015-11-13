@@ -112,7 +112,11 @@ public class TestTripleStoreBasics extends TestCase2 {
         
 //        // magic sets support (still under development).
 //        suite.addTest(com.bigdata.rdf.magic.TestAll.suite());
-        
+
+        // integration test suite for inline URIs.
+        // See BLZG-1507 (Implement support for DTE extension types for URIs)
+        suite.addTestSuite(com.bigdata.rdf.store.TestInlineURIs.class);
+
         return suite;
 
     }

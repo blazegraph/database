@@ -516,9 +516,21 @@ abstract public class WriteCacheService implements IWriteCache {
              * Setup a reasonable default if no value was specified.
              * Just need to make sure we have a few spare buffers to
              * prevent latency on acquiring a clean buffer for writing.
+	     *
+	     * The default here is 5% of the write cache buffers. This
+	     * is based on historical experience that we do better with
+	     * 50MB of dirty list when there are 2000 write cache buffers,
+	     * which is 2.5%.  It seems a reasonable thing to give over
+	     * 5%.  If you want more write elision, then just increase
+	     * the number of write cache buffers.  95% of them will be 
+	     * used to defer writes and elide writes.  5% of them will
+	     * be available to drive the disk with random write IOs.
+	     *
+	     * See BLZG-1589 (Modify the default behavior for setting
+the clear/dirty list threshold)
              */
             
-            minCleanListSize = Math.min(4, nwriteBuffers);
+            minCleanListSize = Math.min(4, (int) (nwriteBuffers*.05));
 
         }
         
@@ -1481,11 +1493,27 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (log.isDebugEnabled())
                     log.debug("Writing to file: " + cache.toString());
 
-                // Flush WriteCache buffer to channel (write on disk)
-                cache.flush(false/* force */);
+                final long begin = System.nanoTime();
+                final long nrecs = cache.recordMap.size(); // #of records in the write cache block.
 
-                counters.get().nbufferEvictedToChannel++;
+                try {
+                
+                    // Flush WriteCache buffer to channel (write on disk)
+                    cache.flush(false/* force */);
+                    
+                } finally {
 
+                    // See BLZG-1589 (new latency-oriented counters)
+                    final long elapsed = System.nanoTime() - begin;
+                    
+                    final WriteCacheServiceCounters c = counters.get();
+                    
+                    c.nbufferEvictedToChannel++;
+                    c.nrecordsEvictedToChannel += nrecs;
+                    c.elapsedBufferEvictedToChannelNanos += elapsed;
+    
+                }
+                
             }
 
             /*
@@ -2335,6 +2363,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
     }
 
+    @Override
     public boolean write(final long offset, final ByteBuffer data, final int chk)
             throws InterruptedException, IllegalStateException {
      
@@ -2379,9 +2408,33 @@ abstract public class WriteCacheService implements IWriteCache {
      *       that buffer first. This might provide better throughput for the RW
      *       store but would require an override of this method specific to that
      *       implementation.
+     *       
+     * See BLZG-1589 (new latency-oriented counters)
      */
     public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum,final int latchedAddr)
             throws InterruptedException, IllegalStateException {
+
+        final long begin = System.nanoTime();
+        
+        try {
+
+            return write_timed(offset, data, chk, useChecksum, latchedAddr);
+            
+        } finally {
+            
+            final long elapsed = System.nanoTime() - begin;
+            
+            final WriteCacheServiceCounters c = counters.get();
+            
+            c.ncacheWrites++; // maintain nwrites
+            c.elapsedCacheWriteNanos += elapsed;
+            
+        }
+        
+    }
+    
+    private boolean write_timed(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum,final int latchedAddr)
+                throws InterruptedException, IllegalStateException {
 
       	if (log.isTraceEnabled()) {
             log.trace("offset: " + offset + ", length: " + data.limit()
@@ -2397,9 +2450,6 @@ abstract public class WriteCacheService implements IWriteCache {
         if (data == null)
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_NULL);
-
-        // maintain nwrites
-        counters.get().ncacheWrites++;
 
         // #of bytes in the record.
         final int remaining = data.remaining();
