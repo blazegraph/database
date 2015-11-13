@@ -58,7 +58,7 @@ public class FixedAllocator implements Allocator {
     private final int cModAllocation = 1 << RWStore.ALLOCATION_SCALEUP;
     private final int cMinAllocation = cModAllocation * 1; // must be multiple of cModAllocation
 
-	volatile private int m_freeBits;
+	volatile int m_freeBits;
 	volatile private int m_freeTransients;
 
     /**
@@ -71,6 +71,13 @@ public class FixedAllocator implements Allocator {
 	volatile private int m_index;
 	
 	Bucket m_statsBucket = null;
+	
+	/**
+	 * If an allocator is selected in a smallSlotHighWaste scenario, then the sparseness test
+	 * for allocation must be relaxed or there is a risk that no allocation would be made
+	 * from a "free" allocator.
+	 */
+	boolean m_smallSlotHighWaste = false;
 
 	public void setIndex(final int index) {
 		final AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
@@ -582,7 +589,8 @@ public class FixedAllocator implements Allocator {
 	void resetAllocIndex(final int start) {
 		m_allocIndex = start;
 		
-		if (m_size <= 1024) {
+		if (m_size <= m_store.cSmallSlot) {
+	    	
 			for (int a = m_allocIndex/m_bitSize; a < m_allocBlocks.size(); a++) {
 				final AllocBlock ab = m_allocBlocks.get(a);
 				
@@ -591,8 +599,11 @@ public class FixedAllocator implements Allocator {
 				for (int i = (m_allocIndex%m_bitSize); i < m_bitSize; i++) {
 					// first check if transients are already full
 					if (ab.m_transients[i] != 0xFFFFFFFF) {
-						// then check maximum 50% commit allocated
-						if (Integer.bitCount(ab.m_commit[i]) < 16) { 
+						/*
+						 * If small slots are in a high waste scenario, then do not check for extra
+						 * locality in uncommitted state
+						 */
+						if (m_smallSlotHighWaste || Integer.bitCount(ab.m_commit[i]) < 16) { 
 							final AllocBlock abr = m_allocBlocks.get(m_allocIndex/m_bitSize);
 							assert abr == ab;
 							
@@ -602,7 +613,7 @@ public class FixedAllocator implements Allocator {
 					m_allocIndex++;
 				}
 			}
-			
+		
 			// must remove from free list if we cannot set the alloc Index for a small slot
 			if (start == 0) {
 				removeFromFreeList();
@@ -847,7 +858,7 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 	
-	private void addToFreeList() {
+	void addToFreeList() {
 		assert m_freeWaiting;
 		
 		m_freeWaiting = false;
@@ -865,8 +876,9 @@ public class FixedAllocator implements Allocator {
 		}
 		
 		// then check for small slots
-		if (m_size <= m_store.cSmallSlot) { // it's a small slotSMALL_SLOT_TYPE
-			return m_freeBits > m_store.cSmallSlotThreshold;
+		if (m_size <= m_store.cSmallSlot) { // it's a small slot
+			final boolean ret =  m_freeBits > m_store.cSmallSlotThreshold;
+			return ret;
 		} else {
 			return true;
 		}

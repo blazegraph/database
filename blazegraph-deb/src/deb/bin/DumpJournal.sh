@@ -14,7 +14,11 @@
 # -tuples    : Dump the records in the indices.
 
 # Setup the source environment.
-source src/resources/HAJournal/HAJournal.env
+source /etc/default/blazegraph
+
+LIB_DIR="$BLZG_HOME"/lib
+
+CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`:${CLASSPATH}
 
 java ${JAVA_OPTS} \
     -cp ${CLASSPATH} \

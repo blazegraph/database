@@ -29,8 +29,8 @@ package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
 import java.net.UnknownHostException;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -48,8 +48,8 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.constraints.DateTimeUtility;
-import com.bigdata.rdf.internal.constraints.MathUtility;
 import com.bigdata.rdf.internal.constraints.IMathOpHandler;
+import com.bigdata.rdf.internal.constraints.MathUtility;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
@@ -57,7 +57,9 @@ import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
@@ -68,7 +70,6 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
-import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -86,7 +87,6 @@ import com.bigdata.util.InnerCause;
  * statement indices and how other RDF Values are coded into the lexicon.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class LexiconConfiguration<V extends BigdataValue>
         implements ILexiconConfiguration<V> {
@@ -202,21 +202,26 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     /**
      * The set of registered {@link IMathOpHandler}s.
+     * 
+     * @see BLZG-1592 (ConcurrentModificationException in MathBOp when using expression in BIND)
      */
-    private static final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
+    private final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
 
+    @Override
     public final BigdataValueFactory getValueFactory() {
 
         return valueFactory;
 
     }
 
+    @Override
     public int getMaxInlineStringLength() {
 
         return maxInlineTextLength;
 
     }
 
+    @Override
     public boolean isInlineTextLiterals() {
 
         return inlineTextLiterals;
@@ -263,6 +268,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         
     }
 
+    @Override
     public String toString() {
 
     	final StringBuilder sb = new StringBuilder();
@@ -370,6 +376,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public void initExtensions(final IDatatypeURIResolver resolver) {
 
@@ -407,6 +414,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         typeHandlers.add(new MathUtility());
     }
 
+    @Override
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public V asValue(final LiteralExtensionIV<?> iv
 //            ,final BigdataValueFactory vf
@@ -425,6 +433,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public V asValueFromVocab(final IV<?, ?> iv) {
 
@@ -522,8 +531,10 @@ public class LexiconConfiguration<V extends BigdataValue>
         /*
          * See if there is a handler for inline URIs for this namespace.
          */
-        @SuppressWarnings("rawtypes")
+        
+    	@SuppressWarnings("rawtypes")
         final URIExtensionIV inline = uriFactory.createInlineURIIV(value);
+        
         if (inline != null) {
 
             return inline;
@@ -548,7 +559,6 @@ public class LexiconConfiguration<V extends BigdataValue>
 
             final String namespace = ((URI) value).getNamespace();
 
-            @SuppressWarnings("unchecked")
             final IV<BigdataURI, ?> namespaceIV = vocab.get(new URIImpl(namespace));
 
             if (namespaceIV != null) {
@@ -731,22 +741,26 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
 
     /**
-     * Attempt to inline an xsd datatype corresponding to either a java
-     * primitive (int, long, float, etc.) or to one of the special cases
-     * (BigDecimal, BigInteger).
-     *
-     * @param value
-     *            The RDF {@link Value}.
-     * @param datatype
-     *            The XSD datatype {@link URI}.
-     *
-     * @return The {@link IV} -or- <code>null</code> if the value could not be
-     *         inlined.
-     */
+	 * Attempt to inline an xsd datatype corresponding to either an intrinsic
+	 * datatype, including a java primitive (int, long, float, etc.) or of the
+	 * special cases (BigDecimal, BigInteger). Both the {@link DTE} and the
+	 * {@link DTEExtension} enums will be checked to see if either one
+	 * recognizes the datatype as an intrinsic.
+	 *
+	 * @param value
+	 *            The RDF {@link Value}.
+	 * @param datatype
+	 *            The XSD datatype {@link URI}.
+	 *
+	 * @return The {@link IV} -or- <code>null</code> if the value could not be
+	 *         inlined.
+	 *         
+	 * @see BLZG-1507 (Implement support for DTE extension types for URIs)
+	 */
     private AbstractInlineIV<BigdataLiteral, ?> createInlineDatatypeIV(
             final Literal value, final URI datatype) {
 
-        // get the native DTE
+        // Get the native (intrinsic) DTE.
         final DTE dte = DTE.valueOf(datatype);
 
 // DTE.Extension being used for IPv4 now
@@ -758,7 +772,16 @@ public class LexiconConfiguration<V extends BigdataValue>
 //            return null;
 //        }
 
-        if (dte == null) {
+		final DTEExtension dtex;
+		if (dte == null) {
+			// Check for an extended intrinsic datatype.
+			dtex = DTEExtension.valueOf(datatype);
+		} else {
+			dtex = null;
+		}
+        
+        if (dte == null && dtex == null) {
+			// Not an intrinsic data type. 
             return null;
         }
 
@@ -770,6 +793,31 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         try {
 
+			if (dtex != null) {
+				/*
+				 * Handle an extended intrinsic datatype.
+				 */
+				switch (dtex) {
+				case IPV4:
+					/*
+					 * Extension for IPv4. Throws UnknownHostException if not
+					 * parseable as an IPv4.
+					 */
+					return new IPv4AddrIV<BigdataLiteral>(v);
+				 case PACKED_LONG:
+				    /*
+				     * Extension for packed long value in the range [0;72057594037927935L].
+				     */
+				    return new PackedLongIV<BigdataLiteral>(v);					
+				default:
+					// Not handled.
+					return null;
+				}
+        	}
+
+			/*
+			 * Handle an intrinsic datatype (but not a DTEExtended intrinsic).
+			 */
             switch (dte) {
             case XSDBoolean:
                 return new XSDBooleanIV<BigdataLiteral>(XMLDatatypeUtil
@@ -806,13 +854,9 @@ public class LexiconConfiguration<V extends BigdataValue>
            case XSDUnsignedInt:
                 return new XSDUnsignedIntIV<BigdataLiteral>(parseUnsignedInt(v));
             case XSDUnsignedLong:
-                return new XSDUnsignedLongIV<BigdataLiteral>(parseUnsignedLong(v));
-            case Extension:
-                /*
-                 * Hijacking DTE.Extension for IPv4.  Throws UnknownHostException
-                 * if not parseable as an IPv4.
-                 */
-                return new IPv4AddrIV<BigdataLiteral>(v);
+				return new XSDUnsignedLongIV<BigdataLiteral>(parseUnsignedLong(v));
+			case Extension: 
+				// Fall through. Should have been handled above.
             default:
                 // Not handled.
                 return null;
@@ -1018,61 +1062,65 @@ public class LexiconConfiguration<V extends BigdataValue>
 	        case STATEMENT:
 	            return true;
             case BNODE:
-                return inlineBNodes && isSupported(dte);
+                return inlineBNodes;// && isSupported(dte);
             case LITERAL:
-                return inlineXSDDatatypeLiterals && isSupported(dte);
+                return inlineXSDDatatypeLiterals;// && isSupported(dte);
             default:
                 return false;
         }
 
     }
 
-    /**
-     * Hack for supported {@link DTE}s (this is here because we do not support
-     * the unsigned variants yet).
-     *
-     * @param dte
-     *            The {@link DTE}.
-     *
-     * @return <code>true</code> if the {@link DTE} has native inline support
-     *         (versus support via an {@link IExtension} handler or inline
-     *         support via a {@link FullyInlineTypedLiteralIV} (a catch all)).
-     */
-    private boolean isSupported(final DTE dte) {
+//    /**
+//     * Hack for supported {@link DTE}s (this is here because we do not support
+//     * the unsigned variants yet).
+//     *
+//     * @param dte
+//     *            The {@link DTE}.
+//     *
+//     * @return <code>true</code> if the {@link DTE} has native inline support
+//     *         (versus support via an {@link IExtension} handler or inline
+//     *         support via a {@link FullyInlineTypedLiteralIV} (a catch all)).
+//     */
+//    private boolean isSupported(final DTE dte) {
+//
+//        switch (dte) {
+//            case XSDBoolean:
+//            case XSDByte:
+//            case XSDShort:
+//            case XSDInt:
+//            case XSDLong:
+//            case XSDFloat:
+//            case XSDDouble:
+//            case XSDInteger:
+//            case XSDDecimal:
+//            case UUID:
+//            case Extension:  
+//                return true;
+//            case XSDString:
+//            /*
+//             * Note: xsd:string is handled as a registered extension by
+//             * XSDStringExtension. This method reports [false] for xsd:string
+//             * because this method returns [true] only for datatypes handled
+//             * outside of the extension mechanism.
+//             */
+//                return true;
+//            case XSDUnsignedByte:
+//            case XSDUnsignedShort:
+//            case XSDUnsignedInt:
+//            case XSDUnsignedLong:
+//                return true; // enable supporting XSD unsigned types!
+//            default:
+//                throw new AssertionError();
+//        }
+//
+//    }
 
-        switch (dte) {
-            case XSDBoolean:
-            case XSDByte:
-            case XSDShort:
-            case XSDInt:
-            case XSDLong:
-            case XSDFloat:
-            case XSDDouble:
-            case XSDInteger:
-            case XSDDecimal:
-            case UUID:
-            case Extension:  // Extension being used for IPv4
-                return true;
-            case XSDString:
-            /*
-             * Note: xsd:string is handled as a registered extension by
-             * XSDStringExtension. This method reports [false] for xsd:string
-             * because this method returns [true] only for datatypes handled
-             * outside of the extension mechanism.
-             */
-                return true;
-            case XSDUnsignedByte:
-            case XSDUnsignedShort:
-            case XSDUnsignedInt:
-            case XSDUnsignedLong:
-                return true; // enable supporting XSD unsigned types!
-            default:
-                throw new AssertionError();
-        }
-
-    }
-
+    @Override
     public Iterable<IMathOpHandler> getTypeHandlers() {
-        return Collections.unmodifiableList(typeHandlers);
+
+    	return Collections.unmodifiableList(typeHandlers);
+    	
     }
+
 }
