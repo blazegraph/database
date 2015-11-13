@@ -87,7 +87,8 @@ import com.bigdata.rdf.store.BD;
  * in the {@link ASTDatasetClause}, which are matched as either {@link ASTIRI}
  * or {@link ASTQName}.
  * <p>
- * Note: This replaces the functionality of the {@link BigdataValueReplacer}.
+ * Note: This is a part of deferred IV batch resolution, which is intended 
+ * to replace the functionality of the {@link BigdataValueReplacer}.
  * <p>
  * Note: {@link IValueExpression} nodes used in {@link SPARQLConstraint}s are
  * allowed to use values not actually in the database. MP
@@ -101,15 +102,13 @@ import com.bigdata.rdf.store.BD;
  *      remove tight coupling with IVs while checking up parsed queries)
  */
 // FIXME RENAME THIS CLASS.
-public class BatchRDFValueResolver extends ASTVisitorBase {
+public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     private final static Logger log = Logger
-            .getLogger(BatchRDFValueResolver.class);
+            .getLogger(ASTDeferredIVResolutionInitializer.class);
 
     private final Map<Value, BigdataValue> vocab;
 
-    private final boolean readOnly;
-    
     private final BigdataValueFactory valueFactory;
 
     private final LinkedHashMap<ASTRDFValue, BigdataValue> nodes;
@@ -125,18 +124,11 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
     	
     }
 
-    /**
-     * @param readOnly
-     *            When <code>true</code>, unknown RDF {@link Value}s are not
-     *            recorded in the database.
-     */
-    public BatchRDFValueResolver(final boolean readOnly) {
+    public ASTDeferredIVResolutionInitializer() {
 
-        this.readOnly = readOnly;
-        
         // Unnamed BigdataValueFactory is used to provide instances
         // of BigdataValue, which are required by existing test suite.
-        // See also task ...
+        // See also task https://jira.blazegraph.com/browse/BLZG-1519
 //        this.valueFactory = BigdataValueFactoryImpl.getInstance("parser"+UUID.randomUUID().toString().replaceAll("-", ""));
         this.valueFactory = new BigdataValueFactoryHeadlessImpl();
         

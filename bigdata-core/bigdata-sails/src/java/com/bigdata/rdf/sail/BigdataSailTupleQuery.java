@@ -8,7 +8,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailTupleQuery;
 
-import com.bigdata.rdf.sail.sparql.BatchRDFValueResolver;
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolutionInitializer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
