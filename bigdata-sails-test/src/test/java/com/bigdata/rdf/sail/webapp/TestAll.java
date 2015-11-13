@@ -99,6 +99,8 @@ public class TestAll extends TestCase {
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
+        
+        suite.addTestSuite(TestServiceWhiteList.class);
 
         return suite;
 
