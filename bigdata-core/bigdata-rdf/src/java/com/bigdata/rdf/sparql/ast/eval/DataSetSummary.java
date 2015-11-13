@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.query.Dataset;
 
 import com.bigdata.bop.BOpContextBase;
@@ -16,8 +17,11 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -30,7 +34,7 @@ import com.bigdata.service.ResourceService;
 @SuppressWarnings("rawtypes")
 public class DataSetSummary {
 
-    public static Set<IV> toInternalValues(final Set<URI> graphs) {
+    public static Set<IV> toInternalValues(final Set<URI> graphs, BigdataValueFactory vf) {
 		
         /*
          * Note: Per DAWG tests graph-02 and graph-04, a query against an empty
@@ -49,12 +53,29 @@ public class DataSetSummary {
 			
 			IV iv = null;
 			
-			if (uri != null && uri instanceof BigdataURI) {
+			if (uri != null) {
+				if(uri instanceof BigdataURI) {
 				
-				final BigdataURI bURI = (BigdataURI) uri;
+					final BigdataURI bURI = (BigdataURI) uri;
+					
+					iv = bURI.getIV();
+					
+					
+					if (iv == null) {
+					
+						iv = TermId.mockIV(VTE.valueOf(uri));
+					
+					}
+					
+					iv.setValue(bURI);
 				
-				iv = bURI.getIV();
-				
+				} else {
+					
+					iv = TermId.mockIV(VTE.valueOf(uri));
+					
+					iv.setValue(vf.asValue(uri));
+					
+				}
 			}
 			
 			s.add(iv);
@@ -162,9 +183,10 @@ public class DataSetSummary {
         this.firstContext = firstContext;
 
         /*
-         * Note: Includes unknown IVs iff [update:=true].
+         * Note: Includes unknown IVs to support deferred IV batch resolution
+         * See: https://jira.blazegraph.com/browse/BLZG-1176
          */
-        final IV[] a = new IV[nknown + (update ? nunknown : 0)];
+        final IV[] a = new IV[nknown + nunknown];
 
         final Iterator<IV> itr = graphs.iterator();
 
@@ -177,10 +199,13 @@ public class DataSetSummary {
             if (iv == null)
                 continue;
 
-            if (iv.isNullIV() && !update) {
-                // Drop unknown IVs unless [update:=true].
-                continue;
-            }
+// See https://jira.blazegraph.com/browse/BLZG-1176
+// To support single deferred IV resolution, dataset is passed without resolved IVs,
+// so we could not skip unresolved IVs, as they should be resolved later
+//            if (iv.isNullIV() && !update) {
+//                // Drop unknown IVs unless [update:=true].
+//                continue;
+//            }
 
             a[nknown++] = iv;
 

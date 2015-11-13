@@ -8,6 +8,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailTupleQuery;
 
+import com.bigdata.rdf.sail.sparql.BatchRDFValueResolver;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -31,15 +32,8 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     @Override
     public void setDataset(final Dataset dataset) {
 
-        /*
-         * Batch resolve RDF Values to IVs and then set on the query model.
-         */
-
-        final Object[] tmp = new BigdataValueReplacer(getTripleStore())
-                .replaceValues(dataset, null/* bindings */);
-
         astContainer.getOriginalAST().setDataset(
-                new DatasetNode((Dataset) tmp[0], false/* update */));
+                new DatasetNode(dataset, false/* update */, getTripleStore().getValueFactory()));
 
     }
 

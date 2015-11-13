@@ -1072,6 +1072,16 @@ public class ASTEvalHelper {
         if(astContainer == null)
             throw new IllegalArgumentException();
         
+        if (dataset != null) {
+
+            /*
+             * Apply the optional data set override.
+             */
+
+            applyDataSet(conn.getTripleStore(), astContainer, dataset);
+            
+        }
+
         try {
         	// @see https://jira.blazegraph.com/browse/BLZG-1176
             ASTDeferredIVResolution.resolveUpdate(conn.getTripleStore(), astContainer);
@@ -1080,16 +1090,6 @@ public class ASTEvalHelper {
         }
 
         try {
-
-            if (dataset != null) {
-
-                /*
-                 * Apply the optional data set override.
-                 */
-
-                applyDataSet(conn.getTripleStore(), astContainer, dataset);
-                
-            }
 
             final AST2BOpUpdateContext ctx = new AST2BOpUpdateContext(
                     astContainer, conn);
@@ -1166,14 +1166,14 @@ public class ASTEvalHelper {
          * Batch resolve RDF Values to IVs and then set on the query model.
          */
 
-        final Object[] tmp = new BigdataValueReplacer(tripleStore)
-                .replaceValues(dataset, null/* bindings */);
+//        final Object[] tmp = new BigdataValueReplacer(tripleStore)
+//                .replaceValues(dataset, null/* bindings */);
 
         /*
          * Set the data set on the original AST.
          */
         
-        final Dataset resolvedDataset = (Dataset) tmp[0];
+//        final Dataset resolvedDataset = (Dataset) tmp[0];
 
         final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
         
@@ -1183,7 +1183,7 @@ public class ASTEvalHelper {
             
                 final IDataSetNode node = ((IDataSetNode) op);
 
-                node.setDataset(new DatasetNode(resolvedDataset, true/* update */));
+                node.setDataset(new DatasetNode(dataset, true/* update */, tripleStore.getValueFactory()));
                 
             }
             
