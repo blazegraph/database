@@ -263,8 +263,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 BlankNodeVarProcessor.process(uc);
 
                 /*
-                 * Batch resolve ASTRDFValue to BigdataValues with their
-                 * associated IVs.
+                 * Prepare deferred batch IV resolution of ASTRDFValue to BigdataValues.
+                 * @see https://jira.blazegraph.com/browse/BLZG-1176
                  * 
                  * Note: IV resolution must proceed separately (or be
                  * re-attempted) for each UPDATE operation in a sequence since
@@ -276,7 +276,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  * 
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
                  */
-                new BatchRDFValueResolver(true/* readOnly */)
+                new ASTDeferredIVResolutionInitializer()
                         .process(uc);
 
                 final ASTUpdate updateNode = uc.getUpdate();
@@ -346,10 +346,10 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             BlankNodeVarProcessor.process(qc);
 
             /*
-             * Batch resolve ASTRDFValue to BigdataValues with their associated
-             * IVs.
+             * Prepare deferred batch IV resolution of ASTRDFValue to BigdataValues.
+             * @see https://jira.blazegraph.com/browse/BLZG-1176
              */
-            final BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
+            final ASTDeferredIVResolutionInitializer resolver = new ASTDeferredIVResolutionInitializer();
             
             resolver.process(qc);
 
