@@ -33,6 +33,7 @@ import junit.framework.AssertionFailedError;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
  * Data driven test suite for the Runtime Query Optimizer (RTO) using BSBM data
@@ -281,9 +282,15 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         
         /*
          * Verify that the runtime optimizer produced the expected join path.
+         * 
+         * The join IDs depend on whether the pipelined hash join is enabled
+         * by default. Given that the pipelined hash join unites the hash index
+         * construction and join in one operator, there is one less operator
+         * in the plan, so the indices decrease by one.
          */
-
-        final int[] expected = new int[] { 8, 7, 9, 5, 6, 10, 11 };
+        final int[] expected = QueryHints.DEFAULT_PIPELINED_HASH_JOIN ?
+            new int[] { 7, 6, 8, 4, 5, 9, 10 } :
+            new int[] { 8, 7, 9, 5, 6, 10, 11 };
 
         assertSameJoinOrder(expected, helper);
 
@@ -335,9 +342,15 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         
         /*
          * Verify that the runtime optimizer produced the expected join path.
+         * 
+         * The join IDs depend on whether the pipelined hash join is enabled
+         * by default. Given that the pipelined hash join unites the hash index
+         * construction and join in one operator, there is one less operator
+         * in the plan, so the indices decrease by one.
          */
-
-        final int[] expected = new int[] { 5, 6, 7, 8 };
+        final int[] expected = QueryHints.DEFAULT_PIPELINED_HASH_JOIN ?
+            new int[] { 4, 5, 6, 7 } :
+            new int[] { 5, 6, 7, 8 };
 
         assertSameJoinOrder(expected, helper);
         
