@@ -40,7 +40,6 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
-import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
@@ -717,5 +716,13 @@ public interface QueryHints {
 
    boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
          System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "false"));
+   
+   /**
+    * 
+    */
+   String PIPELINED_HASH_JOIN = "pipelinedHashJoin";
+
+   boolean DEFAULT_PIPELINED_HASH_JOIN = Boolean.valueOf(System.getProperty(
+           QueryHints.class.getName() + "." + PIPELINED_HASH_JOIN, "false"));
 
 }

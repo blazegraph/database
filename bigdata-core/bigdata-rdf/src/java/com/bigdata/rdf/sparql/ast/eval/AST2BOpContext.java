@@ -202,6 +202,15 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     public boolean nativeHashJoins = QueryHints.DEFAULT_NATIVE_HASH_JOINS;
     
     /**
+     * When <code>true</code>, use pipelined hash join operations wherever
+     * possible. Otherwise use standard, blocking hash joins (which might be
+     * more efficient due to less memory overhead). Note that, even if this
+     * is set to <code>false</code>, the system chooses pipelined hash joins
+     * occasionally for queries with LIMIT.
+     */
+    public boolean pipelinedHashJoins = QueryHints.DEFAULT_PIPELINED_HASH_JOIN;
+    
+    /**
      * When <code>true</code>, a merge-join pattern will be recognized if it
      * appears in a join group. When <code>false</code>, this can still be
      * selectively enabled using a query hint.
