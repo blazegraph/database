@@ -38,7 +38,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph JINI (Scaleout) Tests</name>
   <packaging>jar</packaging>
-
+  <properties>
+     <!-- Used to prevent ant from starting test services -->
+     <maven.test.skip>false</maven.test.skip>
+  </properties>
     <profiles>
      <profile>
       <id>localZookeeper</id>
@@ -46,7 +49,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         <activeByDefault>true</activeByDefault>
        </activation>
        <properties>
-	<zookeeper.Installation>${local.test.zookeeper.installDir}</zookeeper.Installation>
+	    <zookeeper.Installation>${local.test.zookeeper.installDir}</zookeeper.Installation>
         <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
        </properties>
      </profile>
@@ -59,7 +62,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         </property>
        </activation>
        <properties>
-	<zookeeper.Installation>${env.TEST_ZOOKEEPER_HOME}</zookeeper.Installation>
+	    <zookeeper.Installation>${env.TEST_ZOOKEEPER_HOME}</zookeeper.Installation>
         <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
        </properties>
      </profile>
@@ -124,7 +127,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>process-test-resources</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="preTestPreparation"/>
+                   <ant antfile="build.xml" target="preTestPreparation">
+                       <property name="maven.test.skip" value="${maven.test.skip}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>
@@ -136,7 +141,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>test</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="postTestCleanup"/>
+                   <ant antfile="build.xml" target="postTestCleanup">
+                       <property name="maven.test.skip" value="${maven.test.skip}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>

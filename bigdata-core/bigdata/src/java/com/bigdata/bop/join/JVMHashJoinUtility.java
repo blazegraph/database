@@ -1,5 +1,4 @@
 /**
-
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
@@ -7,7 +6,7 @@ Contact:
      2501 Calvert ST NW #106
      Washington, DC 20008
      licenses@systap.com
-
+     
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; version 2 of the License.
@@ -100,12 +99,13 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.
      */
-    private final AtomicBoolean open = new AtomicBoolean(true);
-    
-    /**
+    protected final AtomicBoolean open = new AtomicBoolean(true);
+
+
+   /**
      * The type of join to be performed.
      */
-    private final JoinTypeEnum joinType;
+    protected final JoinTypeEnum joinType;
     
 //    /**
 //     * <code>true</code> iff the join is OPTIONAL.
@@ -126,29 +126,29 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * @see HashJoinAnnotations#ASK_VAR
      */
-    private final IVariable<?> askVar;
+    protected final IVariable<?> askVar;
     
     /**
      * The join variables.
      */
-    private final IVariable<?>[] joinVars;
+    protected final IVariable<?>[] joinVars;
 
     /**
      * The variables to be retained (aka projected out) (optional, all variables
      * are retained if not specified).
      */
-    private final IVariable<?>[] selectVars;
+    protected final IVariable<?>[] selectVars;
 
     /**
      * True if the hash join utility class is to output the distinct join
      * variables.
      */
-    private boolean outputDistinctJVs = false;
+    protected boolean outputDistinctJVs = false;
     
     /**
      * The join constraints (optional).
      */
-    private final IConstraint[] constraints;
+    protected final IConstraint[] constraints;
 
     /**
      * The hash index.
@@ -156,12 +156,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * Note: There is no separate "joinSet". Instead, the {@link SolutionHit}
      * class provides a join hit counter.
      */
-    private final AtomicReference<JVMHashIndex> rightSolutionsRef = new AtomicReference<JVMHashIndex>();
+    protected final AtomicReference<JVMHashIndex> rightSolutionsRef = new AtomicReference<JVMHashIndex>();
     
     /**
      * The #of solutions accepted into the hash index.
      */
-    private final CAT rightSolutionCount = new CAT();
+    protected final CAT rightSolutionCount = new CAT();
     
     /**
      * The maximum #of (left,right) solution joins that will be considered
@@ -172,17 +172,17 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * The #of left solutions considered for a join.
      */
-    private final CAT nleftConsidered = new CAT();
+    protected final CAT nleftConsidered = new CAT();
 
     /**
      * The #of right solutions considered for a join.
      */
-    private final CAT nrightConsidered = new CAT();
+    protected final CAT nrightConsidered = new CAT();
 
     /**
      * The #of solution pairs considered for a join.
      */
-    private final CAT nJoinsConsidered = new CAT();
+    protected final CAT nJoinsConsidered = new CAT();
     
     /**
      * Human readable representation of the {@link IHashJoinUtility} metadata
@@ -332,17 +332,16 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 .getProperty(JoinAnnotations.SELECT) : joinVars;
                 
         rightSolutionsRef.set(//
-                new JVMHashIndex(//
-                        keyVars,//
-                        indexSolutionsHavingUnboundJoinVars,//
-                        new LinkedHashMap<Key, Bucket>(op.getProperty(
-                                HashMapAnnotations.INITIAL_CAPACITY,
-                                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                                op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                                        HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
-                        )//
-                ));
-
+            new JVMHashIndex(//
+                keyVars,//
+                indexSolutionsHavingUnboundJoinVars,//
+                new LinkedHashMap<Key, Bucket>(op.getProperty(
+                    HashMapAnnotations.INITIAL_CAPACITY,
+                    HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
+                    op.getProperty(HashMapAnnotations.LOAD_FACTOR,
+                    HashMapAnnotations.DEFAULT_LOAD_FACTOR)//
+                )//
+        ));
     }
     
     @Override
@@ -382,7 +381,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
     }
 
-    private JVMHashIndex getRightSolutions() {
+    protected long getNoJoinVarsLimit() {
+        return noJoinVarsLimit;
+    }
+    
+    protected JVMHashIndex getRightSolutions() {
         
         return rightSolutionsRef.get();
         
@@ -703,7 +706,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * @param outSolution
      *            The solution.
      */
-    private void outputSolution(final IBuffer<IBindingSet> outputBuffer,
+    protected void outputSolution(final IBuffer<IBindingSet> outputBuffer,
             final IBindingSet outSolution) {
 
         if (log.isDebugEnabled())

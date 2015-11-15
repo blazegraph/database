@@ -11,6 +11,6 @@ echo "Updating POM versions to ${CURRENT_VERSION}-${BRANCH}-${YYMMDD}"
 
 mvn versions:set -DnewVersion=${CURRENT_VERSION}-${BRANCH}-${YYMMDD} versions:update-child-modules -f ${PARENT_POM}
 
-mvn -f ${PARENT_POM} -N clean install -DskipTests
+mvn -f ${PARENT_POM} -N clean install -Dmaven.test.skip=true
 
-mvn -f ${PARENT_POM} clean install -DskipTests
+mvn -f ${PARENT_POM} clean install -Dmaven.test.skip=true
