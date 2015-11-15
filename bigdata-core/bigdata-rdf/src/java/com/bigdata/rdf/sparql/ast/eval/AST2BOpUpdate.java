@@ -419,20 +419,40 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             break;
         }
         case Clear:
-        case Drop:
+        case Drop: {
             left = convertClearOrDropGraph(left, (DropGraph) op, context);
             break;
+        }
         case InsertData:
-        case DeleteData:
+        case DeleteData: {
             left = convertInsertOrDeleteData(left, (AbstractGraphDataUpdate) op,
                     context);
             break;
-        case Load:
+        }
+        case Load: {
             left = convertLoadGraph(left, (LoadGraph) op, context);
             break;
-        case DeleteInsert:
+        }
+        case DeleteInsert: {
             left = convertDeleteInsert(left, (DeleteInsertGraph) op, context, deleteInsertWhereStats);
             break;
+        }
+        case DropEntailments: {
+        	left = convertDropEntailments(left, context);
+        	break;
+        }
+        case CreateEntailments: {
+        	left = convertCreateEntailments(left, context);
+        	break;
+        }
+        case EnableEntailments: {
+        	left = convertEnableEntailments(left, context);
+        	break;
+        }
+        case DisableEntailments: {
+        	left = convertDisableEntailments(left, context);
+        	break;
+        }
         default:
             throw new UnsupportedOperationException("updateType=" + updateType);
         }
@@ -1867,7 +1887,96 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         
     }
 
-    /**
+   	private static PipelineOp convertDropEntailments(final PipelineOp left,
+			final AST2BOpUpdateContext context) throws SailException {
+		
+		long stmtCount = 0;
+		
+		if (log.isDebugEnabled()) {			
+			stmtCount = context.conn.getSailConnection().getTripleStore().getStatementCount(true);			
+			log.info("begin drop entailments");
+			
+		}
+		
+		context.conn.getSailConnection().removeAllEntailments();
+				
+		if (log.isDebugEnabled()) {			
+			long removedCount = stmtCount - context.conn.getSailConnection().getTripleStore().getStatementCount(true);			
+            log.debug("Removed statements = " + removedCount);
+            
+		}
+		
+        return left;
+
+    }
+	
+	private static PipelineOp convertDisableEntailments(PipelineOp left,
+			AST2BOpUpdateContext context) {
+		
+		if (log.isDebugEnabled()) {
+            log.debug("Going to disable truth maintenance");
+		}
+		
+		
+		if (context.conn.getSailConnection().isTruthMaintenanceConfigured()) {
+			
+			context.conn.getSailConnection().setTruthMaintenance(false);
+			
+		} else {			
+			log.debug("Truth maintenance is not configured");			
+		}
+			
+		if (log.isDebugEnabled()) {			
+            log.debug("truthMaintenance = " + context.conn.getSailConnection().getTruthMaintenance());            
+		}
+		
+		return left;
+	}
+	
+	private static PipelineOp convertEnableEntailments(PipelineOp left,
+			AST2BOpUpdateContext context) {
+		
+		if (log.isDebugEnabled()) {			
+		    log.debug("Going to enable truth maintenance");            
+		}
+		
+		if (context.conn.getSailConnection().isTruthMaintenanceConfigured()) {
+			
+			context.conn.getSailConnection().setTruthMaintenance(true);
+			
+		} else {			
+			log.debug("Truth maintenance is not configured");			
+		}		
+			
+		if (log.isDebugEnabled()) {			
+            log.debug("truthMaintenance = " + context.conn.getSailConnection().getTruthMaintenance());            
+		}
+		
+		return left;
+	}
+	
+	private static PipelineOp convertCreateEntailments(PipelineOp left,
+			AST2BOpUpdateContext context) throws SailException {
+		
+		long stmtCount = 0;
+		if (log.isDebugEnabled()) {
+			stmtCount = context.conn.getSailConnection().getTripleStore().getStatementCount(true);
+			log.info("begin compute closure");
+		}
+		
+		context.conn.getSailConnection().computeClosure();
+		
+		if (log.isDebugEnabled()) {
+			long inferredCount = context.conn.getSailConnection().getTripleStore().getStatementCount(true) - stmtCount;
+            log.debug("Inferred statements = " + inferredCount);
+            
+		}
+		
+		return left;
+	}
+
+	
+	/**
 	 * GRAPHS : If the graph already exists (context has at least one
 	 * statement), then this is an error (unless SILENT). Otherwise it is a NOP.
 	 * <p>
