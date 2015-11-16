@@ -38,7 +38,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <version>1.6.0-load-performance-geo-SNAPSHOT</version>
   <name>Blazegraph Zookeeper and Quorum Tests</name>
   <packaging>jar</packaging>
-
+  <properties>
+     <!-- Used to prevent ant from starting test services -->
+     <maven.test.skip>false</maven.test.skip>
+  </properties>
     <profiles>
      <profile>
       <id>localZookeeper</id>
@@ -124,7 +127,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>process-test-resources</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="preTestPreparation"/>
+                   <ant antfile="build.xml" target="preTestPreparation">
+                       <property name="maven.test.skip" value="${maven.test.skip}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>
@@ -136,7 +141,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>test</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="postTestCleanup"/>
+                   <ant antfile="build.xml" target="postTestCleanup">
+                       <property name="maven.test.skip" value="${maven.test.skip}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>
