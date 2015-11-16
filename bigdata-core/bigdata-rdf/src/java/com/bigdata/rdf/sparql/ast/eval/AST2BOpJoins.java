@@ -685,7 +685,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+            return newJoin(left, anns, ctx.defaultGraphDistinctFilter, summary,
                     cutoffLimit, queryHints, ctx);
 
         }
@@ -945,7 +945,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+            return newJoin(left, anns, ctx.defaultGraphDistinctFilter, summary,
                     cutoffLimit, queryHints, ctx);
 
         } else {
@@ -1033,7 +1033,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
            
-            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+            return newJoin(left, anns, ctx.defaultGraphDistinctFilter, summary,
                     cutoffLimit, queryHints, ctx);
 
         }
