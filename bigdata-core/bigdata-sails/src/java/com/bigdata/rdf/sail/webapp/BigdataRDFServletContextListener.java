@@ -40,6 +40,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -111,6 +112,10 @@ public class BigdataRDFServletContextListener implements
      */
     private boolean closeIndexManager;
 
+	private Set<String> oldWhitelist;
+
+	private boolean oldWhitelistEnabled;
+
     /**
      * The name of the {@link ServletContext} attribute under which we store
      * any overrides for the init parameters of the {@link ServletContext}. Note
@@ -137,6 +142,13 @@ public class BigdataRDFServletContextListener implements
         return effectiveInitParams.get(key);
 
     }
+
+	public void removeInitParameter(String key) {
+
+		effectiveInitParams.remove(key);
+		
+	}
+
 
     public BigdataRDFServletContextListener() {
         super();
@@ -590,6 +602,8 @@ public class BigdataRDFServletContextListener implements
             if (serviceWhitelist != null) {
                 log.info("Service whitelist: " + serviceWhitelist);
                 ServiceRegistry reg = ServiceRegistry.getInstance();
+                oldWhitelist = reg.getWhitelist();
+                oldWhitelistEnabled = reg.isWhitelistEnabled();
                 reg.setWhitelistEnabled(true);
                 for(String url: serviceWhitelist.split("\\s*,\\s*")) {
                     reg.addWhitelistURL(url);
@@ -670,8 +684,6 @@ public class BigdataRDFServletContextListener implements
 //
 //        }
 
-        effectiveInitParams = null;
-
         /*
          * Terminate various threads which should no longer be executing once we
          * have destroyed the servlet context. If you do not do this then
@@ -683,6 +695,22 @@ public class BigdataRDFServletContextListener implements
             SynchronizedHardReferenceQueueWithTimeout.stopStaleReferenceCleaner();
 
         }
+
+        {
+            final String serviceWhitelist = getInitParameter(ConfigParams.SERVICE_WHITELIST);
+            if (serviceWhitelist != null) {
+                log.info("Restoring service whitelist");
+                ServiceRegistry reg = ServiceRegistry.getInstance();
+                reg.setWhitelistEnabled(oldWhitelistEnabled);
+                for(String url: serviceWhitelist.split("\\s*,\\s*")) {
+                	if (!oldWhitelist.contains(url)) {
+                		reg.removeWhitelistURL(url);
+                	}
+                }
+            }
+        }
+        
+        effectiveInitParams = null;
 
     }
 
