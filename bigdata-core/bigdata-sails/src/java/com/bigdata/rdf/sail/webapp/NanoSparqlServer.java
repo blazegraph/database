@@ -1060,6 +1060,9 @@ public class NanoSparqlServer {
                     BigdataRDFServletContextListener.INIT_PARAM_OVERRIDES,
                     initParams);
 
+        } else {
+            wac.removeAttribute(
+                    BigdataRDFServletContextListener.INIT_PARAM_OVERRIDES);
         }
 
     }

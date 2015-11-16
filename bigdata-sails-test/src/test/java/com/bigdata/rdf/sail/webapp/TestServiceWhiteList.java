@@ -39,7 +39,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
@@ -49,19 +48,21 @@ import com.bigdata.util.config.NicUtil;
  */
 public class TestServiceWhiteList extends TestCase2 {
 	
-    private Server m_fixture;
+    private static final String SOME_SERVICE_ENDPOINT = "http://someService.com/test";
+	private Server m_fixture;
 	protected String namespace;
 	protected Journal m_indexManager;
 	private String m_rootURL;
 	private String m_serviceURL;
 	private RemoteRepositoryManager m_repo;
 	private HttpClient m_client;
+	private final Map<String, String> initParams = new LinkedHashMap<String, String>();
 
     public void testServiceWhiteList() throws Exception {
 
         TupleQueryResult res = m_repo.getRepositoryForDefaultNamespace(). //
-        		prepareTupleQuery("SELECT ?b { ?b <http://purl.org/dc/elements/1.1/title> ?title . SERVICE <http://someService.com/test> { } }") //
-        		.evaluate();
+        		prepareTupleQuery("SELECT ?b { ?b <http://purl.org/dc/elements/1.1/title> ?title . " + 
+        							"SERVICE <" + SOME_SERVICE_ENDPOINT + "> { } }").evaluate();
         
         int resCount = 0;;
         while(res.hasNext()){
@@ -75,8 +76,8 @@ public class TestServiceWhiteList extends TestCase2 {
         
         try {
         	res = m_repo.getRepositoryForDefaultNamespace(). //
-				prepareTupleQuery("SELECT ?b { ?b <http://purl.org/dc/elements/1.1/title> ?title . SERVICE <http://someService.com/test1> { } }") //
-				.evaluate();
+				prepareTupleQuery("SELECT ?b { ?b <http://purl.org/dc/elements/1.1/title> ?title . " + 
+						"SERVICE <" + SOME_SERVICE_ENDPOINT + "1> { } }").evaluate();
         	
         } catch(Exception e) {
           	exceptionThrown = e.toString().contains("Service URI http://someService.com/test1 is not allowed");
@@ -96,9 +97,7 @@ public class TestServiceWhiteList extends TestCase2 {
 	         tripleStoreProperties.setProperty(Journal.Options.BUFFER_MODE,
 	                    BufferMode.MemStore.name());
 	         
-	        // tripleStoreProperties.setProperty(BigdataSail.Options., value)
-	
-	     }
+	      }
 	     
 	     return tripleStoreProperties;
 	}
@@ -110,10 +109,9 @@ public class TestServiceWhiteList extends TestCase2 {
 	        
 	        m_indexManager = new Journal(getTripleStoreProperties());
 	       
-	        final Map<String, String> initParams = new LinkedHashMap<String, String>();
 	        {
 	        	
-	            initParams.put(ConfigParams.SERVICE_WHITELIST, "http://someService.com/test");
+	            initParams.put(ConfigParams.SERVICE_WHITELIST, SOME_SERVICE_ENDPOINT);
 	            
 	        }
 	
@@ -162,10 +160,9 @@ public class TestServiceWhiteList extends TestCase2 {
 	
 	        if (m_fixture != null) {
 	
-	            m_fixture.stop();
-	
+	        	m_fixture.stop();
 	            m_fixture = null;
-	
+		
 	        }
 	
 	        if (m_indexManager != null && namespace != null) {
