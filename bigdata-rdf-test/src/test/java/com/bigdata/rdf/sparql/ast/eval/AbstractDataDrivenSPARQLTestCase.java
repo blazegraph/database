@@ -308,7 +308,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
 
                 final TupleQueryResult queryResult = ASTEvalHelper
                         .evaluateTupleQuery(store, astContainer,
-                                new QueryBindingSet());
+                                new QueryBindingSet(), null /* dataset */);
 
 //                final TupleQueryResult queryResult = ASTEvalHelper
 //                        .evaluateTupleQuery(store, queryPlan,
@@ -325,7 +325,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
                 final Set<Statement> expectedResult = readExpectedGraphQueryResult();
 
                 final GraphQueryResult gqr = ASTEvalHelper.evaluateGraphQuery(
-                        store, astContainer, new QueryBindingSet());
+                        store, astContainer, new QueryBindingSet(), null /* dataset */);
                 
 //                final GraphQueryResult gqr = ASTEvalHelper.evaluateGraphQuery(
 //                        store, //
@@ -347,7 +347,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
             case ASK: {
 
                 final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
-                        store, astContainer, new QueryBindingSet());
+                        store, astContainer, new QueryBindingSet(), null /* dataset */);
 
 //                final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
 //                        store, queryPlan, new QueryBindingSet(),

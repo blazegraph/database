@@ -17,8 +17,14 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.Binding;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -149,6 +155,18 @@ public class ASTDeferredIVResolution {
         this.vf = store.getValueFactory();
         
     }
+    
+    static class DeferredResolutionResult {
+
+        BindingSet bindingSet;
+        Dataset dataset;
+
+        public DeferredResolutionResult(final BindingSet bindingSet, final Dataset dataset) {
+            this.bindingSet = bindingSet;
+            this.dataset = dataset;
+        }
+
+    }
 
     /**
      * Do deferred resolution of IVs, which were left unresolved while preparing
@@ -160,7 +178,34 @@ public class ASTDeferredIVResolution {
      *            - AST model of the query, which should be resolved
      * @throws MalformedQueryException
      */
-    public static void resolveQuery(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
+    public static DeferredResolutionResult resolveQuery(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
+        return resolveQuery(store, ast, null, null);
+    }
+    
+    /**
+     * Do deferred resolution of IVs, which were left unresolved while preparing
+     * the query
+     * 
+     * @param store
+     *            - triple store, which will be used for values resolution
+     * @param ast
+     *            - AST model of the query, which should be resolved
+     * @param bs
+     *            - binding set, which should be resolved 
+     * @param dataset 
+     * @throws MalformedQueryException
+     */
+    public static DeferredResolutionResult resolveQuery(final AbstractTripleStore store, final ASTContainer ast, final BindingSet bs, final Dataset dataset) throws MalformedQueryException {
+
+        final AST2BOpContext context = new AST2BOpContext(ast, store);
+
+        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution(store);
+
+        // process provided binding set
+        final BindingSet resolvedBindingset =  termsResolver.handleBindingSet(context, bs);
+
+        // process provided dataset
+        final Dataset resolvedDataset = termsResolver.handleDataset(context, dataset);
 
         /*
          * Prevent running IV resolution more than once.
@@ -170,14 +215,16 @@ public class ASTDeferredIVResolution {
          * in running resolution again.
          */
         if (Boolean.TRUE.equals(ast.getProperty(Annotations.RESOLVED))) {
-        	return;
+            if (!termsResolver.deferred.isEmpty()) {
+                termsResolver.resolveIVs(context);
+            }
+            
+        	return new DeferredResolutionResult(resolvedBindingset, resolvedDataset);
         }
         
     	final long beginNanos = System.nanoTime();
     	
         final QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
-
-        final AST2BOpContext context = new AST2BOpContext(ast, store);
 
         /*
          * Handle dataset declaration
@@ -213,9 +260,7 @@ public class ASTDeferredIVResolution {
 
         final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
-        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution(store);
-        
-        termsResolver.resolve(context, queryRoot2, dcLists);
+        termsResolver.resolve(context, queryRoot2, dcLists, bs);
         
         queryRoot2.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
         
@@ -225,6 +270,7 @@ public class ASTDeferredIVResolution {
 
         ast.setProperty(Annotations.RESOLVED, Boolean.TRUE);
 
+        return new DeferredResolutionResult(resolvedBindingset, resolvedDataset);
     }
 
     /**
@@ -233,7 +279,30 @@ public class ASTDeferredIVResolution {
      * @param ast - AST model of the update, which should be resolved
      * @throws MalformedQueryException
      */
-    public static void resolveUpdate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
+    public static DeferredResolutionResult resolveUpdate(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
+        return resolveUpdate(store, ast, null, null);
+    }
+
+    /**
+     * Do deferred resolution of IVs, which were left unresolved while preparing the update
+     * @param store - triple store, which will be used for values resolution
+     * @param ast - AST model of the update, which should be resolved
+     * @param bs - binding set, which should be resolved
+     * @param dataset 
+     * @return 
+     * @throws MalformedQueryException
+     */
+    public static DeferredResolutionResult resolveUpdate(final AbstractTripleStore store, final ASTContainer ast, final BindingSet bs, final Dataset dataset) throws MalformedQueryException {
+
+        final AST2BOpContext context = new AST2BOpContext(ast, store);
+
+        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution(store);
+
+        // process provided binding set
+        BindingSet resolvedBindingSet = termsResolver.handleBindingSet(context, bs);
+
+        // process provided dataset
+        final Dataset resolvedDataset = termsResolver.handleDataset(context, dataset);
 
         /*
          * Prevent running IV resolution more than once.
@@ -243,7 +312,10 @@ public class ASTDeferredIVResolution {
          * in running resolution again.
          */
         if (Boolean.TRUE.equals(ast.getProperty(Annotations.RESOLVED))) {
-        	return;
+            if (!termsResolver.deferred.isEmpty()) {
+                termsResolver.resolveIVs(context);
+            }
+        	return new DeferredResolutionResult(resolvedBindingSet, resolvedDataset);
         }
         
     	final long beginNanos = System.nanoTime();
@@ -264,11 +336,8 @@ public class ASTDeferredIVResolution {
             }
         }
         
-        final AST2BOpContext context2 = new AST2BOpContext(ast, store);
 
-        final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution(store);
-
-        termsResolver.resolve(context2, qc, dcLists);
+        termsResolver.resolve(context, qc, dcLists, bs);
 
         if (ast.getOriginalUpdateAST().getPrefixDecls()!=null && !ast.getOriginalUpdateAST().getPrefixDecls().isEmpty()) {
 
@@ -281,6 +350,8 @@ public class ASTDeferredIVResolution {
         ast.setResolveValuesTime(System.nanoTime() - beginNanos);
 
         ast.setProperty(Annotations.RESOLVED, Boolean.TRUE);
+
+        return new DeferredResolutionResult(resolvedBindingSet, resolvedDataset);
 
     }
 
@@ -302,6 +373,9 @@ public class ASTDeferredIVResolution {
              * We have a BigdataValue that belongs to the correct namespace and
              * which has already been resolved to a real IV.
              */
+            if (value.getIV().needsMaterialization()) {
+                value.getIV().setValue(value);
+            }
             handler.handle(value.getIV());
             return;
         }
@@ -326,14 +400,15 @@ public class ASTDeferredIVResolution {
 
     /**
      * Prepare and execute batch resolution of IVs in provided queryNode
+     * @param bs 
      * @param dcList 
      * @throws MalformedQueryException 
      */
-    private void resolve(final AST2BOpContext context, final QueryNodeBase queryNode, final Map<IDataSetNode, List<ASTDatasetClause>> dcLists) throws MalformedQueryException {
+    private void resolve(final AST2BOpContext context, final QueryNodeBase queryNode, final Map<IDataSetNode, List<ASTDatasetClause>> dcLists, final BindingSet bs) throws MalformedQueryException {
 
         // prepare deferred handlers for batch IVs resolution
         prepare(context, queryNode);
-
+        
 		// Assign DataSetNode to each IDataSetNode (sets up handlers that are
 		// then invoked by call backs).
 		resolveDataset(context, dcLists);
@@ -619,6 +694,83 @@ public class ASTDeferredIVResolution {
                 });
             }
         }
+    }
+
+    private BindingSet handleBindingSet(final AST2BOpContext context, final BindingSet bs) {
+        if (bs != null) {
+
+            MapBindingSet newBs = new MapBindingSet();
+            
+            for (Binding entry: bs) {
+                Value value = entry.getValue();
+                if (!(value instanceof BigdataValue)) {
+                    if (bs instanceof QueryBindingSet) {
+                        BigdataValue bValue = context.db.getValueFactory().asValue(value);
+//                        bValue.setIV(TermId.mockIV(VTE.valueOf(bValue)));
+//                        bValue.getIV().setValue(bValue);
+                        value = bValue;
+                    }
+                }
+
+                if (value instanceof BigdataValue && !((BigdataValue) value).isRealIV()) {
+                    final BigdataValue bValue = (BigdataValue) value;
+                    defer((BigdataValue)value, new Handler(){
+                        @Override
+                        public void handle(final IV newIV) {
+                            bValue.setIV(newIV);
+                        }
+                    });
+                }
+                newBs.addBinding(entry.getName(), value);
+            }
+            return newBs;
+        }
+        return bs;
+    }
+
+    private Dataset handleDataset(final AST2BOpContext context, final Dataset dataset) {
+        if (dataset != null) {
+
+            DatasetImpl newDataset = new DatasetImpl();
+            
+            for (final URI uri: dataset.getDefaultGraphs()) {
+                URI value = handleDatasetGraph(context, uri);
+                newDataset.addDefaultGraph(value);
+            }
+            for (final URI uri: dataset.getDefaultRemoveGraphs()) {
+                URI value = handleDatasetGraph(context, uri);
+                newDataset.addDefaultRemoveGraph(value);
+            }
+            for (final URI uri: dataset.getNamedGraphs()) {
+                URI value = handleDatasetGraph(context, uri);
+                newDataset.addNamedGraph(value);
+            }
+            URI value = handleDatasetGraph(context, dataset.getDefaultInsertGraph());
+            newDataset.setDefaultInsertGraph(value);
+            return newDataset;
+        }
+        return dataset;
+    }
+
+    private URI handleDatasetGraph(final AST2BOpContext context, final URI uri) {
+        URI value = uri;
+        if (value!= null && !(value instanceof BigdataValue)) {
+            BigdataURI bValue = context.db.getValueFactory().asValue(value);
+            bValue.setIV(TermId.mockIV(VTE.valueOf(bValue)));
+            bValue.getIV().setValue(bValue);
+            value = bValue;
+        }
+
+        if (value instanceof BigdataValue) {
+            final BigdataValue bValue = (BigdataValue) value;
+            defer((BigdataValue)value, new Handler(){
+                @Override
+                public void handle(final IV newIV) {
+                    bValue.setIV(newIV);
+                }
+            });
+        }
+        return value;
     }
 
     /**
@@ -1037,8 +1189,10 @@ public class ASTDeferredIVResolution {
                             }
                             iv.setValue(resolved);
                             resolved.setIV(iv);
-                        } else {
+                        } else if (ivs[i] != null) {
                             iv = ivs[i];
+                        } else {
+                            iv = TermId.mockIV(VTE.valueOf(v)); // to support bindings, which were not resolved to IVs
                         }
                     }
 

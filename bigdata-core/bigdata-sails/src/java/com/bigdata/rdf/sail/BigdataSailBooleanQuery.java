@@ -28,14 +28,6 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     }
 
     @Override
-    public void setDataset(final Dataset dataset) {
-
-        astContainer.getOriginalAST().setDataset(
-                new DatasetNode(dataset, false/* update */, getTripleStore().getValueFactory()));
-
-    }
-
-    @Override
     public String toString() {
 
         return astContainer.toString();
@@ -84,7 +76,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
 
         final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
                 getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
+                        getBindings()), getDataset());
 
         return queryResult;
     }

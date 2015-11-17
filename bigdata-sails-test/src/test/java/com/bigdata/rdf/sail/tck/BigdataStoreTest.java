@@ -292,7 +292,7 @@ public class BigdataStoreTest extends RDFStoreTest {
 		originalQuery.setIncludeInferred(false);
 		final TupleQueryResult queryResult = ASTEvalHelper.evaluateTupleQuery(
 		        db, astContainer, new QueryBindingSet(
-		        		bs));
+		        		bs), null /* dataset */);
 		
 		return queryResult;
 		

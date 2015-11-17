@@ -4,12 +4,10 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
-import org.openrdf.model.ValueFactory;
 import org.openrdf.query.Dataset;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -135,10 +133,10 @@ public class DatasetNode extends QueryNodeBase {
 
     }
 	
-	public DatasetNode(final Dataset dataset, final boolean update, final BigdataValueFactory vf) {
+	public DatasetNode(final Dataset dataset, final boolean update) {
 		
-        this(DataSetSummary.toInternalValues(dataset.getDefaultGraphs(), vf),
-                DataSetSummary.toInternalValues(dataset.getNamedGraphs(), vf),
+        this(DataSetSummary.toInternalValues(dataset.getDefaultGraphs()),
+                DataSetSummary.toInternalValues(dataset.getNamedGraphs()),
                 update);
 
 	}
