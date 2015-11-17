@@ -8,7 +8,6 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailTupleQuery;
 
-import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolutionInitializer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -27,14 +26,6 @@ public class BigdataSailTupleQuery extends SailTupleQuery
         
         return astContainer;
         
-    }
-
-    @Override
-    public void setDataset(final Dataset dataset) {
-
-        astContainer.getOriginalAST().setDataset(
-                new DatasetNode(dataset, false/* update */, getTripleStore().getValueFactory()));
-
     }
 
     @Override
@@ -86,7 +77,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 
         final TupleQueryResult queryResult = ASTEvalHelper.evaluateTupleQuery(
                 getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
+                        getBindings()), getDataset());
 
         return queryResult;
 

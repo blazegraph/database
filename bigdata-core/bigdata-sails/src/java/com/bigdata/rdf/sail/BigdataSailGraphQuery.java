@@ -51,14 +51,6 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
     }
 
     @Override
-    public void setDataset(final Dataset dataset) {
-
-        astContainer.getOriginalAST().setDataset(
-                new DatasetNode(dataset, false/* update */, getTripleStore().getValueFactory()));
-
-    }
-    
-    @Override
     public String toString() {
 
         return astContainer.toString();
@@ -107,7 +99,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
 
         final GraphQueryResult queryResult = ASTEvalHelper.evaluateGraphQuery(
                 getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
+                        getBindings()), getDataset());
 
         return queryResult;
 

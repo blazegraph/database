@@ -640,7 +640,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				final MutableTupleQueryResult result = new MutableTupleQueryResult(
 						ASTEvalHelper.evaluateTupleQuery(
 								context.conn.getTripleStore(), astContainer,
-								context.getQueryBindingSet()/* bindingSets */));
+								context.getQueryBindingSet()/* bindingSets */, null /* dataset */));
 				deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
 				
 				// If the query contains a nativeDistinctSPO query hint then
@@ -1015,7 +1015,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					 */
                     final GraphQueryResult result = ASTEvalHelper
 							.evaluateGraphQuery(context.conn.getTripleStore(),
-									astContainer, context.getQueryBindingSet()/* bindingSets */);
+									astContainer, context.getQueryBindingSet()/* bindingSets */, null /* dataset */);
                     
                     try {
 
