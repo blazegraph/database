@@ -43,14 +43,14 @@ import com.bigdata.rdf.sail.webapp.client.AST2SPARQLUtil;
 
 /**
  * Utility class constructs a valid SPARQL query for a remote
- * <code>SPARQL 1.1</code> using the <code>VALUES</code> clause to vector
+ * <code>SPARQL 1.1</code> using the <code>BINDINGS</code> clause to vector
  * solutions into that remote end point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: RemoteSparqlQueryBuilder.java 6071 2012-03-04 18:08:57Z
  *          thompsonbry $
  */
-public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
+public class RemoteSparql11DraftQueryBuilder implements IRemoteSparqlQueryBuilder {
 
     private static final Logger log = Logger
             .getLogger(RemoteSparql10QueryBuilder.class);
@@ -92,7 +92,7 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
      * @param serviceNode
      *            The SERVICE clause.
      */
-    public RemoteSparql11QueryBuilder(final ServiceNode serviceNode) {
+    public RemoteSparql11DraftQueryBuilder(final ServiceNode serviceNode) {
 
         if (serviceNode == null)
             throw new IllegalArgumentException();
@@ -293,8 +293,7 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
             // Variables in a known stable order.
             final LinkedHashSet<String> vars = getDistinctVars(bindingSets);
 
-            sb.append("VALUES");
-            sb.append(" (");
+            sb.append("BINDINGS");
 
             // Variable declarations.
             {
@@ -304,8 +303,6 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
                     sb.append(v);
                 }
             }
-            
-            sb.append(")");
 
             // Bindings.
             {

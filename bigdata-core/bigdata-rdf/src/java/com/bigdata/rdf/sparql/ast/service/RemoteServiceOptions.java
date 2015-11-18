@@ -73,6 +73,7 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
     private boolean isSparql11 = true;
     private boolean isGET = DEFAULT_IS_GET;
     private String acceptStr = null;
+    private SPARQLVersion sparqlVersion = SPARQLVersion.SPARQL_11;
 
     public RemoteServiceOptions() {
 
@@ -95,6 +96,7 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
     }
 
     @Override
+    @Deprecated
     public boolean isSparql11() {
         return isSparql11;
     }
@@ -159,5 +161,14 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
         sb.append("}");
         return sb.toString();
     }
+
+	@Override
+	public SPARQLVersion getSPARQLVersion() {
+		return sparqlVersion;
+	}
+	
+	public void setSPARQLVersion (SPARQLVersion sparqlVersion) {
+		this.sparqlVersion = sparqlVersion;
+	}
 
 }

@@ -63,7 +63,11 @@ public interface IServiceOptions {
      * <code>SPARQL 1.1</code> (including the <code>SPARQL 1.1 BINDINGS</code>).
      * When <code>false</code>, the solutions will be vectored to the end point
      * using a technique which is compatible with <code>SPARQL 1.0</code>.
+     * 
+     * @deprecated replaced by getSPARQLVersion()
+     * @see #getSPARQLVersion()
      */
+    @Deprecated
     boolean isSparql11();
 
     /**
@@ -85,5 +89,18 @@ public interface IServiceOptions {
      * known to expose the bigdata LBS pattern.
      */
     boolean isBigdataLBS();
+    
+    
+    /**
+     * Returns if {@link SPARQLVersion#SPARQL_11} iff the end point supports
+     * <code>SPARQL 1.1</code>.
+     * When {@link SPARQLVersion#SPARQL_10}, the solutions will be vectored to the end point
+     * using a technique which is compatible with <code>SPARQL 1.0</code>.
+     * 
+     * @return the SPARQL version {@link SPARQLVersion}
+     * 
+     *      
+     */
+    SPARQLVersion getSPARQLVersion();
     
 }

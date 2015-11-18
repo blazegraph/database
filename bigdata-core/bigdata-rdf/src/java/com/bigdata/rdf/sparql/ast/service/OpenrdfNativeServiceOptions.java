@@ -59,10 +59,22 @@ public class OpenrdfNativeServiceOptions extends ServiceOptionsBase implements
 
     /**
      * Always returns <code>false</code> (response is ignored).
+     * 
+     * @deprecated replaced with {@link #getSPARQLVersion()}
      */
     @Override
+    @Deprecated
     final public boolean isSparql11() {
         return false;
     }
+
+    /**
+     * Always returns <code>null</code> (response is ignored).
+     * 
+     */
+	@Override
+	final public SPARQLVersion getSPARQLVersion() {
+		return null;
+	}
 
 }
