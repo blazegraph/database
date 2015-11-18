@@ -27,8 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Enumeration;
+import java.util.Properties;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
@@ -40,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -321,7 +326,10 @@ This case 4 appears to be misconceived: Jeremy Carroll.
              * Just replace the parent JoinGroupNode (op) with the
              * child.
              */
-
+           
+            // inherit query hints
+            copyQueryHints(op.get(0),op.getQueryHints());
+            
             ((GroupNodeBase<?>) op.getParent())
                     .replaceWith(op, (BOp) op.get(0));
 
@@ -403,8 +411,11 @@ This case 4 appears to be misconceived: Jeremy Carroll.
     		 * from the grandparent and replace it with the child.
     		 */
     		
-            final GroupNodeBase<?> grandparent = (GroupNodeBase<?>) parent
+         final GroupNodeBase<?> grandparent = (GroupNodeBase<?>) parent
                     .getParent();
+
+         // inherit query hints
+         copyQueryHints(child,parent.getQueryHints());
 
     		grandparent.replaceWith(parent, child);
     		
@@ -414,4 +425,38 @@ This case 4 appears to be misconceived: Jeremy Carroll.
     	
     }
 
+    
+    /**
+     * Copies the query hints to the given node, if not specified there. 
+     * If the given node already has the query hint, it is left unmodified.
+     * 
+     * @param node
+     * @param queryHints
+     */
+    private static void copyQueryHints(BOp node, final Properties queryHints) {
+
+       if (queryHints == null)
+          return;
+
+       if (!(node instanceof QueryNodeBase))
+           return;
+
+       final QueryNodeBase nodeAsQN = (QueryNodeBase)node;
+       final Enumeration<?> pnames = queryHints.propertyNames();
+
+       while (pnames.hasMoreElements()) {
+
+          final String name = (String) pnames.nextElement();
+
+          final String value = queryHints.getProperty(name);
+
+          // copy over query hint, ignoring conflicting ones
+          final String curHint = nodeAsQN.getQueryHint(name);
+          if (curHint==null) {
+             nodeAsQN.setQueryHint(name, value);
+          }
+
+       }
+    }
+    
 }

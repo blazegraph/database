@@ -177,6 +177,16 @@ public class QueryHintRegistry {
          */
         add(new HistoryHint());
         
+        /*
+         * Selectively enable/disbale usage of pipelined hash joins.
+         */
+        add(new PipelinedHashJoinHint());
+        
+        /*
+         * Disable default graph distinct filter
+         */
+        add(new DefaultGraphDistinctFilterHint());
+        
     }
 
 }

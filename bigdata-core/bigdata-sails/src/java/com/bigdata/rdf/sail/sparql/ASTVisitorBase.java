@@ -906,4 +906,23 @@ public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
         return node.childrenAccept(this, data);
     }
 
+    public Object visit(ASTCreateEntailments node, Object data)
+    		throws VisitorException {
+        return node.childrenAccept(this, data);
+    }
+    
+    public Object visit(ASTDisableEntailments node, Object data)
+    		throws VisitorException {
+        return node.childrenAccept(this, data);
+    }
+    
+    public Object visit(ASTDropEntailments node, Object data)
+    		throws VisitorException {
+        return node.childrenAccept(this, data);
+    }
+    
+    public Object visit(ASTEnableEntailments node, Object data)
+    		throws VisitorException {
+        return node.childrenAccept(this, data);
+    }
 }
