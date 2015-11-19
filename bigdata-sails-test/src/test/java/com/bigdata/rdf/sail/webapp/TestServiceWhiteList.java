@@ -53,7 +53,7 @@ public class TestServiceWhiteList extends TestCase2 {
 	
     private static final String SOME_SERVICE_ENDPOINT = "http://someService.com/test";
 	private Server m_fixture;
-	protected String namespace;
+	protected String namespace = "testWhiteList";
 	protected Journal m_indexManager;
 	private String m_rootURL;
 	private String m_serviceURL;
@@ -63,7 +63,7 @@ public class TestServiceWhiteList extends TestCase2 {
 
     public void testServiceWhiteList() throws Exception {
 
-        TupleQueryResult res = m_repo.getRepositoryForDefaultNamespace(). //
+        TupleQueryResult res = m_repo.getRepositoryForNamespace(namespace). //
         		prepareTupleQuery("SELECT ?b { ?b <http://purl.org/dc/elements/1.1/title> ?title . " + 
         							"SERVICE <" + SOME_SERVICE_ENDPOINT + "> { } }").evaluate();
         
@@ -78,7 +78,7 @@ public class TestServiceWhiteList extends TestCase2 {
         boolean exceptionThrown = false;
         
         try {
-        	res = m_repo.getRepositoryForDefaultNamespace(). //
+        	res = m_repo.getRepositoryForNamespace(namespace). //
 				prepareTupleQuery("SELECT ?b { ?b <http://purl.org/dc/elements/1.1/title> ?title . " + 
 						"SERVICE <" + SOME_SERVICE_ENDPOINT + "1> { } }").evaluate();
         	
@@ -115,6 +115,7 @@ public class TestServiceWhiteList extends TestCase2 {
 	        {
 	        	
 	            initParams.put(ConfigParams.SERVICE_WHITELIST, SOME_SERVICE_ENDPOINT);
+	            initParams.put(ConfigParams.NAMESPACE, namespace);
 	            
 	        }
 	
