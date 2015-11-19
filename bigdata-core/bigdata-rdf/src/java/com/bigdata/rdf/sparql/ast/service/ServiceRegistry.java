@@ -352,13 +352,6 @@ public class ServiceRegistry {
     }
 
     /**
-     * Get service whitelist
-     */
-    public Set<String> getWhitelist() {
-        return Collections.unmodifiableSet(serviceWhitelist);
-    }
-
-    /**
      * Set whitelist status.
      * @param enable true if enabled, false if disabled
      */
