@@ -1463,4 +1463,19 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_bg1542a.srx"// resultFileURL
           ).runTest();   
     }
+    
+    /**
+     * Ticket 1524: MINUS being ignored. Analogous test
+     * case for OPTIONAL case.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1542b() throws Exception {
+       new TestHelper(
+             "ticket_bg1542b",// testURI,
+             "ticket_bg1542b.rq",// queryFileURL
+             "ticket_bg1542.trig",// dataFileURL
+             "ticket_bg1542b.srx"// resultFileURL
+          ).runTest();   
+    }
 }
