@@ -26,6 +26,7 @@ import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 import junit.framework.TestCase2;
 
@@ -53,7 +54,7 @@ public class TestServiceWhiteList extends TestCase2 {
 	
     private static final String SOME_SERVICE_ENDPOINT = "http://someService.com/test";
 	private Server m_fixture;
-	protected String namespace = "testWhiteList";
+	protected String namespace;
 	protected Journal m_indexManager;
 	private String m_rootURL;
 	private String m_serviceURL;
@@ -109,6 +110,7 @@ public class TestServiceWhiteList extends TestCase2 {
 	public void setUp() throws Exception {
 	
 	        log.warn("Setting up test:" + getName());
+	        namespace = "testWhiteList" + UUID.randomUUID();
 	        
 	        m_indexManager = new Journal(getTripleStoreProperties());
 	       
