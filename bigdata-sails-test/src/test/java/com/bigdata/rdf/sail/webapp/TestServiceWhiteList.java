@@ -30,7 +30,9 @@ import java.util.Properties;
 import junit.framework.TestCase2;
 
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.BigdataStatics;
@@ -40,6 +42,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
 
@@ -157,8 +160,11 @@ public class TestServiceWhiteList extends TestCase2 {
 	
 	        // if (log.isInfoEnabled())
 	        log.warn("tearing down test: " + getName());
-	
-	        if (m_fixture != null) {
+	        
+	        ServiceRegistry.getInstance().remove(new URIImpl(SOME_SERVICE_ENDPOINT));
+	        ServiceRegistry.getInstance().setWhitelistEnabled(false);
+	        
+	       if (m_fixture != null) {
 	
 	        	m_fixture.stop();
 	            m_fixture = null;
