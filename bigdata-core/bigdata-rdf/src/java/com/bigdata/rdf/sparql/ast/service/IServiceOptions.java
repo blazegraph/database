@@ -60,15 +60,9 @@ public interface IServiceOptions {
 
     /**
      * Return <code>true</code> iff the end point supports
-     * <code>SPARQL 1.1</code> (including the <code>SPARQL 1.1 BINDINGS</code>).
-     * When <code>false</code>, the solutions will be vectored to the end point
-     * using a technique which is compatible with <code>SPARQL 1.0</code>.
-     * 
-     * @deprecated replaced by getSPARQLVersion()
-     * @see #getSPARQLVersion()
+     * <code>SPARQL 1.0</code>  
      */
-    @Deprecated
-    boolean isSparql11();
+     boolean isSparql10();
 
     /**
      * Return <code>true</code> iff the service end point is one which should

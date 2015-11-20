@@ -70,10 +70,10 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
      */
     private final static boolean DEFAULT_IS_GET = false;
     
-    private boolean isSparql11 = true;
+    private SPARQLVersion sparqlVersion = SPARQLVersion.SPARQL_11;
     private boolean isGET = DEFAULT_IS_GET;
     private String acceptStr = null;
-    private SPARQLVersion sparqlVersion = SPARQLVersion.SPARQL_11;
+    
 
     public RemoteServiceOptions() {
 
@@ -96,13 +96,8 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
     }
 
     @Override
-    @Deprecated
-    public boolean isSparql11() {
-        return isSparql11;
-    }
-
-    public void setSparql11(final boolean newValue) {
-        this.isSparql11 = newValue;
+    public boolean isSparql10() {
+        return getSPARQLVersion().equals(SPARQLVersion.SPARQL_10);
     }
 
     /**
@@ -155,7 +150,7 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getName());
-        sb.append("{sparql11=" + isSparql11());
+        sb.append("{SPARQLVersion=" + getSPARQLVersion());
         sb.append(",GET=" + isGET());
         sb.append(",Accept=" + getAcceptHeader());
         sb.append("}");
@@ -168,6 +163,9 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
 	}
 	
 	public void setSPARQLVersion (SPARQLVersion sparqlVersion) {
+		if(sparqlVersion == null) {
+			throw new IllegalArgumentException("SPARQL version value must not be null");
+		}
 		this.sparqlVersion = sparqlVersion;
 	}
 
