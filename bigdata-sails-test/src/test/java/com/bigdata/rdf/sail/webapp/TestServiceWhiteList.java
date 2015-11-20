@@ -40,6 +40,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
@@ -110,15 +111,30 @@ public class TestServiceWhiteList extends TestCase2 {
 	public void setUp() throws Exception {
 	
 	        log.warn("Setting up test:" + getName());
+	        
+	        final Properties journalProperties = new Properties();
+	        
+	        {
+	            journalProperties.setProperty(Journal.Options.BUFFER_MODE,
+	                    BufferMode.MemStore.name());
+	            
+	        }
+	        
 	        namespace = "testWhiteList" + UUID.randomUUID();
 	        
-	        m_indexManager = new Journal(getTripleStoreProperties());
+	        m_indexManager = new Journal(journalProperties);
+	        
+	        AbstractApiTask.submitApiTask(m_indexManager,
+		               new CreateKBTask(namespace, journalProperties)).get();
 	       
 	        {
 	        	
 	            initParams.put(ConfigParams.SERVICE_WHITELIST, SOME_SERVICE_ENDPOINT);
-	            initParams.put(ConfigParams.NAMESPACE, namespace);
 	            
+	            initParams.put(ConfigParams.NAMESPACE, namespace);
+	        	
+	            initParams.put(ConfigParams.CREATE, "true");
+	            	            
 	        }
 	
 	        // Start server for that kb instance.
