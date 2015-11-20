@@ -269,8 +269,12 @@ public class TestParsing extends TestCase2 {
                 return new PIDStatReader() {
                     @Override
                     protected ActiveProcess getActiveProcess() {
-                        //return super.getActiveProcess();
-                        return new MockActiveProcess();
+                        return new ActiveProcess() {
+                            @Override
+                            public boolean isAlive() {
+                                return true;
+                            }
+                        };
                     }
                 };
             }
@@ -278,32 +282,20 @@ public class TestParsing extends TestCase2 {
         final PIDStatCollector.PIDStatReader pidStatReader = (PIDStatCollector.PIDStatReader) pidStatCollector.getProcessReader();
         pidStatReader.start(new ByteArrayInputStream(output.getBytes()));
         Thread t = new Thread(pidStatReader);
-        t.start();
-        Thread.sleep(1000);
-        CounterSet counterSet = pidStatCollector.getCounters();
+        CounterSet counterSet;
+        try {
+            t.start();
+            Thread.sleep(100);
+            counterSet = pidStatCollector.getCounters();
+        } finally {
+            t.interrupt();
+        }
+
         double cpu_usr = (Double)((ICounter) counterSet.getChild(IProcessCounters.CPU).getChild("% User Time")).getInstrument().getValue();
         long rss = (Long)((ICounter) counterSet.getChild(IProcessCounters.Memory).getChild("Resident Set Size")).getInstrument().getValue();
-        t.interrupt();
-
 
         assertEquals(cpu_usr, 0.005d);
         assertEquals(rss, 1289368*1024);
 
-
-
-        /*Iterator<ICounter> counters = counterSet.getCounters(Pattern.compile(".*"));
-        while (counters.hasNext()) {
-            System.err.println(counters.next().getInstrument().getValue().toString());
-        }*/
-
-    }
-
-    private final class MockActiveProcess extends ActiveProcess {
-
-
-        @Override
-        public boolean isAlive() {
-            return true;
-        }
     }
 }
