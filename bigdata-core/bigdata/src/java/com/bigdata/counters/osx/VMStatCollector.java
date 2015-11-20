@@ -28,26 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.osx;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.bigdata.counters.AbstractProcessCollector;
-import com.bigdata.counters.AbstractProcessReader;
-import com.bigdata.counters.ActiveProcess;
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterHierarchy;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IHostCounters;
-import com.bigdata.counters.IInstrument;
-import com.bigdata.counters.IRequiredHostCounters;
-import com.bigdata.counters.ProcessReaderHelper;
+import com.bigdata.counters.*;
 
 /**
  * Collects some counters using <code>vmstat</code>.
@@ -270,7 +258,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
     *         Thompson</a>
     */
-   private class VMStatReader extends ProcessReaderHelper {
+   protected class VMStatReader extends ProcessReaderHelper {
 
       @Override
       protected ActiveProcess getActiveProcess() {
@@ -287,6 +275,8 @@ public class VMStatCollector extends AbstractProcessCollector implements
          super();
 
       }
+
+      private final Pattern pageSizePattern = Pattern.compile("size of (\\d+) ");
 
       /**
        * The index of the field associated with the "free" counter.
@@ -316,7 +306,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
       private AtomicInteger INDEX_PAGEOUT = new AtomicInteger();
 
       /**
-       * 
+       *
        * @see TestParse_vm_stat#test_vmstat_header_and_data_parse()
        */
       @Override
@@ -344,14 +334,20 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
             h0 = readLine();
 
-            final String[] fields = pattern.split(h0.trim(), 0/* limit */);
 
             if (log.isInfoEnabled())
                log.info("header: " + h0);
 
-            assertFieldByPosition(0/* index */, fields, "Mach"/* expected */);
+            if (!h0.contains("Mach")) {
+                throw new RuntimeException("Wrong input, expected hader: " + h0);
+            }
 
-            pageSize = Integer.valueOf(fields[7]);
+            Matcher matcher = pageSizePattern.matcher(h0);
+            if (matcher.find()) {
+                pageSize = Integer.valueOf(matcher.group(1));
+            } else {
+                throw new RuntimeException("Failed to extract page size");
+            }
 
             if (pageSize <= 0 || (pageSize % 512 != 0))
                throw new RuntimeException("pageSize=" + pageSize);
