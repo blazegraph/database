@@ -1449,4 +1449,33 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        assertTrue(pred.isConstant());
        assertTrue(obj.isConstant());
     }
+    
+    /**
+     * Ticket 1524: MINUS being ignored.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1542a() throws Exception {
+       new TestHelper(
+             "ticket_bg1542a",// testURI,
+             "ticket_bg1542a.rq",// queryFileURL
+             "ticket_bg1542.trig",// dataFileURL
+             "ticket_bg1542a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1524: MINUS being ignored. Analogous test
+     * case for OPTIONAL case.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1542b() throws Exception {
+       new TestHelper(
+             "ticket_bg1542b",// testURI,
+             "ticket_bg1542b.rq",// queryFileURL
+             "ticket_bg1542.trig",// dataFileURL
+             "ticket_bg1542b.srx"// resultFileURL
+          ).runTest();   
+    }
 }
