@@ -368,10 +368,17 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
          * SubqueryRoot. Otherwise we use the parent since there is no wrapping
          * JoinGroupNode (or if there is, it has some other stuff in there as
          * well).
+         * 
+         * BLZG-1542 -> there is an additional thing we need to take care of:
+         *              whenever the parent node is an OPTIONAL or MINUS, we 
+         *              must not remove it, otherwise we would just "drop" an
+         *              OPTIONAL or MINUS, thus changing the query's semantics
+         *              
          */
          
-        if ((parent instanceof JoinGroupNode) && ((BOp) parent).arity() == 1
-                && parent.getParent() != null && 
+        if ((parent instanceof JoinGroupNode) && !((JoinGroupNode)parent).isOptional()
+                && !((JoinGroupNode)parent).isMinus() && ((BOp) parent).arity() == 1
+                && parent.getParent() != null &&
                 !((IGroupNode<?>)parent.getParent() instanceof UnionNode)) {
             
             final IGroupNode<IGroupMemberNode> pp = parent.getParent();
