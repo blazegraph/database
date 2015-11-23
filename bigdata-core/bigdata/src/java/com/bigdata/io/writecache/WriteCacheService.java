@@ -530,7 +530,7 @@ abstract public class WriteCacheService implements IWriteCache {
 the clear/dirty list threshold)
              */
             
-            minCleanListSize = Math.max(4, (int) (nwriteBuffers*.025));
+            minCleanListSize = Math.max(4, (int) (nwriteBuffers*.003));
 
         }
         
