@@ -2395,7 +2395,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		void stressSessionProtection(final int smallSlotSize) {
-			final Journal store = (Journal) getSmallSlotStore(smallSlotSize);
+			// ensure smallslots WILL recycle "high-waste" immediately for even single allocator
+			final Journal store = (Journal) getSmallSlotStore(smallSlotSize, 1, 0.2f);
 			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 			final RWStore rw = bs.getStore();
@@ -2456,10 +2457,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				long used = bucket.usedSlots();
 				long reserved = bucket.reservedSlots();
 	
-				if (smallSlotSize == 0) { // check not guaranteed with small slots
-					assertTrue(reserved > used);
-					assertTrue(reserved-used < (addrs.size()/2)); // must have reclaimed recycled slots
-				}
+				assertTrue(reserved > used);
+
+				// check should be okay for small slots if high waste check is always triggered!
+				assertTrue(reserved-used < (addrs.size()/2)); // must have reclaimed recycled slots
 			}
 
 			} finally {
