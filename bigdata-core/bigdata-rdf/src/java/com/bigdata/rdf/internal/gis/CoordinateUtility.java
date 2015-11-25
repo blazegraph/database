@@ -300,6 +300,30 @@ public class CoordinateUtility {
 
        return metersToUnits(distAsDegree * 60 * 1.1515 * 1609.344, units);
     }
+    
+    
+    /**
+     * Computes the distance between two coordinates in meters.
+     * 
+     * @param latP1 latitude of point #1
+     * @param latP2 latitude of point #2
+     * @param lonP1 latitude of point #1
+     * @param lonP1 latitude of point #2
+     * @param units desired return unit
+     * @return
+     */
+    public static double distanceInMeters(
+       final double latP1, final double latP2, final double lonP1, final double lonP2) {
+       
+       double distRad = 
+          Math.acos(
+             Math.sin(toRadians(latP1)) * Math.sin(toRadians(latP2)) + 
+             Math.cos(toRadians(latP1)) * Math.cos(toRadians(latP2)) * Math.cos(toRadians(lonP1 - lonP2)));
+
+       final double distAsDegree = toDegrees(distRad);
+
+       return distAsDegree * 60 * 1.1515 * 1609.344;
+    }
 
 
 

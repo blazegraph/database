@@ -1938,9 +1938,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       private static final long serialVersionUID = -346928614528045113L;
 
-      final private CoordinateDD spatialPointAsCoordinateDD;
-      final private Double distance;
-      final private UNITS unit;
+      final private double spatialPointLat;
+      final private double spatialPointLon;      
+      final private Double distanceInMeters;
 
       final private Long timeMin;
       final private Long timeMax;
@@ -1953,9 +1953,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          
          super(litExt, geoSpatialCounters);
 
-         this.spatialPointAsCoordinateDD = spatialPoint.asCoordinateDD();
-         this.distance = distance;
-         this.unit = unit;
+         this.spatialPointLat = spatialPoint.getLat();
+         this.spatialPointLon = spatialPoint.getLon();
+         this.distanceInMeters = CoordinateUtility.unitsToMeters(distance, unit);
          this.timeMin = timeMin;
          this.timeMax = timeMax;         
       }
@@ -1963,53 +1963,53 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       @Override
       @SuppressWarnings("rawtypes")      
       protected boolean isValidInternal(final ITuple tuple) {
-                  
-			final PointLatLonTime p = asPoint(tuple);
-			
-			if (p==null) {
-			   if (log.isInfoEnabled()) {
-			      log.info(
-			         "Something went wrong extracting the object. " +
-			         "Rejecting unprocessable value.");
-			   }
 
-			   return false; // reject value
-			}
-			
-         final CoordinateDD pAsDD = p.getSpatialPoint().asCoordinateDD();
-			
-			boolean ret = 
-			   CoordinateUtility.distance(
-			      pAsDD, spatialPointAsCoordinateDD, unit) <= distance &&
-			      timeMin <= p.getTimestamp() && p.getTimestamp() <= timeMax;
-			   
-			return ret;
-		}
-
-      @SuppressWarnings("rawtypes")
-      public PointLatLonTime asPoint(final ITuple tuple) {
+          // Note: this is possibly called over and over again, so we choose a
+          //       low-level implementation to get best performance out of it
 
          try {
+             
             final byte[] key = ((ITuple<?>) tuple).getKey();
-            final IV[] ivs = IVUtility.decode(key, objectPos+1);
-            
-            final IV oIV= ivs[objectPos];
-   
+            final IV[] ivs = IVUtility.decode(key, objectPos + 1);
+
+            final IV oIV = ivs[objectPos];
+
+            final double lat;
+            final double lon;
+            final long time;
             if (oIV instanceof LiteralExtensionIV) {
+                
                final LiteralExtensionIV lit = (LiteralExtensionIV) oIV;
-   
+
                long[] longArr = litExt.asLongArray(lit);
                final Object[] components = litExt.longArrAsComponentArr(longArr);
-   
-               return new PointLatLonTime(
-                  new PointLatLon((Double) components[0],
-                  (Double) components[1]), (Long) components[2]);
-            }
-         } catch (Exception e) {
-            // ignore (this may be an invalid data point)
-         }
 
-         return null; // something went wrong
+               lat = (double)components[0];
+               lon = (double)components[1];
+               time = (long)components[2];
+               
+            } else {
+                
+                throw new IllegalArgumentException("Invalid IV cannot be cast to LiteralExtensionIV");
+                
+            }
+
+            return 
+               CoordinateUtility.distanceInMeters(lat, spatialPointLat, lon, spatialPointLon) <= distanceInMeters &&
+               timeMin <= time && time <= timeMax;
+                    
+         } catch (Exception e) {
+         
+             if (log.isInfoEnabled()) {
+                log.info(
+                   "Something went wrong extracting the object: " + e.getMessage() +
+                   "Rejecting unprocessable value.");
+             }
+             
+         }
+         
+         return false; // exception code path -> reject value
+
       }
    
    }
