@@ -953,14 +953,14 @@ public class TestRemoteSparqlBuilderFactory extends
 
         IRemoteSparqlQueryBuilder queryBuilder = RemoteSparqlBuilderFactory.get(options, serviceNode, a);
         
-        final String actualQueryStrVersion_10 = queryBuilder.getSparqlQuery(a).replaceAll(" ", "").replaceAll("\n", "");
+        final String actualQueryStrVersion_10 = queryBuilder.getSparqlQuery(a).replaceAll("\\s+", " ");
         
-        final String expectedSparqlVersion_10 = new String("SELECT  ?s" + 
-											        		"WHERE {" + //
-											        		"FILTER ( sameTerm( ?p, <p:p1>) )." + //
-											        		"FILTER ( sameTerm( ?o, \"lit1\") )." + //
+        final String expectedSparqlVersion_10 = new String("SELECT  ?s " + 
+											        		"WHERE { " + //
+											        		"FILTER ( sameTerm( ?p, <p:p1>) ). " + //
+											        		"FILTER ( sameTerm( ?o, \"lit1\") ). " + //
 											        		" ?s ?p ?o " + // 
-											        		"}").replaceAll(" ", "");
+											        		"} ").replaceAll("\\s+", " ");
         
         assertEquals(expectedSparqlVersion_10, actualQueryStrVersion_10);
 
@@ -968,15 +968,15 @@ public class TestRemoteSparqlBuilderFactory extends
 
         queryBuilder = RemoteSparqlBuilderFactory.get(options, serviceNode, a);
         
-        final String actualQueryStrVersion_11 = queryBuilder.getSparqlQuery(a).replaceAll(" ", "").replaceAll("\n", "");
+        final String actualQueryStrVersion_11 = queryBuilder.getSparqlQuery(a).replaceAll("\\s+", " ");
         
-        final String expectedSparqlVersion_11 = new String("SELECT  ?s" + //
+        final String expectedSparqlVersion_11 = new String("SELECT  ?s " + //
 											        		"WHERE {" + //
 											        		" ?s ?p ?o " + // 
-											        		"}" + //
-											        		"VALUES ( ?p ?o) {" + //
-											        		"( <p:p1> \"lit1\" )" + //
-											        		"}").replaceAll(" ", "");
+											        		"} " + //
+											        		"VALUES ( ?p ?o) { " + //
+											        		"( <p:p1> \"lit1\" ) " + //
+											        		"} ").replaceAll("\\s+", " ");
         
         assertEquals(expectedSparqlVersion_11, actualQueryStrVersion_11);
     
@@ -984,15 +984,15 @@ public class TestRemoteSparqlBuilderFactory extends
         
         queryBuilder = RemoteSparqlBuilderFactory.get(options, serviceNode, a);
         
-        final String actualQueryStrVersion_11_DRAFT_BINDINGS = queryBuilder.getSparqlQuery(a).replaceAll(" ", "").replaceAll("\n", "");
+        final String actualQueryStrVersion_11_DRAFT_BINDINGS = queryBuilder.getSparqlQuery(a).replaceAll("\\s+", " ");
         
-        final String expectedSparqlVersion_11_DRAFT_BINDINGS = new String("SELECT  ?s" + //
+        final String expectedSparqlVersion_11_DRAFT_BINDINGS = new String("SELECT  ?s " + //
 														        		"WHERE {" + //
 														        		" ?s ?p ?o " + // 
-														        		"}" + //
-														        		"BINDINGS ?p ?o {" + //
-														        		"( <p:p1> \"lit1\" )" + //
-														        		"}").replaceAll(" ", "");
+														        		"} " + //
+														        		"BINDINGS ?p ?o { " + //
+														        		"( <p:p1> \"lit1\" ) " + //
+														        		"} ").replaceAll("\\s+", " ");
         
         assertEquals(actualQueryStrVersion_11_DRAFT_BINDINGS, expectedSparqlVersion_11_DRAFT_BINDINGS);
  
