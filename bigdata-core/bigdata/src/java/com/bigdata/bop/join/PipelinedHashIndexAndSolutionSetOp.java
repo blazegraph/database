@@ -478,7 +478,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             }
             
             
-            ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
+            ((PipelinedHashJoinUtility)state).acceptAndOutputSolutions(
                unsyncBuffer, src, stats, joinConstraints, subquery,
                bsFromBindingsSetSource, projectInVars, askVar,
                context.isLastInvocation(), distinctProjectionBufferThreshold,
