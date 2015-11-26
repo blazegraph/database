@@ -29,6 +29,7 @@ package com.bigdata.bop.join;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
@@ -51,6 +53,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -622,161 +625,230 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
 
                 long sameHashCodeCount = 0;
                 
-                while (titr.hasNext()) {
-
-                    sameHashCodeCount++;
-                    
-                    final ITuple<?> t = titr.next();
-
-                    /*
-                     * Note: The map entries must be the full source
-                     * binding set, not just the join variables, even
-                     * though the key and equality in the key is defined
-                     * in terms of just the join variables.
-                     * 
-                     * Note: Solutions which have the same hash code but
-                     * whose bindings are inconsistent will be rejected
-                     * by bind() below.
-                     */
-                    final IBindingSet rightSolution = decodeSolution(t);
-
-                    nrightConsidered.increment();
-
+                final Set<IBindingSet> leftSolutionsWithoutMatch = new LinkedHashSet<IBindingSet>();
+                
+                if (!titr.hasNext()) {
                     for (int i = fromIndex; i < toIndex; i++) {
-
-                        final IBindingSet leftSolution = a[i].bset;
                         
-                        // Join.
-                        final IBindingSet outSolution = BOpContext
-                                .bind(leftSolution, rightSolution,
-                                        constraints,
-                                        selectVars);
-
-                        nJoinsConsidered.increment();
-
-                        if (noJoinVars
-                                && nJoinsConsidered.get() == noJoinVarsLimit) {
-
-                            if (nleftConsidered.get() > 1
-                                    && nrightConsidered.get() > 1) {
-
-                                throw new UnconstrainedJoinException();
-
+                        final IBindingSet leftSolution = a[i].bset;
+                        leftSolutionsWithoutMatch.add(leftSolution);
+                    }
+                    
+                } else {
+                    
+                    while (titr.hasNext()) {
+    
+                        sameHashCodeCount++;
+                        
+                        final ITuple<?> t = titr.next();
+    
+                        /*
+                         * Note: The map entries must be the full source
+                         * binding set, not just the join variables, even
+                         * though the key and equality in the key is defined
+                         * in terms of just the join variables.
+                         * 
+                         * Note: Solutions which have the same hash code but
+                         * whose bindings are inconsistent will be rejected
+                         * by bind() below.
+                         */
+                        final IBindingSet rightSolution = decodeSolution(t);
+    
+                        nrightConsidered.increment();
+    
+                        for (int i = fromIndex; i < toIndex; i++) {
+                            
+                            final IBindingSet leftSolution = a[i].bset;
+                            leftSolutionsWithoutMatch.add(leftSolution); // unless proven otherwise
+                            
+                            // Join.
+                            final IBindingSet outSolution = BOpContext
+                                    .bind(leftSolution, rightSolution,
+                                            constraints,
+                                            selectVars);
+    
+                            nJoinsConsidered.increment();
+    
+                            if (noJoinVars
+                                    && nJoinsConsidered.get() == noJoinVarsLimit) {
+    
+                                if (nleftConsidered.get() > 1
+                                        && nrightConsidered.get() > 1) {
+    
+                                    throw new UnconstrainedJoinException();
+    
+                                }
+    
                             }
-
-                        }
-
-                        if (outSolution == null) {
-                            
-                            nrejected++;
-                            
-                            if (log.isTraceEnabled())
-                                log.trace("Does not join"//
-                                        +": hashCode="+ hashCode//
+    
+                            if (outSolution == null) {
+                                
+                                nrejected++;
+                                
+                                if (log.isTraceEnabled())
+                                    log.trace("Does not join"//
+                                            +": hashCode="+ hashCode//
+                                            + ", sameHashCodeCount="+ sameHashCodeCount//
+                                            + ", #left=" + bucketSize//
+                                            + ", #joined=" + njoined//
+                                            + ", #rejected=" + nrejected//
+                                            + ", left=" + leftSolution//
+                                            + ", right=" + rightSolution//
+                                            );
+    
+                            } else {
+    
+                                njoined++;
+                                leftSolutionsWithoutMatch.remove(leftSolution); // match found
+    
+                                if (log.isDebugEnabled())
+                                    log.debug("JOIN"//
+                                        + ": hashCode=" + hashCode//
                                         + ", sameHashCodeCount="+ sameHashCodeCount//
-                                        + ", #left=" + bucketSize//
+                                        + ", #left="+ bucketSize//
                                         + ", #joined=" + njoined//
                                         + ", #rejected=" + nrejected//
-                                        + ", left=" + leftSolution//
-                                        + ", right=" + rightSolution//
+                                        + ", solution=" + outSolution//
                                         );
-
-                        } else {
-
-                            njoined++;
-
-                            if (log.isDebugEnabled())
-                                log.debug("JOIN"//
-                                    + ": hashCode=" + hashCode//
-                                    + ", sameHashCodeCount="+ sameHashCodeCount//
-                                    + ", #left="+ bucketSize//
-                                    + ", #joined=" + njoined//
-                                    + ", #rejected=" + nrejected//
-                                    + ", solution=" + outSolution//
-                                    );
-                        
-                        }
-
-                        switch(joinType) {
-                        case Normal:
-                        case Optional: {
-                            if (outSolution == null) {
-                                // Join failed.
-                                continue;
-                            }
-                            // Resolve against ivCache.
-                            encoder.resolveCachedValues(outSolution);
                             
-                            // Output this solution.
-                            outputBuffer.add(outSolution);
-
-                            if (optional) {
-                                // Accumulate solutions to vector into
-                                // the joinSet.
-                                joined.add(new BS2(rightSolution
-                                        .hashCode(), t.getValue()));
                             }
-                            
-                            break;
-                        }
-                        case Exists: {
-                            /*
-                             * The right solution is output iff there is
-                             * at least one left solution which joins
-                             * with that right solution. Each right
-                             * solution is output at most one time. This
-                             * amounts to outputting the joinSet after
-                             * we have run the entire join. As long as
-                             * the joinSet does not allow duplicates it
-                             * will be contain the solutions that we
-                             * want.
-                             */
-                            if (outSolution != null) {
-                                // Accumulate solutions to vector into
-                                // the joinSet.
-                                joined.add(new BS2(rightSolution
-                                        .hashCode(), t.getValue()));
+    
+                            switch(joinType) {
+                            case Normal:
+                            case Optional: {
+                                if (outSolution != null) {
+                                    // Resolve against ivCache.
+                                    encoder.resolveCachedValues(outSolution);
+                                    
+                                    if (askVar!=null) {
+                                        outSolution.set(askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                                    }
+                                    
+                                    // Output this solution.
+                                    outputBuffer.add(outSolution);
+        
+    //                                if (optional) {
+    //                                    // Accumulate solutions to vector into
+    //                                    // the joinSet.
+    //                                    joined.add(new BS2(rightSolution.hashCode(), t.getValue()));
+    //                                }
+                                }
+                                
+                                break;
                             }
-                            break;
-                        }
-                        case NotExists: {
-                            /*
-                             * The right solution is output iff there
-                             * does not exist any left solution which
-                             * joins with that right solution. This
-                             * basically an optional join where the
-                             * solutions which join are not output.
-                             */
-                            if (outSolution != null) {
-                                // Accumulate solutions to vector into
-                                // the joinSet.
-                                joined.add(new BS2(rightSolution
-                                        .hashCode(), t.getValue()));
+                            case Exists: 
+                                // TODO: check -> this probably results in wrong multiplicity
+                                if (askVar!=null) {
+                                    rightSolution.set(
+                                      askVar, 
+                                      new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                                    outputBuffer.add(leftSolution);
+                                }
+                                break;
+    
+    //                        {
+    //                            /*
+    //                             * The right solution is output iff there is
+    //                             * at least one left solution which joins
+    //                             * with that right solution. Each right
+    //                             * solution is output at most one time. This
+    //                             * amounts to outputting the joinSet after
+    //                             * we have run the entire join. As long as
+    //                             * the joinSet does not allow duplicates it
+    //                             * will be contain the solutions that we
+    //                             * want.
+    //                             */
+    //                            if (outSolution != null) {
+    //                                // Accumulate solutions to vector into
+    //                                // the joinSet.
+    //                                if (askVar!=null) {
+    //                                    left.set(
+    //                                       askVar, 
+    //                                       new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE : XSDBooleanIV.FALSE));
+    //                                   outputSolution(outputBuffer, left);
+    //                                 }
+    //                                joined.add(new BS2(rightSolution.hashCode(), t.getValue()));
+    //                            }
+    //                            break;
+    //                        }
+                            case NotExists: 
+    //                        {
+    //                            /*
+    //                             * The right solution is output iff there
+    //                             * does not exist any left solution which
+    //                             * joins with that right solution. This
+    //                             * basically an optional join where the
+    //                             * solutions which join are not output.
+    //                             */
+    //                            if (outSolution != null) {
+    //                                // Accumulate solutions to vector into
+    //                                // the joinSet.
+    //                                joined.add(new BS2(rightSolution
+    //                                        .hashCode(), t.getValue()));
+    //                            }
+    //                            break;
+    //                        }
+                                // case Exists and NotExists will be handled at the end
+                                break;
+                            default:
+                                throw new AssertionError();
                             }
-                            break;
-                        }
-                        default:
-                            throw new AssertionError();
-                        }
-
-                    } // next left in the same bucket.
-
-                } // next rightSolution with the same hash code.
-
-                if (joined != null && !joined.isEmpty()) {
-                    /*
-                     * Vector the inserts into the [joinSet].
+    
+                        } // next left in the same bucket.
+    
+                    } // next rightSolution with the same hash code.
+    
+                    // TODO: remove joined variable (unused)
+    //                if (joined != null && !joined.isEmpty()) {
+    //                    /*
+    //                     * Vector the inserts into the [joinSet].
+    //                     */
+    //                    final BS2[] a2 = joined.toArray(new BS2[njoined]);
+    //                    Arrays.sort(a2, 0, njoined);
+    //                    for (int i = 0; i < njoined; i++) {
+    //                        final BS2 tmp = a2[i];
+    //                        saveInJoinSet(tmp.hashCode, tmp.value);
+    //                    }
+    //                }
+                }
+                
+                // handle left solutions without match
+                for (final IBindingSet leftSolutionWithoutMatch : leftSolutionsWithoutMatch) {
+                    
+                    // handle other join types
+                    switch (getJoinType()) {
+                    case Optional:
+                    case NotExists:
+                       outputBuffer.add(leftSolutionWithoutMatch);
+                       break;
+                    /**
+                     * Semantics of EXISTS is defined as follows: it only takes effect
+                     * if the ASK var is not null; in that case, it has the same
+                     * semantics as OPTIONAL, but binds the askVar to true or false
+                     * depending on whether a match exists.
                      */
-                    final BS2[] a2 = joined.toArray(new BS2[njoined]);
-                    Arrays.sort(a2, 0, njoined);
-                    for (int i = 0; i < njoined; i++) {
-                        final BS2 tmp = a2[i];
-                        saveInJoinSet(tmp.hashCode, tmp.value);
+                    case Exists:
+                    {
+                       if (askVar!=null) {
+                           leftSolutionWithoutMatch.set(
+                             askVar, 
+                             new Constant<XSDBooleanIV<?>>(XSDBooleanIV.FALSE));
+                           outputBuffer.add(leftSolutionWithoutMatch);
+                       }
+                       break;
                     }
+                    case Normal:
+                       // this has been fully handled already
+                       break;
+                    default:
+                       throw new AssertionError();
+                    }                      
+                       
                 }
 
             } // end block of leftSolutions having the same hash code.
-
+            
+            
             fromIndex = toIndex;
             
         }
