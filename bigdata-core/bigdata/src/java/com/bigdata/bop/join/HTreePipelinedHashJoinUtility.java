@@ -29,15 +29,14 @@ package com.bigdata.bop.join;
 
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
@@ -47,13 +46,15 @@ import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.JVMHashIndex.Bucket;
-import com.bigdata.bop.join.JVMHashIndex.SolutionHit;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.counters.CAT;
-import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
+import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -67,7 +68,13 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @version $Id$
  */
 // TODO: implement (this is currently a copy of JVMPipielinedHashJoinUtility
-public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
+public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implements PipelinedHashJoinUtility {
+
+    public HTreePipelinedHashJoinUtility(IMemoryManager mmgr, PipelineOp op,
+            JoinTypeEnum joinType) {
+        super(mmgr, op, joinType);
+        // TODO Auto-generated constructor stub
+    }
 
    private static final Logger log = Logger.getLogger(HTreePipelinedHashJoinUtility.class);
 
@@ -118,7 +125,8 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
       PipelineOp op, JoinTypeEnum joinType, BOpContext<IBindingSet> context,
       int chunkCapacity) {
       
-      super(op, joinType);
+      // TODO: is this problematic (usage of query's memory manager)?
+      super(context.getMemoryManager(null /* use memory mgr of this query */), op, joinType);
       
       if (!(op instanceof PipelinedHashIndexAndSolutionSetOp)) {
          throw new IllegalArgumentException();
@@ -149,11 +157,7 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
         
     };
     
-    /**
-     * AcceptAndOutputSolutions is a special method for building the hash index
-     * of the {@link JVMPipelinedHashIndex}, which accepts and immediately
-     * forwards relevant solutions (non-blocking index).
-     */
+    @Override
     public long acceptAndOutputSolutions(
           final UnsyncLocalOutputBuffer<IBindingSet> out,
           final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,
@@ -165,8 +169,16 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
           final int incomingBindingsBufferThreshold,
           final BOpContext<IBindingSet> context) {
 
-       
-        final JVMHashIndex rightSolutions = getRightSolutions();
+        /**
+         * The hash index. The keys are int32 hash codes built from the join
+         * variables. The values are an {@link IV}[], similar to the encoding in
+         * the statement indices. The mapping from the index positions in the
+         * {@link IV}s to the variables is managed by the {@link #encoder}.
+         */
+        final HTree rightSolutions = getRightSolutions();
+        
+        final IKeyBuilder keyBuilder = 
+                rightSolutions.getIndexMetadata().getKeyBuilder();
 
         if (bsFromBindingsSetSource!=null) {
            addBindingsSetSourceToHashIndexOnce(rightSolutions, bsFromBindingsSetSource);
@@ -191,8 +203,16 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
                 stats.unitsIn.add(chunk.length);
             }
 
-            for (int i = 0; i < chunk.length; i++) {
+            final AtomicInteger vectorSize = new AtomicInteger();
+            final BS[] a = vector(chunk, getJoinVars(), null, false, vectorSize);
+            
+            int fromIndex = 0;
+            int n = vectorSize.get();
 
+            while (fromIndex < n) {
+                
+                final IBindingSet curBs = a[fromIndex].bset;
+                
                 /**
                  * fast path: if we don't have a subquery but a join against
                  * mappings passed in via binding set annotation, these mappings
@@ -200,44 +220,63 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
                  * bsFromBindingsSetSource, have been added to the index right
                  * in the beginning of this method already).
                  */
-                if (subquery==null) {
-                   dontRequireSubqueryEvaluation.add(chunk[i]);
+                if (subquery==null) { // TODO: this does not increase index and/or counter
+                   dontRequireSubqueryEvaluation.add(curBs);
                    continue;
                 }
-               
-                // Take a distinct projection of the join variables.
-                final IBindingSet bsetDistinct = chunk[i].copy(projectInVars);
-
-                /**
-                 *  Find bucket in hash index for that distinct projection
-                 * (bucket of solutions with the same join vars from the
-                 *  subquery - basically a JOIN).
+                
+                /*
+                 * Figure out how many left solutions in the current chunk
+                 * have the same hash code. We will use the same iterator
+                 * over the right solutions for that hash code against the
+                 * HTree.
                  */
-                final Bucket b = rightSolutions.getBucket(bsetDistinct);
+                
+                // The next hash code to be processed.
+                final int hashCode = a[fromIndex].hashCode;
+                
+                // scan for the first hash code which is different.
+                int toIndex = fromIndex+1; // TODO assume upper bound.
+                
+                // TODO: fast path
+//                for (int i = fromIndex + 1; i < n; i++) {
+//                    if (a[i].hashCode != hashCode) {
+//                        toIndex = i;
+//                        break;
+//                    }
+//                }
+                
+                final byte[] key = 
+                        keyBuilder.reset().append(hashCode).getKey();
 
-                if (b != null || 
+                final IBindingSet bsetDistinct = curBs.copy(projectInVars);
+                
+                if (rightSolutions.contains(key) || 
                     distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct)) {
+                    
                     /*
                      * Either a match in the bucket or subquery was already
                      * computed for this distinct projection but did not produce
                      * any results. Either way, it will take a fast path that
                      * avoids the subquery.
                      */
-                    dontRequireSubqueryEvaluation.add(chunk[i]);
-
+                    dontRequireSubqueryEvaluation.add(curBs);
+                    
                 } else {
+                    
                     // This is a new distinct projection. It will need to run
                     // through the subquery. We buffer the solutions in a
                     // operator-global data structure
-                    incomingBindingsBuffer.add(chunk[i]);
-                    distinctProjectionBuffer.add(bsetDistinct);
-
+                    incomingBindingsBuffer.add(curBs);
+                    distinctProjectionBuffer.add(bsetDistinct);                    
                 }
-
+                
                 naccepted++;
-
+                
+                fromIndex = toIndex;
             }
         }
+        
         
         // record the number of distinct projections seen in the chunk
         nDistinctBindingSets.add(distinctProjectionBuffer.size()-nDistinctProjections);
@@ -293,15 +332,32 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
 
             try {
 
+
                 while (subquerySolutionItr.hasNext()) {
 
                     final IBindingSet[] solutions = subquerySolutionItr.next();
 
+                    // insert solutions into htree hash index
+                    final AtomicInteger vectorSize = new AtomicInteger();
+                    final BS[] a = vector(solutions, getJoinVars(), null, false, vectorSize);
+                    final int n = vectorSize.get();
+                    
+                    for (int i = 0; i < n; i++) {
+    
+                        final BS tmp = a[i];
+    
+                        // Encode the key.
+                        final byte[] key = keyBuilder.reset().append(tmp.hashCode).getKey();
+    
+                        // Encode the solution.
+                        final byte[] val = encoder.encodeSolution(tmp.bset);
+                        
+                        rightSolutions.insert(key, val);
+    
+                    }
+                    
                     for (IBindingSet solution : solutions) {
-
-                        // add solutions to the subquery into the hash index.
-                        rightSolutions.add(solution);
-
+                        
                         /*
                          * we remove all mappings that generated at least one
                          * result from distinct set (which will be further
@@ -358,8 +414,8 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
 
         }
 
-        
-        rightSolutionCount.add(naccepted);
+        // TODO
+//        rightSolutionCount.add(naccepted);
 
         // hash index join for the subquery path.
         hashJoinAndEmit(incomingBindingsBuffer.toArray(
@@ -397,18 +453,34 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
       * @param bsFromBindingsSetSource the solutions to add (must be non null)
       */
     void addBindingsSetSourceToHashIndexOnce(
-       final JVMHashIndex rightSolutions,
+       final HTree rightSolutions,
        final IBindingSet[] bsFromBindingsSetSource) {
 
        if (!bsFromBindingsSetSourceAddedToHashIndex) {
-          
-          for (IBindingSet solution : bsFromBindingsSetSource) {
 
-             // add solutions to the join with the binding set to hash index.
-             rightSolutions.add(solution);
-          
+           final IKeyBuilder keyBuilder = 
+                   rightSolutions.getIndexMetadata().getKeyBuilder();
+           
+           // insert solutions into htree hash index
+           final AtomicInteger vectorSize = new AtomicInteger();
+           final BS[] a = vector(bsFromBindingsSetSource, getJoinVars(), null, false, vectorSize);
+           final int n = vectorSize.get();
+           
+           for (int i = 0; i < n; i++) {
+
+               final BS tmp = a[i];
+
+               // Encode the key.
+               final byte[] key = keyBuilder.reset().append(tmp.hashCode).getKey();
+
+               // Encode the solution.
+               final byte[] val = encoder.encodeSolution(tmp.bset);
+               
+               rightSolutions.insert(key, val);
+
           }
-          
+           
+          // remember we've added these bindings
           bsFromBindingsSetSourceAddedToHashIndex = true;
        }
    }
@@ -424,117 +496,397 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
             final IConstraint[] joinConstraints,//
             final IVariable<?> askVar) {
 
-        final JVMHashIndex rightSolutions = getRightSolutions();
+        final HTree rightSolutions = getRightSolutions();
           
-        if (log.isInfoEnabled()) {
-            log.info("rightSolutions: #buckets=" + rightSolutions.bucketCount()
-                    + ",#solutions=" + getRightSolutionCount());
-        }
+        final IKeyBuilder keyBuilder = 
+            rightSolutions.getIndexMetadata().getKeyBuilder();
         
-        // join solutions with hash index
+        if (log.isInfoEnabled()) {
+            log.info("rightSolutions: #nnodes="
+                    + rightSolutions.getNodeCount() + ",#leaves="
+                    + rightSolutions.getLeafCount() + ",#entries="
+                    + rightSolutions.getEntryCount());
+        }
+                // join solutions with hash index
         final boolean noJoinVars = getJoinVars().length == 0;
 
-        for (final IBindingSet left : chunk) {
-              
-           final Bucket bucket = rightSolutions.getBucket(left);
-           nleftConsidered.increment();
-              
-           boolean matchExists = false; // try to prove otherwise
-           if (bucket != null) {
-              
-              final Iterator<SolutionHit> ritr = bucket.iterator();
- 
-              while (ritr.hasNext()) {
-   
-                  final SolutionHit right = ritr.next();
-                     
-                  nrightConsidered.increment();
-   
-                  if (log.isDebugEnabled())
-                      log.debug("Join with " + right);
-   
-                  nJoinsConsidered.increment();
-                     
-                  if (noJoinVars
-                        && nJoinsConsidered.get() == getNoJoinVarsLimit()) {
-   
-                     if (nleftConsidered.get() > 1
-                            && nrightConsidered.get() > 1) {
-   
-                        throw new UnconstrainedJoinException();
-   
-                     }
-   
-                  }
-                     
-                  // See if the solutions join.
-                  final IBindingSet outSolution = BOpContext.bind(//
-                     right.solution,//
-                     left,//
-                     joinConstraints,//
-                     getSelectVars()//
-                  );
-                     
-                  // record that we've seen a solution, if so
-                  matchExists |= outSolution!=null;
-   
-                  // for normal joins and opt
-                  switch (getJoinType()) {
-                  case Normal:
-                  case Optional:
-                  {
-                     if (outSolution!=null) {
-                        if (askVar!=null) {
-                           outSolution.set(
-                              askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
-                        }
-                        outputSolution(outputBuffer, outSolution);
-                     }
-                     break;
-                  }
-                  case Exists:
-                  case NotExists:
-                     break; // will be handled at the end
-                  default:
-                     throw new AssertionError();
-                     
-                  }                      
-              }
-           }
-              
-           // handle other join types
-           switch (getJoinType()) {
-           case Optional:
-           case NotExists:
-              if (!matchExists) {     
-                 outputSolution(outputBuffer, left);
-              }
-              break;
-           /**
-            * Semantics of EXISTS is defined as follows: it only takes effect
-            * if the ASK var is not null; in that case, it has the same
-            * semantics as OPTIONAL, but binds the askVar to true or false
-            * depending on whether a match exists.
-            */
-           case Exists:
-           {
-              if (askVar!=null) {
-                 left.set(
-                    askVar, 
-                    new Constant<XSDBooleanIV<?>>(
-                       matchExists ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE));
-                outputSolution(outputBuffer, left);
-              }
-              break;
-           }
-           case Normal:
-              // this has been fully handled already
-              break;
-           default:
-              throw new AssertionError();
-           }                      
-              
+        
+         // vectored solutions.
+        final int n; // #of valid elements in a[].
+
+        
+        if (stats != null) {
+            stats.chunksIn.increment();
+            stats.unitsIn.add(chunk.length);
         }
+        
+        // vectored solutions
+        final AtomicInteger vectorSize = new AtomicInteger();
+        
+        final BS[] a = vector(chunk, getJoinVars(), null, false, vectorSize);
+        
+        n = vectorSize.get();
+        
+        nleftConsidered.add(n);
+        
+        
+        
+        int fromIndex = 0;
+
+        while (fromIndex < n) {
+            
+            /*
+             * Figure out how many left solutions in the current chunk
+             * have the same hash code. We will use the same iterator
+             * over the right solutions for that hash code against the
+             * HTree.
+             */
+            
+            // The next hash code to be processed.
+            final int hashCode = a[fromIndex].hashCode;
+            
+            // scan for the first hash code which is different.
+            int toIndex = n; // assume upper bound.
+            for (int i = fromIndex + 1; i < n; i++) {
+                if (a[i].hashCode != hashCode) {
+                    toIndex = i;
+                    break;
+                }
+            }
+            
+            // #of left solutions having the same hash code.
+            final int bucketSize = toIndex - fromIndex;
+            
+            if (log.isTraceEnabled())
+                log.trace("hashCode=" + hashCode + ": #left="
+                        + bucketSize + ", vectorSize=" + n
+                        + ", firstLeft=" + a[fromIndex]);
+            
+            /*
+             * Note: all source solutions in [fromIndex:toIndex) have
+             * the same hash code. They will be vectored together.
+             */
+            // All solutions which join for that collision bucket
+            final LinkedList<BS2> joined;
+            switch (joinType) {
+            case Optional:
+            case Exists:
+            case NotExists:
+                joined = new LinkedList<BS2>();
+                break;
+            default:
+                joined = null;
+                break;
+            }
+            
+            // #of solutions which join for that collision bucket.
+            int njoined = 0;
+            // #of solutions which did not join for that collision bucket.
+            int nrejected = 0;
+            
+            {
+
+                final byte[] key = 
+                    keyBuilder.reset().append(hashCode).getKey();
+                
+                /**
+                 * Visit all source solutions having the same hash code.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/763#comment:19">
+                 *      Stochastic results with Analytic Query Mode)
+                 *      </a>
+                 * 
+                 *      FIXME This appears to be the crux of the problem
+                 *      for #764. If you replace lookupAll(key) with
+                 *      rangeIterator() then the hash join is correct.
+                 *      Of course, it is also scanning all tuples each
+                 *      time so it is very inefficient. The root cause
+                 *      is the FrontCodedRabaCoder. It is doing a binary
+                 *      search on the BucketPage. However, the
+                 *      FrontCodedRabaCoder was not developed to deal
+                 *      with duplicates on the page. Therefore it is
+                 *      returning an offset into the middle of a run of
+                 *      duplicate keys when it does its binary search.
+                 *      We will either need to modify this IRabaCoder to
+                 *      handle this case (where duplicate keys are
+                 *      allowed) or write a new IRabaCoder that is smart
+                 *      about duplicates.
+                 */
+                final ITupleIterator<?> titr;
+                if (true) {// scan just the hash bucket for that key.
+                    titr = rightSolutions.lookupAll(key);
+                } else { // do a full scan on the HTree. 
+                    titr = rightSolutions.rangeIterator();
+                }
+
+                long sameHashCodeCount = 0;
+                
+                while (titr.hasNext()) {
+
+                    sameHashCodeCount++;
+                    
+                    final ITuple<?> t = titr.next();
+
+                    /*
+                     * Note: The map entries must be the full source
+                     * binding set, not just the join variables, even
+                     * though the key and equality in the key is defined
+                     * in terms of just the join variables.
+                     * 
+                     * Note: Solutions which have the same hash code but
+                     * whose bindings are inconsistent will be rejected
+                     * by bind() below.
+                     */
+                    final IBindingSet rightSolution = decodeSolution(t);
+
+                    nrightConsidered.increment();
+
+                    for (int i = fromIndex; i < toIndex; i++) {
+
+                        final IBindingSet leftSolution = a[i].bset;
+                        
+                        // Join.
+                        final IBindingSet outSolution = BOpContext
+                                .bind(leftSolution, rightSolution,
+                                        constraints,
+                                        selectVars);
+
+                        nJoinsConsidered.increment();
+
+                        if (noJoinVars
+                                && nJoinsConsidered.get() == noJoinVarsLimit) {
+
+                            if (nleftConsidered.get() > 1
+                                    && nrightConsidered.get() > 1) {
+
+                                throw new UnconstrainedJoinException();
+
+                            }
+
+                        }
+
+                        if (outSolution == null) {
+                            
+                            nrejected++;
+                            
+                            if (log.isTraceEnabled())
+                                log.trace("Does not join"//
+                                        +": hashCode="+ hashCode//
+                                        + ", sameHashCodeCount="+ sameHashCodeCount//
+                                        + ", #left=" + bucketSize//
+                                        + ", #joined=" + njoined//
+                                        + ", #rejected=" + nrejected//
+                                        + ", left=" + leftSolution//
+                                        + ", right=" + rightSolution//
+                                        );
+
+                        } else {
+
+                            njoined++;
+
+                            if (log.isDebugEnabled())
+                                log.debug("JOIN"//
+                                    + ": hashCode=" + hashCode//
+                                    + ", sameHashCodeCount="+ sameHashCodeCount//
+                                    + ", #left="+ bucketSize//
+                                    + ", #joined=" + njoined//
+                                    + ", #rejected=" + nrejected//
+                                    + ", solution=" + outSolution//
+                                    );
+                        
+                        }
+
+                        switch(joinType) {
+                        case Normal:
+                        case Optional: {
+                            if (outSolution == null) {
+                                // Join failed.
+                                continue;
+                            }
+                            // Resolve against ivCache.
+                            encoder.resolveCachedValues(outSolution);
+                            
+                            // Output this solution.
+                            outputBuffer.add(outSolution);
+
+                            if (optional) {
+                                // Accumulate solutions to vector into
+                                // the joinSet.
+                                joined.add(new BS2(rightSolution
+                                        .hashCode(), t.getValue()));
+                            }
+                            
+                            break;
+                        }
+                        case Exists: {
+                            /*
+                             * The right solution is output iff there is
+                             * at least one left solution which joins
+                             * with that right solution. Each right
+                             * solution is output at most one time. This
+                             * amounts to outputting the joinSet after
+                             * we have run the entire join. As long as
+                             * the joinSet does not allow duplicates it
+                             * will be contain the solutions that we
+                             * want.
+                             */
+                            if (outSolution != null) {
+                                // Accumulate solutions to vector into
+                                // the joinSet.
+                                joined.add(new BS2(rightSolution
+                                        .hashCode(), t.getValue()));
+                            }
+                            break;
+                        }
+                        case NotExists: {
+                            /*
+                             * The right solution is output iff there
+                             * does not exist any left solution which
+                             * joins with that right solution. This
+                             * basically an optional join where the
+                             * solutions which join are not output.
+                             */
+                            if (outSolution != null) {
+                                // Accumulate solutions to vector into
+                                // the joinSet.
+                                joined.add(new BS2(rightSolution
+                                        .hashCode(), t.getValue()));
+                            }
+                            break;
+                        }
+                        default:
+                            throw new AssertionError();
+                        }
+
+                    } // next left in the same bucket.
+
+                } // next rightSolution with the same hash code.
+
+                if (joined != null && !joined.isEmpty()) {
+                    /*
+                     * Vector the inserts into the [joinSet].
+                     */
+                    final BS2[] a2 = joined.toArray(new BS2[njoined]);
+                    Arrays.sort(a2, 0, njoined);
+                    for (int i = 0; i < njoined; i++) {
+                        final BS2 tmp = a2[i];
+                        saveInJoinSet(tmp.hashCode, tmp.value);
+                    }
+                }
+
+            } // end block of leftSolutions having the same hash code.
+
+            fromIndex = toIndex;
+            
+        }
+        
+        
+        
+        
+        
+        
+//        for (final IBindingSet left : chunk) {
+//              
+//           final Bucket bucket = rightSolutions.getBucket(left);
+//           nleftConsidered.increment();
+//              
+//           boolean matchExists = false; // try to prove otherwise
+//           if (bucket != null) {
+//              
+//              final Iterator<SolutionHit> ritr = bucket.iterator();
+// 
+//              while (ritr.hasNext()) {
+//   
+//                  final SolutionHit right = ritr.next();
+//                     
+//                  nrightConsidered.increment();
+//   
+//                  if (log.isDebugEnabled())
+//                      log.debug("Join with " + right);
+//   
+//                  nJoinsConsidered.increment();
+//                     
+//                  if (noJoinVars
+//                        && nJoinsConsidered.get() == getNoJoinVarsLimit()) {
+//   
+//                     if (nleftConsidered.get() > 1
+//                            && nrightConsidered.get() > 1) {
+//   
+//                        throw new UnconstrainedJoinException();
+//   
+//                     }
+//   
+//                  }
+//                     
+//                  // See if the solutions join.
+//                  final IBindingSet outSolution = BOpContext.bind(//
+//                     right.solution,//
+//                     left,//
+//                     joinConstraints,//
+//                     getSelectVars()//
+//                  );
+//                     
+//                  // record that we've seen a solution, if so
+//                  matchExists |= outSolution!=null;
+//   
+//                  // for normal joins and opt
+//                  switch (getJoinType()) {
+//                  case Normal:
+//                  case Optional:
+//                  {
+//                     if (outSolution!=null) {
+//                        if (askVar!=null) {
+//                           outSolution.set(
+//                              askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+//                        }
+//                        outputSolution(outputBuffer, outSolution);
+//                     }
+//                     break;
+//                  }
+//                  case Exists:
+//                  case NotExists:
+//                     break; // will be handled at the end
+//                  default:
+//                     throw new AssertionError();
+//                     
+//                  }                      
+//              }
+//           }
+//              
+//           // handle other join types
+//           switch (getJoinType()) {
+//           case Optional:
+//           case NotExists:
+//              if (!matchExists) {     
+//                 outputSolution(outputBuffer, left);
+//              }
+//              break;
+//           /**
+//            * Semantics of EXISTS is defined as follows: it only takes effect
+//            * if the ASK var is not null; in that case, it has the same
+//            * semantics as OPTIONAL, but binds the askVar to true or false
+//            * depending on whether a match exists.
+//            */
+//           case Exists:
+//           {
+//              if (askVar!=null) {
+//                 left.set(
+//                    askVar, 
+//                    new Constant<XSDBooleanIV<?>>(
+//                       matchExists ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE));
+//                outputSolution(outputBuffer, left);
+//              }
+//              break;
+//           }
+//           case Normal:
+//              // this has been fully handled already
+//              break;
+//           default:
+//              throw new AssertionError();
+//           }                      
+//              
+//        }
               
      }
 
@@ -569,6 +921,7 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
         
     }
 
+
     /**
      * Human readable representation of the {@link IHashJoinUtility} metadata
      * (but not the solutions themselves).
@@ -581,11 +934,14 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
         sb.append(getClass().getSimpleName());
         
         sb.append("{open=" + open);
-        sb.append(",joinType="+joinType);
+        sb.append(",joinType=" + joinType);
+//        sb.append(",chunkSize=" + chunkSize);
+//        sb.append(",optional=" + optional);
+//        sb.append(",filter=" + filter);
         if (askVar != null)
             sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
-        sb.append(",outputDistinctJVs=" + outputDistinctJVs);        
+        sb.append(",outputDistinctJVs=" + outputDistinctJVs);
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
@@ -594,13 +950,17 @@ public class HTreePipelinedHashJoinUtility extends JVMHashJoinUtility {
         sb.append(", distinctProjectionsWithoutSubqueryResult=" + distinctProjectionsWithoutSubqueryResult.size());
         sb.append(", distinctBindingSets (seen/released)=" + nDistinctBindingSets + "/" + nDistinctBindingSetsReleased);
         sb.append(", subqueriesIssued=" + nSubqueriesIssued);
-        sb.append(", resultsFromSubqueries=" + nResultsFromSubqueries);
+        sb.append(", resultsFromSubqueries=" + nResultsFromSubqueries);        
         sb.append(",considered(left=" + nleftConsidered + ",right="
                 + nrightConsidered + ",joins=" + nJoinsConsidered + ")");
+        if (joinSet.get() != null)
+            sb.append(",joinSetSize=" + getJoinSetSize());
+//        sb.append(",encoder="+encoder);
         sb.append("}");
         
         return sb.toString();
         
-    }
-
+    }    
+    
+    
 }

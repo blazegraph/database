@@ -66,7 +66,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
+public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements PipelinedHashJoinUtility {
 
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
 
@@ -148,11 +148,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         
     };
     
-    /**
-     * AcceptAndOutputSolutions is a special method for building the hash index
-     * of the {@link JVMPipelinedHashIndex}, which accepts and immediately
-     * forwards relevant solutions (non-blocking index).
-     */
+    @Override
     public long acceptAndOutputSolutions(
           final UnsyncLocalOutputBuffer<IBindingSet> out,
           final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,

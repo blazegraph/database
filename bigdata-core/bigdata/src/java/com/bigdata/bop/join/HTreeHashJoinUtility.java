@@ -227,7 +227,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.
      */
-    private final AtomicBoolean open = new AtomicBoolean(true);
+    protected final AtomicBoolean open = new AtomicBoolean(true);
     
     /**
      * The operator whose annotations are used to initialize this object.
@@ -246,17 +246,17 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Utility class for compactly and efficiently encoding and decoding
      * {@link IBindingSet}s.
      */
-    private final IVBindingSetEncoderWithIVCache encoder;
+    protected final IVBindingSetEncoderWithIVCache encoder;
     
     /**
      * The type of join to be performed.
      */
-    private final JoinTypeEnum joinType;
+    protected final JoinTypeEnum joinType;
     
     /**
      * <code>true</code> iff the join is OPTIONAL.
      */
-    private final boolean optional;
+    protected final boolean optional;
     
     /**
      * <code>true</code> iff this is a DISTINCT filter.
@@ -276,29 +276,29 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     /**
      * @see HashJoinAnnotations#ASK_VAR
      */
-    private final IVariable<?> askVar;
+    protected final IVariable<?> askVar;
     
     /**
      * The join variables.
      */
-    private final IVariable<?>[] joinVars;
+    protected final IVariable<?>[] joinVars;
     
     /**
      * The variables to be retained (optional, all variables are retained if
      * not specified).
      */
-    private final IVariable<?>[] selectVars;
+    protected final IVariable<?>[] selectVars;
 
     /**
      * True if the hash join utility class is to output the distinct join
      * variables.
      */
-    private boolean outputDistinctJVs = false;
+    protected boolean outputDistinctJVs = false;
     
     /**
      * The join constraints (optional).
      */
-    private final IConstraint[] constraints;
+    protected final IConstraint[] constraints;
 
     /**
      * The backing {@link IRawStore}.
@@ -317,7 +317,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * The set of distinct source solutions which joined. This set is maintained
      * iff the join is optional and is <code>null</code> otherwise.
      */
-    private final AtomicReference<HTree> joinSet = new AtomicReference<HTree>();
+    protected final AtomicReference<HTree> joinSet = new AtomicReference<HTree>();
     
     /**
      * The maximum #of (left,right) solution joins that will be considered
@@ -326,27 +326,27 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * TODO HINTS: Annotation and query hint for this. Probably on
      * {@link HashJoinAnnotations}.
      */
-    private final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
+    protected final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
     
     /**
      * The #of left solutions considered for a join.
      */
-    private final CAT nleftConsidered = new CAT();
+    protected final CAT nleftConsidered = new CAT();
 
     /**
      * The #of right solutions considered for a join.
      */
-    private final CAT nrightConsidered = new CAT();
+    protected final CAT nrightConsidered = new CAT();
 
     /**
      * The #of solution pairs considered for a join.
      */
-    private final CAT nJoinsConsidered = new CAT();
+    protected final CAT nJoinsConsidered = new CAT();
     
     /**
      * The hash index.
      */
-    private HTree getRightSolutions() {
+    protected HTree getRightSolutions() {
         
         return rightSolutions.get();
         
@@ -421,7 +421,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     }
 
-    private long getJoinSetSize() {
+    protected long getJoinSetSize() {
 
         final HTree htree = getJoinSet();
 
@@ -923,7 +923,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * 
      * @return The decoded {@link IBindingSet}.
      */
-    private IBindingSet decodeSolution(final ITuple<?> t) {
+    protected IBindingSet decodeSolution(final ITuple<?> t) {
         
         final ByteArrayBuffer b = t.getValueBuffer();
 
@@ -936,11 +936,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Glue class for hash code and binding set used when the hash code is for
      * just the join variables rather than the entire binding set.
      */
-    private static class BS implements Comparable<BS> {
+    public static class BS implements Comparable<BS> {
 
-        final private int hashCode;
+        final int hashCode;
 
-        final private IBindingSet bset;
+        final IBindingSet bset;
 
         BS(final int hashCode, final IBindingSet bset) {
             this.hashCode = hashCode;
@@ -968,11 +968,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Glue class for hash code and encoded binding set used when we already
      * have the binding set encoded.
      */
-    private static class BS2 implements Comparable<BS2> {
+    static class BS2 implements Comparable<BS2> {
 
-        final private int hashCode;
+        final int hashCode;
 
-        final private byte[] value;
+        final byte[] value;
 
         BS2(final int hashCode, final byte[] value) {
             this.hashCode = hashCode;
@@ -1363,7 +1363,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * 
      * @return The vectored chunk of solutions ordered by hash code.
      */
-    private BS[] vector(final IBindingSet[] leftSolutions,
+    protected BS[] vector(final IBindingSet[] leftSolutions,
             final IVariable<?>[] joinVars,
             final IVariable<?>[] selectVars,
             final boolean ignoreUnboundVariables,
@@ -1436,7 +1436,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Note: the hash key is based on the entire solution (not just the join
      * variables). The values are the full encoded {@link IBindingSet}.
      */
-    private void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
+    protected void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
 
         final HTree joinSet = this.getJoinSet();
 
