@@ -29,6 +29,9 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.join.HTreePipelinedHashJoinUtility;
+import com.bigdata.bop.join.HashIndexOpBase.Annotations;
+import com.bigdata.bop.join.JVMPipelinedHashJoinUtility;
 import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetOp;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -70,7 +73,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
 
@@ -89,7 +92,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
 
@@ -108,7 +111,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
 
@@ -127,7 +130,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }    
     
@@ -145,7 +148,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
     
@@ -164,7 +167,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
 
@@ -182,9 +185,10 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
+    
     
     /**
      * Do use pipelined hash join for NOT EXISTS clause if LIMIT in query.
@@ -200,7 +204,159 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
+
+    }
+    
+    /**
+     * Use pipelined hash join for OPTIONAL when LIMIT specified
+     * and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForOptionalAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = 
+            new TestHelper(
+                "pipelined-hashjoin-used-optional-analytic",// testURI
+                "pipelined-hashjoin-used-optional-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-optional.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+
+    /**
+     * Use pipelined hash join for MINUS when LIMIT specified and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForMinusAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = 
+            new TestHelper(
+                "pipelined-hashjoin-used-minus-analytic",// testURI
+                "pipelined-hashjoin-used-minus-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-minus.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+
+    /**
+     * Use pipelined hash join for ALP "*" node and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForALP01AnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = 
+            new TestHelper(
+                "pipelined-hashjoin-used-pp01-analytic",// testURI
+                "pipelined-hashjoin-used-pp01-analytic.rq", // queryURI
+                "pipelined-hashjoin-pp.trig", // dataURI
+                "pipelined-hashjoin-pp01.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+
+    /**
+     * Use pipelined hash join for ALP "+" node and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForALP02AnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = 
+            new TestHelper(
+                "pipelined-hashjoin-used-pp02-analytic",// testURI
+                "pipelined-hashjoin-used-pp02-analytic.rq", // queryURI
+                "pipelined-hashjoin-pp.trig", // dataURI
+                "pipelined-hashjoin-pp02.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }    
+    
+    /**
+     * Use pipelined hash join for SPARQL 1.1 subquery and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForSubqueryAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-subquery-analytic",// testURI
+                "pipelined-hashjoin-used-subquery-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-subquery.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+  
+    /**
+     * Use pipelined hash join for inlined VALUES node and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForValuesAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-values-analytic",// testURI
+                "pipelined-hashjoin-used-values-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-values.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+
+    /**
+     * Do use pipelined hash join for EXISTS clause if LIMIT in query
+     * and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForExistsAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-exists-analytic",// testURI
+                "pipelined-hashjoin-used-exists-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-exists.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+    
+    
+    /**
+     * Do use pipelined hash join for NOT EXISTS clause if LIMIT in query
+     * and analytic mode.
+     */
+    public void testPipelinedHashJoinUsedForNotExistsAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-used-notexists-analytic",// testURI
+                "pipelined-hashjoin-used-notexists-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-notexists.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
 
     }
 
@@ -223,7 +379,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
 
@@ -246,7 +402,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
 
@@ -267,7 +423,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
     
@@ -287,7 +443,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
     
@@ -307,7 +463,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
     
@@ -326,7 +482,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
 
@@ -345,7 +501,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
     
@@ -364,7 +520,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
 
     }
     
@@ -383,7 +539,31 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
         assertPipelinedPlanOrNot(
-            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN);
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, false);
+
+    }
+    
+    
+    /**
+     * Make sure the pipelined hash join operator is not used as a standard for
+     * non-LIMIT query. Query body is the same as for
+     * testPipelinedHashJoinUsedForOptional(), but no LIMIT.
+     * Verifies exemplarily for analytic mode.
+     */
+    public void testPipelinedHashJoinDefaultUsedOptional01Analytic() throws Exception {
+
+        final ASTContainer astContainer = 
+            new TestHelper(
+                "pipelined-hashjoin-notused-optional01-analytic",// testURI
+                "pipelined-hashjoin-notused-optional01-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-optional.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(
+            queryPlan, astContainer, QueryHints.DEFAULT_PIPELINED_HASH_JOIN, true);
 
     }
 
@@ -402,9 +582,10 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
+
     
     /**
      * Combination of MINUS and enablement by query hint.
@@ -421,7 +602,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
     
@@ -440,7 +621,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
     
@@ -458,7 +639,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
     
@@ -476,7 +657,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
     
@@ -494,7 +675,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
     
@@ -512,7 +693,26 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
+
+    }
+    
+    /**
+     * Combination of OPTIONAL and enablement by query hint and analytic mode.
+     */
+    public void testPipelinedHashEnabledByQueryHintOptionalAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = 
+            new TestHelper(
+                "pipelined-hashjoin-used-optional-hint-analytic",// testURI
+                "pipelined-hashjoin-used-optional-hint-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-optional.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
 
     }
 
@@ -531,7 +731,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     
         final PipelineOp queryPlan = astContainer.getQueryPlan();
     
-        assertPipelinedPlanOrNot(queryPlan, astContainer, false);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
     
     }
 
@@ -550,7 +750,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     
         final PipelineOp queryPlan = astContainer.getQueryPlan();
     
-        assertPipelinedPlanOrNot(queryPlan, astContainer, false);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
     
     }
 
@@ -569,7 +769,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     
         final PipelineOp queryPlan = astContainer.getQueryPlan();
     
-        assertPipelinedPlanOrNot(queryPlan, astContainer, false);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
     
     }
 
@@ -587,7 +787,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     
         final PipelineOp queryPlan = astContainer.getQueryPlan();
     
-        assertPipelinedPlanOrNot(queryPlan, astContainer, false);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
     
     }
 
@@ -605,7 +805,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     
         final PipelineOp queryPlan = astContainer.getQueryPlan();
     
-        assertPipelinedPlanOrNot(queryPlan, astContainer, false);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
     
     }
 
@@ -623,7 +823,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     
         final PipelineOp queryPlan = astContainer.getQueryPlan();
     
-        assertPipelinedPlanOrNot(queryPlan, astContainer, false);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
     
     }
 
@@ -641,7 +841,26 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
     
         final PipelineOp queryPlan = astContainer.getQueryPlan();
     
-        assertPipelinedPlanOrNot(queryPlan, astContainer, false);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
+    
+    }
+    
+    /**
+     * Combination of OPTIONAL and enablement by query hint and analytic mode.
+     */
+    public void testPipelinedHashDisabledByQueryHintOptionalAnalyticMode() throws Exception {
+    
+        final ASTContainer astContainer = 
+            new TestHelper(
+                "pipelined-hashjoin-used-optional-hintneg-analytic",// testURI
+                "pipelined-hashjoin-used-optional-hintneg-analytic.rq", // queryURI
+                "pipelined-hashjoin.trig", // dataURI
+                "pipelined-hashjoin-optional.srx" // resultURI
+        ).runTest();
+    
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+    
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, true);
     
     }
 
@@ -660,7 +879,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }
     
@@ -679,9 +898,47 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        assertPipelinedPlanOrNot(queryPlan, astContainer, true);
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
 
     }    
+    
+    /**
+     * Test query affected by 
+     * PipelinedHashIndexAndSolutionSetOp.INCOMING_BINDINGS_BUFFER_THRESHOLD.
+     */
+    public void testPipelinedHashIncomingBindingsBufferThresholdAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-threshold-incoming-bindings-buffer-analytic",// testURI
+                "pipelined-hashjoin-threshold-incoming-bindings-buffer-analytic.rq", // queryURI
+                "pipelined-hashjoin-threshold.trig", // dataURI
+                "pipelined-hashjoin-threshold-incoming-bindings-buffer.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+    
+    /**
+     * Test query affected by 
+     * PipelinedHashIndexAndSolutionSetOp.DISTINCT_PROJECTION_BUFFER_THRESHOLD
+     */
+    public void testPipelinedHashDistinctProjectionBufferThresholdAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-threshold-distinct-projection-buffer-analytic",// testURI
+                "pipelined-hashjoin-threshold-distinct-projection-buffer-analytic.rq", // queryURI
+                "pipelined-hashjoin-threshold.trig", // dataURI
+                "pipelined-hashjoin-threshold-distinct-projection-buffer.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }   
     
     /**
      * Asserts that a PipelinedHashIndexAndSolutionSetOp is contained in the
@@ -689,24 +946,47 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
      * NOT contained.
      */
     protected void assertPipelinedPlanOrNot(final PipelineOp queryPlan, 
-        final ASTContainer container, final boolean assertPipelined) {
+        final ASTContainer container, final boolean assertPipelined,
+        final boolean analyticMode) {
+        
+        final Class<?> operatorClass = PipelinedHashIndexAndSolutionSetOp.class;
         
         if (assertPipelined) {
-            
-            if (!BOpUtility.visitAll(queryPlan,
-                    PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+
+            // verify the operator class is correctly set
+            if (!BOpUtility.visitAll(queryPlan, operatorClass).hasNext()) {
                 
-                fail("Expecting PipelinedHashIndexAndSolutionSetOp in the plan: "
+                fail("Expecting " + operatorClass + " in the plan: "
                         + container.toString());
 
             }
+
+            // verify that we're properly using the analytical vs. JVM version of the class
+            final Class<?> expectedUtilClass = analyticMode ?
+                    HTreePipelinedHashJoinUtility.class : JVMPipelinedHashJoinUtility.class;
+
+            final PipelinedHashIndexAndSolutionSetOp firstMatch = 
+                (PipelinedHashIndexAndSolutionSetOp)BOpUtility.visitAll(queryPlan, operatorClass).next();
             
+            final Object utilFactory = firstMatch.annotations().get(Annotations.HASH_JOIN_UTILITY_FACTORY);
+            final Class<?> observedUtilClass = utilFactory.getClass();
+            
+            /**
+             * The string checking below is a workaround for dealing with the anonymous
+             * inner classes, what we have here is something lie
+             * 
+             * observedUtilClass.toString() := class com.bigdata.bop.join.JVMPipelinedHashJoinUtility$1
+             * expectedUtilClass.toString() := class com.bigdata.bop.join.JVMPipelinedHashJoinUtility
+             */
+            if (!observedUtilClass.toString().contains(expectedUtilClass.toString())) {
+                fail("Expecting util factory of type " + expectedUtilClass + ", but used one is " + utilFactory.getClass());
+            }
+                        
         } else {
             
-            if (BOpUtility.visitAll(queryPlan,
-                    PipelinedHashIndexAndSolutionSetOp.class).hasNext()) {
+            if (BOpUtility.visitAll(queryPlan, operatorClass).hasNext()) {
                 
-                fail("Expecting *no* PipelinedHashIndexAndSolutionSetOp in the plan: "
+                fail("Expecting *no* " + operatorClass + " in the plan: "
                         + container.toString());
 
             }
