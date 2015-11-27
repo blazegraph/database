@@ -938,7 +938,79 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
 
-    }   
+    }
+    
+    /**
+     * Check correct multiplicity for EXISTS.
+     */
+    public void testPipelinedHashJoinExistsMultiplicity() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-exists-multiplicity",// testURI
+                "pipelined-hashjoin-exists-multiplicity.rq", // queryURI
+                "pipelined-hashjoin-multiplicity.trig", // dataURI
+                "pipelined-hashjoin-exists-multiplicity.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
+
+    }
+    
+    /**
+     * Check correct multiplicity for EXISTS in analytic mode.
+     */
+    public void testPipelinedHashJoinExistsMultiplicityAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-exists-multiplicity-analytic",// testURI
+                "pipelined-hashjoin-exists-multiplicity-analytic.rq", // queryURI
+                "pipelined-hashjoin-multiplicity.trig", // dataURI
+                "pipelined-hashjoin-exists-multiplicity.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }
+    
+    /**
+     * Check correct multiplicity for NOT EXISTS.
+     */
+    public void testPipelinedHashJoinNotExistsMultiplicity() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-notexists-multiplicity",// testURI
+                "pipelined-hashjoin-notexists-multiplicity.rq", // queryURI
+                "pipelined-hashjoin-multiplicity.trig", // dataURI
+                "pipelined-hashjoin-notexists-multiplicity.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
+
+    }
+    
+    /**
+     * Check correct multiplicity for NOT EXISTS in analytic mode.
+     */
+    public void testPipelinedHashJoinNotExistsMultiplicityAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-notexists-multiplicity-analytic",// testURI
+                "pipelined-hashjoin-notexists-multiplicity-analytic.rq", // queryURI
+                "pipelined-hashjoin-multiplicity.trig", // dataURI
+                "pipelined-hashjoin-notexists-multiplicity.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+
+    }    
     
     /**
      * Asserts that a PipelinedHashIndexAndSolutionSetOp is contained in the
