@@ -628,6 +628,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                 long sameHashCodeCount = 0;
                 
                 final Set<IBindingSet> leftSolutionsWithoutMatch = new LinkedHashSet<IBindingSet>();
+                final Set<IBindingSet> leftSolutionsWithMatch = new LinkedHashSet<IBindingSet>();
                 
                 if (!titr.hasNext()) {
                     for (int i = fromIndex; i < toIndex; i++) {
@@ -739,12 +740,8 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                                 break;
                             }
                             case Exists: 
-                                // TODO: check -> this probably results in wrong multiplicity
                                 if (askVar!=null) {
-                                    leftSolution.set(
-                                      askVar, 
-                                      new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
-                                    outputBuffer.add(leftSolution);
+                                    leftSolutionsWithMatch.add(leftSolution);
                                 }
                                 break;
     
@@ -848,6 +845,39 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                        
                 }
 
+                for (final IBindingSet leftSolutionWithMatch : leftSolutionsWithMatch) {
+                    
+                    // handle other join types
+                    switch (getJoinType()) {
+                    case Optional:
+                    case NotExists:
+                       break;
+                    /**
+                     * Semantics of EXISTS is defined as follows: it only takes effect
+                     * if the ASK var is not null; in that case, it has the same
+                     * semantics as OPTIONAL, but binds the askVar to true or false
+                     * depending on whether a match exists.
+                     */
+                    case Exists:
+                    {
+                       if (askVar!=null) {
+                           leftSolutionWithMatch.set(
+                             askVar, 
+                             new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                           outputBuffer.add(leftSolutionWithMatch);
+                       }
+                       break;
+                    }
+                    case Normal:
+                       // this has been fully handled already
+                       break;
+                    default:
+                       throw new AssertionError();
+                    }                      
+                       
+                }
+                
+                
             } // end block of leftSolutions having the same hash code.
             
             
