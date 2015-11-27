@@ -212,74 +212,76 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
             int fromIndex = 0;
             int n = vectorSize.get();
 
-            while (fromIndex < n) {
+            /**
+             * if we don't have a subquery but a join against mappings passed in via 
+             * binding set annotation, these mappings can be processed immediately
+             * (the latter, bsFromBindingsSetSource, have been added to the index
+             * right in the beginning of this method already).
+             */
+            if (subquery==null) {
                 
-                final IBindingSet curBs = a[fromIndex].bset;
-                
-                /**
-                 * fast path: if we don't have a subquery but a join against
-                 * mappings passed in via binding set annotation, these mappings
-                 * can be processed immediately (the latter, 
-                 * bsFromBindingsSetSource, have been added to the index right
-                 * in the beginning of this method already).
-                 */
-                if (subquery==null) { // TODO: this does not increase index and/or counter
-                   dontRequireSubqueryEvaluation.add(curBs);
-                   continue;
+                for (int i=0; i<n; i++) {
+                    dontRequireSubqueryEvaluation.add(a[fromIndex].bset);
                 }
                 
-                /*
-                 * Figure out how many left solutions in the current chunk
-                 * have the same hash code. We will use the same iterator
-                 * over the right solutions for that hash code against the
-                 * HTree.
-                 */
-                
-                // The next hash code to be processed.
-                final int hashCode = a[fromIndex].hashCode;
-                
-                // scan for the first hash code which is different.
-                int toIndex = fromIndex+1; // TODO assume upper bound.
-                
-                // TODO: fast path
-//                for (int i = fromIndex + 1; i < n; i++) {
-//                    if (a[i].hashCode != hashCode) {
-//                        toIndex = i;
-//                        break;
-//                    }
-//                }
-                
-                final byte[] key = 
-                        keyBuilder.reset().append(hashCode).getKey();
-
-                final IBindingSet bsetDistinct = curBs.copy(projectInVars);
-                
-                if (rightSolutions.contains(key) || 
-                    distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct)) {
+            } else {
+            
+                while (fromIndex < n) {
+                    
+                    final IBindingSet curBs = a[fromIndex].bset;
                     
                     /*
-                     * Either a match in the bucket or subquery was already
-                     * computed for this distinct projection but did not produce
-                     * any results. Either way, it will take a fast path that
-                     * avoids the subquery.
+                     * Figure out how many left solutions in the current chunk
+                     * have the same hash code. We will use the same iterator
+                     * over the right solutions for that hash code against the
+                     * HTree.
                      */
-                    dontRequireSubqueryEvaluation.add(curBs);
                     
-                } else {
+                    // The next hash code to be processed.
+                    final int hashCode = a[fromIndex].hashCode;
                     
-                    // This is a new distinct projection. It will need to run
-                    // through the subquery. We buffer the solutions in a
-                    // operator-global data structure
-                    incomingBindingsBuffer.add(curBs);
-                    distinctProjectionBuffer.add(bsetDistinct);                    
+                    // scan for the first hash code which is different.
+                    int toIndex = fromIndex+1; // TODO assume upper bound.
+                    
+                    // TODO: fast path -- this is hard to align...
+    //                for (int i = fromIndex + 1; i < n; i++) {
+    //                    if (a[i].hashCode != hashCode) {
+    //                        toIndex = i;
+    //                        break;
+    //                    }
+    //                }
+                    
+                    final byte[] key = 
+                            keyBuilder.reset().append(hashCode).getKey();
+    
+                    final IBindingSet bsetDistinct = curBs.copy(projectInVars);
+                    
+                    if (rightSolutions.contains(key) || 
+                        distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct)) {
+                        
+                        /*
+                         * Either a match in the bucket or subquery was already
+                         * computed for this distinct projection but did not produce
+                         * any results. Either way, it will take a fast path that
+                         * avoids the subquery.
+                         */
+                        dontRequireSubqueryEvaluation.add(curBs);
+                        
+                    } else {
+                        
+                        // This is a new distinct projection. It will need to run
+                        // through the subquery. We buffer the solutions in a
+                        // operator-global data structure
+                        incomingBindingsBuffer.add(curBs);
+                        distinctProjectionBuffer.add(bsetDistinct);                    
+                    }
+                    
+                    naccepted++;
+                    
+                    fromIndex = toIndex;
                 }
-                
-                naccepted++;
-                
-                fromIndex = toIndex;
             }
-        }
-        
+        }        
         
         // record the number of distinct projections seen in the chunk
         nDistinctBindingSets.add(distinctProjectionBuffer.size()-nDistinctProjections);
@@ -739,7 +741,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                             case Exists: 
                                 // TODO: check -> this probably results in wrong multiplicity
                                 if (askVar!=null) {
-                                    rightSolution.set(
+                                    leftSolution.set(
                                       askVar, 
                                       new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
                                     outputBuffer.add(leftSolution);
