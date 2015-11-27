@@ -1,0 +1,8 @@
+SELECT * WHERE {
+  hint:Query hint:analytic "true" .
+
+  ?s <http://p1> ?o1
+  FILTER NOT EXISTS {
+    ?s <http://p2> ?o2 .
+  }
+} LIMIT 100 # effectively all
