@@ -288,7 +288,36 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
            ));
          
       }}.test();
-   }    
+   }  
+   
+   /**
+    * VALUES claused placed early whenever it binds values that are reused
+    * by other nodes such as BINDs. Motivated by the scenario discussed in
+    * https://jira.blazegraph.com/browse/BLZG-1463.
+    */
+   public void testValuesPlacement02() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(s), 
+            where (
+               stmtPatternWithVars("s","o"),
+               assignmentWithVar("o","reused"),
+               bindingsClauseWithVars("reused")
+            ));
+         
+         expected = 
+            select(varNode(s), 
+            where (
+               bindingsClauseWithVars("reused"),
+               assignmentWithVar("o","reused"),
+               stmtPatternWithVars("s","o")
+           ));
+         
+      }}.test();
+   }      
+   
    
    public void testServicePlacementSparql11a() {
 

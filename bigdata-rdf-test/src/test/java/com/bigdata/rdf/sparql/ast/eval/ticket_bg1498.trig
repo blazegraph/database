@@ -1,0 +1,5 @@
+<http://graph1> {
+  <http://s1> rdf:type <http://T> .
+  <http://s1> <http://p1> <http://s11> .
+  <http://s11> <http://p2> "A" .
+}

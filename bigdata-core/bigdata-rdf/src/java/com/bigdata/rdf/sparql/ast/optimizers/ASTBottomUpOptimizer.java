@@ -789,8 +789,11 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 final GroupMemberValueExpressionNodeBase filter = 
                         (GroupMemberValueExpressionNodeBase) child;
                 
+                final IValueExpressionNode nodeParent =
+                   (filter instanceof IValueExpressionNode) ? (IValueExpressionNode)filter : null;
+                   
                 if(rewriteUnboundVariablesInFilter(context, maybeBound, map,
-                        null/* parent */, filter.getValueExpressionNode())) {
+                      nodeParent, filter.getValueExpressionNode())) {
                     
                     /*
                      * Re-generate the IVE for this filter.
@@ -1041,7 +1044,11 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     
                     ((IGroupNode) group).removeChild(childGroup);
                     
-                    i++;
+                    /**
+                     * BLZG-1627: the group has one member less now, so
+                     * we decrease the arity to avoid running out of bounds.
+                     */
+                    arity--;
 
                 }
                 

@@ -451,17 +451,8 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 
 		final VarNode theVar = assignmentNode.getVarNode();
 
-		// Mark the triple pattern with the FAST-RANGE-COUNT attribute.
-		sp.setFastRangeCount(theVar);
-
-		/*
-		 * Mark the triple pattern as having an ESTIMATED-CARDINALITY one ONE.
-		 * 
-		 * Note: We will compute the COUNT(*) for the triple pattern using two
-		 * key probes. Therefore we set the estimated cost of computing that
-		 * cardinality to the minimum.
-		 */
-		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 1L);
+		// Mark the triple pattern for fast range count.
+		markForFastRangeCount(sp, theVar);
 		
 		// Rewrite the projection as SELECT ?var.
 		final ProjectionNode newProjection = new ProjectionNode();
@@ -469,5 +460,21 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 		queryBase.setProjection(newProjection);
 		
 	}
+
+   protected void markForFastRangeCount(final StatementPatternNode sp,
+                                        final VarNode fastRangeCountVariable)
+   {
+      // Mark the triple pattern with the FAST-RANGE-COUNT attribute.
+      sp.setFastRangeCount(fastRangeCountVariable);
+
+      /*
+       * Mark the triple pattern as having an ESTIMATED-CARDINALITY one ONE.
+       * 
+       * Note: We will compute the COUNT(*) for the triple pattern using two
+       * key probes. Therefore we set the estimated cost of computing that
+       * cardinality to the minimum.
+       */
+      sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 1L);
+   }
 
 }

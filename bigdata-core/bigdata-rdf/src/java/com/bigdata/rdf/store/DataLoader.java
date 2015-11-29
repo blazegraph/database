@@ -1457,6 +1457,7 @@ public class DataLoader {
                     DataLoader.Options.CLOSURE,
                     DataLoader.Options.COMMIT,
                     DataLoader.Options.FLUSH,
+                    DataLoader.Options.IGNORE_INVALID_FILES,
             };
             for (String s : overrides) {
                 if (System.getProperty(s) != null) {

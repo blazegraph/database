@@ -1,0 +1,9 @@
+@prefix : <http://www.bigdata.com/> .
+
+: {
+   <http://TestCaseAuthor> <http://is> <http://Michael> .
+   <http://Michael> <http://knows> <http://Bryan> .
+   <http://Michael> <http://knows> <http://Peter> .
+   <http://Bryan> <http://knows> <http://Brad> .
+   <http://Bryan> <http://knows> <http://Mike> .
+}

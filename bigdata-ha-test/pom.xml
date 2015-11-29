@@ -29,15 +29,18 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-ha-test</artifactId>
-  <version>1.5.3-master-SNAPSHOT</version>
+  <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph High Availability (HA) Tests</name>
   <packaging>jar</packaging>
-
+  <properties>
+     <!-- Used to prevent ant from starting test services -->
+     <maven.test.skip>false</maven.test.skip>
+  </properties>
     <profiles>
      <profile>
       <id>localZookeeper</id>
@@ -123,7 +126,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>process-test-resources</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="preTestPreparation"/>
+                   <ant antfile="build.xml" target="preTestPreparation">
+                      <property name="maven.test.skip" value="${maven.test.skip}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>
@@ -135,7 +140,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>test</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="postTestCleanup"/>
+                   <ant antfile="build.xml" target="postTestCleanup">
+                      <property name="maven.test.skip" value="${maven.test.skip}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>

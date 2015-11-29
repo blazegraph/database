@@ -105,6 +105,26 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
     public volatile long nbufferEvictedToChannel;
 
     /**
+     * The cumulative latency (nanoseconds) when writing a write cache buffer
+     * onto the backing channel.
+     * 
+     * See BLZG-1589 (new latency-oriented counters)
+     */
+    public volatile long elapsedBufferEvictedToChannelNanos;
+
+    /**
+     * The cumulative number of records written onto the backing channel. This
+     * may be used to track the number of induced write operators per second.
+     * However, note that the RWStore will pad out writes to their slot size in
+     * order to offer the underlying file system and disk controller an
+     * opportunity to meld together multiple writes into a single IO. This is
+     * particularly effective in combination with the small slots optimization.
+     * 
+     * See BLZG-1589 (new latency-oriented counters)
+     */
+    public volatile long nrecordsEvictedToChannel;
+    
+    /**
      * The #of {@link WriteCache} buffers that have been compacted.
      */
     public volatile long ncompact;
@@ -113,6 +133,14 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
      * The #of record-level writes made onto the {@link WriteCacheService}.
      */
     public volatile long ncacheWrites;
+
+    /**
+     * The cumulative latency (nanoseconds) when writing into the
+     * write cache.
+     * 
+     * See BLZG-1589 (new latency-oriented counters)
+     */
+    public volatile long elapsedCacheWriteNanos;
 
     /**
      * The requests to clear an address from the cache.
@@ -151,6 +179,7 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
 
     }
 
+    @Override
     public CounterSet getCounters() {
 
         final CounterSet root = super.getCounters();
@@ -164,66 +193,152 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
                 compactingThreshold));
 
         root.addCounter(NDIRTY, new Instrument<Integer>() {
+            @Override
             public void sample() {
                 setValue(ndirty);
             }
         });
 
         root.addCounter(MAX_DIRTY, new Instrument<Integer>() {
+            @Override
             public void sample() {
                 setValue(maxdirty);
             }
         });
 
         root.addCounter(NCLEAN, new Instrument<Integer>() {
+            @Override
             public void sample() {
                 setValue(nclean);
             }
         });
 
         root.addCounter(NRESET, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(nreset);
             }
         });
 
         root.addCounter(NSEND, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(nsend);
             }
         });
 
         root.addCounter(NBUFFER_EVICTED_TO_CHANNEL, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(nbufferEvictedToChannel);
             }
         });
 
+        root.addCounter(ELAPSED_BUFFER_EVICTED_TO_CHANNEL_NANOS, new Instrument<Long>() {
+            @Override
+            public void sample() {
+                setValue(elapsedBufferEvictedToChannelNanos);
+            }
+        });
+
+        root.addCounter(AVERAGE_BUFFER_EVICTED_TO_CHANNEL_NANOS, new Instrument<Double>() {
+            @Override
+            public void sample() {
+                if (nbufferEvictedToChannel > 0) {
+                    final double d = elapsedBufferEvictedToChannelNanos / nbufferEvictedToChannel;
+                    setValue(((long) (d * 100)) / 100d);
+                }
+            }
+        });
+
+        root.addCounter(NRECORDS_EVICTED_TO_CHANNEL, new Instrument<Long>() {
+            @Override
+            public void sample() {
+                setValue(nrecordsEvictedToChannel);
+            }
+        });
+
+        root.addCounter(AVERAGE_RECORD_EVICTED_TO_CHANNEL_NANOS, new Instrument<Double>() {
+            @Override
+            public void sample() {
+                if (nrecordsEvictedToChannel > 0) {
+                    /*
+                     * Note: records are evicted a buffer at a time. Therefore
+                     * we use the same divisor here as we do for the
+                     * AVERAGE_BUFFER_EVICTED_TO_CHANNEL_NANOS.
+                     */
+                    final double d = elapsedBufferEvictedToChannelNanos / nrecordsEvictedToChannel;
+                    setValue(((long) (d * 100)) / 100d);
+                }
+            }
+        });
+
+        root.addCounter(AVERAGE_RANDOM_WRITES_PER_SECOND, new Instrument<Double>() {
+            @Override
+            public void sample() {
+                if (nrecordsEvictedToChannel > 0) {
+                    /*
+                     * Note: records are evicted a buffer at a time. Therefore
+                     * we use the same divisor here as we do for the
+                     * AVERAGE_BUFFER_EVICTED_TO_CHANNEL_NANOS.
+                     */
+                    // records written / second.
+                    final double d = TimeUnit.NANOSECONDS.toSeconds(elapsedBufferEvictedToChannelNanos)
+                            / ((double) nrecordsEvictedToChannel);
+                    // two decimal places of precision.
+                    final double v = ((long) (d * 100)) / 100d;
+                    setValue(v);
+                }
+            }
+        });
+
         root.addCounter(NCOMPACT, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(ncompact);
             }
         });
 
         root.addCounter(NCACHE_WRITES, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(ncacheWrites);
             }
         });
 
+        root.addCounter(ELAPSED_CACHE_WRITES_NANOS, new Instrument<Long>() {
+            @Override
+            public void sample() {
+                setValue(elapsedCacheWriteNanos);
+            }
+        });
+
+        root.addCounter(AVERAGE_CACHE_WRITE_NANOS, new Instrument<Double>() {
+            @Override
+            public void sample() {
+                if (ncacheWrites > 0) {
+                    final double d = elapsedCacheWriteNanos / ncacheWrites;
+                    setValue(((long) (d * 100)) / 100d);
+                }
+            }
+        });
+
         root.addCounter(NCLEAR_ADDR_REQUESTS, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(nclearAddrRequests);
             }
         });
 
         root.addCounter(NCLEAR_ADDR_CLEARED, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(nclearAddrCleared);
             }
         });
 
         root.addCounter(MB_PER_SEC, new Instrument<Double>() {
+            @Override
             public void sample() {
                 final double mbPerSec = (((double) bytesWritten)
                         / Bytes.megabyte32 / (TimeUnit.NANOSECONDS
@@ -238,12 +353,14 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
          */
         
         root.addCounter(NREAD_NOT_INSTALLED, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(nreadNotInstalled.get());
             }
         });
 
         root.addCounter(MEMO_CACHE_SIZE, new Instrument<Long>() {
+            @Override
             public void sample() {
                 setValue(memoCacheSize.get());
             }
