@@ -80,11 +80,15 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      */    
     public void testInRectangleQuery01() throws Exception {
        
-       new TestHelper(
-          "geo-quads-rectangle01",
-          "geo-quads-rectangle01.rq", 
-          "geo-quads-grid101010.nq",
-          "geo-quads-rectangle01.srx").runTest();
+        if (!store.isQuads()) {
+            return;
+        }
+
+        new TestHelper(
+            "geo-quads-rectangle01",
+            "geo-quads-rectangle01.rq", 
+            "geo-quads-grid101010.nq",
+            "geo-quads-rectangle01.srx").runTest();
        
     }
     
@@ -114,11 +118,15 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      */    
     public void testInRectangleQuery02a() throws Exception {
        
-       new TestHelper(
-          "geo-quads-rectangle02a",
-          "geo-quads-rectangle02a.rq", 
-          "geo-quads-grid101010.nq",
-          "geo-quads-rectangle02a.srx").runTest();
+        if (!store.isQuads()) {
+            return;
+        }
+
+        new TestHelper(
+            "geo-quads-rectangle02a",
+            "geo-quads-rectangle02a.rq", 
+            "geo-quads-grid101010.nq",
+            "geo-quads-rectangle02a.srx").runTest();
        
     }
     
@@ -148,11 +156,15 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      */    
     public void testInRectangleQuery02b() throws Exception {
        
-       new TestHelper(
-          "geo-quads-rectangle02b",
-          "geo-quads-rectangle02b.rq", 
-          "geo-quads-grid101010.nq",
-          "geo-quads-rectangle02b.srx").runTest();
+        if (!store.isQuads()) {
+            return;
+        }
+
+        new TestHelper(
+            "geo-quads-rectangle02b",
+            "geo-quads-rectangle02b.rq", 
+            "geo-quads-grid101010.nq",
+            "geo-quads-rectangle02b.srx").runTest();
        
     }
     
@@ -179,11 +191,15 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      */
     public void testInCircleQuery01() throws Exception {
        
-       new TestHelper(
-          "geo-quads-circle01",
-          "geo-quads-circle01.rq", 
-          "geo-quads-grid101010.nq",
-          "geo-quads-circle01.srx").runTest();
+        if (!store.isQuads()) {
+            return;
+        }
+
+        new TestHelper(
+            "geo-quads-circle01",
+            "geo-quads-circle01.rq", 
+            "geo-quads-grid101010.nq",
+            "geo-quads-circle01.srx").runTest();
        
     }
 
@@ -214,11 +230,15 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      */
     public void testInCircleQuery02() throws Exception {
        
-       new TestHelper(
-          "geo-quads-circle02",
-          "geo-quads-circle02.rq", 
-          "geo-quads-grid101010.nq",
-          "geo-quads-circle02.srx").runTest();
+        if (!store.isQuads()) {
+            return;
+        }
+
+        new TestHelper(
+            "geo-quads-circle02",
+            "geo-quads-circle02.rq", 
+            "geo-quads-grid101010.nq",
+            "geo-quads-circle02.srx").runTest();
        
     }
     
@@ -241,12 +261,16 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      * @throws Exception
      */
     public void testValueExtraction() throws Exception {
+        
+        if (!store.isQuads()) {
+            return;
+        }
        
-       new TestHelper(
-          "geo-quads-valueextr",
-          "geo-quads-valueextr.rq", 
-          "geo-quads-grid101010.nq",
-          "geo-quads-valueextr.srx").runTest();
+        new TestHelper(
+            "geo-quads-valueextr",
+            "geo-quads-valueextr.rq", 
+            "geo-quads-grid101010.nq",
+            "geo-quads-valueextr.srx").runTest();
        
     }
 
