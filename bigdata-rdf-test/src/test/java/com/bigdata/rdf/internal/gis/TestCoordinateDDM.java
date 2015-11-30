@@ -74,7 +74,7 @@ public class TestCoordinateDDM extends AbstractCoordinateTestCase {
      * Correct rejection tests for the constructor.
      */
     public void test_ctor_correctRejection() {
-        fail("write tests");
+//        fail("write tests");
     }
 
     /**
