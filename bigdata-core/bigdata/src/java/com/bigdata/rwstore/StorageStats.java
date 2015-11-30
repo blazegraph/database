@@ -76,7 +76,8 @@ public class StorageStats {
 		long m_allocationSize;
 		long m_allocations;
 		long m_deletes;
-		long m_deleteSize;
+		// See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//		long m_deleteSize;
 		
 		// By copying committed data the stats can be reset on abort
 		BlobBucket m_committed = null;
@@ -84,21 +85,25 @@ public class StorageStats {
 		public BlobBucket(final int size) {
 			m_size = size;
 		}
-		public BlobBucket(DataInputStream instr) throws IOException {
+		public BlobBucket(final DataInputStream instr) throws IOException {
 			m_size = instr.readInt();
 			m_allocationSize = instr.readLong();
 			m_allocations = instr.readLong();
-			m_deleteSize = instr.readLong();
+			// See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+			instr.readLong(); // was m_deleteSize
+//			m_deleteSize = instr.readLong();
 			m_deletes = instr.readLong();
 			
 			commit();
 		}
 		
-		public void write(DataOutputStream outstr) throws IOException {
+		public void write(final DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
 			outstr.writeLong(m_allocationSize);
 			outstr.writeLong(m_allocations);
-			outstr.writeLong(m_deleteSize);
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+            outstr.writeLong(0L); // was m_deleteSize
+//            outstr.writeLong(m_deleteSize);
 			outstr.writeLong(m_deletes);
 		}
 		public void commit() {
@@ -107,7 +112,8 @@ public class StorageStats {
 			}
 			m_committed.m_allocationSize = m_allocationSize;
 			m_committed.m_allocations = m_allocations;
-			m_committed.m_deleteSize = m_deleteSize;
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_committed.m_deleteSize = m_deleteSize;
 			m_committed.m_deletes = m_deletes;
 		}
 		
@@ -115,21 +121,24 @@ public class StorageStats {
 			if (m_committed != null) {
 				m_allocationSize = m_committed.m_allocationSize;
 				m_allocations = m_committed.m_allocations;
-				m_deleteSize = m_committed.m_deleteSize;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_deleteSize = m_committed.m_deleteSize;
 				m_deletes = m_committed.m_deletes;
 			} else {
 				m_allocationSize = 0;
 				m_allocations = 0;
-				m_deleteSize = 0;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_deleteSize = 0;
 				m_deletes = 0;
 			}
 		}
 		
-		public void delete(int sze) {
-			m_deleteSize += sze;
+		public void delete(final int sze) {
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_deleteSize += sze;
 			m_deletes++;
 		}
-		public void allocate(int sze) {
+		public void allocate(final int sze) {
 			m_allocationSize += sze;
 			m_allocations++;
 		}
@@ -659,28 +668,28 @@ public class StorageStats {
 		str.append("\n-------------------------\n");
 		str.append("BLOBS\n");
 		str.append("-------------------------\n");
-		str.append(String.format("%-10s %12s %12s %12s %12s %12s %12s %12s\n",// %12s\n", 
+		str.append(String.format("%-10s %12s %12s %12s %12s %12s\n",// %12s\n", 
 			"Bucket(K)",
 			"Allocations",
 			"Allocated",
 			"Deletes",
-			"Deleted",
+//			"Deleted", // 4
 			"Current",
-			"Data",
+//			"Data", // 6
 			"Mean"
 //			"Churn"
 			));
 
 		for (BlobBucket b: m_blobBuckets) {
-			str.append(String.format("%-10d %12d %12d %12d %12d %12d %12d %12d\n",// %12.2f\n", 
-				b.m_size/1024,
-				b.m_allocations,
-				b.m_allocationSize,
-				b.m_deletes,
-				b.m_deleteSize,
-				(b.m_allocations - b.m_deletes),
-				(b.m_allocationSize - b.m_deleteSize),
-				b.meanAllocation()
+			str.append(String.format("%-10d %12d %12d %12d %12d %12d\n",// %12.2f\n", 
+				b.m_size/1024, // Bucket(K)
+				b.m_allocations, // Allocations
+				b.m_allocationSize, // Allocated
+				b.m_deletes, // Deletes
+//				b.m_deleteSize, // Deleted
+				(b.m_allocations - b.m_deletes), // Current
+//				(b.m_allocationSize - b.m_deleteSize), // Data
+				b.meanAllocation() // Mean
 //				b.churn()
 			));
 		}
