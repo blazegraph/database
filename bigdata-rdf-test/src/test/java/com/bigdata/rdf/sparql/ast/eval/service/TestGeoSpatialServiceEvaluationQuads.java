@@ -87,7 +87,7 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
         new TestHelper(
             "geo-quads-rectangle01",
             "geo-quads-rectangle01.rq", 
-            "geo-quads-grid101010.nq",
+            "geo-quads-grid101010.trig",
             "geo-quads-rectangle01.srx").runTest();
        
     }
@@ -125,7 +125,7 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
         new TestHelper(
             "geo-quads-rectangle02a",
             "geo-quads-rectangle02a.rq", 
-            "geo-quads-grid101010.nq",
+            "geo-quads-grid101010.trig",
             "geo-quads-rectangle02a.srx").runTest();
        
     }
@@ -163,7 +163,7 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
         new TestHelper(
             "geo-quads-rectangle02b",
             "geo-quads-rectangle02b.rq", 
-            "geo-quads-grid101010.nq",
+            "geo-quads-grid101010.trig",
             "geo-quads-rectangle02b.srx").runTest();
        
     }
@@ -198,7 +198,7 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
         new TestHelper(
             "geo-quads-circle01",
             "geo-quads-circle01.rq", 
-            "geo-quads-grid101010.nq",
+            "geo-quads-grid101010.trig",
             "geo-quads-circle01.srx").runTest();
        
     }
@@ -237,7 +237,7 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
         new TestHelper(
             "geo-quads-circle02",
             "geo-quads-circle02.rq", 
-            "geo-quads-grid101010.nq",
+            "geo-quads-grid101010.trig",
             "geo-quads-circle02.srx").runTest();
        
     }
@@ -269,7 +269,7 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
         new TestHelper(
             "geo-quads-valueextr",
             "geo-quads-valueextr.rq", 
-            "geo-quads-grid101010.nq",
+            "geo-quads-grid101010.trig",
             "geo-quads-valueextr.srx").runTest();
        
     }
