@@ -37,7 +37,9 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.InlineLiteralIV;
+import com.bigdata.rdf.internal.InlinePrefixedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlineSignedIntegerURIHandler;
+import com.bigdata.rdf.internal.InlineSuffixedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlineURIFactory;
 import com.bigdata.rdf.internal.InlineURIHandler;
 import com.bigdata.rdf.internal.InlineUUIDURIHandler;
@@ -57,7 +59,6 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151106;
 
 /**
@@ -257,6 +258,15 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
                 SUFFIXED_INT_NAMESPACE + "foo", false);
     }
 
+    public void testPrefixedInteger() throws Exception {
+        uriRoundtripTestCase(PREFIXED_INT_NAMESPACE + "prefix-1", true,//
+                PREFIXED_INT_NAMESPACE + "1", false,//
+                PREFIXED_INT_NAMESPACE + "prefix-foo", false,//
+                PREFIXED_INT_NAMESPACE + "prefix-", false,//
+                PREFIXED_INT_NAMESPACE + "foo", false);
+    }
+
+
     private void uriRoundtripTestCase(final Object... options) throws Exception {
 
     	final Properties props = new Properties(getProperties());
@@ -426,7 +436,8 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
             
             assertEquals(DTE.Extension, uri1.getIV().getDTE());
             
-            final InlineLiteralIV[] ivs = ((LiteralArrayIV) ((URIExtensionIV) uri1.getIV()).getLocalNameIV()).getIVs();
+            @SuppressWarnings("rawtypes")
+			final InlineLiteralIV[] ivs = ((LiteralArrayIV) ((URIExtensionIV) uri1.getIV()).getLocalNameIV()).getIVs();
             
             assertEquals(DTE.UUID, ivs[0].getDTE());
             assertEquals(DTE.XSDByte, ivs[1].getDTE());
@@ -448,6 +459,9 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
     private static final String SIGNED_INT_NAMESPACE = "http://example.com/int/";
     private static final String UNSIGNED_INT_NAMESPACE = "http://example.com/uint/";
     private static final String SUFFIXED_INT_NAMESPACE = "http://example.com/intsuf/";
+    private static final String PREFIXED_INT_NAMESPACE = "http://example.com/intprefix/";
+    private static final String PREFIX = "prefix-";
+    private static final String SUFFIX = "-suffix";
     private static final String ARRAY = "myapp:array:";
     
     /**
@@ -471,6 +485,7 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
             addDecl(new BaseVocabularyDecl(SIGNED_INT_NAMESPACE));
             addDecl(new BaseVocabularyDecl(UNSIGNED_INT_NAMESPACE));
             addDecl(new BaseVocabularyDecl(SUFFIXED_INT_NAMESPACE));
+            addDecl(new BaseVocabularyDecl(PREFIXED_INT_NAMESPACE));
             addDecl(new BaseVocabularyDecl(ARRAY));
         }        
         
@@ -483,7 +498,8 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
             addHandler(new InlineUUIDURIHandler(CUSTOM_NAMESPACE));
             addHandler(new InlineSignedIntegerURIHandler(SIGNED_INT_NAMESPACE));
             addHandler(new InlineUnsignedIntegerURIHandler(UNSIGNED_INT_NAMESPACE));
-            addHandler(new InlineSuffixedIntegerURIHandler(SUFFIXED_INT_NAMESPACE, "-suffix"));
+            addHandler(new InlineSuffixedIntegerURIHandler(SUFFIXED_INT_NAMESPACE, SUFFIX));
+            addHandler(new InlinePrefixedIntegerURIHandler(PREFIXED_INT_NAMESPACE, PREFIX));
         }
         
         
@@ -557,31 +573,7 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
         
     }
 
-	public static class InlineSuffixedIntegerURIHandler extends
-			InlineSignedIntegerURIHandler {
-		private final String suffix;
-
-		public InlineSuffixedIntegerURIHandler(String namespace, String suffix) {
-			super(namespace);
-			this.suffix = suffix;
-		}
-
-		@Override
-		@SuppressWarnings("rawtypes")
-		protected AbstractLiteralIV createInlineIV(String localName) {
-			if (!localName.endsWith(suffix)) {
-				return null;
-			}
-			return super.createInlineIV(localName.substring(0,
-					localName.length() - suffix.length()));
-		}
-
-		@Override
-		public String getLocalNameFromDelegate(
-				AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-			return super.getLocalNameFromDelegate(delegate) + suffix;
-		}
-	}
+	
 
     public static class InlineArrayFactory extends InlineURIFactory {
         
