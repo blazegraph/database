@@ -29,8 +29,16 @@ package com.bigdata.rdf.rio;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -40,6 +48,11 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.jsr166.LinkedBlockingQueue;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
@@ -60,7 +73,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.util.Bits;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * A write buffer for absorbing the output of the RIO parser or other
@@ -82,9 +95,8 @@ import com.bigdata.util.Bits;
  * writers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class StatementBuffer<S extends Statement> implements IStatementBuffer<S> {
+public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>, ICounterSetAccess {
 
     final private static Logger log = Logger.getLogger(StatementBuffer.class);
    
@@ -111,6 +123,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected int numStmts;
 
+	/**
+	 * The total number of statements accepted by the {@link StatementBuffer}.
+	 * This can include statements that are currently buffered as well as those
+	 * that have already been queued or written. This is a running total and
+	 * does not attempt to avoid counting duplicates.
+	 */
+    private long numTotalStmts;
+    
     /**
      * @todo consider tossing out these counters - they only add complexity to
      * the code in {@link #handleStatement(Resource, URI, Value, StatementEnum)}.
@@ -127,7 +147,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * Map used to filter out duplicate terms.  The use of this map provides
      * a ~40% performance gain.
      */
-    final private Map<Value, BigdataValue> distinctTermMap;
+	final private Map<Value, BigdataValue> distinctTermMap;
 
     /**
      * A canonicalizing map for blank nodes. This map MUST be cleared before you
@@ -173,10 +193,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     private boolean statementIdentifiers;
     
     /**
-     * When non-<code>null</code> the statements will be written on this
-     * store. When <code>null</code> the statements are written onto the
-     * {@link #database}.
-     */
+	 * When non-<code>null</code> the statements will be written on this store.
+	 * When <code>null</code> the statements are written onto the
+	 * {@link #database}. (This is used to support incremental truth
+	 * maintenance.)
+	 */
     private final AbstractTripleStore statementStore;
 
     /**
@@ -230,14 +251,94 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * hold. The minimum capacity is three (3) since that corresponds to a
      * single triple where all terms are URIs.
      */
-    protected final int capacity;
+	private final int bufferCapacity;
 
+    /**
+     * The maximum #of Statements, URIs, Literals, or BNodes that the buffer can
+     * hold. The minimum capacity is three (3) since that corresponds to a
+     * single triple where all terms are URIs.
+     */
+	public int getCapacity() {
+		
+		return bufferCapacity;
+		
+	}
+	
 //    /**
 //     * When true only distinct terms are stored in the buffer (this is always
 //     * true since this condition always outperforms the alternative).
 //     */
 //    protected final boolean distinct = true;
     
+    /**
+	 * The capacity of the optional {@link #queue} used to overlap the parser
+	 * with the index writer -or- ZERO (0) iff the queue is disabled and index
+	 * writes will be synchronous and alternate with the parser (the historical
+	 * behavior).
+	 */
+	private final int queueCapacity;
+
+	/**
+	 * The #of batches added to the {@link #queue}.
+	 */
+	private int batchAddCount;
+	
+	/**
+	 * The #of batches taken from the {@link #queue}.
+	 */
+	private int batchTakeCount;
+
+	/**
+	 * The number of batches merged.
+	 */
+	private int batchMergeCount;
+
+	/**
+	 * The #of batches written onto the database.
+	 */
+	private int batchWriteCount;
+	
+    /**
+	 * When non-null, this is a deque that will be used allow the parser to race
+	 * ahead. Once the writes on the statement indices are done, the queue can
+	 * be drained to a thread that will then merge the batches and batch them
+	 * through to the database.
+	 * 
+	 * @see BLZG-641
+	 * @see BLZG-1522
+	 */
+    private final LinkedBlockingQueue<Batch<S>> queue;
+
+    /**
+	 * When non-null, this is a single threaded executor that will be used to
+	 * drain {@link #queue} and batch updates through to the database.
+	 */
+    private final Executor executor;
+
+    /**
+	 * When the {@link #queue} is being used, this is the {@link Future} of the
+	 * current task (if any) that is writing the current {@link Batch} onto the
+	 * database.
+	 * <p>
+	 * Note: This is lazily initialized since {@link #reset()} does not have the
+	 * semantics of "close()" and the {@link StatementBuffer} MIGHT be reused.
+	 */
+	private volatile FutureTask<Void> ft;
+
+	/**
+	 * The capacity of the optional queue used to overlap the parser with the
+	 * index writer -or- ZERO (0) iff the queue is disabled and index writes
+	 * will be synchronous and alternate with the parser (the historical
+	 * behavior).
+	 * 
+	 * @see BLZG-1552
+	 */
+	public int getQueueCapacity() {
+		
+		return queueCapacity;
+		
+	}
+	
     @Override
     public boolean isEmpty() {
         
@@ -266,16 +367,94 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     			+ ", bnodes.size()=" + (bnodes != null ? String.valueOf(bnodes.size()) : "null")
     			+ ", distinctTermMap.size()=" + (distinctTermMap != null ? String.valueOf(distinctTermMap.size()) : "null")
     			+ ", reifiedStmts.size()=" + (reifiedStmts != null ? String.valueOf(reifiedStmts.size()) : "null")
-    			+ ", deferredStmts.size()=" + (deferredStmts != null ? String.valueOf(deferredStmts.size()) : "null");
+    			+ ", deferredStmts.size()=" + (deferredStmts != null ? String.valueOf(deferredStmts.size()) : "null")//
+				+ (queue == null ? "" : ", queue.size=" + queue.size())//
+    			;
     	
     }
+
+	@Override
+	public CounterSet getCounters() {
+
+		final CounterSet counters = new CounterSet();
+
+		counters.addCounter("readOnly", new OneShotInstrument<Boolean>(readOnly));
+
+		counters.addCounter("bnodesSize", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				final Map<String, BigdataBNode> t = bnodes;
+				if (t != null)
+					setValue(t.size());
+			}
+		});
+		
+		counters.addCounter("distinctTermMapSize", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				final Map<Value, BigdataValue> t = distinctTermMap;
+				if (t != null)
+					setValue(t.size());
+			}
+		});
+		
+		counters.addCounter("bufferCapacity", new OneShotInstrument<Integer>(bufferCapacity));
+
+		// Note: tracked even when the queue is not enabled.
+		counters.addCounter("batchAddCount", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				setValue(batchAddCount);
+			}
+		});
+
+		// Note: tracked even when the queue is not enabled.
+		counters.addCounter("batchWriteCount", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				setValue(batchWriteCount);
+			}
+		});
+
+		if (queue != null) {
+
+			// Only defined when the queue is enabled.
+			
+			counters.addCounter("queueCapacity", new OneShotInstrument<Integer>(queueCapacity));
+
+			counters.addCounter("queueSize", new Instrument<Integer>() {
+				@Override
+				public void sample() {
+					final LinkedBlockingQueue<Batch<S>> t = queue;
+					if (t != null)
+						setValue(t.size());
+				}
+			});
+
+			counters.addCounter("batchTakeCount", new Instrument<Integer>() {
+				@Override
+				public void sample() {
+					setValue(batchTakeCount);
+				}
+			});
+
+			counters.addCounter("batchMergeCount", new Instrument<Integer>() {
+				@Override
+				public void sample() {
+					setValue(batchMergeCount);
+				}
+			});
+
+		}
+
+		return counters;
+		
+	}
 
     /**
      * When invoked, the {@link StatementBuffer} will resolve terms against the
      * lexicon, but not enter new terms into the lexicon. This mode can be used
      * to efficiently resolve terms to {@link SPO}s.
-     * 
-     * FIXME REFACTOR
      * 
      * @todo Use an {@link IBuffer} pattern can be used to make the statement
      *       buffer chunk-at-a-time. The buffer has a readOnly argument and will
@@ -297,14 +476,53 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     
     private boolean readOnly = false;
     
+	/**
+	 * Set an {@link IChangeLog} listener that will be notified about each
+	 * statement actually written onto the backing store.
+	 * 
+	 * @param changeLog
+	 *            The change log listener.
+	 */
     public void setChangeLog(final IChangeLog changeLog) {
         
         this.changeLog = changeLog;
         
     }
     
+    /**
+	 * When non-null, this is an {@link IChangeLog} listener that will be
+	 * notified about each statement actually written onto the backing store.
+	 */
     private IChangeLog changeLog;
 
+    /**
+	 * Note: The use of this interface is NOT encouraged. It is used to hook the
+	 * axioms in {@link com.bigdata.rdf.axioms.BaseAxioms}. Ideally this could
+	 * be backed out in favor of using the {@link IChangeLog} but I was not able
+	 * to make that work out very easily.
+	 * 
+	 * @author bryan
+	 *
+	 * @param <S>
+	 * 
+	 * @see BLZG-1552
+	 */
+	public interface IWrittenSPOArray {
+		
+	    /**
+		 * A callback that is invoked with the statements actually written onto the
+		 * backing store. The default implementation is a NOP.
+		 * 
+		 * @param stmts
+		 *            An array of the statements written onto the backing store.
+		 * @param numStmts
+		 *            The number of entries in that array that were written.
+		 */
+		void didWriteSPOs(final SPO[] stmts, final int numStmts);
+
+	}
+	protected IWrittenSPOArray didWriteCallback = null;
+	
     /**
      * Create a buffer that converts Sesame {@link Value} objects to {@link SPO}
      * s and writes on the <i>database</i> when it is {@link #flush()}ed. This
@@ -320,40 +538,61 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param capacity
      *            The #of statements that the buffer can hold.
      */
-    public StatementBuffer(final AbstractTripleStore database,
-            final int capacity) {
-        this(null/* statementStore */, database, capacity);
+	public StatementBuffer(final AbstractTripleStore database, final int capacity) {
 
-    }
+		this(database, capacity, 10/* defaultQueueCapacity */);
+
+	}
+
+	public StatementBuffer(final AbstractTripleStore database, final int capacity, final int queueCapacity) {
+
+		this(null/* statementStore */, database, capacity, queueCapacity);
+
+	}
 
     /**
-     * Create a buffer that writes on a {@link TempTripleStore} when it is
-     * {@link #flush()}ed. This variant is used during truth maintenance since
-     * the terms are written on the database lexicon but the statements are
-     * asserted against the {@link TempTripleStore}.
-     * 
-     * @param statementStore
-     *            The store into which the statements will be inserted
-     *            (optional). When <code>null</code>, both statements and
-     *            terms will be inserted into the <i>database</i>. This
-     *            optional argument provides the ability to load statements into
-     *            a temporary store while the terms are resolved against the
-     *            main database. This facility is used during incremental
-     *            load+close operations.
-     * @param database
-     *            The database. When <i>statementStore</i> is <code>null</code>,
-     *            both terms and statements will be inserted into the
-     *            <i>database</i>.
-     * @param capacity
-     *            The #of statements that the buffer can hold.
-     */
+	 * Create a buffer that writes on a {@link TempTripleStore} when it is
+	 * {@link #flush()}ed. This variant is used during truth maintenance since
+	 * the terms are written on the database lexicon but the statements are
+	 * asserted against the {@link TempTripleStore}.
+	 * 
+	 * @param statementStore
+	 *            The store into which the statements will be inserted
+	 *            (optional). When <code>null</code>, both statements and terms
+	 *            will be inserted into the <i>database</i>. This optional
+	 *            argument provides the ability to load statements into a
+	 *            temporary store while the terms are resolved against the main
+	 *            database. This facility is used during incremental load+close
+	 *            operations.
+	 * @param database
+	 *            The database. When <i>statementStore</i> is <code>null</code>,
+	 *            both terms and statements will be inserted into the
+	 *            <i>database</i>.
+	 * @param capacity
+	 *            The #of statements that the buffer can hold.
+	 * @param queueCapacity
+	 *            The capacity of blocking queue used by the
+	 *            {@link StatementBuffer} -or- ZERO (0) to disable the blocking
+	 *            queue and perform synchronous writes (default is
+	 *            {@value #DEFAULT_QUEUE_CAPACITY} statements). The blocking
+	 *            queue holds parsed data pending writes onto the backing store
+	 *            and makes it possible for the parser to race ahead while
+	 *            writer is blocked writing onto the database indices.
+	 * 
+	 * @see BLZG-1552 (added blocking queue)
+	 */
     public StatementBuffer(final TempTripleStore statementStore,
-            final AbstractTripleStore database, final int capacity) {
+            final AbstractTripleStore database, final int capacity, 
+            final int queueCapacity
+            ) {
         
         if (database == null)
             throw new IllegalArgumentException();
 
         if (capacity <= 0)
+            throw new IllegalArgumentException();
+        
+        if (queueCapacity < 0)
             throw new IllegalArgumentException();
         
         this.statementStore = statementStore; // MAY be null.
@@ -364,7 +603,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         this.valueFactory = database.getValueFactory();
         
-        this.capacity = capacity;
+        this.bufferCapacity = capacity;
+
+        this.queueCapacity = queueCapacity;
         
         values = new BigdataValue[capacity * arity + 5];
         
@@ -406,8 +647,233 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	getDistinctTerm(RDF_OBJECT, true);
     	getDistinctTerm(RDF_STATEMENT, true);
     	getDistinctTerm(RDF_TYPE, true);
-        
+    
+		/**
+		 * TODO BLZG-1522. There is some odd interaction with SIDS that causes a
+		 * thrown exception from BigdataBNodeImpl.getIV() when the queue is used
+		 * with sids....
+		 * 
+		 * <pre>
+		 * throw new UnificationException("illegal self-referential sid");
+		 * </pre>
+		 */
+		if (true && !statementIdentifiers && queueCapacity != 0) {
+			
+			/*
+			 * Setup a deque that will be used allow the parser to race ahead.
+			 * Once the writes on the statement indices are done, the queue can
+			 * be drained to a thread that will then merge the batches and batch
+			 * them through to the database.
+			 * 
+			 * @see BLZG-641
+			 * 
+			 * @see BLZG-1522
+			 */
+			queue = new LinkedBlockingQueue<Batch<S>>(10/* capacity */);
+
+			/*
+			 * Setup executor used to drain the queue, merge the batches and
+			 * write on the backing store.
+			 * 
+			 * Note: executor is backed by the database executor service and has
+			 * a maximum parallelism of one.
+			 */
+			executor = new LatchedExecutor(database.getExecutorService(), 1/* nparallel */);
+			
+		} else {
+			
+			/*
+			 * Do not use the queue. incrementalWrite() will synchronously write
+			 * onto the backing store.
+			 */
+			queue = null;
+			executor = null;
+			ft = null;
+    	}
+		
+		
     }
+
+	/**
+	 * Added to ensure that the {@link FutureTask} is cancelled in case the
+	 * caller does not shutdown the {@link StatementBuffer} normally.
+	 */
+    @Override
+    protected void finalize() throws Throwable {
+    	super.finalize();
+		if (ft != null) {
+			reset();
+		}
+	}
+    
+	/**
+	 * Evict a batch (blocking put, but spins to look for an error in
+	 * {@link Future} for the thread draining the queue.
+	 * 
+	 * @param batch
+	 *            A batch (required).
+	 * 
+	 * @throws InterruptedException
+	 */
+	private void putOnQueue(final Batch<S> batch) throws InterruptedException {
+
+		Future<Void> f;
+		while ((f = ft) != null && !f.isDone()) {
+
+			if (queue.offer(batch, 100L, TimeUnit.MILLISECONDS)) {
+
+				return;
+
+			}
+
+		}
+
+		if (f == null) {
+
+			/*
+			 * The Future of the task draining the queue has been cleared (most
+			 * likely due to an error or interrupt). At this point nothing more
+			 * will be drained from the queue.
+			 */
+
+			throw new RuntimeException("Writer is done, but reader still working?");
+
+		} else if (f.isDone()) {
+
+			/*
+			 * This is most likely to indicate either an error or interrupt in
+			 * the writer. At this point nothing more will be drained from the
+			 * queue.
+			 */
+
+			throw new RuntimeException("Writer is done, but reader still working?");
+
+		}
+		
+	}
+
+	/**
+	 * Drains {@link Batch}es from the queue and writes on the database.
+	 * 
+	 * @author bryan
+	 * 
+	 * @see BLZG-1522
+	 * 
+	 *      FIXME BLZG-1522 Modify this to merge multiple batches using
+	 *      drainTo() and then batch the combined result. Then do performance
+	 *      testing. The 10k value used by the bufferCapacity is probably good
+	 *      in combination with a queue capacity of 10 since that would allow as
+	 *      many as 100k statements to be buffered. But larger values might also
+	 *      be ok as well as large queue capacities. Allow the latter to be
+	 *      parameterized and do some performance tests.
+	 */
+	private class DrainQueueCallable implements Callable<Void> {
+
+		private boolean exhausted = false;
+		
+		@Override
+		public Void call() throws Exception {
+
+			while (!exhausted) {
+
+				// Block and wait for a batch.
+				final Batch<S> batch = queue.take();
+
+				if (batch == Batch.POISON_PILL) {
+
+					// Done.
+					exhausted = true;
+					
+					continue;
+
+				} else batchTakeCount++;
+
+				if (queue.isEmpty()) {
+
+					// Nothing else in the queue. Write out the batch immediately.
+					batch.writeNow();
+					batchWriteCount++;
+					
+					continue;
+
+				}
+
+				drainQueueAndMergeBatches(batch);
+				
+			} // block and wait for the next batch.
+			
+			// done.
+			return null;
+
+		} // call()
+
+		/**
+		 * There is more in the queue. Drain it. Watch out for that poison pill!
+		 * 
+		 * Note: Maximum from drainTo() is queueCapacity. Plus 1 since we
+		 * already have one batch on hand.
+		 */
+		private void drainQueueAndMergeBatches(final Batch<S> batch) {
+
+			if (batch == null)
+				throw new IllegalArgumentException();
+			
+			if (batch == Batch.POISON_PILL) // DO NOT pass the poisen pill!
+				throw new IllegalArgumentException();
+			
+			final List<Batch<S>> avail = new LinkedList<Batch<S>>();
+
+			// add the batch already on hand (from caller)
+			avail.add(batch);
+
+			// drain the queue while queue is *known* to contain something.
+			while (!exhausted && !queue.isEmpty()) {
+
+				// non-blocking take. should be available immediately. but
+				// there *might* have been a clear() call.
+				final Batch<S> anotherBatch = queue.poll();
+
+				if (anotherBatch == null) {
+
+					// Note: This could arise through a concurrent clear of
+					// the queue.
+					exhausted = true;
+
+				} else if (anotherBatch == Batch.POISON_PILL) {
+
+					// Done.
+					exhausted = true;
+
+				} else {
+
+					// Add to the set that we will merge together.
+					avail.add(anotherBatch);
+					batchTakeCount++;
+					
+				}
+
+			}
+
+			if (avail.size() == 1) {
+
+				/*
+				 * Safety check. Do not merge a single batch.
+				 */
+				avail.get(0).writeNow();
+				batchWriteCount++;
+
+			} else {
+
+				// Merge the batches together and then write them out.
+				new MergeUtility<S>().merge(avail).writeNow();
+				batchMergeCount += avail.size();
+				batchWriteCount++;
+
+			}
+			
+		}
+		
+	} // DrainQueueCallable
 
     /**
      * Signals the end of a source and causes all buffered statements to be
@@ -420,7 +886,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * 
      * @todo this implementation always returns ZERO (0).
      */
-    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
     public long flush() {
        
 //        log.warn("");
@@ -432,6 +899,36 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
         // flush anything left in the buffer.
         incrementalWrite();
+        
+		if (queue != null) {
+			
+			// Drop a poison pill on the queue.
+			try {
+				
+				queue.put((Batch) Batch.POISON_PILL);
+
+				// block and wait until the flush is done.
+				final Future<Void> ft = this.ft;
+				if (ft != null) {
+					ft.get();
+				}
+				
+			} catch (InterruptedException e) {
+				
+				// Cancel task and propagate interrupt.
+				
+				ft.cancel(true/* mayInterruptIfRunning */);
+				
+				Thread.currentThread().interrupt();
+				
+			} catch (ExecutionException e) {
+				
+				// Wrap and throw.
+				throw new RuntimeException(e);
+				
+			}
+			
+        }
         
         // discard all buffer state (including bnodes and deferred statements).
         reset();
@@ -728,6 +1225,24 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         reifiedStmts = null;
         
+		if (queue != null) {
+
+			final Future<Void> ft = this.ft;
+
+			if (ft != null) {
+
+				// Cancel any running task.
+				ft.cancel(true/* mayInterruptIfRunning */);
+
+				this.ft = null;
+				
+			}
+			
+			// Clear the queue.
+			queue.clear();
+			
+		}
+        
     }
     
     /**
@@ -817,98 +1332,689 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	    	}
 	    	
     	}
+    	    
+    	// Buffer a batch and then incrementally flush.
+		if (queue == null) {
+
+			new Batch<S>(this, false/* clone */).writeNow();
+			batchWriteCount++;
+
+	        // Reset the state of the buffer (but not the bnodes nor deferred stmts).
+	        _clear();
+
+		} else {
+			
+			if (ft == null) {
+
+				/*
+				 * Note: Lazily initialized since reset() does not make the
+				 * StatementBuffer object invalid for further use.
+				 */
+
+				ft = new FutureTask<Void>(new DrainQueueCallable());
+
+				executor.execute(ft);
+
+			}
+
+			try {
+
+				// Blocking put.
+				queue.put(new Batch<S>(this, true/* clone */));
+				batchAddCount++;
+				
+			} catch (InterruptedException e) {
+				
+				throw new RuntimeException(e);
+				
+			}
+
+		}
     	
-        final long begin = System.currentTimeMillis();
-
-        if (log.isInfoEnabled()) {
-        
-            log.info("numValues=" + numValues + " (uris=" + numURIs + ", lits="
-                    + numLiterals + ", bnodes=" + numBNodes + ")"
-                    + ", numStmts=" + numStmts);
-            
-        }
-
-        // Insert terms (batch operation).
-        if (numValues > 0) {
-            if (log.isDebugEnabled()) {
-                for (int i = 0; i < numValues; i++) {
-                    log
-                            .debug("adding term: "
-                                    + values[i]
-                                    + " (iv="
-                                    + values[i].getIV()
-                                    + ")"
-                                    + ((values[i] instanceof BNode) ? "sid="
-                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
-                                            : ""));
-                }
-            }
-            addTerms(values, numValues);
-            if (log.isDebugEnabled()) {
-                for (int i = 0; i < numValues; i++) {
-                    log
-                            .debug(" added term: "
-                                    + values[i]
-                                    + " (iv="
-                                    + values[i].getIV()
-                                    + ")"
-                                    + ((values[i] instanceof BNode) ? "sid="
-                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
-                                            : ""));
-                }
-            }
-        }
-
-        // Insert statements (batch operation).
-        if (numStmts > 0) {
-            if (log.isDebugEnabled()) {
-                for(int i=0; i<numStmts; i++) {
-                    log.debug("adding stmt: "+stmts[i]);
-                }
-            }
-            addStatements(stmts, numStmts);
-            if (log.isDebugEnabled()) {
-                for(int i=0; i<numStmts; i++) {
-                    log.debug(" added stmt: "+stmts[i]);
-                }
-            }
-        }
-        
-        if (log.isInfoEnabled()) {
-            
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            log.info("numValues=" + numValues + ", numStmts=" + numStmts
-                    + ", elapsed=" + elapsed + "ms");
-            
-        }
-
-        // Reset the state of the buffer (but not the bnodes nor deferred stmts).
-        _clear();
-
-    }
-
-    protected void addTerms(final BigdataValue[] terms, final int numTerms) {
-
-        if (log.isInfoEnabled()) {
-
-            log.info("writing " + numTerms);
-            
-            for (int i = 0; i < numTerms; i++) {
-            	log.info("term: " + terms[i] + ", iv: " + terms[i].getIV());
-            }
-
-        }
-        
-        final long l =
-                database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
-        
-        if (log.isInfoEnabled()) {
-            log.info("# reported from addTerms: " + l);
-        }
-        
     }
     
+    /**
+	 * A utility class to merge {@link Batch}es together while maintaining their
+	 * distinct {@link Value}[]s.
+	 * 
+	 * @author bryan
+	 * @see BLZG-1522
+	 * @param <S>
+	 */
+    private static class MergeUtility<S extends Statement> {
+
+		/*
+		 * used by merge(). single threaded access.
+		 */
+		private int numValues;
+		private BigdataValue[] values;
+    	private Map<BigdataValue, BigdataValue> distinctTermMap;
+    	
+    	MergeUtility() {
+    		
+    	}
+    	
+    	/**
+		 * Merge a set of batches together.
+		 * 
+		 * @param avail
+		 *            The available batches.
+		 *            
+		 * @throws IllegalArgumentException
+		 *             if the argument is null.
+		 * @throws IllegalArgumentException
+		 *             if the argument is an empty list.
+		 * @throws IllegalArgumentException
+		 *             if the argument does not contain at least two batches.
+		 */
+		public Batch<S> merge(final List<Batch<S>> avail) {
+			
+			if (avail == null)
+				throw new IllegalArgumentException();
+			if (avail.isEmpty())
+				throw new IllegalArgumentException();
+			if (avail.size() < 2)
+				throw new IllegalArgumentException();
+
+			if (distinctTermMap != null) {
+				// An attempt to reuse a MergeUtility object.
+				throw new IllegalStateException();				
+			}
+			
+			/*
+			 * We need to create a new combined Statement[] containing only the
+			 * distinct Values and a new Value[] in which those distinct values
+			 * are entered. This removes duplicates from the Value[] which is
+			 * quite important for throughput. It is not as critical to de-dup
+			 * the Statement[] as duplicate statements are uncommon and do not
+			 * incur much overhead since we will sort the statements before
+			 * writing on the indices.
+			 * 
+			 * TODO We could potentially run into problems with a very large
+			 * capacity since the combined size of the values[] (without
+			 * duplicate removal) could exceed an int32 value. But this is not
+			 * likely.
+			 */
+
+			// find maximum size for arrays.
+			int maxValues = 0;
+			int maxStmts = 0;
+			{
+				for (Batch<S> sb : avail) {
+					maxValues += sb.numValues;
+					maxStmts += sb.numStmts;
+				}
+
+				// we will de-dup the values below.
+				values = new BigdataValue[maxValues];
+
+				// set map to find the distinct Values.
+				distinctTermMap = new HashMap<BigdataValue, BigdataValue>(maxValues);
+
+			}
+
+			// copy statements, finding distinct Values.
+			final int numStmts;
+			final BigdataStatement[] stmts;
+			{
+				// we will not de-dup the statements.
+				stmts = new BigdataStatement[maxStmts];
+
+				int n = 0;
+				for (Batch<S> sb : avail) {
+					for (int i = 0; i < sb.numStmts; i++, n++) {
+						// Create new statement using distinct values.
+						final BigdataStatement stmt = (BigdataStatement) sb.stmts[i];
+						final BigdataResource s = (BigdataResource) getDistinctTerm(stmt.getSubject());
+						final BigdataURI p = (BigdataURI) getDistinctTerm(stmt.getPredicate());
+						final BigdataValue o = getDistinctTerm(stmt.getObject());
+						final BigdataResource c = stmt.getContext() == null ? null
+								: (BigdataResource) getDistinctTerm(stmt.getContext());
+						stmts[n] = s.getValueFactory().createStatement(s, p, o, c, stmt.getStatementType());
+					}
+				}
+				numStmts = n;
+			}
+
+			final Batch<S> sb = avail.get(0);
+			return new Batch<S>(sb.database, // copy by reference
+					sb.statementStore, // copy by reference
+					sb.readOnly, // copy by reference
+					sb.changeLog, // copy by reference
+					sb.didWriteCallback, // copy by reference
+					numValues, // copied the data.
+					values, // copied the data.
+					numStmts, // copied the data.
+					stmts // copied the data.
+			);
+
+		} // merge()
+
+	    /**
+		 * Canonicalizing mapping for a term when merging {@link Batch}es
+		 * together. This is simpler than the general case since we have already
+		 * handled blank nodes, SIDs, etc. in the outer context.
+		 * 
+		 * @param term
+		 *            A term.
+		 * 
+		 * @return Either the term or the pre-existing term in the {@link Batch}
+		 *         with the same data.
+		 * 
+		 * @throws IllegalArgumentException
+		 *             if the argument is null (so do not pass a null context in
+		 *             here!)
+		 */
+		private BigdataValue getDistinctTerm(final BigdataValue term) {
+
+			if (term == null)
+				throw new IllegalArgumentException();
+
+			// TODO BLZG-1532 (JAVA8) replace with putIfAbsent()
+			final BigdataValue existingTerm = distinctTermMap.get(term);
+
+			if (existingTerm != null) {
+
+				/*
+				 * Term already exists, do not add.
+				 */
+				return existingTerm;
+
+			}
+
+			// put the new term in the map.
+			if (distinctTermMap.put(term, term) != null) {
+
+				throw new AssertionError();
+
+			}
+
+			values[numValues++] = term;
+
+			// return the new term.
+			return term;
+
+	    }
+	    
+
+    }
+
+	/**
+	 * A batch of statements together with their distinct values to be written
+	 * onto the database.
+	 * 
+	 * @author bryan
+	 * 
+	 * @see BLZG-1522
+	 */
+    private static class Batch<S extends Statement> {
+
+    	/**
+		 * Singleton instance used to indicate that no more elements will be
+		 * added to the queue.
+		 */
+    	@SuppressWarnings("rawtypes")
+		private static final Batch<?> POISON_PILL = new Batch();
+
+		/*
+		 * All of these are fields from the outer class. They have either been
+		 * copied by reference or cloned depending on the constructor call.
+		 * 
+		 * Note: I have explicitly replicated them here to provide a boundary
+		 * around the state that can be dropped into the queue and the state
+		 * that is being used to absorb statements from the parser. This is why
+		 * Batch is a *static* class.
+		 * 
+		 * Note: One benefit of this boundary is that we known that the
+		 * StatementBuffer bnodes map is NOT used from within this class so we
+		 * do not need to worry about concurrency control for that collection.
+		 */
+    	
+    	private final AbstractTripleStore database;
+    	
+    	private final AbstractTripleStore statementStore;
+    	
+    	private final boolean readOnly;
+    	
+    	private final IChangeLog changeLog;
+    	
+    	private final IWrittenSPOArray didWriteCallback;
+
+    	private final int numValues;
+    	
+    	private final BigdataValue[] values;
+    	
+    	private final int numStmts;
+    	
+    	private final BigdataStatement[] stmts;
+
+    	/**
+    	 * Singleton instance constructor.
+    	 */
+    	private Batch() {
+			database = null;
+			statementStore = null;
+			readOnly = true;
+			changeLog = null;
+			didWriteCallback = null;
+			numValues = 0;
+			values = null;
+			numStmts = 0;
+			stmts = null;
+    	}
+
+    	/**
+    	 * Constructor used when merging multiple batches.
+    	 */
+    	private Batch(  final AbstractTripleStore database, //
+				final AbstractTripleStore statementStore, //
+				final boolean readOnly, //
+				final IChangeLog changeLog, //
+				final IWrittenSPOArray didWriteCallback, //
+				final int numValues, //
+				final BigdataValue[] values, //
+				final int numStmts, //
+				final BigdataStatement[] stmts//
+		) {
+			this.database = database;
+			this.statementStore = statementStore;
+			this.readOnly = readOnly;
+			this.changeLog = changeLog;
+			this.didWriteCallback = didWriteCallback;
+			this.numValues = numValues;
+			this.values = values;
+			this.numStmts = numStmts;
+			this.stmts = stmts;
+    	}
+    	
+    	/**
+		 * 
+		 * @param sb
+		 * @param clone
+		 *            When true, the backing arrays are cloned in order to allow
+		 *            them to be cleared by the caller. When false, the caller
+		 *            MUST invoke {@link #writeNow()} synchronously. (This is used
+		 *            to make it easier to compare the two approaches without 
+		 *            introducing any new overhead).
+		 */
+    	Batch(final StatementBuffer<S> sb, final boolean clone) {
+
+			if (sb == null)
+				throw new IllegalArgumentException();
+
+			/*
+			 * All of these fields can be copied by reference. They are not
+			 * carrying any interesting state information from the parser.
+			 */
+			this.database = sb.database;
+			this.statementStore = sb.statementStore;
+			this.readOnly = sb.readOnly;
+			this.changeLog = sb.changeLog;
+			this.didWriteCallback = sb.didWriteCallback;
+
+			if (!clone) {
+
+				// Copy array references.
+				
+				this.numValues = sb.numValues;
+				this.values = sb.values;
+
+				this.numStmts = sb.numStmts;
+				this.stmts = sb.stmts;
+
+			} else {
+
+				// Clone array data.
+				
+				this.numValues = sb.numValues;
+				this.values = new BigdataValue[sb.numValues];
+				System.arraycopy(sb.values/* src */, 0/* srcPos */, this.values/* dest */, 0/* destPos */,
+						sb.numValues/* length */);
+
+				this.numStmts = sb.numStmts;
+				this.stmts = new BigdataStatement[sb.numStmts];
+				System.arraycopy(sb.stmts/* src */, 0/* srcPos */, this.stmts/* dest */, 0/* destPos */,
+						sb.numStmts);
+				
+				/*
+				 * The data was cloned, so reset the statement of the buffer in
+				 * the outer context (but not the bnodes nor deferred stmts).
+				 */
+				sb._clear();
+
+			}
+			
+    	}
+
+	    /**
+		 * Flush the batch.
+		 * 
+		 * @return The #of statements actually written.
+		 */
+		private long writeNow() {
+
+            final long begin = System.currentTimeMillis();
+
+            if (log.isInfoEnabled())
+				log.info("numValues=" + numValues + ", numStmts=" + numStmts);
+
+            // Insert terms (batch operation).
+            if (numValues > 0) {
+                if (log.isDebugEnabled()) {
+                    for (int i = 0; i < numValues; i++) {
+                        log
+                                .debug("adding term: "
+                                        + values[i]
+                                        + " (iv="
+                                        + values[i].getIV()
+                                        + ")"
+                                        + ((values[i] instanceof BNode) ? "sid="
+                                                + ((BigdataBNode) values[i]).isStatementIdentifier()
+                                                : ""));
+                    }
+                }
+    			addTerms(database, values, numValues, readOnly);
+                if (log.isDebugEnabled()) {
+                    for (int i = 0; i < numValues; i++) {
+                        log
+                                .debug(" added term: "
+                                        + values[i]
+                                        + " (iv="
+                                        + values[i].getIV()
+                                        + ")"
+                                        + ((values[i] instanceof BNode) ? "sid="
+                                                + ((BigdataBNode) values[i]).isStatementIdentifier()
+                                                : ""));
+                    }
+                }
+            }
+
+            // Insert statements (batch operation).
+            final long nwritten;
+			if (numStmts > 0) {
+				if (log.isDebugEnabled()) {
+					for (int i = 0; i < numStmts; i++) {
+						log.debug("adding stmt: " + stmts[i]);
+					}
+				}
+				nwritten = addStatements(database, statementStore, stmts, numStmts, changeLog, didWriteCallback);
+				if (log.isDebugEnabled()) {
+					for (int i = 0; i < numStmts; i++) {
+						log.debug(" added stmt: " + stmts[i]);
+					}
+				}
+            } else nwritten = 0;
+            
+            if (log.isInfoEnabled()) {
+                
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                log.info("numValues=" + numValues + ", numStmts=" + numStmts
+                        + ", elapsed=" + elapsed + "ms");
+                
+            }
+            
+            return nwritten;
+            
+    	}
+    	
+    	static private void addTerms(
+    			final AbstractTripleStore database, //
+    			final BigdataValue[] terms, //
+    			final int numTerms,//
+    			final boolean readOnly//
+    			) {
+
+            if (log.isInfoEnabled()) {
+
+                log.info("writing " + numTerms);
+                
+                for (int i = 0; i < numTerms; i++) {
+                	log.info("term: " + terms[i] + ", iv: " + terms[i].getIV());
+                }
+
+            }
+            
+            final long l =
+                    database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
+            
+            if (log.isInfoEnabled()) {
+                log.info("# reported from addTerms: " + l);
+            }
+            
+        }
+        
+        /**
+         * Adds the statements to each index (batch api, NO truth maintenance).
+         * <p>
+         * Pre-conditions: The {s,p,o} term identifiers for each
+         * {@link BigdataStatement} are defined.
+         * <p>
+         * Note: If statement identifiers are enabled and the context position is
+         * non-<code>null</code> then it will be unified with the statement
+         * identifier assigned to that statement. It is an error if the context
+         * position is a URI (since it can not be unified with the assigned
+         * statement identifier). It is an error if the context position is a blank
+         * node which is already bound to a term identifier whose value is different
+         * from the statement identifier assigned/reported by the {@link #database}.
+         * 
+    	 * @param database
+    	 *            The database that will be used to resolve terms. When
+    	 *            <i>statementStore</i> is <code>null</code>, statements will be
+    	 *            written into this store as well.
+    	 * @param statementStore
+    	 *            When non-<code>null</code> the statements will be written on
+    	 *            this store. When <code>null</code> the statements are written
+    	 *            onto the <i>database</i>. (This is used to support incremental
+    	 *            truth maintenance.)
+         * @param stmts
+         *            An array of statements in any order.
+         *            @param numStmts The number of statements in that array.
+         *            @param changeLog
+         *            
+         * 
+         * @return The #of statements written on the database.
+         */
+    	final private static <S> long addStatements(final AbstractTripleStore database,
+    			final AbstractTripleStore statementStore, final BigdataStatement[] stmts, final int numStmts,
+    			final IChangeLog changeLog,
+    			final IWrittenSPOArray didWriteCallback) {
+
+            final SPO[] tmp = new SPO[numStmts];
+
+            for (int i = 0; i < tmp.length; i++) {
+
+                final BigdataStatement stmt = stmts[i];
+                
+                final SPO spo = new SPO(stmt);
+
+                if (log.isDebugEnabled()) 
+                    log.debug("adding: " + stmt.toString() + " (" + spo + ")");
+                
+                if(!spo.isFullyBound()) {
+                    
+                    throw new AssertionError("Not fully bound? : " + spo);
+                    
+                }
+                
+                tmp[i] = spo;
+
+            }
+            
+            /*
+             * Note: When handling statement identifiers, we clone tmp[] to avoid a
+             * side-effect on its order so that we can unify the assigned statement
+             * identifiers below.
+             * 
+             * Note: In order to report back the [ISPO#isModified()] flag, we also
+             * need to clone tmp[] to avoid a side effect on its order. Therefore we
+             * now always clone tmp[].
+             */
+//            final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
+            final long nwritten = writeSPOs(database, statementStore, tmp.clone(), numStmts, didWriteCallback);
+
+//            if (sids) {
+    //
+//                /*
+//                 * Unify each assigned statement identifier with the context
+//                 * position on the corresponding statement.
+//                 */
+    //
+//                for (int i = 0; i < numStmts; i++) {
+//                    
+//                    final SPO spo = tmp[i];
+//                    
+//                    final BigdataStatement stmt = stmts[i];
+    //
+//                    // verify that the BigdataStatement and SPO are the same triple.
+//                    assert stmt.s() == spo.s;
+//                    assert stmt.p() == spo.p;
+//                    assert stmt.o() == spo.o;
+//                    
+//                    final BigdataResource c = stmt.getContext();
+//                    
+//                    if (c == null)
+//                        continue;
+    //
+////                    if (c instanceof URI) {
+    ////
+////                        throw new UnificationException(
+////                                "URI not permitted in context position when statement identifiers are enabled: "
+////                                        + stmt);
+////                        
+////                    }
+//                    
+//                    if( c instanceof BNode) {
+    //
+//                        final IV sid = spo.getStatementIdentifier();
+//                        
+//                        if(c.getIV() != null) {
+//                            
+//                            if (!sid.equals(c.getIV())) {
+    //
+//                                throw new UnificationException(
+//                                        "Can not unify blankNode "
+//                                                + c
+//                                                + "("
+//                                                + c.getIV()
+//                                                + ")"
+//                                                + " in context position with statement identifier="
+//                                                + sid + ": " + stmt + " (" + spo
+//                                                + ")");
+//                                
+//                            }
+//                            
+//                        } else {
+//                            
+//                            // assign the statement identifier.
+//                            c.setIV(sid);
+//                            
+//                            if (log.isDebugEnabled()) {
+//                                
+//                                log.debug("Assigned statement identifier: " + c
+//                                        + "=" + sid);
+//                                
+//                            }
+    //
+//                        }
+//                        
+//                    }
+//                    
+//                }
+//                    
+//            }
+
+            // Copy the state of the isModified() flag
+            for (int i = 0; i < numStmts; i++) {
+
+                if (tmp[i].isModified()) {
+
+                    stmts[i].setModified(tmp[i].getModified());
+                    
+                    if (changeLog != null) {
+                        
+                        switch(stmts[i].getModified()) {
+                        case INSERTED:
+                            changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.INSERTED));
+                            break;
+                        case UPDATED:
+                            changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.UPDATED));
+                            break;
+                        case REMOVED:
+                            throw new AssertionError();
+                        default:
+                            break;
+                        }
+                        
+                    }
+
+                }
+                
+            }
+            
+            return nwritten;
+            
+        }
+
+        /**
+    	 * Adds the statements to each index (batch api, NO truth maintenance).
+    	 * 
+    	 * @param database
+    	 *            The database that will be used to resolve terms. When
+    	 *            <i>statementStore</i> is <code>null</code>, statements will be
+    	 *            written into this store as well.
+    	 * @param statementStore
+    	 *            When non-<code>null</code> the statements will be written on
+    	 *            this store. When <code>null</code> the statements are written
+    	 *            onto the <i>database</i>. (This is used to support incremental
+    	 *            truth maintenance.)
+    	 * @param stmts
+    	 *            An array of the statements to be written onto the backing
+    	 *            store.
+    	 * @param numStmts
+    	 *            The number of entries in that array to be written.
+    	 * 
+    	 * @return The #of statements written on the database.
+    	 * 
+    	 * @see AbstractTripleStore#addStatements(AbstractTripleStore, boolean,
+    	 *      IChunkedOrderedIterator, IElementFilter)
+    	 */
+		static private <S> long writeSPOs(final AbstractTripleStore database, final AbstractTripleStore statementStore,
+				final SPO[] stmts, final int numStmts, final IWrittenSPOArray callback) {
+
+            final IChunkedOrderedIterator<ISPO> itr = new ChunkedArrayIterator<ISPO>(
+                    numStmts, stmts, null/* keyOrder */);
+
+            final AbstractTripleStore sink = statementStore != null ? statementStore
+                    : database;
+
+            if (log.isInfoEnabled()) {
+
+                log.info("writing " + numStmts + " on "
+                        + (statementStore != null ? "statementStore" : "database"));
+                
+                for (int i = 0; i < numStmts; i++) {
+                	log.info("spo: " + stmts[i]);
+                }
+
+            }
+
+            // synchronous write on the target.
+            final long nwritten = database
+                    .addStatements(sink, false/* copyOnly */, itr, null /* filter */);
+
+			if (callback != null) {
+
+				callback.didWriteSPOs(stmts, numStmts);
+				
+            }
+            
+            return nwritten;
+            
+        }
+
+    } // class Batch
+
     /**
      * Add an "explicit" statement to the buffer (flushes on overflow, no
      * context).
@@ -965,7 +2071,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                  * reset()).
                  */
                 flush();
-                bnodes = new HashMap<String, BigdataBNode>(capacity);
+                bnodes = new HashMap<String, BigdataBNode>(bufferCapacity);
                 deferredStmts = new HashSet<BigdataStatement>(stmts.length);
             }
         }
@@ -985,200 +2091,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     }
 
     /**
-     * Adds the statements to each index (batch api, NO truth maintenance).
-     * <p>
-     * Pre-conditions: The {s,p,o} term identifiers for each
-     * {@link BigdataStatement} are defined.
-     * <p>
-     * Note: If statement identifiers are enabled and the context position is
-     * non-<code>null</code> then it will be unified with the statement
-     * identifier assigned to that statement. It is an error if the context
-     * position is a URI (since it can not be unified with the assigned
-     * statement identifier). It is an error if the context position is a blank
-     * node which is already bound to a term identifier whose value is different
-     * from the statement identifier assigned/reported by the {@link #database}.
-     * 
-     * @param stmts
-     *            An array of statements in any order.
-     * 
-     * @return The #of statements written on the database.
-     */
-    final protected long addStatements(final BigdataStatement[] stmts,
-            final int numStmts) {
-
-        final SPO[] tmp = new SPO[numStmts];
-
-        for (int i = 0; i < tmp.length; i++) {
-
-            final BigdataStatement stmt = stmts[i];
-            
-            final SPO spo = new SPO(stmt);
-
-            if (log.isDebugEnabled()) 
-                log.debug("adding: " + stmt.toString() + " (" + spo + ")");
-            
-            if(!spo.isFullyBound()) {
-                
-                throw new AssertionError("Not fully bound? : " + spo);
-                
-            }
-            
-            tmp[i] = spo;
-
-        }
-        
-        /*
-         * Note: When handling statement identifiers, we clone tmp[] to avoid a
-         * side-effect on its order so that we can unify the assigned statement
-         * identifiers below.
-         * 
-         * Note: In order to report back the [ISPO#isModified()] flag, we also
-         * need to clone tmp[] to avoid a side effect on its order. Therefore we
-         * now always clone tmp[].
-         */
-//        final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
-        final long nwritten = writeSPOs(tmp.clone(), numStmts);
-
-//        if (sids) {
-//
-//            /*
-//             * Unify each assigned statement identifier with the context
-//             * position on the corresponding statement.
-//             */
-//
-//            for (int i = 0; i < numStmts; i++) {
-//                
-//                final SPO spo = tmp[i];
-//                
-//                final BigdataStatement stmt = stmts[i];
-//
-//                // verify that the BigdataStatement and SPO are the same triple.
-//                assert stmt.s() == spo.s;
-//                assert stmt.p() == spo.p;
-//                assert stmt.o() == spo.o;
-//                
-//                final BigdataResource c = stmt.getContext();
-//                
-//                if (c == null)
-//                    continue;
-//
-////                if (c instanceof URI) {
-////
-////                    throw new UnificationException(
-////                            "URI not permitted in context position when statement identifiers are enabled: "
-////                                    + stmt);
-////                    
-////                }
-//                
-//                if( c instanceof BNode) {
-//
-//                    final IV sid = spo.getStatementIdentifier();
-//                    
-//                    if(c.getIV() != null) {
-//                        
-//                        if (!sid.equals(c.getIV())) {
-//
-//                            throw new UnificationException(
-//                                    "Can not unify blankNode "
-//                                            + c
-//                                            + "("
-//                                            + c.getIV()
-//                                            + ")"
-//                                            + " in context position with statement identifier="
-//                                            + sid + ": " + stmt + " (" + spo
-//                                            + ")");
-//                            
-//                        }
-//                        
-//                    } else {
-//                        
-//                        // assign the statement identifier.
-//                        c.setIV(sid);
-//                        
-//                        if (log.isDebugEnabled()) {
-//                            
-//                            log.debug("Assigned statement identifier: " + c
-//                                    + "=" + sid);
-//                            
-//                        }
-//
-//                    }
-//                    
-//                }
-//                
-//            }
-//                
-//        }
-
-        // Copy the state of the isModified() flag
-        for (int i = 0; i < numStmts; i++) {
-
-            if (tmp[i].isModified()) {
-
-                stmts[i].setModified(tmp[i].getModified());
-                
-                if (changeLog != null) {
-                    
-                    switch(stmts[i].getModified()) {
-                    case INSERTED:
-                        changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.INSERTED));
-                        break;
-                    case UPDATED:
-                        changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.UPDATED));
-                        break;
-                    case REMOVED:
-                        throw new AssertionError();
-                    default:
-                        break;
-                    }
-                    
-                }
-
-            }
-            
-        }
-        
-        return nwritten;
-        
-    }
-
-    /**
-     * Adds the statements to each index (batch api, NO truth maintenance).
-     * 
-     * @param stmts
-     *            An array of {@link SPO}s
-     * 
-     * @return The #of statements written on the database.
-     * 
-     * @see AbstractTripleStore#addStatements(AbstractTripleStore, boolean,
-     *      IChunkedOrderedIterator, IElementFilter)
-     */
-    protected long writeSPOs(final SPO[] stmts, final int numStmts) {
-
-        final IChunkedOrderedIterator<ISPO> itr = new ChunkedArrayIterator<ISPO>(
-                numStmts, stmts, null/* keyOrder */);
-
-        final AbstractTripleStore sink = statementStore != null ? statementStore
-                : database;
-
-        if (log.isInfoEnabled()) {
-
-            log.info("writing " + numStmts + " on "
-                    + (statementStore != null ? "statementStore" : "database"));
-            
-            for (int i = 0; i < numStmts; i++) {
-            	log.info("spo: " + stmts[i]);
-            }
-
-        }
-
-        // synchronous write on the target.
-        return database
-                .addStatements(sink, false/* copyOnly */, itr, null /* filter */);
-
-    }
-
-    /**
      * Returns true if the bufferQueue has less than three slots remaining for
      * any of the value arrays (URIs, Literals, or BNodes) or if there are no
      * slots remaining in the statements array. Under those conditions adding
@@ -1189,7 +2101,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     public boolean nearCapacity() {
 
-        if (numStmts + 1 > capacity)
+        if (numStmts + 1 > bufferCapacity)
             return true;
 
         if (numValues + arity > values.length)
@@ -1214,7 +2126,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @return Either the term or the pre-existing term in the buffer with the
      *         same data.
      */
-    protected BigdataValue getDistinctTerm(final BigdataValue term, final boolean addIfAbsent) {
+    private BigdataValue getDistinctTerm(final BigdataValue term, final boolean addIfAbsent) {
 
         if (term == null)
         	return null;
@@ -1255,7 +2167,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	            if (bnodes == null) {
 	
 	                // allocating canonicalizing map for blank nodes.
-	                bnodes = new HashMap<String, BigdataBNode>(capacity);
+	                bnodes = new HashMap<String, BigdataBNode>(bufferCapacity);
 	
 	                // insert this blank node into the map.
 	                bnodes.put(id, bnode);
@@ -1292,6 +2204,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	         * when reading very large documents.
 	         */
 	        
+			// TODO BLZG-1532 (JAVA8) replace with putIfAbsent()
 	        final BigdataValue existingTerm = distinctTermMap.get(term);
 	        
 	        if (existingTerm != null) {
@@ -1347,7 +2260,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
     }
     
-    protected void addTerm(final BigdataValue term) {
+    private void addTerm(final BigdataValue term) {
     	
     	if (term == null)
     		return;
@@ -1402,7 +2315,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @see #nearCapacity()
      */
     protected void handleStatement(Resource _s, URI _p, Value _o, Resource _c,
-            StatementEnum type) {
+            final StatementEnum type) {
         
     	// silently strip context in quads mode. See #1086.
     	_c = database.isQuads() ? _c : null;
@@ -1503,6 +2416,38 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         // add to the buffer.
         stmts[numStmts++] = stmt;
 
+        numTotalStmts++;
+
+		final Future<Void> f = ft;
+
+		if (f != null && f.isDone()) {
+
+			/*
+			 * We are transferring batches to a queue, but the task draining the
+			 * queue is no longer running.
+			 */
+
+			try {
+			
+				f.get(); // get the future. Expect ExecutionException.
+				
+				// Nothing thrown, but task draining queue is not running so it
+				// is still a problem.
+				throw new RuntimeException("Writer is done?");
+				
+			} catch (InterruptedException e) {
+				
+				// Propagate interrupt
+				Thread.currentThread().interrupt();
+				
+			} catch (ExecutionException ex) {
+				
+				throw new RuntimeException(ex);
+				
+			}
+			
+        }
+        
 //        if (c != null && statementIdentifiers && c instanceof BNode) {
 //        	
 //        	((BigdataBNodeImpl) c).setStatement(stmt);
@@ -1639,9 +2584,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			this.o = o;
 		}
 
-		public void setContext(final BigdataResource c) {
-			this.c = c;
-		}
+//		public void setContext(final BigdataResource c) {
+//			this.c = c;
+//		}
 		
 	    @Override
 	    public String toString() {
@@ -1656,6 +2601,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	    	
 	    }
     	
-    }
+	}
 
 }

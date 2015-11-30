@@ -62,7 +62,6 @@ import com.bigdata.counters.Instrument;
  *       do not require value deserialization.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
@@ -73,7 +72,8 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
     /**
      * Equal iff they are the same instance.
      */
-    public boolean equals(Object o) {
+    @Override
+    public boolean equals(final Object o) {
         
         return this == o;
         
@@ -90,6 +90,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         
     }
     
+    @Override
     public BTreeCounters clone() {
         
         final BTreeCounters tmp = new BTreeCounters();
@@ -266,6 +267,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
     // IRangeQuery
     public final CAT nrangeCount = new CAT();
     public final CAT nrangeIterator = new CAT();
+
     // Structural change (single-threaded, so plain variables are Ok).
     public int rootsSplit = 0;
     public int rootsJoined = 0;
@@ -525,6 +527,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
      * the instance fields of this class.
      */
 //    synchronized 
+    @Override
     public CounterSet getCounters() {
         
 //        if(counterSet == null) {
@@ -549,12 +552,14 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
                 // Note: mutation counters are Ok since mutation is single-threaded.
                 tmp.addCounter("insert", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ninserts.get());
                     }
                 });
 
                 tmp.addCounter("remove", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(nremoves.get());
                     }
@@ -569,18 +574,21 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                 final CounterSet tmp = counterSet.makePath(IBTreeCounters.LinearList);
 
                 tmp.addCounter("indexOf", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(nindexOf.get());
                     }
                 });
 
                 tmp.addCounter("getKey", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ngetKey.get());
                     }
                 });
 
                 tmp.addCounter("getValue", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ngetValue.get());
                     }
@@ -602,12 +610,14 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                 final CounterSet tmp = counterSet.makePath(IBTreeCounters.RangeQuery);
 
                 tmp.addCounter("rangeCount", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(nrangeCount.get());
                     }
                 });
                 
                 tmp.addCounter("rangeIterator", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(nrangeIterator.get());
                     }
@@ -626,60 +636,70 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                 final CounterSet tmp = counterSet.makePath(IBTreeCounters.Structure);
                 
                 tmp.addCounter("rootSplit", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(rootsSplit);
                     }
                 });
 
                 tmp.addCounter("rootJoined", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(rootsJoined);
                     }
                 });
 
                 tmp.addCounter("nodeSplit", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(nodesSplit);
                     }
                 });
 
                 tmp.addCounter("nodeJoined", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(nodesJoined);
                     }
                 });
 
                 tmp.addCounter("leafSplit", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(leavesSplit);
                     }
                 });
 
                 tmp.addCounter("leafJoined", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(leavesJoined);
                     }
                 });
 
                 tmp.addCounter("headSplit", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(headSplit);
                     }
                 });
 
                 tmp.addCounter("tailSplit", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(tailSplit);
                     }
                 });
 
                 tmp.addCounter("leafCopyOnWrite", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(leavesCopyOnWrite);
                     }
                 });
 
                 tmp.addCounter("nodeCopyOnWrite", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(nodesCopyOnWrite);
                     }
@@ -695,29 +715,34 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                 final CounterSet tmp = counterSet.makePath(IBTreeCounters.Tuples);
 
                 tmp.addCounter("insertValue", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ntupleInsertValue);
                     }
                 });
                 tmp.addCounter("insertDelete", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ntupleInsertDelete);
                     }
                 });
 
                 tmp.addCounter("updateValue", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ntupleUpdateValue);
                     }
                 });
 
                 tmp.addCounter("updateDelete", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ntupleUpdateDelete);
                     }
                 });
 
                 tmp.addCounter("tupleRemove", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(ntupleRemove);
                     }
@@ -735,18 +760,21 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  * bytes on store.
                  */
 				tmp.addCounter("bytesOnStoreNodesAndLeaves", new Instrument<Long>() {
+				    @Override
 					protected void sample() {
 						setValue(bytesOnStore_nodesAndLeaves.get());
 					}
 				});
 				
 				tmp.addCounter("bytesOnStoreRawRecords", new Instrument<Long>() {
+				    @Override
 					protected void sample() {
 						setValue(bytesOnStore_rawRecords.get());
 					}
 				});
 
 				tmp.addCounter("bytesOnStoreTotal", new Instrument<Long>() {
+				    @Override
 					protected void sample() {
 						setValue(bytesOnStore_nodesAndLeaves.get()
 								+ bytesOnStore_rawRecords.get());
@@ -758,24 +786,28 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  */
 
                 tmp.addCounter("leafReadCount", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(leavesRead.get());
                     }
                 });
 
                 tmp.addCounter("nodeReadCount", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(nodesRead.get());
                     }
                 });
 
                 tmp.addCounter("leafWriteCount", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(leavesWritten);
                     }
                 });
 
                 tmp.addCounter("nodeWriteCount", new Instrument<Integer>() {
+                    @Override
                     protected void sample() {
                         setValue(nodesWritten);
                     }
@@ -786,12 +818,14 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  */
 
                 tmp.addCounter("bytesRead", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(bytesRead.get());
                     }
                 });
 
                 tmp.addCounter("readSecs", new Instrument<Double>() {
+                    @Override
                     public void sample() {
                         final double elapsedReadSecs = (readNanos.get() / 1000000000.);
                         setValue(elapsedReadSecs);
@@ -800,6 +834,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
                 tmp.addCounter("bytesReadPerSec",
                         new Instrument<Double>() {
+            	    @Override
                             public void sample() {
                                 final double readSecs = (readNanos.get() / 1000000000.);
                                 final double bytesReadPerSec = (readSecs == 0L ? 0d
@@ -812,12 +847,14 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  * store writes (bytes)
                  */
                 tmp.addCounter("bytesWritten", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(bytesWritten);
                     }
                 });
 
                 tmp.addCounter("writeSecs", new Instrument<Double>() {
+                    @Override
                     public void sample() {
                         final double writeSecs = (writeNanos / 1000000000.);
                         setValue(writeSecs);
@@ -826,6 +863,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
                 tmp.addCounter("bytesWrittenPerSec",
                         new Instrument<Double>() {
+                    @Override
                             public void sample() {
                                 final double writeSecs = (writeNanos/ 1000000000.);
                                 final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
@@ -839,6 +877,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  */
                 
                 tmp.addCounter("serializeSecs", new Instrument<Double>() {
+                    @Override
                     public void sample() {
                         final double serializeSecs = (serializeNanos / 1000000000.);
                         setValue(serializeSecs);
@@ -847,6 +886,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
                 tmp.addCounter("serializePerSec",
                         new Instrument<Double>() {
+                    @Override
                             public void sample() {
                                 final double serializeSecs = (serializeNanos / 1000000000.);
                                 final double serializePerSec = (serializeSecs== 0L ? 0d
@@ -856,6 +896,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                         });
 
                 tmp.addCounter("deserializeSecs", new Instrument<Double>() {
+                    @Override
                     public void sample() {
                         final double deserializeSecs = (deserializeNanos.get() / 1000000000.);
                         setValue(deserializeSecs);
@@ -864,6 +905,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
                 tmp.addCounter("deserializePerSec",
                         new Instrument<Double>() {
+                    @Override
                             public void sample() {
                                 final double deserializeSecs = (deserializeNanos.get() / 1000000000.);
                                 final double deserializePerSec = (deserializeSecs== 0L ? 0d
@@ -880,6 +922,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  * Sum of readSecs + writeSecs + deserializeSecs + serializeSecs.
                  */
                 tmp.addCounter("totalReadWriteSecs", new Instrument<Double>() {
+                    @Override
                     public void sample() {
                         final double secs = (computeRawReadWriteScore()/ 1000000000.);
                         setValue(secs);
@@ -890,6 +933,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  * Sum of readSecs + deserializeSecs.
                  */
                 tmp.addCounter("totalReadSecs", new Instrument<Double>() {
+                    @Override
                     public void sample() {
                         final double secs = (computeRawReadScore()/ 1000000000.);
                         setValue(secs);
@@ -900,6 +944,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  * Sum of writeSecs + serializeSecs.
                  */
                 tmp.addCounter("totalWriteSecs", new Instrument<Double>() {
+                    @Override
                     public void sample() {
                         final double secs = (computeRawWriteScore()/ 1000000000.);
                         setValue(secs);
@@ -910,27 +955,32 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                  * RawRecords
                  */
                 tmp.addCounter("rawRecordsRead", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(rawRecordsRead.get());
                     }
                 });
                 tmp.addCounter("rawRecordsBytesRead", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(rawRecordsBytesRead.get());
                     }
                 });
                 tmp.addCounter("rawRecordsWritten", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(rawRecordsWritten);
                     }
                 });
                 tmp.addCounter("rawRecordsBytesWritten", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(rawRecordsBytesWritten);
                     }
                 });
                 
                 tmp.addCounter("bytesReleased", new Instrument<Long>() {
+                    @Override
                     protected void sample() {
                         setValue(bytesReleased);
                     }
@@ -945,6 +995,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
     }
 //    private CounterSet counterSet;
     
+    @Override
     public String toString() {
 
         // in XML.

@@ -55,6 +55,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.BatchPutIfAbsent.BatchPutIfAbsentConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -195,6 +196,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      */
     protected final long timestamp;
 
+    @Override
     final public long getTimestamp() {
         
         return timestamp;
@@ -206,6 +208,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      */
     protected final String name;
     
+    @Override
     final public String getName() {
         
         return name;
@@ -261,6 +264,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      */
     final protected boolean readConsistent;
 
+    @Override
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
@@ -348,18 +352,21 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * {@link IKeyArrayIndexProcedure}s when we serialize a procedure to be
      * sent to a remote {@link IDataService}.
      */
+    @Override
     public IndexMetadata getIndexMetadata() {
 
         return metadataIndexMetadata.getManagedIndexMetadata();
 
     }
 
+    @Override
     public IDataService getDataService(final PartitionLocator pmd) {
 
         return fed.getDataService(pmd.getDataServiceUUID());
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public Iterator<PartitionLocator> locatorScan(final long ts,
             final byte[] fromKey, final byte[] toKey, final boolean reverseScan) {
@@ -373,12 +380,14 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * index would include all "live" resources in the corresponding
      * {@link MetadataIndex}.
      */
+    @Override
     public IResourceMetadata[] getResourceMetadata() {
         
         throw new UnsupportedOperationException();
         
     }
     
+    @Override
     public ICounter getCounter() {
         
         throw new UnsupportedOperationException();
@@ -406,6 +415,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
     }
     
+    @Override
     public boolean contains(Object key) {
 
         key = getTupleSerializer().serializeKey(key);
@@ -414,7 +424,8 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         
     }
     
-    public boolean contains(byte[] key) {
+    @Override
+    public boolean contains(final byte[] key) {
         
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -432,6 +443,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         
     }
     
+    @Override
     public Object insert(Object key,Object val) {
         
         final ITupleSerializer tupleSer = getTupleSerializer();
@@ -447,7 +459,8 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         
     }
     
-    public byte[] insert(byte[] key, byte[] value) {
+    @Override
+    public byte[] insert(final byte[] key, final byte[] value) {
 
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -466,6 +479,27 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
     }
 
+    @Override
+    public byte[] putIfAbsent(final byte[] key, final byte[] value) {
+
+        if (batchOnly)
+            log.error(NON_BATCH_API,new RuntimeException());
+        else
+            if(WARN) log.warn(NON_BATCH_API);
+
+        final byte[][] keys = new byte[][] { key };
+        final byte[][] vals = new byte[][] { value };
+        
+        final IResultHandler resultHandler = new IdentityHandler();
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
+                BatchPutIfAbsentConstructor.RETURN_OLD_VALUES, resultHandler);
+
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
+
+    }
+
+    @Override
     public Object lookup(Object key) {
         
         key = getTupleSerializer().serializeKey(key);
@@ -477,7 +511,8 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         
     }
 
-    public byte[] lookup(byte[] key) {
+    @Override
+    public byte[] lookup(final byte[] key) {
 
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -495,6 +530,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
     }
 
+    @Override
     public Object remove(Object key) {
         
         key = getTupleSerializer().serializeKey(key);
@@ -506,6 +542,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
     }
     
+    @Override
     public byte[] remove(final byte[] key) {
 
         if (batchOnly)
@@ -529,6 +566,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * partitions.
      */
 
+    @Override
     public long rangeCount() {
         
         return rangeCount(null, null);
@@ -539,6 +577,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
      */
+    @Override
     public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final LongAggregator handler = new LongAggregator();
@@ -556,6 +595,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * The exact range count is obtained by mapping a key-range scan over the
      * index partitions. The operation is parallelized.
      */
+    @Override
     final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final LongAggregator handler = new LongAggregator();
@@ -574,6 +614,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * mapping a key-range scan over the index partitions. The operation is
      * parallelized.
      */
+    @Override
     final public long rangeCountExactWithDeleted(final byte[] fromKey,
             final byte[] toKey) {
 
@@ -588,6 +629,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
     }
     
+    @Override
     final public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);
@@ -599,6 +641,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * {@link ResultSet}s to cover all index partitions spanned by the key
      * range.
      */
+    @Override
     public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
         
         return rangeIterator(fromKey, toKey, capacity,
@@ -620,6 +663,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      *       until the caller uses first(), last(), seek(), hasNext(), or
      *       hasPrior().
      */
+    @Override
     public ITupleIterator rangeIterator(final byte[] fromKey,
             final byte[] toKey, int capacity, final int flags,
             final IFilter filter) {
@@ -729,6 +773,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      *       {@link IMetadataService} but then we have the problem of figuring
      *       out when to release locators if the client is long-lived.
      */
+    @Override
     public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
             final int toIndex, final byte[][] keys) {
 
@@ -867,6 +912,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
     }
 
+    @Override
     public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
             final int toIndex, final KVO[] a) {
 
@@ -952,6 +998,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         
     }
     
+    @Override
     public void staleLocator(final long ts, final PartitionLocator locator,
             final StaleLocatorException cause) {
 
@@ -976,6 +1023,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
     }
 
 
+    @Override
     public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
         if (readConsistent && proc.isReadOnly()
@@ -1039,6 +1087,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * When the task is not parallelizable the tasks will be submitted to the
      * corresponding index partitions at a time and in key order.
      */
+    @Override
     public void submit(final byte[] fromKey, final byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler resultHandler) {
 
@@ -1108,6 +1157,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * @return The aggregated result of applying the procedure to the relevant
      *         index partitions.
      */
+    @Override
     public void submit(final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
             final AbstractKeyArrayIndexProcedureConstructor ctor,
@@ -1294,6 +1344,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * Return a new {@link CounterSet} backed by the {@link ScaleOutIndexCounters}
      * for this scale-out index.
      */
+    @Override
     public CounterSet getCounters() {
 
         return getFederation().getIndexCounters(name).getCounters();

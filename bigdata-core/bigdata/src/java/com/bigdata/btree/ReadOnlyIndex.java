@@ -30,7 +30,6 @@ package com.bigdata.btree;
 import java.util.Iterator;
 
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
-import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
@@ -48,7 +47,6 @@ import cutthecrap.utils.striterators.IFilter;
  * @see {@link IResourceManager#getIndex(String, long)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ReadOnlyIndex extends DelegateIndex {
     
@@ -59,6 +57,7 @@ public class ReadOnlyIndex extends DelegateIndex {
     }
 
     /** {@link IndexMetadata} is cloned to disallow modification. */
+    @Override
     final public IndexMetadata getIndexMetadata() {
 
         return super.getIndexMetadata().clone();
@@ -70,6 +69,7 @@ public class ReadOnlyIndex extends DelegateIndex {
      * {@link IResourceMetadata} instances in the array are all dynamically
      * created so changes to them do not propagate back to the index).
      */
+    @Override
     final public IResourceMetadata[] getResourceMetadata() {
 
         return super.getResourceMetadata().clone();
@@ -79,6 +79,7 @@ public class ReadOnlyIndex extends DelegateIndex {
     /**
      * Counter is read-only.
      */
+    @Override
     final public ICounter getCounter() {
 
         return new ReadOnlyCounter(super.getCounter());
@@ -88,6 +89,7 @@ public class ReadOnlyIndex extends DelegateIndex {
     /**
      * Disabled.
      */
+    @Override
     final public byte[] insert(byte[] key, byte[] value) {
 
         throw new UnsupportedOperationException();
@@ -97,6 +99,7 @@ public class ReadOnlyIndex extends DelegateIndex {
     /**
      * Disabled.
      */
+    @Override
     final public byte[] remove(byte[] key) {
 
         throw new UnsupportedOperationException();
@@ -106,6 +109,7 @@ public class ReadOnlyIndex extends DelegateIndex {
     /**
      * {@link IRangeQuery#REMOVEALL} and {@link Iterator#remove()} are disabled.
      */
+    @Override
     final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IFilter filter) {
 
@@ -127,39 +131,42 @@ public class ReadOnlyIndex extends DelegateIndex {
         
     }
     
-    /**
-     * Overriden to ensure that procedure is applied against read-only view and
-     * not the {@link DelegateIndex}.
-     */
-    final public Object submit(byte[] key, IIndexProcedure proc) {
+//    /**
+//     * Overridden to ensure that procedure is applied against read-only view and
+//     * not the {@link DelegateIndex}.
+//     */
+//    @Override
+//    final public <T> T submit(final byte[] key, IIndexProcedure<T> proc) {
+//    
+//        return proc.apply(this);
+//        
+//    }
+//
+//    /**
+//     * Overridden to ensure that procedure is applied against read-only view and
+//     * not the {@link DelegateIndex}.
+//     */
+//    @Override
+//    @SuppressWarnings("unchecked")
+//    final public void submit(final byte[] fromKey, final byte[] toKey,
+//            final IIndexProcedure proc, final IResultHandler handler) {
+//
+//        final Object result = proc.apply(this, handler);
+//        
+//        if (handler != null) {
+//            
+//            handler.aggregate(result, new Split(null,0,0));
+//            
+//        }
+//        
+//    }
     
-        return proc.apply(this);
-        
-    }
-
     /**
-     * Overriden to ensure that procedure is applied against read-only view and
+     * Overridden to ensure that procedure is applied against read-only view and
      * not the {@link DelegateIndex}.
      */
     @SuppressWarnings("unchecked")
-    final public void submit(byte[] fromKey, byte[] toKey,
-            final IIndexProcedure proc, final IResultHandler handler) {
-
-        final Object result = proc.apply(this);
-        
-        if (handler != null) {
-            
-            handler.aggregate(result, new Split(null,0,0));
-            
-        }
-        
-    }
-    
-    /**
-     * Overriden to ensure that procedure is applied against read-only view and
-     * not the {@link DelegateIndex}.
-     */
-    @SuppressWarnings("unchecked")
+    @Override
     final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
             AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
 

@@ -21,29 +21,40 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Feb 12, 2007
- */
+package com.bigdata.service.ndx;
 
-package com.bigdata.btree;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.service.Split;
 
 /**
- * Error messages for the B+Tree package.
+ * NOP aggregator does nothing and returns <code>null</code>. This is used for
+ * parallelizing operations that require a result handler to stripe them against
+ * the index.
  * 
- * @todo add error codes; localize.
+ * @author bryan
+ *
+ * @param <R>
+ * @param <A>
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @see BLZG-1537 (Schedule more IOs when loading data)
  */
-public class Errors {
+public class NopAggregator<R, A> implements IResultHandler<R, A> {
 
-    public static final transient String ERR_FROM_INDEX = "fromIndex is invalid";
+	@SuppressWarnings("rawtypes")
+	public static final IResultHandler INSTANCE = new NopAggregator();
 
-    public static final transient String ERR_TO_INDEX = "toIndex is invalid";
+	public NopAggregator() {
+	}
 
-    public static final transient String ERR_KEYS_NULL = "keys is null";
+	@Override
+	public void aggregate(final R result, final Split split) {
+		// NOP
+	}
 
-    public static final transient String ERR_VALS_NULL = "values is null";
-
-    public static final transient String ERR_VALS_NOT_NULL = "values must be null";
+	@Override
+	public A getResult() {
+		// NOP
+		return null;
+	}
 
 }

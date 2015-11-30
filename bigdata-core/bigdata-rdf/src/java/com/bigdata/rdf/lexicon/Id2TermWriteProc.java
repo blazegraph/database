@@ -30,10 +30,13 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
+import com.bigdata.service.ndx.NopAggregator;
 
 /**
  * Unisolated write operation makes consistent assertions on the
@@ -152,19 +155,19 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
      * @return <code>null</code>.
      */
     @Override
-    public Void apply(final IIndex ndx) {
+    public Void applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
         
-        final int n = getKeyCount();
+    	final int n = keys.size();
         
         for (int i = 0; i < n; i++) {
 
             // Note: the key is the term identifier.
             // @todo copy key/val into reused buffers to reduce allocation.
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);
             
-            // Note: the value is the serialized term (and never a BNode).
-            final byte[] val;
-
+//            // Note: the value is the serialized term (and never a BNode).
+//            final byte[] val;
+//
 //            if (validate) {
 //
 //                // The term identifier.
@@ -270,17 +273,20 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
                  * you SHOULD use.
                  */
 
-                if (!ndx.contains(key)) {
-
-                    val = getValue(i);
-                    
-                    if (ndx.insert(key, val) != null) {
-
-                        throw new AssertionError();
-
-                    }
-
-                }
+            // See BLZG-1539
+            ndx.putIfAbsent(key, vals.get(i));
+            
+//                if (!ndx.contains(key)) {
+//
+//                    val = vals.get(i);
+//                    
+//                    if (ndx.insert(key, val) != null) {
+//
+//                        throw new AssertionError();
+//
+//                    }
+//
+//                }
 
 //            }
             
@@ -289,5 +295,18 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> imple
         return null;
         
     }
+
+    /**
+	 * Nothing is returned, so nothing to aggregate, but uses a
+	 * {@link NopAggregator} to preserve striping against a local index.
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	protected IResultHandler<Void, Void> newAggregator() {
+
+		// NOP aggegrator preserves striping against the index.
+		return NopAggregator.INSTANCE;
+
+	}
 
 }

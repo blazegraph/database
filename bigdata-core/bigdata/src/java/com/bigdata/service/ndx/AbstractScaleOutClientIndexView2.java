@@ -58,7 +58,6 @@ import com.bigdata.service.Split;
  * A concrete subclass must implement {@link #runTasks(boolean, ArrayList)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractScaleOutClientIndexView2 extends
         AbstractScaleOutClientIndexView {

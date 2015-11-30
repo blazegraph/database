@@ -39,7 +39,11 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractLocalSplitResultAggregator;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.SplitValuePair;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.LongPacker;
@@ -50,6 +54,7 @@ import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.lexicon.BlobsWriteProc.Result;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
+import com.bigdata.service.Split;
 
 /**
  * This unisolated operation inserts {@link Value}s into the
@@ -174,9 +179,9 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 	 *         node with an entry in the index.
 	 */
 	@Override
-    public Result apply(final IIndex ndx) {
+    public Result applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
         
-        final int numTerms = getKeyCount();
+        final int numTerms = keys.size();
         
         assert numTerms > 0 : "numTerms="+numTerms;
 
@@ -215,7 +220,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 
             // Copy key into reused buffer to reduce allocation.
 //            final byte[] baseKey = getKey(i);
-			getKeys().copy(i, kbuf.reset());
+			keys.copy(i, kbuf.reset());
 
 			// decode the VTE from the flags.
 			final VTE vte = AbstractIV
@@ -265,7 +270,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 
 					// The size of the collision bucket (aka the assigned ctr).
 					counter = helper.addBNode(ndx, keyBuilder, baseKey,
-							getValue(i), tmp);
+							vals.get(i), tmp);
 
                 }
                 
@@ -280,7 +285,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 				 * also need to decode the byte which represents the termCode
 				 * can can be used to derive the VTE of the Value.
 				 */
-            	final byte[] val = getValue(i);
+            	final byte[] val = vals.get(i);
             	
 				counter = helper.resolveOrAddValue(ndx, readOnly,
 						keyBuilder, baseKey, val, tmp, null/* bucketSize */);
@@ -374,7 +379,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
 
         /**
          * The counters assigned to each {@link Value} in the request. The
-         * indicies of this array are correlated with the indices of the array
+         * indices of this array are correlated with the indices of the array
          * provided to the request.
          * <p>
          * Note: The actual counters values are SHORTs, not INTs. However,
@@ -490,5 +495,72 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> imple
         }
         
     } // class Result
+
+    /**
+	 * {@link Split}-wise aggregation followed by combining the results across
+	 * those splits in order to return an aggregated result whose counters[] is
+	 * 1:1 with the original keys[][].
+	 */
+	@Override
+	protected IResultHandler<Result, Result> newAggregator() {
+	
+		return new BlobResultAggregator(getKeys().size());
+
+	}
+	
+	/**
+	 * Aggregator collects the individual results in an internal ordered map and
+	 * assembles the final result when it is requested from the individual
+	 * results. With this approach there is no overhead or contention when the
+	 * results are being produced in parallel and they can be combined
+	 * efficiently within a single thread in {@link #getResult()}.
+	 *
+	 * @author bryan
+	 */
+	private class BlobResultAggregator extends AbstractLocalSplitResultAggregator<Result> {
+
+		/**
+		 * 
+		 * @param size
+		 *            The #of elements in the request (which is the same as the
+		 *            cardinality of the aggregated result).
+		 */
+		public BlobResultAggregator(final int size) {
+			super(size);
+		}
+
+		@Override
+		protected Result newResult(final int size, SplitValuePair<Split, Result>[] a) {
+
+			long totalBucketSize = 0;
+
+			int maxBucketSize = 0;
+
+			final int[] counters = new int[size];
+
+			for (int i = 0; i < a.length; i++) {
+
+				final Split split = a[i].key;
+
+				final Result tmp = a[i].val;
+
+				totalBucketSize += tmp.totalBucketSize;
+
+				maxBucketSize = Math.max(maxBucketSize, tmp.maxBucketSize);
+
+				System.arraycopy(tmp.counters/* src */, 0/* srcPos */, counters/* dest */, split.fromIndex/* destPos */,
+						split.ntuples/* length */);
+
+			}
+
+			/*
+			 * Return the aggregated result.
+			 */
+			final Result r = new Result(totalBucketSize, maxBucketSize, counters);
+
+			return r;
+		}
+
+	} // BlobResultHandler
 
 }

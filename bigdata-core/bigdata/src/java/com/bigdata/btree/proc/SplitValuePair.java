@@ -21,46 +21,46 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.metrics;
+package com.bigdata.btree.proc;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.util.Comparator;
+
+import com.bigdata.service.Split;
 
 /**
- * Aggregates test suites into increasing dependency order.
- *
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * A key/value pair where the key is a Split.
+ * 
+ * @param <K>
+ * @param <V>
+ * 
+ * @author bryan
  */
-public class TestAll extends TestCase {
+public class SplitValuePair<K extends Split,V> {
 
-    /**
-     * 
-     */
-    public TestAll() {
-    }
+	final public K key;
+	final public V val;
 
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
+	public SplitValuePair(final K key, final V val) {
+		this.key = key;
+		this.val = val;
+	}
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
+	/**
+	 * Sorts {@link SplitValuePair}s.
+	 * 
+	 * @author bryan
+	 */
+	public static class PairComparator<K extends Split, V> implements Comparator<SplitValuePair<K, V>> {
 
-        TestSuite suite = new TestSuite("metrics");
+		@Override
+		public int compare(final SplitValuePair<K, V> o1, final SplitValuePair<K, V> o2) {
+			if (o1.key.fromIndex < o2.key.fromIndex)
+				return -1;
+			if (o1.key.fromIndex > o2.key.fromIndex)
+				return 1;
+			return 0;
+		}
 
-        // @todo nothing is run automatically in this test suite.
-        
-        return suite;
-        
-    }
-    
+	}
+
 }
