@@ -28,6 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.osx;
 
+import com.bigdata.counters.*;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.regex.Pattern;
 
 /**
@@ -225,6 +229,54 @@ Mach Virtual Memory Statistics: (page size of 4096 bytes)
 
      }
        
+    }
+
+
+    public void test_iostat_collector() throws IOException, InterruptedException {
+
+        String output =
+        "Mach Virtual Memory Statistics: (page size of 4096 bytes, cache hits 0%)\n" +
+        "  free active   spec inactive   wire   faults     copy    0fill reactive  pageins  pageout\n" +
+        "404670  1238K  42678   161330 183963  144830K  2032186 81929280  1353888   351293   149940\n";
+
+        final VMStatCollector vmStatCollector = new VMStatCollector(1) {
+            @Override
+            public AbstractProcessReader getProcessReader() {
+                return new VMStatReader() {
+                    @Override
+                    protected ActiveProcess getActiveProcess() {
+                        return new ActiveProcess() {
+                            @Override
+                            public boolean isAlive() {
+                                return true;
+                            }
+                        };
+                    }
+                };
+            }
+        };
+        final VMStatCollector.VMStatReader vmStatReader = (VMStatCollector.VMStatReader) vmStatCollector.getProcessReader();
+        vmStatReader.start(new ByteArrayInputStream(output.getBytes()));
+        Thread t = new Thread(vmStatReader);
+        CounterSet counterSet;
+        try {
+            t.start();
+            Thread.sleep(100);
+            counterSet = vmStatCollector.getCounters();
+        } finally {
+            t.interrupt();
+        }
+
+        double bytes_free = (Double) ((ICounter) counterSet.getChild(IProcessCounters.Memory).getChild("Bytes Free")).getInstrument().getValue();
+        assertEquals(404670*4096, bytes_free);
+
+
+
+        /*Iterator<ICounter> counters = counterSet.getCounters(Pattern.compile(".*"));
+        while (counters.hasNext()) {
+            System.err.println(counters.next().getInstrument().getValue().toString());
+        }*/
+
     }
     
 }

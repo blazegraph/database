@@ -398,6 +398,10 @@ public class ServiceRegistry {
         if (serviceURI == null)
             throw new IllegalArgumentException();
 
+        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI)) {
+            throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
+        }
+        
         final URI alias = aliases.get(serviceURI);
 
         if (alias != null) {
@@ -484,6 +488,10 @@ public class ServiceRegistry {
      *         as fallback
      */
     public ServiceFactory getServiceFactoryByServiceURI(URI serviceUri) {
+       
+       if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceUri)) {
+          throw new IllegalArgumentException("Service URI " + serviceUri + " is not allowed");
+       }
        
        final ServiceFactory serviceFactory = 
           serviceUri==null ? 
