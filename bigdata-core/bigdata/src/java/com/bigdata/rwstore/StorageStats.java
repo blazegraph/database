@@ -183,15 +183,16 @@ public class StorageStats {
 		long m_slotDeletes;
 		/** The user bytes in use across all allocations for this slot size (does not consider recycled or deleted slots). */
 		long m_sizeAllocations;
-		/**
-		 * The user bytes that were in use across all allocations for this slot
-		 * size that have been recycled / deleted.
-		 * <p>
-		 * Note: Per BLZG-1551, this value is not tracked accurately!
-		 * 
-		 * @see BLZG-1551 (Storage statistics documentation and corrections)
-		 */
-		long m_sizeDeletes;
+//		/**
+//		 * The user bytes that were in use across all allocations for this slot
+//		 * size that have been recycled / deleted.
+//		 * <p>
+//		 * Note: Per BLZG-1551, this value is not tracked accurately!
+//		 * 
+//		 * @see BLZG-1551 (Storage statistics documentation and corrections)
+//         * See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//		 */
+//		long m_sizeDeletes;
 		
 		// By copying committed data the stats can be reset on abort
 		Bucket m_committed = null;
@@ -209,7 +210,9 @@ public class StorageStats {
 			m_slotDeletes = instr.readLong();
 			m_totalSlots = instr.readLong();
 			m_sizeAllocations = instr.readLong();
-			m_sizeDeletes = instr.readLong();
+			// See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+            instr.readLong(); // was m_sizeDeletes
+//            m_sizeDeletes = instr.readLong();
 			
 			commit();
 		}
@@ -222,7 +225,9 @@ public class StorageStats {
 			outstr.writeLong(m_slotDeletes);
 			outstr.writeLong(m_totalSlots);
 			outstr.writeLong(m_sizeAllocations);
-			outstr.writeLong(m_sizeDeletes);
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+			outstr.writeLong(0L); // was m_sizeDeletes
+//			outstr.writeLong(m_sizeDeletes);
 		}
 		
 		public void commit() {
@@ -234,7 +239,8 @@ public class StorageStats {
 			m_committed.m_slotDeletes = m_slotDeletes;
 			m_committed.m_totalSlots = m_totalSlots;
 			m_committed.m_sizeAllocations = m_sizeAllocations;
-			m_committed.m_sizeDeletes = m_sizeDeletes;
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_committed.m_sizeDeletes = m_sizeDeletes;
 		}
 		
 		public void reset() {
@@ -244,31 +250,33 @@ public class StorageStats {
 				m_slotDeletes = m_committed.m_slotDeletes;
 				m_totalSlots = m_committed.m_totalSlots;
 				m_sizeAllocations = m_committed.m_sizeAllocations;
-				m_sizeDeletes = m_committed.m_sizeDeletes;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_sizeDeletes = m_committed.m_sizeDeletes;
 			} else {
 				m_allocators = 0;
 				m_slotAllocations = 0;
 				m_slotDeletes = 0;
 				m_totalSlots =0;
 				m_sizeAllocations = 0;
-				m_sizeDeletes = 0;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_sizeDeletes = 0;
 			}
 		}
 		
-		public void delete(int sze) {
+		public void delete(final int sze) {
 			if (sze < 0)
 				throw new IllegalArgumentException("delete requires positive size, got: " + sze);
 			
-			if (m_size > 64 && sze < 64) {
-				/*
-				 * If called from deferFree then may not include size. If so
-				 * then use average size of slots to date as best running
-				 * estimate.
-				 * 
-				 * @see BLZG-1551 (Storage statistics documentation and corrections)
-				 */
-				sze = meanAllocation();
-			}
+//			if (m_size > 64 && sze < 64) {
+//				/*
+//				 * If called from deferFree then may not include size. If so
+//				 * then use average size of slots to date as best running
+//				 * estimate.
+//				 * 
+//				 * @see BLZG-1551 (Storage statistics documentation and corrections)
+//				 */
+//				sze = meanAllocation();
+//			}
 			
 			if (sze > m_size) {
 				// sze = ((sze - 1 + m_maxFixed)/ m_maxFixed) * 4; // Blob header
@@ -276,7 +284,8 @@ public class StorageStats {
 				throw new IllegalArgumentException("Deletion of address with size greater than slot - " + sze + " > " + m_size);
 			}
 			
-			m_sizeDeletes += sze;
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_sizeDeletes += sze;
 			m_slotDeletes++;
 		}
 		
@@ -305,16 +314,17 @@ public class StorageStats {
 		 * BytesAppData: The #of bytes in the allocated slots which are used by
 		 * application data (including the record checksum).
 		 * 
-		 * FIXME BLZG-1551 : The data reported here is bad. It is pretty clear
-		 * that {@link #m_sizeDeletes} is not being tracked correctly in the
-		 * {@link StorageStats}. Thus while we know the user data in the slots
-		 * for each slot size, we do not know how much user data was in those
-		 * slots when they were recycled. However, this should never return a
-		 * native number! Instead we could always fall back to (slotsAllocated -
-		 * slotsRecycled) * slotSize
+		 * See BLZG-1551 : The data reported here used to be bad since 
+		 * {@link #m_sizeDeletes} could not being tracked correctly in the
+		 * {@link StorageStats} because we do not know the actual #of bytes
+		 * in the slot that contain application data when we finally recycle
+		 * the slot.
+		 * 
+		 * See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
 		 */
 		public long usedStore() {
-			return m_sizeAllocations - m_sizeDeletes;
+		    return usedSlots() * m_size;
+//			return m_sizeAllocations - m_sizeDeletes;
 		}
 		
 		/** %SlotWaste: How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)). */
@@ -322,8 +332,8 @@ public class StorageStats {
 			if (usedStore() == 0)
 				return 0.0f;
 			
-			BigDecimal size = new BigDecimal(reservedStore());
-			BigDecimal store = new BigDecimal(100 * (reservedStore() - usedStore()));
+			final BigDecimal size = new BigDecimal(reservedStore());
+			final BigDecimal store = new BigDecimal(100 * (reservedStore() - usedStore()));
 			if(size.signum()==0) return 0f;
 			return store.divide(size, 2, RoundingMode.HALF_UP).floatValue();
 		}
@@ -594,7 +604,7 @@ public class StorageStats {
 	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
 	 * <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
 	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots (AllocatorSlots * SlotsReserved).</dd>
-	 * <dt>BytesAppData</dt><dd>The #of bytes in the allocated slots which are used by application data (including the record checksum).</dd>
+	 * <dt>UsedStore</dt><dd>The #of bytes in the allocated slots.</dd>
 	 * <dt>%SlotWaste</dt><dd>How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)).</dd>
 	 * <dt>%AppData</dt><dd>How much of your data is stored by each allocator (BytesAppData/Sum(BytesAppData)).</dd>
 	 * <dt>%StoreFile</dt><dd>How much of the backing file is reserved for each allocator (BytesReserved/Sum(BytesReserved)).</dd>
@@ -603,6 +613,8 @@ public class StorageStats {
 	 * </dl>
 	 * 
 	 * @param str The allocator statistics will be appended to the caller's buffer.
+	 * 
+     * @see BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
 	 */
 	public void showStats(final StringBuilder str) {
 		str.append("\n-------------------------\n");
@@ -656,7 +668,7 @@ public class StorageStats {
 				b.m_totalSlots, // SlotsReserved
 				b.slotsUnused(), // %SlotsUnused
 				b.reservedStore(), // BytesReserved
-				b.usedStore(), // BytesAppData 
+				b.usedStore(), // UsedStore 
 				b.slotWaste(), // %SlotWaste
 				dataPercent(b.usedStore(), totalAppData), // %AppData
 				dataPercent(b.reservedStore(), totalFileStore), // %StoreFile
