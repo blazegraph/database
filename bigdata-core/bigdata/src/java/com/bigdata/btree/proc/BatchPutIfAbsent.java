@@ -35,16 +35,19 @@ import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.service.ndx.NopAggregator;
 
 /**
- * Batch insert operation.
+ * Batch conditional insert operation (putIfAbsent).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * @see BLZG-1539 (putIfAbsent)
  */
-public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> implements
+public class BatchPutIfAbsent extends AbstractKeyArrayIndexProcedure<ResultBuffer> implements
         IParallelizableIndexProcedure<ResultBuffer> {
 
     /**
@@ -72,28 +75,28 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
     }
     
     /**
-     * Factory for {@link BatchInsert} procedures.
+     * Factory for {@link BatchPutIfAbsent} procedures.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    public static class BatchInsertConstructor extends
-            AbstractKeyArrayIndexProcedureConstructor<BatchInsert> {
+    public static class BatchPutIfAbsentConstructor extends
+            AbstractKeyArrayIndexProcedureConstructor<BatchPutIfAbsent> {
 
         /**
          * Singleton requests the return of the old values that were overwritten
          * in the index by the operation.
          */
-        public static final BatchInsertConstructor RETURN_OLD_VALUES = new BatchInsertConstructor(true);
+        public static final BatchPutIfAbsentConstructor RETURN_OLD_VALUES = new BatchPutIfAbsentConstructor(true);
         
         /**
          * Singleton does NOT request the return of the old values that were
          * overwritten in the index by the operation.
          */
-        public static final BatchInsertConstructor RETURN_NO_VALUES = new BatchInsertConstructor(false); 
+        public static final BatchPutIfAbsentConstructor RETURN_NO_VALUES = new BatchPutIfAbsentConstructor(false); 
 
         private boolean returnOldValues;
         
-        private BatchInsertConstructor(final boolean returnOldValues) {
+        private BatchPutIfAbsentConstructor(final boolean returnOldValues) {
 
             this.returnOldValues = returnOldValues;
 
@@ -110,11 +113,11 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         }
 
         @Override
-        public BatchInsert newInstance(final IRabaCoder keysCoder,
-            	final IRabaCoder valsCoder, final int fromIndex, final int toIndex,
-                final byte[][] keys, final byte[][] vals) {
+        public BatchPutIfAbsent newInstance(IRabaCoder keysCoder,
+                IRabaCoder valsCoder, int fromIndex, int toIndex,
+                byte[][] keys, byte[][] vals) {
 
-            return new BatchInsert(keysCoder, valsCoder, fromIndex, toIndex,
+            return new BatchPutIfAbsent(keysCoder, valsCoder, fromIndex, toIndex,
                     keys, vals, returnOldValues);
 
         }
@@ -125,7 +128,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
      * De-serialization ctor.
      *
      */
-    public BatchInsert() {
+    public BatchPutIfAbsent() {
         
     }
     
@@ -149,9 +152,9 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
      * 
      * @see BatchInsertConstructor
      */
-    protected BatchInsert(final IRabaCoder keysCoder, final IRabaCoder valsCoder,
-            final int fromIndex, final int toIndex, final byte[][] keys, final byte[][] vals,
-            final boolean returnOldValues) {
+    protected BatchPutIfAbsent(IRabaCoder keysCoder, IRabaCoder valsCoder,
+            int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
+            boolean returnOldValues) {
 
         super(keysCoder, valsCoder, fromIndex, toIndex, keys, vals);
 
@@ -163,7 +166,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
     }
     
     /**
-     * Applies the operator using {@link ISimpleBTree#insert(Object, Object)}
+     * Applies the operator using {@link ISimpleBTree#putIfAbsent(byte[], byte[])}
      * 
      * @param ndx
      * 
@@ -187,7 +190,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
             
             final byte[] val = vals.get(i);
 
-            final byte[] old = (byte[]) ndx.insert(key, val);
+            final byte[] old = (byte[]) ndx.putIfAbsent(key, val);
 
             if (returnOldValues) {
                 

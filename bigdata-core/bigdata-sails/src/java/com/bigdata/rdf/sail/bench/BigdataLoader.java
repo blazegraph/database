@@ -19,16 +19,21 @@ import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Very simple loader that takes a journal file and a data file as input and
- * loads the data into the journal. 
+ * loads the data into the journal.
  * <p>
- * If the journal file exists, you should generally delete it 
- * before the load so that the load takes place on a clean journal.
+ * If the journal file exists, you should generally delete it before the load so
+ * that the load takes place on a clean journal.
  * <p>
- * Note: For scale-out, use the {@link com.bigdata.rdf.load.MappedRDFDataLoadMaster} instead.
+ * Note: For scale-out, use the
+ * {@link com.bigdata.rdf.load.MappedRDFDataLoadMaster} instead.
  * 
  * @author mike
  * @author thompsonbry
+ * @deprecated This is specific to BSBM and we are not using it anywhere in the
+ *             main code base. People should use the {@link DataLoader} instead
+ *             of this class.
  */
+@Deprecated
 public class BigdataLoader {
 
     /**

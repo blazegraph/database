@@ -7,37 +7,44 @@ import com.bigdata.service.Split;
  * Hands back the object visited for a single index partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-@SuppressWarnings("unused")
-public class IdentityHandler implements IResultHandler<Object, Object> {
+public class IdentityHandler<T> implements IResultHandler<T, T> {
 
-    int nvisited = 0;
-    private Object ret;
+    private int nvisited = 0;
+    private T ret;
     
-    public void aggregate(Object result, Split split) {
+    @Override
+    public void aggregate(final T result, final Split split) {
 
-        if (nvisited != 0) {
-        
-            /*
-             * You can not use this handler if the procedure is mapped over
-             * more than one split.
-             */
-            
-            throw new UnsupportedOperationException();
+		synchronized (this) {
+			
+			if (nvisited != 0) {
 
-        }
-        
-        this.ret = result;
-        
-        nvisited++;
-        
+				/*
+				 * You can not use this handler if the procedure is mapped over
+				 * more than one split.
+				 */
+
+				throw new UnsupportedOperationException();
+
+			}
+
+			this.ret = result;
+
+			nvisited++;
+
+		}
         
     }
 
-    public Object getResult() {
+    @Override
+    public T getResult() {
 
-        return ret;
+		synchronized (this) {
+			
+			return ret;
+			
+		}
         
     }
     

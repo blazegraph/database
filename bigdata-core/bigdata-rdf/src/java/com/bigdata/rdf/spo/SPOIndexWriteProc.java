@@ -36,6 +36,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.model.StatementEnum;
@@ -169,13 +171,11 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> im
      *         <code>reportMutations := true</code>.
      */
     @Override
-    public Object apply(final IIndex ndx) {
+    public Object applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
         // #of statements actually written on the index partition.
         int writeCount = 0;
 
-        final IRaba keys = getKeys();
-        
         final int n = keys.size();//getKeyCount();
 
 //        // used to generate the values that we write on the index.
@@ -208,7 +208,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> im
              * the value MUST also encode the statement identifier (bytes 1-9).
              * Otherwise the statement identifier MUST NOT be present.
              */
-            final byte[] val = getValue(i);
+            final byte[] val = vals.get(i);
             assert val != null;
             assert val.length == 1;
 
@@ -402,5 +402,19 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> im
         reportMutation = in.readBoolean();
 
     }
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
+	protected IResultHandler<Object, Object> newAggregator() {
+
+		if (reportMutation) {
+
+			return (IResultHandler) new ResultBitBufferHandler(getKeys().size(), 2/* multiplier */);
+
+		}
+
+		return (IResultHandler) new LongAggregator();
+
+	}
 
 }

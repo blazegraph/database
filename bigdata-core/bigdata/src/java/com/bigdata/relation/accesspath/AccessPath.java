@@ -1743,7 +1743,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      *         Thompson</a>
      */
     private static final class EstimateShardScanCost implements
-            ISimpleIndexProcedure {
+            ISimpleIndexProcedure<ScanCostReport> {
 
         private static final long serialVersionUID = 1L;
 
@@ -1761,7 +1761,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         }
 
         @Override
-        public Object apply(final IIndex ndx) {
+        public ScanCostReport apply(final IIndex ndx) {
             
             final ScanCostReport scanCostReport = AccessPath.estimateCost(
                     ((ILocalBTreeView) ndx), rangeCount, fromKey, toKey);

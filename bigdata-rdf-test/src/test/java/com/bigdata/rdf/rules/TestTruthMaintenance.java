@@ -256,7 +256,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
 
                 final StatementBuffer assertionBuffer = new StatementBuffer(
-                        tempStore, store, 10/* capacity */);
+                        tempStore, store, 10/* capacity */, 10/*queueCapacity*/);
 
                 assertTrue(tempStore == assertionBuffer.getStatementStore());
                 
@@ -334,7 +334,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
             
                 final StatementBuffer assertionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 assertionBuffer.add(U, rdfsSubClassOf, V);
                 assertionBuffer.add(V, rdfsSubClassOf, X);
@@ -365,7 +365,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
                 
                 final StatementBuffer retractionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 retractionBuffer.add(V, rdfsSubClassOf, X);
 
@@ -392,7 +392,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
                 
                 final StatementBuffer assertionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
                 
                 assertionBuffer.add(V, rdfsSubClassOf, X);
                 
@@ -418,7 +418,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
                 
                 final StatementBuffer retractionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 retractionBuffer.add(U, rdfsSubClassOf, X);
 
@@ -477,7 +477,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 {
 
                     final StatementBuffer assertionBuffer = new StatementBuffer(
-                            tempStore, store, 10/* capacity */);
+                            tempStore, store, 10/* capacity */, 10/*queueCapacity*/);
 
                     assertTrue(tempStore == assertionBuffer.getStatementStore());
 
@@ -535,7 +535,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 {
 
                     final StatementBuffer retractionBuffer = new StatementBuffer(
-                            tempStore, store, 10/* capacity */);
+                            tempStore, store, 10/* capacity */, 10/*queueCapacity*/);
 
                     assertTrue(tempStore == retractionBuffer
                             .getStatementStore());
@@ -626,7 +626,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
             
                 final StatementBuffer assertionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 // stmt a
                 assertionBuffer.add(user, currentGraph, foo );
@@ -672,7 +672,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
                 
                 final StatementBuffer retractionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 retractionBuffer.add(user, currentGraph, foo);
 
@@ -737,7 +737,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
             
                 final StatementBuffer assertionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 assertionBuffer.add(a, sco, b );
                 assertionBuffer.add(b, sco, c );
@@ -760,7 +760,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
                 
                 final StatementBuffer retractionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 retractionBuffer.add(b, sco, c);
 
@@ -792,9 +792,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                     final TruthMaintenance tmControlStore = new TruthMaintenance(
                             controlStore.getInferenceEngine());
 
-                    final StatementBuffer assertionBuffer = new StatementBuffer(
+                    final StatementBuffer<?> assertionBuffer = new StatementBuffer(
                             tmControlStore.newTempTripleStore(), controlStore,
-                            100/* capacity */);
+                            100/* capacity */, 10/*queueCapacity*/);
 
                     assertionBuffer.add(a, sco, b);
                     // assertionBuffer.add(c, sco, d );
@@ -858,7 +858,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
 
                 final StatementBuffer assertionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 // stmt a
                 assertionBuffer.add(a, rdfType, entity );
@@ -893,7 +893,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             {
 
                 final StatementBuffer retractionBuffer = new StatementBuffer(tm
-                        .newTempTripleStore(), store, 100/* capacity */);
+                        .newTempTripleStore(), store, 100/* capacity */, 10/*queueCapacity*/);
 
                 // retract the sameas
                 retractionBuffer.add(a, sameAs, b);

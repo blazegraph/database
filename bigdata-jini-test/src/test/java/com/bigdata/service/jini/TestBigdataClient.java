@@ -41,7 +41,9 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.TestKeyBuilder;
+import com.bigdata.btree.proc.BatchPutIfAbsent;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.proc.BatchPutIfAbsent.BatchPutIfAbsentConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
@@ -214,6 +216,63 @@ public class TestBigdataClient extends AbstractServerTestCase {
         // batch insert.
         ndx.submit(0/* fromIndex */, limit/* toIndex */, keys, vals,
                 BatchInsertConstructor.RETURN_NO_VALUES, null);
+
+        // verify #of index entries.
+        assertEquals(limit, ndx.rangeCount(null, null));
+
+        // verify data.
+        {
+
+            final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
+
+            int i = 0;
+
+            while (itr.hasNext()) {
+
+                final ITuple<?> tuple = itr.next();
+
+                assertEquals(keys[i], tuple.getKey());
+
+                assertEquals(vals[i], tuple.getValue());
+
+                i++;
+
+            }
+
+            assertEquals(limit, i);
+
+        }
+
+    }
+
+    /**
+     * Variant using {@link BatchPutIfAbsent}.
+     * @param ndx
+     */
+    protected void doBasicIndexTests02(final IIndex ndx) {
+        
+        final int limit = 1000;
+        
+        final byte[][] keys = new byte[limit][];
+        final byte[][] vals = new byte[limit][];
+        
+        final Random r = new Random();
+
+        for (int i = 0; i < limit; i++) {
+
+            keys[i] = TestKeyBuilder.asSortKey(i);
+    
+            final byte[] val = new byte[10];
+            
+            r.nextBytes(val);
+            
+            vals[i] = val;
+            
+        }
+
+        // batch insert.
+        ndx.submit(0/* fromIndex */, limit/* toIndex */, keys, vals,
+                BatchPutIfAbsentConstructor.RETURN_NO_VALUES, null);
 
         // verify #of index entries.
         assertEquals(limit, ndx.rangeCount(null, null));

@@ -74,7 +74,6 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * this and how to obtain and work with revision timestamps.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAccess {
 
@@ -93,6 +92,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
      * <p>
      * Note: the root may have fewer keys.
      */
+    @Override
     protected final int minKeys() {
 
 //        /*
@@ -113,6 +113,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
      * Return <code>branchingFactor</code>, which is the maximum #of keys for a
      * {@link Leaf}.
      */
+    @Override
     protected final int maxKeys() {
         
 //        // The maximum #of keys is easy to compute.
@@ -122,6 +123,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
         
     }
 
+    @Override
     final public ILeafData getDelegate() {
         
         return data;
@@ -135,6 +137,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
     /**
      * Always returns <code>true</code>.
      */
+    @Override
     final public boolean isLeaf() {
 
         return true;
@@ -147,35 +150,42 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
      * persisted. If there is a mutation operation, the backing
      * {@link ILeafData} is automatically converted into a mutable instance.
      */
+    @Override
     final public boolean isReadOnly() {
         
         return data.isReadOnly();
         
     }
 
+    @Override
     final public boolean isCoded() {
         
         return data.isCoded();
         
     }
     
+    @Override
     final public AbstractFixedByteArrayBuffer data() {
         
         return data.data();
         
     }
     
+    @Override
     final public boolean getDeleteMarker(final int index) {
         
         return data.getDeleteMarker(index);
         
     }
 
+    @Override
     final public int getKeyCount() {
         
         return data.getKeyCount();
         
     }
+
+    @Override
     // See https://sourceforge.net/apps/trac/bigdata/ticket/550 (NPE in Leaf.getKey())
     final public IRaba getKeys() {
         if(data==null) throw new NullPointerException("leaf="+toString());
@@ -189,12 +199,14 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
 //        
 //    }
 
+    @Override
     final public int getValueCount() {
         
         return data.getValueCount();
         
     }
 
+    @Override
     final public IRaba getValues() {
         
         return data.getValues();
@@ -536,7 +548,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
      */
     @Override
     public Tuple insert(final byte[] searchKey, final byte[] newval,
-            final boolean delete, final long timestamp, final Tuple tuple) {
+            final boolean delete, final boolean putIfAbsent, final long timestamp, final Tuple tuple) {
 
         if (delete && !data.hasDeleteMarkers()) {
 
@@ -553,6 +565,43 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
         
 //        btree.touch(this); // Note: Invoked by copyOnWrite() (immediately below)
 
+        int entryIndex = Integer.MAX_VALUE; // shut up the compiler. complains about not assigned on all code paths.
+		if (putIfAbsent) {
+			/*
+			 * putIfAbsent code path. We look for the search key in the leaf
+			 * before triggering copy-on-write. If the key is found, then we
+			 * will (optionally) return the value under the key and WILL NOT
+			 * modify the leaf.
+			 * 
+			 * Note: If we search for the entryIndex here, then we DO NOT 
+			 * search again below.
+			 * 
+			 * See BLZG-1539
+			 */
+			entryIndex = this.getKeys().search(searchKey);
+			
+			if (entryIndex >= 0) {
+				
+				// found entry for that key.
+				
+				if (!hasDeleteMarkers() || !getDeleteMarker(entryIndex)) {
+
+					/*
+					 * Found an existing (non-deleted) entry under the key.
+					 * 
+					 * Do NOT mutate the leaf.
+					 */
+					
+					// copy tuple (optional).
+					if (tuple != null)
+						tuple.copy(entryIndex, this);
+					
+					// return caller's tuple.
+					return tuple;
+				}
+			}
+		}
+
         /*
          * Note: This is one of the few gateways for mutation of a leaf via the
          * main btree API (insert, lookup, delete). By ensuring that we have a
@@ -564,17 +613,22 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
         if (copy != this) {
 
             /*
-             * This leaf has been copied so delegate the operation to the new
-             * leaf.
-             * 
-             * Note: copy-on-write deletes [this] leaf and delete() notifies any
-             * leaf listeners before it clears the [leafListeners] reference so
-             * not only don't we have to do that here, but we can't since the
-             * listeners would be cleared before we could fire off the event
-             * ourselves.
-             */
+			 * This leaf has been copied so delegate the operation to the new
+			 * leaf.
+			 * 
+			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
+			 * leaf listeners before it clears the [leafListeners] reference so
+			 * not only don't we have to do that here, but we can't since the
+			 * listeners would be cleared before we could fire off the event
+			 * ourselves.
+			 * 
+			 * Note: putIfAbsent() is handled above without triggering a
+			 * copy-on-write so we always set the flag to false if we triggered
+			 * copy on write so the mutation is unconditional on the copy of the
+			 * leaf data.
+			 */
             
-            return copy.insert(searchKey, newval, delete, timestamp, tuple);
+            return copy.insert(searchKey, newval, delete, false/*putIfAbsent*/, timestamp, tuple);
             
         }
 
@@ -586,7 +640,13 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
          */
 
         // look for the search key in the leaf.
-        int entryIndex = this.getKeys().search(searchKey);
+		if (!putIfAbsent) {
+			/*
+			 * when putIfAbsent is true, we already found the entryIndex above.
+			 * Otherwise we find it now.  See BLZG-1539.
+			 */
+			entryIndex = this.getKeys().search(searchKey);
+		}
 
         if (entryIndex >= 0) {
 
