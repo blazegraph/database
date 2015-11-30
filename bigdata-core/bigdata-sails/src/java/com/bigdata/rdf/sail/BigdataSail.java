@@ -2120,6 +2120,10 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
+        public boolean isTruthMaintenanceConfigured() {
+        	return truthMaintenanceIsSupportable && unisolated;
+        }
+        
         /**
          * Enable or suppress incremental truth maintenance for this
          * {@link BigdataSailConnection}. Truth maintenance MUST be configured
@@ -3901,9 +3905,13 @@ public class BigdataSail extends SailBase implements Sail {
 
                     if (getTruthMaintenance()) {
 
-                        // do TM, writing on the database.
-                        tm.assertAll((TempTripleStore) assertBuffer
-                                .getStatementStore(), changeLog);
+                        TempTripleStore statementStore = (TempTripleStore) assertBuffer.getStatementStore();
+                        // statementStore could be null if statement buffer was created after disabling entailments,
+                        // in this case TM handled manually and does not require execution over assertBuffer
+                        if (statementStore != null) {
+                        	// do TM, writing on the database.
+                        	tm.assertAll(statementStore, changeLog);
+                        }
 
                         // must be reallocated on demand.
                         assertBuffer = null;

@@ -28,23 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import com.bigdata.counters.*;
+
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
-
-import com.bigdata.counters.AbstractProcessCollector;
-import com.bigdata.counters.AbstractProcessReader;
-import com.bigdata.counters.ActiveProcess;
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterHierarchy;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IHostCounters;
-import com.bigdata.counters.IInstrument;
-import com.bigdata.counters.IRequiredHostCounters;
-import com.bigdata.counters.ProcessReaderHelper;
 
 /**
  * Collects some counters using <code>vmstat</code>.
@@ -298,7 +289,18 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     private class VMStatReader extends ProcessReaderHelper {
-        
+
+        private static final String VMSTAT_FIELD_SWPD = "swpd";
+        private static final String VMSTAT_FIELD_FREE = "free";
+        private static final String VMSTAT_FIELD_SI = "si";
+        private static final String VMSTAT_FIELD_SO = "so";
+        private static final String VMSTAT_FIELD_BI = "bi";
+        private static final String VMSTAT_FIELD_BO = "bo";
+        private static final String VMSTAT_FIELD_US = "us";
+        private static final String VMSTAT_FIELD_SY = "sy";
+        private static final String VMSTAT_FIELD_ID = "id";
+        private static final String VMSTAT_FIELD_WA = "wa";
+
         @Override
         protected ActiveProcess getActiveProcess() {
             
@@ -368,59 +370,45 @@ public class VMStatCollector extends AbstractProcessCollector implements
                     // timestamp
                     lastModified.set(System.currentTimeMillis());
 
-                    final String[] fields = pattern.split(data.trim(), 0/* limit */);
+                    final Map<String, String> fields = SysstatUtil.getDataMap(header, data);
 
-                    final String swpd = fields[2];
-                    final String free = fields[3];
-
-                    final String si = fields[6];
-                    final String so = fields[7];
-
-                    final String bi = fields[8];
-                    final String bo = fields[9];
-
-                    final String user = fields[12];
-                    final String system = fields[13];
-                    final String idle = fields[14];
-                    final String iowait = fields[15];
-                    // final String steal = fields[16];
 
                     if (log.isInfoEnabled())
-                        log.info("\nswpd=" + swpd + ", free=" + free + ", si="
-                                + si + ", so=" + so + ", bi=" + bi + ", bo="
-                                + bo + ", %user=" + user + ", %system="
-                                + system + ", idle=" + idle + ", iowait="
-                                + iowait + "\n" + header + "\n" + data);
+                        log.info("\nswpd=" + fields.get(VMSTAT_FIELD_SWPD) + ", free=" + fields.get(VMSTAT_FIELD_FREE) + ", si="
+                                + fields.get(VMSTAT_FIELD_SI) + ", so=" + fields.get(VMSTAT_FIELD_SO) + ", bi=" + fields.get(VMSTAT_FIELD_BI) + ", bo="
+                                + fields.get(VMSTAT_FIELD_BO) + ", %user=" + fields.get(VMSTAT_FIELD_US) + ", %system="
+                                + fields.get(VMSTAT_FIELD_SY) + ", idle=" + fields.get(VMSTAT_FIELD_ID) + ", iowait="
+                                + fields.get(VMSTAT_FIELD_WA) + "\n" + header + "\n" + data);
 
                     vals.put(IHostCounters.Memory_SwapBytesUsed, Double
-                            .parseDouble(swpd));
+                            .parseDouble(fields.get(VMSTAT_FIELD_SWPD)));
 
                     vals.put(IHostCounters.Memory_Bytes_Free, Double
-                            .parseDouble(free));
+                            .parseDouble(fields.get(VMSTAT_FIELD_FREE)));
 
                     vals.put(IRequiredHostCounters.Memory_majorFaultsPerSecond, Double
-                            .parseDouble(si));
+                            .parseDouble(fields.get(VMSTAT_FIELD_SI)));
 
                     vals.put(IRequiredHostCounters.PhysicalDisk_BytesReadPerSec, Double
-                            .parseDouble(bi));
+                            .parseDouble(fields.get(VMSTAT_FIELD_BI)));
 
                     vals.put(IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec, Double
-                            .parseDouble(bo));
+                            .parseDouble(fields.get(VMSTAT_FIELD_BO)));
 
                     if (cpuStats) {
 
                         vals.put(IHostCounters.CPU_PercentUserTime, Double
-                                .parseDouble(user));
+                                .parseDouble(fields.get(VMSTAT_FIELD_US)));
 
                         vals.put(IHostCounters.CPU_PercentSystemTime, Double
-                                .parseDouble(system));
+                                .parseDouble(fields.get(VMSTAT_FIELD_SY)));
 
                         vals.put(IHostCounters.CPU_PercentIOWait, Double
-                                .parseDouble(iowait));
+                                .parseDouble(fields.get(VMSTAT_FIELD_WA)));
 
                         vals.put(
                                 IRequiredHostCounters.CPU_PercentProcessorTime,
-                                (100d - Double.parseDouble(idle)));
+                                (100d - Double.parseDouble(fields.get(VMSTAT_FIELD_ID))));
 
                     }
 

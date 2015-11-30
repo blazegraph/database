@@ -1,18 +1,19 @@
 #!/bin/bash
-#assume it is run as ./scripts/makeEclipse.sh
+BASE_DIR=`dirname $0`
+
 #Clean everything
-./scripts/clean.sh
+${BASE_DIR}/clean.sh
 
 #Generate the eclipse projects and compile
 #Use the ECLIPSE_WORKSPACE variable, if it is present
 #Pass along any commandline parameters to the maven command
 
-if [ -z ${ECLIPSE_WORKSPACE} ] ; then
+if [ -z "${ECLIPSE_WORKSPACE}" ] ; then
 
- 	mvn -f blazegraph-parent/pom.xml eclipse:eclipse $*
+ 	mvn -f "${BASE_DIR}"/../blazegraph-parent/pom.xml eclipse:eclipse $*
 
 else 
 
-	mvn -f blazegraph-parent/pom.xml eclipse:eclipse -Declipse.workspace=${ECLIPSE_WORKSPACE} $*
+	mvn -f "${BASE_DIR}"/../blazegraph-parent/pom.xml eclipse:eclipse -Declipse.workspace="${ECLIPSE_WORKSPACE}" $*
 
 fi
