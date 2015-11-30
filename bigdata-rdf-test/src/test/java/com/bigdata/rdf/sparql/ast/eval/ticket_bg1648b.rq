@@ -1,0 +1,16 @@
+SELECT *
+WITH {
+  
+  SELECT * WHERE { ?s1 <http://p> ?o }
+  
+} AS %sub1
+WITH {
+  
+  SELECT * WHERE { ?s2 <http://p> ?o }
+    
+} AS %sub2
+WHERE {
+  INCLUDE %sub1
+  INCLUDE %sub2
+  FILTER (?s1 != ?s2) .
+}
