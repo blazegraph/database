@@ -56,15 +56,7 @@ public class TestCoordinateDD extends AbstractCoordinateTestCase {
         CoordinateDD c = new CoordinateDD(+32.30642, -122.61458);
         assertEquals(c.northSouth, +32.30642);
         assertEquals(c.eastWest, -122.61458);
-        assertEquals("+32.30642, -122.61458", c.toString());
-    }
-
-    /**
-     * Verify that 180W (-18000000) is normalized to 180E by the constructor.
-     */
-    public void test_ctor_180W() {
-        CoordinateDD c = new CoordinateDD(0d, -180d);
-        assertEquals(c.eastWest, 180d);
+        assertEquals("+32.30642,-122.61458", c.toString());
     }
 
     /**
