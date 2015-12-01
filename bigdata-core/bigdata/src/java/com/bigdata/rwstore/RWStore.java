@@ -5012,6 +5012,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             addr <<= 32;
             addr += outlen;
             
+            // Ensure added to blob allocation stats: BLZG-1646
+            if (outlen > this.m_maxFixedAlloc && m_storageStats != null) {
+            	m_storageStats.allocateBlob(outlen);
+            }
+            
             m_deferredFreeOut.reset();
             return addr;            
         } catch (IOException e) {
