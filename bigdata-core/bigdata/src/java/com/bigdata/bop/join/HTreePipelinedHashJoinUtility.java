@@ -413,9 +413,6 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
 
         }
 
-        // TODO
-//        rightSolutionCount.add(naccepted);
-
         // hash index join for the subquery path.
         hashJoinAndEmit(incomingBindingsBuffer.toArray(
             new IBindingSet[0]), stats, out, joinConstraints, askVar);
@@ -527,8 +524,6 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
         n = vectorSize.get();
         
         nleftConsidered.add(n);
-        
-        
         
         int fromIndex = 0;
 
