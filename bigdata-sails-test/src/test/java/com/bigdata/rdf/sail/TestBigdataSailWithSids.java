@@ -114,7 +114,9 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1086.class);
 
         suite.addTestSuite(TestRDRHistory.class);
-        
+
+        suite.addTestSuite(TestSparqlStar.class);
+
         return suite;
         
     }

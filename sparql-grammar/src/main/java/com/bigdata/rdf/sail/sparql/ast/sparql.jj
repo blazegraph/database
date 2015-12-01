@@ -1023,7 +1023,9 @@ void DatasetClause() :
     try {
 /*@egen*/
     <FROM>
-    (      (        [<NAMED> {jjtn000.setNamed(true);}]
+    (
+      (
+        [<NAMED> {jjtn000.setNamed(true);}]
         [<VIRTUAL_GRAPH> {jjtn000.setVirtual(true);}]
         IRIref()
       )
@@ -2583,7 +2585,7 @@ void GraphNode()       :
 void GraphNodePath()       :
 {}
 {
-	VarOrTerm()
+	VarOrTermOrTRefP()
 |
 	TriplesNodePath()
 }

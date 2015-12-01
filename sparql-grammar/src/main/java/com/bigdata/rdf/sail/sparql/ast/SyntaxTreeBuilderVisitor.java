@@ -156,4 +156,4 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTModify node, Object data) throws VisitorException;
   public Object visit(ASTTRefPattern node, Object data) throws VisitorException;
 }
-/* JavaCC - OriginalChecksum=19fc096cf194b0de425ec428b659eb82 (do not edit this line) */
+/* JavaCC - OriginalChecksum=8221bc0d6d31c85623d140de86947694 (do not edit this line) */

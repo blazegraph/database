@@ -312,4 +312,4 @@ public interface SyntaxTreeBuilderTreeConstants
     "TRefPattern",
   };
 }
-/* JavaCC - OriginalChecksum=6c4b34a09246f77648980ce382afc6be (do not edit this line) */
+/* JavaCC - OriginalChecksum=66824576798bd36c6450f4e65cc592d8 (do not edit this line) */
