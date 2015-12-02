@@ -245,6 +245,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                         final IBindingSet bsetDistinct = curBs.copy(projectInVars);
                         
                         // perform a lookup if the hash code of the element changed
+                        // TODO: contains is not enough!!!
                         final boolean currentElementHasMatch = 
                             hashCode==previousHashCode ?
                             previousElementHasMatch :
@@ -280,7 +281,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                 } catch (Throwable t) {
                     
                     final boolean isDone = context.getRunningQuery().isDone();
-                    throw new RuntimeException("Query is done: " + isDone);
+                    throw new RuntimeException("Query is done: " + isDone, t);
                 }
             }
         }        
@@ -376,6 +377,8 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                     }
 
                 }
+                
+                encoder.flush(); // update index IV cache
 
                 /**
                  * register the distinct keys for which the subquery did not
