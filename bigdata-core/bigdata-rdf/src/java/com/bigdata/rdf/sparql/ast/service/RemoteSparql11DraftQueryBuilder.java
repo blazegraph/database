@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -39,126 +38,33 @@ import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sail.webapp.client.AST2SPARQLUtil;
 
 /**
  * Utility class constructs a valid SPARQL query for a remote
- * <code>SPARQL 1.1</code> using the <code>VALUES</code> clause to vector
+ * <code>SPARQL 1.1</code> using the <code>BINDINGS</code> clause to vector
  * solutions into that remote end point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: RemoteSparqlQueryBuilder.java 6071 2012-03-04 18:08:57Z
  *          thompsonbry $
  */
-public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
+public class RemoteSparql11DraftQueryBuilder extends RemoteSparql11QueryBuilder {
 
     private static final Logger log = Logger
             .getLogger(RemoteSparql10QueryBuilder.class);
 
-//    private final ServiceNode serviceNode;
-
-    /** The text "image" of the SERVICE clause. */
-    protected final String exprImage;
-
-    /**
-     * The prefix declarations used within the SERVICE clause (from the original
-     * query).
-     */
-    protected final Map<String, String> prefixDecls;
-
-    protected final AST2SPARQLUtil util;
-    
-    /**
-     * The distinct variables "projected" by the SERVICE group graph pattern.
-     * The order of this set is not important, but the variables must be
-     * distinct.
-     * */
-    protected final Set<IVariable<?>> projectedVars;
-
-//    private final BindingSet[] bindingSets;
-
-//    /**
-//     * This is a vectored implementation.
-//     */
-//    @Override
-//    public boolean isVectored() {
-//        
-//        return true;
-//        
-//    }
-    
     /**
      * 
      * @param serviceNode
      *            The SERVICE clause.
      */
-    public RemoteSparql11QueryBuilder(final ServiceNode serviceNode) {
+    public RemoteSparql11DraftQueryBuilder(final ServiceNode serviceNode) {
 
-        if (serviceNode == null)
-            throw new IllegalArgumentException();
-        
-        this.exprImage = serviceNode.getExprImage();
-        
-        this.prefixDecls = serviceNode.getPrefixDecls();
-        
-        this.projectedVars = serviceNode.getProjectedVars();
-
-        if (exprImage == null)
-            throw new IllegalArgumentException();
-
-        if (projectedVars == null)
-            throw new IllegalArgumentException();
-
-        this.util = new AST2SPARQLUtil(prefixDecls) {
-
-            @Override
-            public String toExternal(final BNode val) {
-
-                /*
-                 * Note: The SPARQL 1.1 GRAMMAR does not permit blank nodes in
-                 * the BINDINGS clause. Blank nodes are sent across as an
-                 * unbound variable (UNDEF). If there is more than one variable
-                 * which takes on the same blank node in a given solution, then
-                 * there must be a FILTER imposed when verifies that those
-                 * variables have the same bound value for *that* solution (the
-                 * constraint can not apply across solutions in which that
-                 * correlation is not present).
-                 */
-                return "UNDEF";
-
-            }
-        };
+       super(serviceNode);
 
     }
 
-    /**
-     * Return an ordered collection of the distinct variable names used in the
-     * given caller's solution set.
-     * 
-     * @param bindingSets
-     *            The solution set.
-     * 
-     * @return The distinct, ordered collection of variables used.
-     */
-    protected LinkedHashSet<String> getDistinctVars(final BindingSet[] bindingSets) {
-
-        final LinkedHashSet<String> vars = new LinkedHashSet<String>();
-
-        for (BindingSet bindingSet : bindingSets) {
-
-            for (Binding binding : bindingSet) {
-
-                vars.add(binding.getName());
-
-            }
-
-        }
-
-        return vars;
-
-    }
-
-    public String getSparqlQuery(final BindingSet[] bindingSets) {
+     public String getSparqlQuery(final BindingSet[] bindingSets) {
 
         final StringBuilder sb = new StringBuilder();
 
@@ -282,19 +188,18 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
         }
 
         /*
-         * VALUES clause.
+         * BINDINGS clause.
          * 
-         * Note: The VALUES clause is used to vector the SERVICE request.
+         * Note: The BINDINGS clause is used to vector the SERVICE request.
          * 
-         * VALUES (?book ?title) { (:book1 :title1) (:book2 UNDEF) }
+         * BINDINGS ?book ?title { (:book1 :title1) (:book2 UNDEF) }
          */
         if (!singleEmptyBindingSet) {
 
             // Variables in a known stable order.
             final LinkedHashSet<String> vars = getDistinctVars(bindingSets);
 
-            sb.append("VALUES");
-            sb.append(" (");
+            sb.append("BINDINGS");
 
             // Variable declarations.
             {
@@ -304,8 +209,6 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
                     sb.append(v);
                 }
             }
-            
-            sb.append(")");
 
             // Bindings.
             {
@@ -339,77 +242,5 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
         return q;
         
     }
-
-    /**
-     * Return a correlated blank node / variables map.
-     * <p>
-     * Note: This is necessary because the BINDINGS clause does not permit blank
-     * nodes.
-     * 
-     * @return The correlated variable bindings map -or- <code>null</code> iff
-     *         there are no variables which are correlated through shared blank
-     *         nodes.
-     * 
-     * @throws UnsupportedOperationException
-     *             If there are correlated variables and there is more than one
-     *             source solution (for this case you need to use the SPARQL 1.0
-     *             compatible query generator).
-     * 
-     * @see RemoteSparql10QueryBuilder
-     */
-    protected static Map<BNode, Set<String>> getCorrelatedVariables(
-           final BindingSet[] bindingSets) {
-        Map<BNode, Set<String/* vars */>> bnodes = null;
-        for (BindingSet bindingSet : bindingSets) {
-            for (Binding b : bindingSet) {
-                final Value v = b.getValue();
-                if (!(v instanceof BNode))
-                    continue;
-                if (bnodes == null)
-                    bnodes = new LinkedHashMap<BNode, Set<String>>();
-                final BNode bnd = (BNode) v;
-                // Set of correlated variables.
-                Set<String> cvars = bnodes.get(bnd);
-                if (cvars == null) {
-                    bnodes.put(bnd, cvars = new LinkedHashSet<String>());
-                } else {
-                    /*
-                     * Correlated. This blank node is already the binding
-                     * for some other variable in this solution.
-                     * 
-                     * Note: A FILTER can be used to enforce a same-term
-                     * constraint for variables correlated via blank nodes,
-                     * but only for a single solution. If there is more than
-                     * one solution then you CAN NOT use the BINDINGS clause
-                     * to communicate the binding sets without also
-                     * rewriting the SERVICE clause as a UNION of the
-                     * original SERVICE class for each source binding set.
-                     */
-                    if (bindingSets.length > 1)
-                        throw new UnsupportedOperationException();
-                }
-                if (!cvars.add(b.getName())) {
-                    /*
-                     * This would imply the same variable was bound more
-                     * than once in the solution.
-                     */
-                    throw new AssertionError();
-                }
-            }
-        }
-        return bnodes;
-    }
     
-//    /**
-//     * {@inheritDoc}
-//     * <p>
-//     * This implementation returns it's argument.
-//     */
-//    @Override
-//    public BindingSet[] getSolutions(final BindingSet[] serviceSolutions) {
-//
-//        return serviceSolutions;
-//
-//    }
-
 }

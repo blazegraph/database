@@ -59,11 +59,11 @@ public class RemoteServiceFactoryImpl extends AbstractServiceFactoryBase {
      * @param isSparql11
      *            <code>true</code> if the end points support SPARQL 1.1.
      */
-    public RemoteServiceFactoryImpl(final boolean isSparql11) {
+    public RemoteServiceFactoryImpl(final SPARQLVersion sparqlVersion) {
         
         this.serviceOptions = new RemoteServiceOptions();
         
-        this.serviceOptions.setSparql11(isSparql11);
+        this.serviceOptions.setSPARQLVersion(sparqlVersion);
         
     }
 
