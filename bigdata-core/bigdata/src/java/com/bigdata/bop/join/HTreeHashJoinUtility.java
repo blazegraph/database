@@ -225,10 +225,26 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
 
+    protected AtomicBoolean getOpen() {
+        return open;
+    }
+
+    protected IVBindingSetEncoderWithIVCache getEncoder() {
+        return encoder;
+    }
+
+    protected long getNoJoinVarsLimit() {
+        return noJoinVarsLimit;
+    }
+    
+    protected boolean getOutputDistintcJVs() {
+        return outputDistinctJVs;
+    }
+    
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.
      */
-    protected final AtomicBoolean open = new AtomicBoolean(true);
+    private final AtomicBoolean open = new AtomicBoolean(true);
     
     /**
      * The operator whose annotations are used to initialize this object.
@@ -247,17 +263,17 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Utility class for compactly and efficiently encoding and decoding
      * {@link IBindingSet}s.
      */
-    protected final IVBindingSetEncoderWithIVCache encoder;
+    private final IVBindingSetEncoderWithIVCache encoder;
     
     /**
      * The type of join to be performed.
      */
-    protected final JoinTypeEnum joinType;
+    private final JoinTypeEnum joinType;
     
     /**
      * <code>true</code> iff the join is OPTIONAL.
      */
-    protected final boolean optional;
+    private final boolean optional;
     
     /**
      * <code>true</code> iff this is a DISTINCT filter.
@@ -277,29 +293,29 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     /**
      * @see HashJoinAnnotations#ASK_VAR
      */
-    protected final IVariable<?> askVar;
+    private final IVariable<?> askVar;
     
     /**
      * The join variables.
      */
-    protected final IVariable<?>[] joinVars;
+    private final IVariable<?>[] joinVars;
     
     /**
      * The variables to be retained (optional, all variables are retained if
      * not specified).
      */
-    protected final IVariable<?>[] selectVars;
+    private final IVariable<?>[] selectVars;
 
     /**
      * True if the hash join utility class is to output the distinct join
      * variables.
      */
-    protected boolean outputDistinctJVs = false;
+    private boolean outputDistinctJVs = false;
     
     /**
      * The join constraints (optional).
      */
-    protected final IConstraint[] constraints;
+    private final IConstraint[] constraints;
 
     /**
      * The backing {@link IRawStore}.
@@ -318,7 +334,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * The set of distinct source solutions which joined. This set is maintained
      * iff the join is optional and is <code>null</code> otherwise.
      */
-    protected final AtomicReference<HTree> joinSet = new AtomicReference<HTree>();
+    private final AtomicReference<HTree> joinSet = new AtomicReference<HTree>();
     
     /**
      * The maximum #of (left,right) solution joins that will be considered
@@ -327,7 +343,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * TODO HINTS: Annotation and query hint for this. Probably on
      * {@link HashJoinAnnotations}.
      */
-    protected final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
+    private final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
     
     /**
      * The #of left solutions considered for a join.
@@ -358,7 +374,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * maintained iff the join is optional and is <code>null</code>
      * otherwise.
      */
-    private HTree getJoinSet() {
+    protected HTree getJoinSet() {
 
         return joinSet.get();
         

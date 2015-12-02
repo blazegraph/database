@@ -170,7 +170,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
           final int incomingBindingsBufferThreshold,
           final BOpContext<IBindingSet> context) {
         
-        if (!open.get())
+        if (!getOpen().get())
             throw new IllegalStateException();
 
         /**
@@ -360,7 +360,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                         final byte[] key = keyBuilder.reset().append(tmp.hashCode).getKey();
     
                         // Encode the solution.
-                        final byte[] val = encoder.encodeSolution(tmp.bset);
+                        final byte[] val = getEncoder().encodeSolution(tmp.bset);
                         
                         rightSolutions.insert(key, val);
     
@@ -381,7 +381,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
 
                 }
                 
-                encoder.flush(); // update index IV cache
+                getEncoder().flush(); // update index IV cache
 
                 /**
                  * register the distinct keys for which the subquery did not
@@ -483,11 +483,13 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                final byte[] key = keyBuilder.reset().append(tmp.hashCode).getKey();
 
                // Encode the solution.
-               final byte[] val = encoder.encodeSolution(tmp.bset);
+               final byte[] val = getEncoder().encodeSolution(tmp.bset);
                
                rightSolutions.insert(key, val);
 
           }
+           
+          getEncoder().flush();
            
           // remember we've added these bindings
           bsFromBindingsSetSourceAddedToHashIndex = true;
@@ -505,7 +507,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
             final IConstraint[] joinConstraints,//
             final IVariable<?> askVar) {
 
-        if (!open.get())
+        if (!getOpen().get())
             throw new IllegalStateException();
 
         final HTree rightSolutions = getRightSolutions();
@@ -649,13 +651,13 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                             // Join.
                             final IBindingSet outSolution = BOpContext
                                     .bind(leftSolution, rightSolution,
-                                            constraints,
-                                            selectVars);
+                                            getConstraints(),
+                                            getSelectVars());
     
                             nJoinsConsidered.increment();
     
                             if (noJoinVars
-                                    && nJoinsConsidered.get() == noJoinVarsLimit) {
+                                    && nJoinsConsidered.get() == getNoJoinVarsLimit()) {
     
                                 if (nleftConsidered.get() > 1
                                         && nrightConsidered.get() > 1) {
@@ -698,12 +700,12 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                             
                             }
     
-                            switch(joinType) {
+                            switch(getJoinType()) {
                             case Normal:
                             case Optional: {
                                 if (outSolution != null) {
                                     // Resolve against ivCache.
-                                    encoder.resolveCachedValues(outSolution);
+                                    getEncoder().resolveCachedValues(outSolution);
                                     
                                     if (askVar!=null) {
                                         outSolution.set(askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
@@ -852,19 +854,19 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
         
         sb.append(getClass().getSimpleName());
         
-        sb.append("{open=" + open);
-        sb.append(",joinType=" + joinType);
+        sb.append("{open=" + getOpen());
+        sb.append(",joinType=" + getJoinType());
 //        sb.append(",chunkSize=" + chunkSize);
 //        sb.append(",optional=" + optional);
 //        sb.append(",filter=" + filter);
-        if (askVar != null)
-            sb.append(",askVar=" + askVar);
-        sb.append(",joinVars=" + Arrays.toString(joinVars));
-        sb.append(",outputDistinctJVs=" + outputDistinctJVs);
-        if (selectVars != null)
-            sb.append(",selectVars=" + Arrays.toString(selectVars));
-        if (constraints != null)
-            sb.append(",constraints=" + Arrays.toString(constraints));
+        if (getAskVar() != null)
+            sb.append(",askVar=" + getAskVar());
+        sb.append(",joinVars=" + Arrays.toString(getJoinVars()));
+        sb.append(",outputDistinctJVs=" + getOutputDistintcJVs());
+        if (getSelectVars() != null)
+            sb.append(",selectVars=" + Arrays.toString(getSelectVars()));
+        if (getConstraints() != null)
+            sb.append(",constraints=" + Arrays.toString(getConstraints()));
         sb.append(",size=" + getRightSolutionCount());
         sb.append(", distinctProjectionsWithoutSubqueryResult=" + distinctProjectionsWithoutSubqueryResult.size());
         sb.append(", distinctBindingSets (seen/released)=" + nDistinctBindingSets + "/" + nDistinctBindingSetsReleased);
@@ -872,7 +874,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
         sb.append(", resultsFromSubqueries=" + nResultsFromSubqueries);        
         sb.append(",considered(left=" + nleftConsidered + ",right="
                 + nrightConsidered + ",joins=" + nJoinsConsidered + ")");
-        if (joinSet.get() != null)
+        if (getJoinSet() != null)
             sb.append(",joinSetSize=" + getJoinSetSize());
 //        sb.append(",encoder="+encoder);
         sb.append("}");
