@@ -2543,6 +2543,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     final public AbstractNode getChild(final int index) {
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheTests.increment();
+        
         /*
          * I've take out this test since it turns out to be relatively
          * expensive!?! The interrupt status of the thread is now checked
@@ -2625,6 +2628,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * the Memoizer and then return the new value of childRefs[index].
          */
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheMisses.increment();
+        
         return btree.loadChild(this, index);
 
     }
@@ -2692,6 +2698,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * The child needs to be read from the backing store.
          */
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheMisses.increment();
+        
         final long addr = data.getChildAddr(index);
 
         if (addr == IRawStore.NULL) {
