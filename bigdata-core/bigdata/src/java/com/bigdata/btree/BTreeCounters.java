@@ -784,6 +784,25 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                     }
                 });
 
+                tmp.addCounter("cacheHits", new Instrument<Long>() {
+                    @Override
+                    protected void sample() {
+                        final long cacheHits = cacheTests.get() - cacheMisses.get();
+                        setValue(cacheHits);
+                    }
+                });
+
+                tmp.addCounter("cacheHitRatio", new Instrument<Double>() {
+                    @Override
+                    protected void sample() {
+                        final double _cacheTests = cacheTests.get();
+                        if(_cacheTests==0) return; // avoid divide-by-zero.
+                        final double _cacheHits = _cacheTests - cacheMisses.get();
+                        final double cacheHitRatio = _cacheHits / _cacheTests;
+                        setValue(cacheHitRatio);
+                    }
+                });
+
                 /*
                  * bytes on store.
                  */
