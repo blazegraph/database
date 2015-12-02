@@ -387,7 +387,7 @@ public class PipelinedHashIndexAndSolutionSetJoinOp extends HashIndexOp {
 
                     if (context.isLastInvocation()) {
 
-                        // Checkpoint the solution set.
+                        // Done. Release the allocation context.
                         state.release();
 
                     }
@@ -399,7 +399,7 @@ public class PipelinedHashIndexAndSolutionSetJoinOp extends HashIndexOp {
                         // Accept ALL solutions.
                         acceptAndOutputSolutions();
                         
-                        // Checkpoint the generated solution set index.
+                        // Done. Release the allocation context.
                         state.release();
                         
                     }
