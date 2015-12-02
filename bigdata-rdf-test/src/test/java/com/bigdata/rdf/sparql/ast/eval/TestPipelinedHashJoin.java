@@ -32,12 +32,12 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.join.HTreePipelinedHashJoinUtility;
 import com.bigdata.bop.join.HashIndexOpBase.Annotations;
 import com.bigdata.bop.join.JVMPipelinedHashJoinUtility;
-import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetOp;
+import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetJoinOp;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
- * Test suite for {@link PipelinedHashIndexAndSolutionSetOp}, which implements a
+ * Test suite for {@link PipelinedHashIndexAndSolutionSetJoinOp}, which implements a
  * pipelined hash join.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
@@ -1021,7 +1021,7 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
         final ASTContainer container, final boolean assertPipelined,
         final boolean analyticMode) {
         
-        final Class<?> operatorClass = PipelinedHashIndexAndSolutionSetOp.class;
+        final Class<?> operatorClass = PipelinedHashIndexAndSolutionSetJoinOp.class;
         
         if (assertPipelined) {
 
@@ -1037,8 +1037,8 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
             final Class<?> expectedUtilClass = analyticMode ?
                     HTreePipelinedHashJoinUtility.class : JVMPipelinedHashJoinUtility.class;
 
-            final PipelinedHashIndexAndSolutionSetOp firstMatch = 
-                (PipelinedHashIndexAndSolutionSetOp)BOpUtility.visitAll(queryPlan, operatorClass).next();
+            final PipelinedHashIndexAndSolutionSetJoinOp firstMatch = 
+                (PipelinedHashIndexAndSolutionSetJoinOp)BOpUtility.visitAll(queryPlan, operatorClass).next();
             
             final Object utilFactory = firstMatch.annotations().get(Annotations.HASH_JOIN_UTILITY_FACTORY);
             final Class<?> observedUtilClass = utilFactory.getClass();

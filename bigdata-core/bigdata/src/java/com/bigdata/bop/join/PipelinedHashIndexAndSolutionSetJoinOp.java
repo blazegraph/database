@@ -200,7 +200,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
-public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
+public class PipelinedHashIndexAndSolutionSetJoinOp extends HashIndexOp {
 
    private static final long serialVersionUID = 3473675701742394157L;
 
@@ -226,7 +226,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         * from outside are visible in the inner filter.
         */
        String PROJECT_IN_VARS = 
-           PipelinedHashIndexAndSolutionSetOp.class.getName() + ".projectInVars";
+           PipelinedHashIndexAndSolutionSetJoinOp.class.getName() + ".projectInVars";
 
        /**
         * The threshold defining when to release the distinctProjectionBuffer.
@@ -234,7 +234,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         * distinctProjectionBuffer at the same time.
         */
        String DISTINCT_PROJECTION_BUFFER_THRESHOLD = 
-           PipelinedHashIndexAndSolutionSetOp.class.getName() 
+           PipelinedHashIndexAndSolutionSetJoinOp.class.getName() 
            + ".distinctProjectionBufferThreshold";
        
        // set default to have a default's chunk size default
@@ -247,7 +247,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         * distinctProjectionBuffer at the same time.
         */
        String INCOMING_BINDINGS_BUFFER_THRESHOLD = 
-           PipelinedHashIndexAndSolutionSetOp.class.getName() 
+           PipelinedHashIndexAndSolutionSetJoinOp.class.getName() 
            + ".incomingBindingsBuffer";
        
        // having buffered 1000 incoming bindings, we release both buffers;
@@ -260,7 +260,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
     /**
       * Deep copy constructor.
       */
-    public PipelinedHashIndexAndSolutionSetOp(final PipelinedHashIndexAndSolutionSetOp op) {
+    public PipelinedHashIndexAndSolutionSetJoinOp(final PipelinedHashIndexAndSolutionSetJoinOp op) {
        
         super(op);
 
@@ -272,13 +272,13 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
      * @param args
      * @param annotations
      */
-    public PipelinedHashIndexAndSolutionSetOp(final BOp[] args, final Map<String, Object> annotations) {
+    public PipelinedHashIndexAndSolutionSetJoinOp(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
 
     }
     
-    public PipelinedHashIndexAndSolutionSetOp(final BOp[] args, final NV... annotations) {
+    public PipelinedHashIndexAndSolutionSetJoinOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -347,7 +347,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         
         final int incomingBindingsBufferThreshold;
         
-        public ChunkTask(final PipelinedHashIndexAndSolutionSetOp op,
+        public ChunkTask(final PipelinedHashIndexAndSolutionSetJoinOp op,
                 final BOpContext<IBindingSet> context, 
                 final PipelineOp subquery, 
                 final IBindingSet[] bsFromBindingsSetSource,
@@ -388,8 +388,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
                     if (context.isLastInvocation()) {
 
                         // Checkpoint the solution set.
-                        checkpointSolutionSet();
-
+                        state.release();
 
                     }
 
@@ -401,7 +400,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
                         acceptAndOutputSolutions();
                         
                         // Checkpoint the generated solution set index.
-                        checkpointSolutionSet();
+                        state.release();
                         
                     }
 

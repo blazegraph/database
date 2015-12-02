@@ -68,7 +68,7 @@ import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NestedLoopJoinOp;
-import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetOp;
+import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetJoinOp;
 import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.bop.paths.ZeroLengthPathOp;
@@ -5506,7 +5506,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * 
      * @param left the left-side pipeline op
      * @param usePipelinedHashJoin whether or not to use the 
-     *            {@link PipelinedHashIndexAndSolutionSetOp} or not
+     *            {@link PipelinedHashIndexAndSolutionSetJoinOp} or not
      * @param ctx the evaluation context
      * @param node current query node
      * @param joinType type of the join
@@ -5578,11 +5578,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
           }
        }
        
-       // TODO: think about output distinct JVs for pipelined hash index; imho
-       //       it makes no sense here  and should be ignored
        if (usePipelinedHashJoin) {
           
-          left = applyQueryHints(new PipelinedHashIndexAndSolutionSetOp(leftOrEmpty(left),//
+          left = applyQueryHints(new PipelinedHashIndexAndSolutionSetJoinOp(leftOrEmpty(left),//
               new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
               new NV(BOp.Annotations.EVALUATION_CONTEXT,
                      BOpEvaluationContext.CONTROLLER),//
@@ -5600,13 +5598,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
                * OUTPUT_DISTINCT_JVs annotation, since this is a "built-in"
                * functionality of the operator.
                */
-              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.PROJECT_IN_VARS, projectInVars),//
+              new NV(PipelinedHashIndexAndSolutionSetJoinOp.Annotations.PROJECT_IN_VARS, projectInVars),//
               new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
               new NV(HashIndexOp.Annotations.ASK_VAR, askVar),//
               new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY, joinUtilFactory),//
               new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
               // the pipelined hash index may also contain a subquery for inner evaluation
-              new NV(PipelinedHashIndexAndSolutionSetOp.Annotations.SUBQUERY, subqueryPlan),
+              new NV(PipelinedHashIndexAndSolutionSetJoinOp.Annotations.SUBQUERY, subqueryPlan),
               new NV(IPredicate.Annotations.RELATION_NAME, 
                     new String[]{ctx.getLexiconNamespace()})              
           ), node, ctx);
