@@ -1690,8 +1690,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //                
 //            }
         
-        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
-                ctx.queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = 
+            NamedSolutionSetRefUtility.newInstance(
+               usePipelinedHashJoin ? null : ctx.queryId, solutionSetName, joinVars);
 
         // VALUES is not optional.
         final JoinTypeEnum joinType = JoinTypeEnum.Normal;
@@ -1965,8 +1966,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //                
 //            }
         
-        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
-                ctx.queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = 
+            NamedSolutionSetRefUtility.newInstance(
+                usePipelinedHashJoin ? null : ctx.queryId, solutionSetName, joinVars);
 
         // Sub-Select is not optional.
 //            final boolean optional = false;
@@ -2220,8 +2222,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
               projectInVars.toArray(new IVariable<?>[projectInVars.size()]);
         
         
-        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
-                ctx.queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = 
+            NamedSolutionSetRefUtility.newInstance(
+                usePipelinedHashJoin ? null : ctx.queryId, solutionSetName, joinVars);
 
         /*
          * Note: We also need to set the "asksVar" annotation to get back T/F
@@ -4157,7 +4160,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 
         final INamedSolutionSetRef namedSolutionSet = 
             NamedSolutionSetRefUtility.newInstance(
-                ctx.queryId, solutionSetName, joinVars);
+                usePipelinedHashJoin ? null : ctx.queryId, solutionSetName, joinVars);
 
         final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
            
