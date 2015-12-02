@@ -155,6 +155,8 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         ntupleUpdateDelete += o.ntupleUpdateDelete;
         ntupleRemove += o.ntupleRemove;
         // IO reads
+        cacheTests.add(o.cacheTests.get());
+        cacheMisses.add(o.cacheMisses.get());
         nodesRead.add(o.nodesRead.get());
         leavesRead.add(o.leavesRead.get());
         bytesRead.add(o.bytesRead.get());
@@ -221,6 +223,8 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         t.ntupleUpdateDelete -= o.ntupleUpdateDelete;
         t.ntupleRemove -= o.ntupleRemove;
         // IO reads
+        t.cacheTests.add(-o.cacheTests.get());
+        t.cacheMisses.add(-o.cacheMisses.get());
         t.nodesRead.add(-o.nodesRead.get());
         t.leavesRead.add(-o.leavesRead.get());
         t.bytesRead.add(-o.bytesRead.get());
@@ -341,6 +345,10 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
      */
     
     // IO reads (concurrent)
+    /** #of tests of the BTree cache (getChild()). See BLZG-1657. Should correlate to #of getChild() calls. */
+    public final CAT cacheTests = new CAT();
+    /** #of misses when testing the BTree cache (getChild()). See BLZG-1657. Should correlate to nodesRead+leavesRead. */
+    public final CAT cacheMisses = new CAT();
     /** #of node read operations. */
     public final CAT nodesRead = new CAT();
     /** #of leaf read operations. */
@@ -755,6 +763,45 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
             {
 
                 final CounterSet tmp = counterSet.makePath(IBTreeCounters.IO);
+
+                /*
+                 * Cache.
+                 */
+
+                /** #of tests of the BTree cache (getChild()). See BLZG-1657. Should correlate to #of getChild() calls. */
+                tmp.addCounter("cacheTests", new Instrument<Long>() {
+                    @Override
+                    protected void sample() {
+                        setValue(cacheTests.get());
+                    }
+                });
+
+                /** #of misses when testing the BTree cache (getChild()). See BLZG-1657. Should correlate to nodesRead+leavesRead. */
+                tmp.addCounter("cacheMisses", new Instrument<Long>() {
+                    @Override
+                    protected void sample() {
+                        setValue(cacheMisses.get());
+                    }
+                });
+
+                tmp.addCounter("cacheHits", new Instrument<Long>() {
+                    @Override
+                    protected void sample() {
+                        final long cacheHits = cacheTests.get() - cacheMisses.get();
+                        setValue(cacheHits);
+                    }
+                });
+
+                tmp.addCounter("cacheHitRatio", new Instrument<Double>() {
+                    @Override
+                    protected void sample() {
+                        final double _cacheTests = cacheTests.get();
+                        if(_cacheTests==0) return; // avoid divide-by-zero.
+                        final double _cacheHits = _cacheTests - cacheMisses.get();
+                        final double cacheHitRatio = _cacheHits / _cacheTests;
+                        setValue(cacheHitRatio);
+                    }
+                });
 
                 /*
                  * bytes on store.
