@@ -60,7 +60,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Utility class supporting a pipelined hash join. This is a variant of the
- * JVMHashJoinUtility. See {@link PipelinedHashIndexAndSolutionSetOp} for a
+ * JVMHashJoinUtility. See {@link PipelinedHashIndexAndSolutionSetJoinOp} for a
  * documentation of this functionality.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
@@ -92,17 +92,17 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements P
   
 
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionBuffer}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionBuffer}
     */
    final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
    
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#incomingBindingsBuffer}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#incomingBindingsBuffer}
     */
    final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
  
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionsWithoutSubqueryResult}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionsWithoutSubqueryResult}
     */
    final Set<IBindingSet> distinctProjectionsWithoutSubqueryResult = new HashSet<IBindingSet>();
    
@@ -119,7 +119,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements P
       
       super(op, joinType);
       
-      if (!(op instanceof PipelinedHashIndexAndSolutionSetOp)) {
+      if (!(op instanceof PipelinedHashIndexAndSolutionSetJoinOp)) {
          throw new IllegalArgumentException();
       }
       

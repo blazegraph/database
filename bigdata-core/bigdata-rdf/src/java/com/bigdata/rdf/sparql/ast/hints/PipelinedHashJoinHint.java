@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.join.JVMPipelinedHashJoinUtility;
-import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetOp;
+import com.bigdata.bop.join.PipelinedHashIndexAndSolutionSetJoinOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -38,7 +38,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
  * Query hint to enable/disable usage of pipelined hash joins. See
- * {@link PipelinedHashIndexAndSolutionSetOp} and
+ * {@link PipelinedHashIndexAndSolutionSetJoinOp} and
  * {@link JVMPipelinedHashJoinUtility} for the respective operators.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
