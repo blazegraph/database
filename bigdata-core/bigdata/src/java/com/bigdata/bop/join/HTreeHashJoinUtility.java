@@ -74,6 +74,7 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.rwstore.sector.MemoryManagerClosedException;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
@@ -2041,13 +2042,25 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * 
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/508 (LIMIT causes
      *      hash join utility to log errors)
+     * @see BLZG-1658 MemoryManager should know when it has been closed
      */
     private RuntimeException launderThrowable(final Throwable t) {
 
         final String msg = "cause=" + t + ", state=" + toString();
 
+        /*
+         * Note: Per BLZG-1658, the MemoryManager.close() is invoked when a
+         * query is done. Thus, any exception having a root cause indicating
+         * that the MemoryManager is closed may be taken as direct evidence that
+         * the query is done. Thus, if an attempt by the HTree or BTree to read
+         * on the backing store (the MemoryManager) fails because the store is
+         * closed, we interpret this as a concurrent termination of the query
+         * for some other root cause and ignore the exception here (this is
+         * just like ignoring InterruptedException or BufferClosedException).
+         */
         if (!InnerCause.isInnerCause(t, InterruptedException.class)
-                && !InnerCause.isInnerCause(t, BufferClosedException.class)) {
+                && !InnerCause.isInnerCause(t, BufferClosedException.class)
+                && !InnerCause.isInnerCause(t, MemoryManagerClosedException.class)) {
 
             /*
              * Some sort of unexpected exception.
