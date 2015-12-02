@@ -115,7 +115,7 @@ public class ServiceRegistry {
         aliases = new ConcurrentHashMap<URI, URI>();
 
         defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
-                new RemoteServiceFactoryImpl(true/* isSparql11 */));
+                new RemoteServiceFactoryImpl(SPARQLVersion.SPARQL_11));
 
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
