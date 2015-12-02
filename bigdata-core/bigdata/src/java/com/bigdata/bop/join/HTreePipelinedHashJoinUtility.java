@@ -169,6 +169,9 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
           final int distinctProjectionBufferThreshold,
           final int incomingBindingsBufferThreshold,
           final BOpContext<IBindingSet> context) {
+        
+        if (!open.get())
+            throw new IllegalStateException();
 
         /**
          * The hash index. The keys are int32 hash codes built from the join
@@ -501,6 +504,9 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
             final IBuffer<IBindingSet> outputBuffer,//
             final IConstraint[] joinConstraints,//
             final IVariable<?> askVar) {
+
+        if (!open.get())
+            throw new IllegalStateException();
 
         final HTree rightSolutions = getRightSolutions();
           
