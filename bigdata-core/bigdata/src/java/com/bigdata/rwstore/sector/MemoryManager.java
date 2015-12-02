@@ -91,6 +91,26 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     private int m_debugCurs = 0;
   
     /**
+     * true iff the {@link MemoryManager} is open.
+     * 
+     * @see BLZG-1658 MemoryManager should know when it has been closed
+     */
+    private final AtomicBoolean open = new AtomicBoolean(true);
+
+    /**
+     * Assert that the {@link MemoryManager} is open.
+     * 
+     * @throws MemoryManagerClosedException
+     *             unless the {@link MemoryManager} is open.
+     * 
+     * @see BLZG-1658 MemoryManager should know when it has been closed
+     */
+    private void assertOpen() {
+        if (!open.get())
+            throw new MemoryManagerClosedException();
+    }
+
+    /**
 	 * The backing pool from which direct {@link ByteBuffer}s are recruited as
 	 * necessary and returned when possible.
 	 */
@@ -427,10 +447,15 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	/**
 	 * The maximum capacity in bytes of the managed memory.
 	 */
-	public long getMaxMemoryCapacity() {
-
-		return m_sectorSize * (long) m_resources.size();
-		
+    public long getMaxMemoryCapacity() {
+        // BLZG-1658 Protect against concurrent modification of [m_resources].
+        m_allocationLock.lock();
+        try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+            return m_sectorSize * (long) m_resources.size();
+        } finally {
+            m_allocationLock.unlock();
+        }
 	}
 	
 	@Override
@@ -450,14 +475,25 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 		if (nbytes == 0)
 			throw new IllegalArgumentException();
-		
-		final long retaddr = allocate(nbytes, blocks);
 
-		final ByteBuffer[] bufs = get(retaddr);
+		// BLZG-1658 Protect against current close between allocate() and get().
+        m_allocationLock.lock();
+        try {
 
-		copyData(data, bufs);
+            final long retaddr = allocate(nbytes, blocks);
 
-		return retaddr;
+            final ByteBuffer[] bufs = get(retaddr);
+
+            copyData(data, bufs);
+
+            return retaddr;
+        
+        } finally {
+        
+            m_allocationLock.unlock();
+            
+        }
+        
 	}
 
 	/**
@@ -626,7 +662,10 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		
 		m_allocationLock.lock();
 		try {
-			if (nbytes <= SectorAllocator.BLOB_SIZE) {
+            
+		    assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+
+            if (nbytes <= SectorAllocator.BLOB_SIZE) {
 
 				final SectorAllocator sector = getSectorFromFreeList(blocks,
 						nbytes);
@@ -741,6 +780,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		if (size <= 0)
 			throw new IllegalArgumentException();
 
+		// FIXME BLZG-1658 We need at least a readLock() on the allocation lock to protect against a concurrent close().
+        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+        
 		if (size <= SectorAllocator.BLOB_SIZE) {
 
 			/*
@@ -776,6 +818,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	@Override
 	public byte[] read(final long addr) {
 
+	    assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+
 		return MemoryManager.read(this, addr);
 		
 	}
@@ -793,6 +837,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	static byte[] read(final IMemoryManager mmgr, final long addr) {
 
+	    // FIXME BLZG-1658 read() should be protected against concurrent close using read/write lock.
 		final int nbytes = getAllocationSize(addr);
 		
 		final byte[] a = new byte[nbytes];
@@ -857,9 +902,12 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	ByteBuffer getBuffer(final int rwaddr, final int size) {
 
+	    // FIXME BLZG-1658 I think we need to assert that the allocation lock (or a readLock() on it) is held by the caller.
+
+	    assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+
 		final SectorAllocator sector = getSector(rwaddr);
-		
-		
+				
 		final int offset = SectorAllocator.getSectorOffset(rwaddr);
 		
 		if (!sector.isGettable(offset)) {
@@ -899,7 +947,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	SectorAllocator getSector(final int rwaddr) {
 	
-		final int index = SectorAllocator.getSectorIndex(rwaddr);
+        final int index = SectorAllocator.getSectorIndex(rwaddr);
 
 		if (index >= m_sectors.size())
 			throw new IllegalStateException("Address: " + rwaddr
@@ -945,7 +993,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		
 		m_allocationLock.lock();
 		try {
-			
+		    assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			if (m_retention > 0) {
 				deferFree(rwaddr, size);
 			} else {
@@ -1117,6 +1165,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
     @Override
 	public IMemoryManager createAllocationContext() {
+        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 		return new AllocationContext(this, true /*isolated*/);
 	}
 
@@ -1130,7 +1179,14 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	public long getCapacity() {
 
-		return m_pool.getBufferCapacity() * (long) m_resources.size();
+        // BLZG-1658 Protect against concurrent modification of [m_resources].
+        m_allocationLock.lock();
+        try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+            return m_pool.getBufferCapacity() * (long) m_resources.size();
+        } finally {
+            m_allocationLock.unlock();
+        }
 
 	}
 	
@@ -1202,16 +1258,26 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	@Override
-	public long alloc(byte[] buf, int size, IAllocationContext context) {
+	public long alloc(final byte[] buf, final int size, final IAllocationContext context) {
 		if (context != null)
 			throw new IllegalArgumentException("The MemoryManager does not support AllocationContexts");
 		
 		return getAllocationAddress(allocate(ByteBuffer.wrap(buf, 0, size))); // return the rwaddr!
 	}
 
+	// @see BLZG-1658 MemoryManager should know when it has been closed
 	@Override
 	public void close() {
-		clear(); // releasing direct buffers
+	    m_allocationLock.lock();
+        try {
+            if (open.compareAndSet(true/* expect */, false/* update */)) {
+                if(log.isDebugEnabled())
+                    log.debug("MemoryManager is closed.");
+                clear(); // releasing direct buffers
+            }
+        } finally {
+            m_allocationLock.unlock();
+        }
 	}
 
 	@Override
@@ -1223,7 +1289,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	@Override
 	public int getAssociatedSlotSize(final int addr) {
-
+	    // FIXME BLZG-1658 MemoryManager should know when it has been closed (operation is not protected against concurrent close()).
 	    final SectorAllocator sector = getSector(addr);
 		
 		final int offset = SectorAllocator.getSectorOffset(addr);
@@ -1232,10 +1298,10 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	@Override
-	public void getData(long l, byte[] buf) {
-		/**
-		 * TBD: this could probably be more efficient!
-		 */
+    public void getData(final long l, final byte[] buf) {
+        /**
+         * TBD: this could probably be more efficient!
+         */
 		final ByteBuffer rbuf = getBuffer((int) l, buf.length);	
 		rbuf.get(buf);
 	}
@@ -1247,21 +1313,28 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	@Override
 	public IPSOutputStream getOutputStream() {
+        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 		return getOutputStream(null/*AllocationContext*/);
 	}
 
 	public IPSOutputStream getOutputStream(final IAllocationContext context) {
+        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, context);
 	}
 
 	@Override
-	public InputStream getInputStream(long addr) {
+	public InputStream getInputStream(final long addr) {
+        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 		return new PSInputStream(this, addr);
 	}
 
 	@Override
 	public void commit() {
-		// NOP, the commit of the transient objects is now in postCommit
+        
+	    assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+
+        // NOP, the commit of the transient objects is now in postCommit
+	    
 	}
 
 	@Override
@@ -1273,6 +1346,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void postCommit() {
 	    if(!m_allocationLock.isHeldByCurrentThread())
 	        throw new IllegalMonitorStateException();
+        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 //		try {
         final Iterator<SectorAllocator> sectors = m_sectors.iterator();
         while (sectors.hasNext()) {
@@ -1303,9 +1377,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     @Override
 	public void registerExternalCache(
 			final ConcurrentWeakValueCache<Long, ICommitter> externalCache, final int dataSize) {
-		
 		m_allocationLock.lock();
 		try {
+	        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			m_externalCache = externalCache;
 			m_cachedDatasize = getSlotSize(dataSize);
 		} finally {
@@ -1353,6 +1427,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public long saveDeferrals() {
 	    m_allocationLock.lock();
 		try {
+	        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			if (m_deferredFreeOut.getBytesWritten() == 0) {
 				return 0;
 			}
@@ -1377,6 +1452,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		assert rwaddr != 0;
 	    m_allocationLock.lock();
 		try {
+	        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			if (sze > (SectorAllocator.BLOB_SIZE)) {
 				m_deferredFreeOut.writeInt(-rwaddr);
 				m_deferredFreeOut.writeInt(sze);
@@ -1419,10 +1495,11 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 * @return the total number of addresses freed
 	 */
 	private int freeDeferrals(final long blockAddr, final long lastReleaseTime) {
+        int totalFreed = 0;
+        DataInputStream strBuf = null;      
 		m_allocationLock.lock();
-		int totalFreed = 0;
-		DataInputStream strBuf = null;		
 		try {
+	        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			strBuf = new DataInputStream(getInputStream(blockAddr));		
 			int nxtAddr = strBuf.readInt();
 			
@@ -1582,6 +1659,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     private void activateTx() {
         m_allocationLock.lock();
         try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
             m_activeTxCount++;
             if(log.isInfoEnabled())
                 log.info("#activeTx="+m_activeTxCount);
@@ -1598,6 +1676,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     private void deactivateTx() {
         m_allocationLock.lock();
         try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
         	if (m_activeTxCount == 0) {
         		throw new IllegalStateException("Tx count must be positive!");
         	}
@@ -1634,6 +1713,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void abortContext(final IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			context.release();
 			
         	if (context.isIsolated()) {
@@ -1657,6 +1737,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void detachContext(final IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			context.release();
 			
         	if (context.isIsolated()) {
@@ -1761,6 +1842,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		
 		m_allocationLock.lock();
 		try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			final int rwaddr = getAllocationAddress(addr);
 
 			final int offset = SectorAllocator.getSectorOffset(rwaddr);
@@ -1778,6 +1860,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public long allocate(ByteBuffer data, IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			return getContextAllocation(context).allocate(data);
 		} finally {
 			m_allocationLock.unlock();
@@ -1793,6 +1876,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void free(long addr, IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 			getContextAllocation(context).free(addr);
 		} finally {
 			m_allocationLock.unlock();
@@ -1805,6 +1889,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     }
 
 	public IAllocationContext newAllocationContext(final boolean isolated) {
+	    // FIXME BLZG-1658 This needs a readLock() on the allocation lock to protect against a concurrent close.
+        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
 		AllocationContext ret = new AllocationContext(this, isolated);
 
 		if (isolated) {
