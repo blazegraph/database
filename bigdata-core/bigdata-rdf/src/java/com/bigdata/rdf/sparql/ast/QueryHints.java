@@ -745,6 +745,6 @@ public interface QueryHints {
 
    boolean DEFAULT_DEFAULT_GRAPH_DISTINCT_FILTER = 
        Boolean.valueOf(System.getProperty(
-           QueryHints.class.getName() + "." + DEFAULT_GRAPH_DISTINCT_FILTER, "true"));
+           QueryHints.class.getName() + "." + DEFAULT_GRAPH_DISTINCT_FILTER, "false"));
 
 }

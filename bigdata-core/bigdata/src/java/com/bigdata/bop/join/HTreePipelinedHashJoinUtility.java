@@ -64,7 +64,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Utility class supporting a pipelined hash join. This is a variant of the
- * {@link HTreeHashJoinUtility}. See {@link PipelinedHashIndexAndSolutionSetOp} for a
+ * {@link HTreeHashJoinUtility}. See {@link PipelinedHashIndexAndSolutionSetJoinOp} for a
  * documentation of this functionality.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
@@ -101,17 +101,17 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
   
 
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionBuffer}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionBuffer}
     */
    final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
    
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#incomingBindingsBuffer}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#incomingBindingsBuffer}
     */
    final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
  
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionsWithoutSubqueryResult}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionsWithoutSubqueryResult}
     */
    final Set<IBindingSet> distinctProjectionsWithoutSubqueryResult = new HashSet<IBindingSet>();
    
@@ -129,7 +129,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
       // TODO: is this problematic (usage of query's memory manager)?
       super(context.getMemoryManager(null /* use memory mgr of this query */), op, joinType);
       
-      if (!(op instanceof PipelinedHashIndexAndSolutionSetOp)) {
+      if (!(op instanceof PipelinedHashIndexAndSolutionSetJoinOp)) {
          throw new IllegalArgumentException();
       }
       
@@ -229,51 +229,58 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
              * exists (which is recorded in distinctProjectionsWithoutSubqueryResult.
              */
             } else {
+                
+                try {
             
-                int previousHashCode = -1; // invalid
-                boolean previousElementHasMatch = false;
-                for (int i=0; i<n; i++) {
-                    
-                    final IBindingSet curBs = a[i].bset;
-                    
-                    // The next hash code to be processed.
-                    final int hashCode = a[i].hashCode;
+                    int previousHashCode = -1; // invalid
+                    boolean previousElementHasMatch = false;
+                    for (int i=0; i<n; i++) {
+                        
+                        final IBindingSet curBs = a[i].bset;
+                        
+                        // The next hash code to be processed.
+                        final int hashCode = a[i].hashCode;
+    
+                        // the distinct projection
+                        final IBindingSet bsetDistinct = curBs.copy(projectInVars);
+                        
+                        // perform a lookup if the hash code of the element changed
+                        final boolean currentElementHasMatch = 
+                            hashCode==previousHashCode ?
+                            previousElementHasMatch :
+                            rightSolutions.contains(keyBuilder.reset().append(hashCode).getKey()) || 
+                                distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct);
 
-                    // the distinct projection
-                    final IBindingSet bsetDistinct = curBs.copy(projectInVars);
-                    
-                    // perform a lookup if the hash code of the element changed
-                    final boolean currentElementHasMatch = 
-                        hashCode==previousHashCode ?
-                        previousElementHasMatch :
-                        rightSolutions.contains(keyBuilder.reset().append(hashCode).getKey()) || 
-                            distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct);
-                    
-                    if (currentElementHasMatch) {
+                        if (currentElementHasMatch) {
+                            
+                            /*
+                             * Either a match in the bucket or subquery was already
+                             * computed for this distinct projection but did not produce
+                             * any results. Either way, it will take a fast path that
+                             * avoids the subquery.
+                             */
+                            dontRequireSubqueryEvaluation.add(curBs);
+                            
+                        } else {
+                            
+                            // This is a new distinct projection. It will need to run
+                            // through the subquery. We buffer the solutions in a
+                            // operator-global data structure
+                            incomingBindingsBuffer.add(curBs);
+                            distinctProjectionBuffer.add(bsetDistinct);                    
+                        }
                         
-                        /*
-                         * Either a match in the bucket or subquery was already
-                         * computed for this distinct projection but did not produce
-                         * any results. Either way, it will take a fast path that
-                         * avoids the subquery.
-                         */
-                        dontRequireSubqueryEvaluation.add(curBs);
+                        naccepted++;
                         
-                    } else {
+                        // record previous hash code + lookup result to avoid unrequired recomputation
+                        previousHashCode = hashCode;
+                        previousElementHasMatch = currentElementHasMatch;
                         
-                        // This is a new distinct projection. It will need to run
-                        // through the subquery. We buffer the solutions in a
-                        // operator-global data structure
-                        incomingBindingsBuffer.add(curBs);
-                        distinctProjectionBuffer.add(bsetDistinct);                    
                     }
+                } catch (Throwable t) {
                     
-                    naccepted++;
-                    
-                    // record previous hash code + lookup result to avoid unrequired recomputation
-                    previousHashCode = hashCode;
-                    previousElementHasMatch = currentElementHasMatch;
-                    
+                    final boolean isDone = context.getRunningQuery().isDone();
+                    throw new RuntimeException("Query is done: " + isDone);
                 }
             }
         }        
