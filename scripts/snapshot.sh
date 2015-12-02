@@ -13,4 +13,4 @@ mvn versions:set -DnewVersion=${CURRENT_VERSION}-${BRANCH}-${YYMMDD} versions:up
 
 mvn -f ${PARENT_POM} -N clean install -Dmaven.test.skip=true
 
-mvn -f ${PARENT_POM} clean install -Dmaven.test.skip=true
+mvn -f ${PARENT_POM} clean install -DskipTests=true
