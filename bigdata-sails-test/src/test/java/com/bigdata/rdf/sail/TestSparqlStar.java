@@ -28,12 +28,13 @@ package com.bigdata.rdf.sail;
 
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
+import org.openrdf.query.GraphQuery;
+import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
@@ -106,6 +107,7 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 
             final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
 
+            // check insert
             {
                 final String updateStr = "insert data { " +
         				"  <x:s> <x:p> \"d\" . " +
@@ -187,29 +189,29 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
             }
 
 // Fails due to expansion of TRef into separate statement in the Construct clause
-//            // check construct
-//            {
-//	            final String selectStr = "construct { "+
-//	       			"  << <x:s> <x:p> \"d\" >> <x:order> ?o . " +
-//	            	"} where { " +
-//       				"  << <x:s> <x:p> \"d\" >> <x:order> ?o . " +
-//					"}";
-//	            final GraphQuery tg = cxn.prepareGraphQuery(QueryLanguage.SPARQL, selectStr);
-//				GraphQueryResult tgr = tg.evaluate();
-//	            final BigdataValue o2 = vf.createLiteral(5);
-//				try {
-//					int cnt = 0;
-//					while (tgr.hasNext()) {
-//						Statement st = tgr.next();
-//						assertEquals(o2, st.getObject());
-//						assertTrue(((BigdataBNode)st.getSubject()).isStatementIdentifier());
-//						cnt++;
-//					}
-//					assertEquals(1, cnt);
-//				} finally {
-//					tgr.close();
-//				}
-//            }
+            // check construct
+            {
+	            final String selectStr = "construct { "+
+	       			"  << <x:s> <x:p> \"d\" >> <x:order> ?o . " +
+	            	"} where { " +
+       				"  << <x:s> <x:p> \"d\" >> <x:order> ?o . " +
+					"}";
+	            final GraphQuery tg = cxn.prepareGraphQuery(QueryLanguage.SPARQL, selectStr);
+				GraphQueryResult tgr = tg.evaluate();
+	            final BigdataValue o2 = vf.createLiteral(5);
+				try {
+					int cnt = 0;
+					while (tgr.hasNext()) {
+						Statement st = tgr.next();
+						assertEquals(o2, st.getObject());
+						assertTrue(((BigdataBNode)st.getSubject()).isStatementIdentifier());
+						cnt++;
+					}
+					assertEquals(1, cnt);
+				} finally {
+					tgr.close();
+				}
+            }
 
             // check delete
             {
@@ -331,30 +333,29 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 				}
             }
 
-// Fails due to expansion of TRef into separate statement in the Construct clause
-//            // check construct
-//            {
-//	            final String selectStr = "construct { "+
-//					"  ?s <x:refers> << <x:s> <x:p> \"d\" >> . " +
-//	            	"} where { " +
-//					"  ?s <x:refers> << <x:s> <x:p> \"d\" >> . " +
-//					"}";
-//	            final GraphQuery tg = cxn.prepareGraphQuery(QueryLanguage.SPARQL, selectStr);
-//				GraphQueryResult tgr = tg.evaluate();
-//	            final BigdataURI s2 = vf.createURI("x:r");
-//				try {
-//					int cnt = 0;
-//					while (tgr.hasNext()) {
-//						Statement st = tgr.next();
-//						assertEquals(s2, st.getSubject());
-//						assertTrue(((BigdataBNode)st.getSubject()).isStatementIdentifier());
-//						cnt++;
-//					}
-//					assertEquals(1, cnt);
-//				} finally {
-//					tgr.close();
-//				}
-//            }
+            // check construct
+            {
+	            final String selectStr = "construct { "+
+					"  ?s <x:refers> << <x:s> <x:p> \"d\" >> . " +
+	            	"} where { " +
+					"  ?s <x:refers> << <x:s> <x:p> \"d\" >> . " +
+					"}";
+	            final GraphQuery tg = cxn.prepareGraphQuery(QueryLanguage.SPARQL, selectStr);
+				GraphQueryResult tgr = tg.evaluate();
+	            final BigdataURI s2 = vf.createURI("x:r");
+				try {
+					int cnt = 0;
+					while (tgr.hasNext()) {
+						Statement st = tgr.next();
+						assertEquals(s2, st.getSubject());
+						assertTrue(((BigdataBNode)st.getObject()).isStatementIdentifier());
+						cnt++;
+					}
+					assertEquals(1, cnt);
+				} finally {
+					tgr.close();
+				}
+            }
 
 			// check delete
 	        {
@@ -485,30 +486,29 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 				}
             }
 
-// Fails due to expansion of TRef into separate statement in the Construct clause
-//            // check construct
-//            {
-//	            final String selectStr = "construct { "+
-//	            	"  ?s <x:recurs> << <x:r> <x:refers> << <x:s> <x:p> \"d\" >> >>." +
-//	            	"} where { " +
-//	            	"  ?s <x:recurs> << <x:r> <x:refers> << <x:s> <x:p> \"d\" >> >>." +
-//					"}";
-//	            final GraphQuery tg = cxn.prepareGraphQuery(QueryLanguage.SPARQL, selectStr);
-//				GraphQueryResult tgr = tg.evaluate();
-//	            final BigdataURI s2 = vf.createURI("x:z");
-//				try {
-//					int cnt = 0;
-//					while (tgr.hasNext()) {
-//						Statement st = tgr.next();
-//						assertEquals(s2, st.getSubject());
-//						assertTrue(((BigdataBNode)st.getSubject()).isStatementIdentifier());
-//						cnt++;
-//					}
-//					assertEquals(1, cnt);
-//				} finally {
-//					tgr.close();
-//				}
-//            }
+            // check construct
+            {
+	            final String selectStr = "construct { "+
+	            	"  ?s <x:recurs> << <x:r> <x:refers> << <x:s> <x:p> \"d\" >> >>." +
+	            	"} where { " +
+	            	"  ?s <x:recurs> << <x:r> <x:refers> << <x:s> <x:p> \"d\" >> >>." +
+					"}";
+	            final GraphQuery tg = cxn.prepareGraphQuery(QueryLanguage.SPARQL, selectStr);
+				GraphQueryResult tgr = tg.evaluate();
+	            final BigdataURI s2 = vf.createURI("x:z");
+				try {
+					int cnt = 0;
+					while (tgr.hasNext()) {
+						Statement st = tgr.next();
+						assertEquals(s2, st.getSubject());
+						assertTrue(((BigdataBNode)st.getObject()).isStatementIdentifier());
+						cnt++;
+					}
+					assertEquals(1, cnt);
+				} finally {
+					tgr.close();
+				}
+            }
 
             // check delete
 			{

@@ -34,15 +34,21 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.util.log.Log;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTBind;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNodePropertyList;
 import com.bigdata.rdf.sail.sparql.ast.ASTCollection;
+import com.bigdata.rdf.sail.sparql.ast.ASTConstruct;
 import com.bigdata.rdf.sail.sparql.ast.ASTObjectList;
 import com.bigdata.rdf.sail.sparql.ast.ASTPathAlternative;
 import com.bigdata.rdf.sail.sparql.ast.ASTPathElt;
@@ -55,7 +61,9 @@ import com.bigdata.rdf.sail.sparql.ast.ASTTRefPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTVar;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
+import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.PathNode;
 import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
 import com.bigdata.rdf.sparql.ast.PathNode.PathElt;
@@ -1063,7 +1071,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
      * @return The SID variable.  This allows the existing code paths to
      * handle nested triple reference patterns without change.
      */
-    public VarNode visit(final ASTTRefPattern node,
+    public ASTBase visit(final ASTTRefPattern node,
             final Object data) throws VisitorException {
         
         /*
@@ -1079,6 +1087,9 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
         /*
          * Check constraints.
          */
+        Resource cs = null;
+		URI cp = null;
+    	Value co = null;
 
         if(s instanceof ConstantNode) {
 
@@ -1089,6 +1100,10 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
                 throw new VisitorException(
                         "Subject in triple reference pattern may not be literal.");
             
+            } else {
+            
+            	cs = (Resource) v;
+            	
             }
             
         } else {
@@ -1116,6 +1131,9 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
                 throw new VisitorException(
                         "Predicate in triple reference pattern must be IRI.");
 
+            } else {
+            
+            	cp = (URI) v;
             }
 
         }
@@ -1124,12 +1142,17 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 
             final BigdataValue v = ((ConstantNode) o).getValue();
 
-            if (v instanceof BNode) {
-
-                throw new VisitorException(
-                        "Object in triple reference pattern may not be blank node.");
-
-            }
+            // See https://jira.blazegraph.com/browse/BLZG-1229
+            // To support SPARQL* syntax in CONSTRUCT clauses with nested TRef values,
+            // BNode should be allowed as an object value of the nesting node
+//            if (v instanceof BNode) {
+//
+//                throw new VisitorException(
+//                        "Object in triple reference pattern may not be blank node.");
+//
+//            }
+            
+            co = v;
 
         } else {
             
@@ -1182,6 +1205,30 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
         // Set the SID variable on the SP.
         sp.setSid(sidVar);
         
+        if (isInConstructClause(parent)) {
+
+        	// @see https://jira.blazegraph.com/browse/BLZG-1229
+        	// in construct clause we should keep TRef as is 
+        	
+        	if (cs == null || cp == null || co == null) {
+                throw new VisitorException(
+                        "Invalid TRef: (" + cs + "," + cp + "," + co + ")");
+        	}
+        	
+			BigdataStatement stmt = context.valueFactory.createStatement(cs, cp, co);
+			
+			BigdataBNode val = context.valueFactory.createBNode(stmt);
+			
+			SidIV<BigdataBNode> iv = new SidIV<BigdataBNode>(stmt);
+			
+			val.setIV(iv);
+			
+			iv.setValue(val);
+			
+			return new ConstantNode(iv);
+			
+        }
+        
         // add to the current join group.
         graphPattern.addSP(sp);
 
@@ -1190,6 +1237,28 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
         // Return the SID variable.
         return sidVar;
         
+    }
+    
+    
+    /**
+     * @param x the node to be tested
+     * @return true if provide node is ASTConstruct or has ASTConstruct in any of transitive parents. 
+     */
+    private boolean isInConstructClause(Node x) {
+
+    	if (x == null) {
+    	
+    		return false;
+
+    	} else if (x instanceof ASTConstruct) {
+    	
+    		return true;
+    	
+    	} else {
+    	
+    		return isInConstructClause(x.jjtGetParent());
+    	}
+    	
     }
  
 }
