@@ -335,10 +335,8 @@ public class DeleteServlet extends BigdataRDFServlet {
                   // Await the Future (of the Query)
                   ft.get();
                   
-                  if(truthMaintenance && suppressTruthMaintenance && (nmodified.get() > 0)){
+                  if (truthMaintenance && suppressTruthMaintenance) {
 						
-						conn.removeAllEntailments();
-						conn.computeClosure();
 						conn.setTruthMaintenance(true);
 						
                   }
@@ -527,10 +525,8 @@ public class DeleteServlet extends BigdataRDFServlet {
                // Delete the buffered statements.
                buffer.removeAll();
                
-               if(truthMaintenance && suppressTruthMaintenance && (nmodified.get() > 0)){
+               if (truthMaintenance && suppressTruthMaintenance) {
 					
-					conn.removeAllEntailments();
-					conn.computeClosure();
 					conn.setTruthMaintenance(true);
 					
                }
@@ -779,12 +775,11 @@ public class DeleteServlet extends BigdataRDFServlet {
                  */
                 rdfParser.parse(req.getInputStream(), baseURI);
                 
-                if(truthMaintenance && suppressTruthMaintenance && (nmodified.get() > 0)){
+                if (truthMaintenance && suppressTruthMaintenance) {
 					
-					conn.removeAllEntailments();
-					conn.computeClosure();
 					conn.setTruthMaintenance(true);
-				}
+
+                }
 
                 // Commit the mutation.
                 conn.commit();
@@ -1071,10 +1066,8 @@ public class DeleteServlet extends BigdataRDFServlet {
                             .getDatabase().removeStatements(s, p, o, null);
                 }
                 
-                if(truthMaintenance && suppressTruthMaintenance && (nmodified > 0)){
+                if (truthMaintenance && suppressTruthMaintenance) {
 					
-					conn.removeAllEntailments();
-					conn.computeClosure();
 					conn.setTruthMaintenance(true);
 					
 				}

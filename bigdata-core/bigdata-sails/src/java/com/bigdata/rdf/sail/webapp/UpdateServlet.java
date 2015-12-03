@@ -438,12 +438,6 @@ public class UpdateServlet extends BigdataRDFServlet {
 							// Await the Future (of the Query)
 							ft.get();
 							
-							if(truthMaintenance && suppressTruthMaintenance && (nmodified.get() > 0)){
-								
-								conn.removeAllEntailments();
-								
-							}
-
 						}
 
 						// Run INSERT
@@ -492,7 +486,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 				
 				if (truthMaintenance && suppressTruthMaintenance) {
 					
-					conn.computeClosure();
+					conn.setTruthMaintenance(true);
 
 				}
 
@@ -699,12 +693,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 	
 	                  // Delete the buffered statements.
 	                  buffer.removeAll();
-	                  
-	                  if (truthMaintenance && suppressTruthMaintenance && nmodified.get() > 0) {
-	                	  
-	                	  conn.removeAllEntailments();
-	                  }
-	
+	                  	
 	               }
 	
 	               // Run INSERT
@@ -749,7 +738,6 @@ public class UpdateServlet extends BigdataRDFServlet {
             
             if (truthMaintenance && suppressTruthMaintenance) {
             	
-            	conn.computeClosure();
             	conn.setTruthMaintenance(true);
             	
             }
@@ -1016,12 +1004,6 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                     processData(conn, contentType, is, handler, baseURI);
                     
-                    if (truthMaintenance && suppressTruthMaintenance && nmodified.get() > 0) {
-
-                    	conn.removeAllEntailments();
-                    	
-                    }
-
                 }
 
                 if (add != null) {
@@ -1039,8 +1021,6 @@ public class UpdateServlet extends BigdataRDFServlet {
                 }
                 
               	if (truthMaintenance && suppressTruthMaintenance) {
-              		
-              		conn.computeClosure();
               		
               		conn.setTruthMaintenance(true);
               		

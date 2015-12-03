@@ -321,8 +321,8 @@ public class InsertServlet extends BigdataRDFServlet {
                 
                 if (truthMaintenance && suppressTruthMaintenance) {
                 	
-                	conn.computeClosure();
                 	conn.setTruthMaintenance(true);
+                	
                 }
 
                 // Commit the mutation.
@@ -621,7 +621,7 @@ public class InsertServlet extends BigdataRDFServlet {
                 
                 if (truthMaintenance && suppressTruthMaintenance) {
                 	
-                	conn.computeClosure();
+                	conn.setTruthMaintenance(true);
                 	
                 }
                 
