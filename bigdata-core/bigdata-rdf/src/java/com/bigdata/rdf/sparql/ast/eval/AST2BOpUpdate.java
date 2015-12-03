@@ -116,7 +116,6 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -126,7 +125,6 @@ import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.UpdateType;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTBatchResolveTermsOptimizer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -275,9 +273,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * 
 				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
-				op = (Update) new ASTBatchResolveTermsOptimizer().optimize(context,
-				      new QueryNodeWithBindingSet(op, context.getBindings()))
-						.getQueryNode();
+				ASTDeferredIVResolution.resolveUpdate(context.db,
+				      op, context.getQueryBindingSet(), context.getDataset());
+				
 				batchResolveNanos = System.nanoTime() - t2;
 
 			}
