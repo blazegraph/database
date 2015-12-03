@@ -115,6 +115,16 @@ ga('send', 'pageview');
       <artifactId>bigdata-common-util</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>system-utils</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-statics</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!--dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-util</artifactId>
