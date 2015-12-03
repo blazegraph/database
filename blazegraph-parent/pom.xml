@@ -210,6 +210,7 @@ dependencies.
     <module>../bigdata-jini</module>
     <module>../bigdata-jini-test</module>
     <module>../bigdata-ha</module>
+    <module>../bigdata-common-util</module>
 <!-- Disable the automatic test execution for now. 
      It is run as a separate Jenkins job.
     <module>../bigdata-ha-test</module>
