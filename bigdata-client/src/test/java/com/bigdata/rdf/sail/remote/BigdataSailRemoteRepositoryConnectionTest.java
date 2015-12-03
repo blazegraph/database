@@ -191,22 +191,6 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 		}
 	}
 
-    @Test
-    public void testServiceNode() throws Exception {
-        final TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * where {SERVICE <http://DBpedia.org/sparql> { <http://dbpedia.org/resource/Tonga_(Nyasa)_language> rdfs:label ?langLabel. }}");
-        final TupleQueryResult tqr = tq.evaluate();
-        try {
-            int cnt = 0;
-            while (tqr.hasNext()) {
-                tqr.next();
-                cnt++;
-            }
-            assertEquals(cnt, 2);
-        } finally {
-            tqr.close();
-        }
-    }
-
 	@Test
 	public void testGetStatements() throws RepositoryException {
 		final RepositoryResult<Statement> stmts = con.getStatements(s, p, o, includeInferred, c);
