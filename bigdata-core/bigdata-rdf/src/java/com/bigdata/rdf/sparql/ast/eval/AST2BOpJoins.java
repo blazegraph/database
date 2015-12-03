@@ -1323,9 +1323,13 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Publish the NamedSolutionSetRef. This makes updates in the state
              * of the hash join visible from the NanoSparqlServer. (Both
              * versions of the operator require this attribute.)
+             * 
+             * BLZG-1608: this needs to be locally scoped, since the named subquery
+             * may be executed multiple times (e.g., when part of an inner subquery
+             * executed through the PipelinedHashIndexAndSolutionSetJoinOp.
              */
             map.put(HashJoinOp.Annotations.NAMED_SET_REF,
-                    NamedSolutionSetRefUtility.newInstance(ctx.queryId,
+                    NamedSolutionSetRefUtility.newInstance(null,
                             "--namedSet-" + ctx.nextId(), joinVars));
 
             /*
