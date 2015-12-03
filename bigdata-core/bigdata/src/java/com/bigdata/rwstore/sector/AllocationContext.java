@@ -88,7 +88,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	 * is shared by the top-level {@link MemoryManager} to avoid lock ordering
 	 * problems.
 	 */
-	private final ReentrantLock lock; 
+	private final Lock lock; 
 
 	/**
 	 * All addresses allocated either directly by this {@link AllocationContext}
@@ -126,7 +126,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 		m_parent = root;
 		
-		lock = root.m_allocationLock;
+		lock = root.m_allocationLock.writeLock();
 
 	}
 	
@@ -139,7 +139,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 		m_parent = parent;
 		
-		lock = m_root.m_allocationLock;
+		lock = m_root.m_allocationLock.writeLock();
 		
 		m_isolated = parent.m_isolated;
 		
