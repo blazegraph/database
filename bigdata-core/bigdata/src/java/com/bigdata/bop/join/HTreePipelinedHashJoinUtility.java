@@ -126,7 +126,6 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
       PipelineOp op, JoinTypeEnum joinType, BOpContext<IBindingSet> context,
       int chunkCapacity) {
       
-      // TODO: is this problematic (usage of query's memory manager)?
       super(context.getMemoryManager(null /* use memory mgr of this query */), op, joinType);
       
       if (!(op instanceof PipelinedHashIndexAndSolutionSetJoinOp)) {
