@@ -736,6 +736,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     public long acceptSolutions(final ICloseableIterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
+        if (!open.get())
+            throw new IllegalStateException();
+        
         if (itr == null)
             throw new IllegalArgumentException();
         
@@ -1039,6 +1042,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final IBuffer<IBindingSet> outputBuffer,//
             final IConstraint[] constraints//
             ) {
+        
+        if (!open.get())
+            throw new IllegalStateException();
+
 
         // Note: We no longer rechunk in this method.
         final Iterator<IBindingSet[]> it;
@@ -1505,6 +1512,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     @Override
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
 
+        if (!open.get())
+            throw new IllegalStateException();
+
         try {
 
             @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -1671,6 +1681,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     @Override
     public void outputSolutions(final IBuffer<IBindingSet> out) {
+
+        if (!open.get())
+            throw new IllegalStateException();
 
        try {
 
