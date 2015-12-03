@@ -123,12 +123,13 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     private final ArrayList<IBufferAccess> m_resources;
 	
 	/**
-	 * The lock used to serialize all allocation/deallocation requests. This is
-	 * shared across all allocation contexts to avoid lock ordering problems.
-	 * 
-	 * FIXME This should be a read/write lock as per RWStore.  That will provide
-	 * better concurrency.
-	 */
+     * The lock used to serialize all allocation/deallocation requests. This is
+     * shared across all allocation contexts to avoid lock ordering problems.
+     * 
+     * @see BLZG-1658 MemoryManager should know when it has been closed
+     * @see BLZG-1660 MemoryManager should use read/write allocation lock to
+     *      protect readers against concurrent close()
+     */
     final /*private*/ ReentrantReadWriteLock m_allocationLock = new ReentrantReadWriteLock();
 
 	/**
