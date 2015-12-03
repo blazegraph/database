@@ -433,9 +433,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                                	   
                }
                 
-               effectiveProperties.replace(RelationSchema.NAMESPACE, namespace);
+               effectiveProperties.put(RelationSchema.NAMESPACE, namespace);
                 
-               effectiveProperties.replace(RelationSchema.CONTAINER, namespace);
+               effectiveProperties.put(RelationSchema.CONTAINER, namespace);
 
              }
              
