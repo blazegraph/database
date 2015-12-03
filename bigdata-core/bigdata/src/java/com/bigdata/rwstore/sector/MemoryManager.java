@@ -784,39 +784,47 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		if (size <= 0)
 			throw new IllegalArgumentException();
 
-		// FIXME BLZG-1658 We need at least a readLock() on the allocation lock to protect against a concurrent close().
-        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
-        
-		if (size <= SectorAllocator.BLOB_SIZE) {
+		// BLZG-1658 We need at least a readLock() on the allocation lock to protect against a concurrent close().
+        final Lock lock = m_allocationLock.readLock();
+    	lock.lock();
+		try {
+			assertOpen(); // BLZG-1658 MemoryManager should know when it has
+							// been closed
 
-			/*
-			 * This is a simple allocation.
-			 */
-			
-			return new ByteBuffer[] { getBuffer(rwaddr, size) };
-			
-		} else {
-			
-			/*
-			 * This will be a BLOB, so retrieve the header, then parse to
-			 * retrieve components and assign to ByteBuffer[].
-			 */
-			
-			final ByteBuffer hdrbuf = getBlobHdr(addr);
-			
-			final int nblocks = hdrbuf.getInt();
-			
-			final ByteBuffer[] blobbufs = new ByteBuffer[nblocks];
-			int remaining = size;
-			for (int i = 0; i < nblocks; i++) {
-				int blockSize = remaining <= SectorAllocator.BLOB_SIZE ? remaining : SectorAllocator.BLOB_SIZE;
-				blobbufs[i] = getBuffer(hdrbuf.getInt(), blockSize);
-				
-				remaining -= blockSize;
+			if (size <= SectorAllocator.BLOB_SIZE) {
+
+				/*
+				 * This is a simple allocation.
+				 */
+
+				return new ByteBuffer[] { getBuffer(rwaddr, size) };
+
+			} else {
+
+				/*
+				 * This will be a BLOB, so retrieve the header, then parse to
+				 * retrieve components and assign to ByteBuffer[].
+				 */
+
+				final ByteBuffer hdrbuf = getBlobHdr(addr);
+
+				final int nblocks = hdrbuf.getInt();
+
+				final ByteBuffer[] blobbufs = new ByteBuffer[nblocks];
+				int remaining = size;
+				for (int i = 0; i < nblocks; i++) {
+					int blockSize = remaining <= SectorAllocator.BLOB_SIZE ? remaining
+							: SectorAllocator.BLOB_SIZE;
+					blobbufs[i] = getBuffer(hdrbuf.getInt(), blockSize);
+
+					remaining -= blockSize;
+				}
+
+				return blobbufs;
 			}
-			
-			return blobbufs;
-		}
+		} finally {
+        	lock.unlock();
+        }
 	}
 
 	@Override
@@ -841,13 +849,13 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	static byte[] read(final IMemoryManager mmgr, final long addr) {
 
-	    // FIXME BLZG-1658 read() should be protected against concurrent close using read/write lock.
 		final int nbytes = getAllocationSize(addr);
 		
 		final byte[] a = new byte[nbytes];
 		
 		final ByteBuffer mybb = ByteBuffer.wrap(a);
 		
+		// BLZG-1658 read() should be protected against concurrent close using read/write lock in get.
 		final ByteBuffer[] bufs = mmgr.get(addr);
 		
 		for (ByteBuffer b : bufs) {
@@ -906,39 +914,49 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	ByteBuffer getBuffer(final int rwaddr, final int size) {
 
-	    // FIXME BLZG-1658 I think we need to assert that the allocation lock (or a readLock() on it) is held by the caller.
+	    // BLZG-1658 I think we need to assert that the allocation lock (or a readLock() on it) is held by the caller.
+        final Lock lock = m_allocationLock.readLock();
+    	lock.lock();
+		try {
+			assertOpen(); // BLZG-1658 MemoryManager should know when it has
+							// been closed
 
-	    assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+			final SectorAllocator sector = getSector(rwaddr);
 
-		final SectorAllocator sector = getSector(rwaddr);
-				
-		final int offset = SectorAllocator.getSectorOffset(rwaddr);
-		
-		if (!sector.isGettable(offset)) {
-			throw new IllegalArgumentException("Address not gettable: " + rwaddr);
-		}
-		
-		final long paddr = sector.getPhysicalAddress(offset);
-		
-		// Duplicate the buffer to avoid side effects to position and limit.
-		final IBufferAccess ba = m_resources.get(sector.m_index);
-		if (ba == null) {
-			throw new IllegalArgumentException();
-		}
-		final ByteBuffer ret = ba.buffer().duplicate();
-		
-		final int bufferAddr = (int) (paddr - sector.m_sectorAddress);
-		
-		// Set position and limit of the view onto the backing buffer.
-		final int nlimit = bufferAddr + size;
-		if (nlimit > ret.capacity() || nlimit < 0) {
-			throw new IllegalStateException("Buffer Limit Error - Capacity: " + ret.capacity() + ", new limit: " + nlimit);
-		}
-		ret.limit(nlimit);
-		ret.position(bufferAddr);
-		
-		// Take a slice to fix the view of the buffer we return to the caller.
-		return ret.slice();
+			final int offset = SectorAllocator.getSectorOffset(rwaddr);
+
+			if (!sector.isGettable(offset)) {
+				throw new IllegalArgumentException("Address not gettable: "
+						+ rwaddr);
+			}
+
+			final long paddr = sector.getPhysicalAddress(offset);
+
+			// Duplicate the buffer to avoid side effects to position and limit.
+			final IBufferAccess ba = m_resources.get(sector.m_index);
+			if (ba == null) {
+				throw new IllegalArgumentException();
+			}
+			final ByteBuffer ret = ba.buffer().duplicate();
+
+			final int bufferAddr = (int) (paddr - sector.m_sectorAddress);
+
+			// Set position and limit of the view onto the backing buffer.
+			final int nlimit = bufferAddr + size;
+			if (nlimit > ret.capacity() || nlimit < 0) {
+				throw new IllegalStateException(
+						"Buffer Limit Error - Capacity: " + ret.capacity()
+								+ ", new limit: " + nlimit);
+			}
+			ret.limit(nlimit);
+			ret.position(bufferAddr);
+
+			// Take a slice to fix the view of the buffer we return to the
+			// caller.
+			return ret.slice();
+		} finally {
+        	lock.unlock();
+        }
 	}
 
 	/**
@@ -1300,21 +1318,35 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	@Override
 	public int getAssociatedSlotSize(final int addr) {
-	    // FIXME BLZG-1658 MemoryManager should know when it has been closed (operation is not protected against concurrent close()).
-	    final SectorAllocator sector = getSector(addr);
-		
-		final int offset = SectorAllocator.getSectorOffset(addr);
-		
-		return sector.getPhysicalSize(offset);
+	    // BLZG-1658 MemoryManager should know when it has been closed (operation is not protected against concurrent close()).
+        final Lock lock = m_allocationLock.readLock();
+    	lock.lock();
+		try {
+			assertOpen();
+			
+			final SectorAllocator sector = getSector(addr);
+
+			final int offset = SectorAllocator.getSectorOffset(addr);
+
+			return sector.getPhysicalSize(offset);
+		} finally {
+        	lock.unlock();
+        }
 	}
 
 	@Override
-    public void getData(final long l, final byte[] buf) {
-        /**
-         * TBD: this could probably be more efficient!
-         */
-		final ByteBuffer rbuf = getBuffer((int) l, buf.length);	
-		rbuf.get(buf);
+	public void getData(final long l, final byte[] buf) {
+		/**
+		 * TBD: this could probably be more efficient!
+		 */
+		final Lock lock = m_allocationLock.readLock();
+		lock.lock();
+		try {
+			final ByteBuffer rbuf = getBuffer((int) l, buf.length);
+			rbuf.get(buf);
+		} finally {
+			lock.unlock();
+		}
 	}
 
 	@Override
@@ -1911,12 +1943,13 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     }
 
 	public IAllocationContext newAllocationContext(final boolean isolated) {
-	    // FIXME BLZG-1658 This needs a readLock() on the allocation lock to protect against a concurrent close.
-        assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+	    // BLZG-1658 This needs a readLock() on the allocation lock to protect against a concurrent close.
         final Lock lock = m_allocationLock.readLock();
     	lock.lock();
         try {
-			AllocationContext ret = new AllocationContext(this, isolated);
+            assertOpen(); // BLZG-1658 MemoryManager should know when it has been closed
+
+            AllocationContext ret = new AllocationContext(this, isolated);
 	
 			if (isolated) {
 		        m_contexts.put(ret, ret);
