@@ -141,7 +141,7 @@ public class SysstatUtil {
     static public String[] splitDataLine(final String data) {
         
         // split into fields
-        final String[] fields = data.split("\\s+");
+        final String[] fields = data.trim().split("\\s+");
         
         if(log.isDebugEnabled()) {
             
