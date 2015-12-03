@@ -111,40 +111,6 @@ public class ASTEvalHelper {
     private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
 
     /**
-     * Batch resolve {@link Value}s to {@link IV}s.
-     * 
-     * @param store
-     *            The KB instance.
-     * @param bs
-     *            The binding set (may be empty or <code>null</code>).
-     * 
-     * @return A binding set having resolved {@link IV}s.
-     * 
-     * @throws QueryEvaluationException
-     */
-    static //private Note: Exposed to CBD class. 
-    IBindingSet batchResolveIVs(final AbstractTripleStore store,
-            final BindingSet bs) throws QueryEvaluationException {
-
-        if (bs == null || bs.size() == 0) {
-
-            // Use an empty binding set.
-            return new ListBindingSet();
-            
-        }
-
-        final Object[] tmp = new BigdataValueReplacer(store).replaceValues(
-                null/* dataset */, new BindingSet[] { bs });
-
-        final BindingSet[] a = (BindingSet[]) tmp[1];
-
-        final BindingSet tmp2 = a[0];
-        
-        return toBindingSet(tmp2);
-
-    }
-    
-    /**
      * Evaluate a boolean query.
      * 
      * @param store
@@ -342,7 +308,8 @@ public class ASTEvalHelper {
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
         final IBindingSet[] globallyScopedBSAsList = 
-              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+                new IBindingSet[] { (globallyScopedBS == null || globallyScopedBS.size() == 0) ? new ListBindingSet() : toBindingSet(globallyScopedBS) }; 
+//              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -1140,6 +1107,7 @@ public class ASTEvalHelper {
             // Propogate bindings
             ctx.setQueryBindingSet(bs);
             ctx.setBindings(bindingSets);
+            ctx.setDataset(dataset);
 
             /*
              * Convert the query (generates an optimized AST as a side-effect).
