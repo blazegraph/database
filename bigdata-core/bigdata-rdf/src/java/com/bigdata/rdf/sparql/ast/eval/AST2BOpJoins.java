@@ -1325,7 +1325,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * versions of the operator require this attribute.)
              */
             map.put(HashJoinOp.Annotations.NAMED_SET_REF,
-                    NamedSolutionSetRefUtility.newInstance(/*ctx.queryId*/null,
+                    NamedSolutionSetRefUtility.newInstance(ctx.queryId,
                             "--namedSet-" + ctx.nextId(), joinVars));
 
             /*
