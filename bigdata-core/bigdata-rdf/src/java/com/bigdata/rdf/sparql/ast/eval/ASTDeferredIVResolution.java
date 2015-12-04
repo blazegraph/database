@@ -53,10 +53,8 @@ import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.AbstractOneGraphManagement;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.CreateGraph;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
-import com.bigdata.rdf.sparql.ast.DropGraph;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -115,10 +113,10 @@ public class ASTDeferredIVResolution {
         void handle(IV newIV);
     }
 
-    /**
-     * The target triple store.
-     */
-    private final AbstractTripleStore store;
+//    /**
+//     * The target triple store.
+//     */
+//    private final AbstractTripleStore store;
     
     /**
      * The value factory for that target triple store.
@@ -150,7 +148,7 @@ public class ASTDeferredIVResolution {
         if (store == null)
             throw new IllegalArgumentException();
 
-        this.store = store;
+//        this.store = store;
         
         this.vf = store.getValueFactory();
         
@@ -378,7 +376,7 @@ public class ASTDeferredIVResolution {
 
 //    	final long beginNanos = System.nanoTime();
     	
-        termsResolver.resolve(store, update, null, bs);
+        termsResolver.resolve(store, update, null/*datasetClauseLists*/, bs);
 
 //        ast.setResolveValuesTime(System.nanoTime() - beginNanos);
 
