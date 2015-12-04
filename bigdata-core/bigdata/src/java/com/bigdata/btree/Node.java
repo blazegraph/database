@@ -82,7 +82,6 @@ import cutthecrap.utils.striterators.Striterator;
  * we can prune the search before we materialize the child.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Node extends AbstractNode<Node> implements INodeData {
 
@@ -907,7 +906,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
     @Override
     public Tuple insert(final byte[] key, final byte[] value,
-            final boolean delete, final long timestamp, final Tuple tuple) {
+            final boolean delete, final boolean putIfAbsent, final long timestamp, final Tuple tuple) {
 
         assert !deleted;
 
@@ -920,7 +919,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         final AbstractNode<?> child = getChild(childIndex);
 
-        return child.insert(key, value, delete, timestamp, tuple);
+        return child.insert(key, value, delete, putIfAbsent, timestamp, tuple);
 
     }
 
@@ -2528,7 +2527,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * <p>
      * As always, the mutable B+Tree is single threaded so there are not added
      * synchronization costs. Concurrent readers can only arise for read-only
-     * {@link BTree}s and for {@link IndexSegment}s.</strong>
+     * {@link BTree}s and for {@link IndexSegment}s.
      * 
      * @param index
      *            The index of the child to be read from the store (in
@@ -2544,6 +2543,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     final public AbstractNode getChild(final int index) {
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheTests.increment();
+        
         /*
          * I've take out this test since it turns out to be relatively
          * expensive!?! The interrupt status of the thread is now checked
@@ -2626,6 +2628,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * the Memoizer and then return the new value of childRefs[index].
          */
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheMisses.increment();
+        
         return btree.loadChild(this, index);
 
     }
@@ -2693,6 +2698,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * The child needs to be read from the backing store.
          */
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheMisses.increment();
+        
         final long addr = data.getChildAddr(index);
 
         if (addr == IRawStore.NULL) {

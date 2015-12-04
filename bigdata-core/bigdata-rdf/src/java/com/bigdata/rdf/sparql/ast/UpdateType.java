@@ -182,7 +182,31 @@ public enum UpdateType {
      * @see http://www.w3.org/TR/sparql11-update/#clear
      * @see ClearGraph
      */
-    Clear(false/* graphUpdate */);
+    Clear(false/* graphUpdate */), 
+    
+    /**
+     * The DROP ENTAILMENTS operation drop the entailments.
+     * This is only required if you have removed some statements from the database. 
+     */
+    DropEntailments(false/* graphUpdate */),
+    
+    /**
+     * The CREATE ENTAILMENTS operation compute the entailments 
+     * using an efficient "database-at-once" closure operation. 
+     */
+    CreateEntailments(false/* graphUpdate */), 
+    
+    /**
+     * The DISABLE ENTAILMENTS operation can be used 
+     * to disable incremental truth maintenance.
+     */
+    DisableEntailments(false/* graphUpdate */),
+    
+    /**
+     * The ENABLE ENTAILMENTS operation can be used
+     * to enable incremental truth maintenance.
+     */
+    EnableEntailments(false/* graphUpdate */);
 
     private UpdateType(final boolean graphUpdate) {
 

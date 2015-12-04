@@ -1870,7 +1870,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         
         if (this.textIndex && textIndex.size() > 0) {
-            
+			/*
+			 * There were some inline literals that need to make it into the
+			 * text index. That is handled here.
+			 * 
+			 * See BLZG-1525
+			 */
             try {
                 
                 stats.fullTextIndexTime

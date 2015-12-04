@@ -2626,8 +2626,8 @@ abstract public class AbstractTripleStore extends
          * Note: This uses the batch API.
          */
 
-        final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
-                this, 1);
+		final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(null/* focusStore */, this,
+				1/* capacity */, 0/* queueCapacity */);
 
         buffer.add(s, p, o, c);
 

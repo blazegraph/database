@@ -56,7 +56,7 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
     public final BigdataValueFactory f;
 
     public final BigdataSailRepositoryConnection conn;
-
+    
     private boolean includeInferred;
     
     private QueryBindingSet qbs;
@@ -112,7 +112,7 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
                 .getDatabase());
 
         this.conn = conn;
-
+        
         this.sail = conn.getSailConnection().getBigdataSail();
        
         this.f = (BigdataValueFactory) sail.getValueFactory();

@@ -8,8 +8,8 @@ if [ -z "$JAVA_OPTS" ] ; then
 	JAVA_OPTS="-ea -Xmx4g -server"
 fi
 
-if [ -z "$JAVA_HOME" ] ; then
-	JAVA=${JAVA_HOME}/bin/java
+if [! -z "$JAVA_HOME" ] ; then
+	JAVA="${JAVA_HOME}/bin/java"
 else
 	JAVA=`which java`
 fi

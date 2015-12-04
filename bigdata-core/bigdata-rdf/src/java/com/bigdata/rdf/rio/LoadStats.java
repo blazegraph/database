@@ -31,7 +31,6 @@ import com.bigdata.rdf.inf.ClosureStats;
  * Used to report statistics when loading data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class LoadStats {
 

@@ -27,8 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.proc;
 
+import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
@@ -68,11 +70,12 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         }
 
         @Override
-        public BatchLookup newInstance(IRabaCoder keysCoder,
-                IRabaCoder valsCoder, int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public BatchLookup newInstance(final IRabaCoder keysCoder,
+                final IRabaCoder valsCoder, final int fromIndex, final int toIndex,
+            	final byte[][] keys, final byte[][] vals) {
 
-            assert vals == null;
+			if (vals != null)
+				throw new IllegalArgumentException(Errors.ERR_VALS_NOT_NULL);
 
             return new BatchLookup(keysCoder, valsCoder, fromIndex, toIndex,
                     keys);
@@ -115,9 +118,9 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
      * @return {@link ResultBuffer}
      */
     @Override
-    public ResultBuffer apply(final IIndex ndx) {
+    public ResultBuffer applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
-        final int n = getKeyCount();
+        final int n = keys.size();
         
         final byte[][] ret = new byte[n][];
         
@@ -125,7 +128,7 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         
         while (i < n) {
 
-            ret[i] = ndx.lookup(getKey(i));
+            ret[i] = ndx.lookup(keys.get(i));
 
             i++;
 
@@ -135,5 +138,12 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
                 .getTupleSerializer().getLeafValuesCoder());
 
     }
+
+	@Override
+	protected IResultHandler<ResultBuffer, ResultBuffer> newAggregator() {
+
+		return new ResultBufferHandler(getKeys().size(), getValuesCoder());
+
+	}
 
 }

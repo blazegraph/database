@@ -60,7 +60,6 @@ import cutthecrap.utils.striterators.IFilter;
  * Test suite for {@link FusedView}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestFusedView extends AbstractBTreeTestCase {
 
@@ -158,24 +157,27 @@ public class TestFusedView extends AbstractBTreeTestCase {
      */
     public void test_indexStuff() {
         
-        byte[] k3 = i2k(3);
-        byte[] k5 = i2k(5);
-        byte[] k7 = i2k(7);
+        final byte[] k3 = i2k(3);
+        final byte[] k5 = i2k(5);
+        final byte[] k7 = i2k(7);
+        final byte[] k9 = i2k(9);
 
-        byte[] v3a = new byte[]{3};
-        byte[] v5a = new byte[]{5};
-        byte[] v7a = new byte[]{7};
+        final byte[] v3a = new byte[]{3};
+        final byte[] v5a = new byte[]{5};
+        final byte[] v7a = new byte[]{7};
+        final byte[] v9a = new byte[]{9};
         
-        byte[] v3b = new byte[]{3,1};
-        byte[] v5b = new byte[]{5,1};
-        byte[] v7b = new byte[]{7,1};
+        final byte[] v3b = new byte[]{3,1};
+        final byte[] v5b = new byte[]{5,1};
+        final byte[] v7b = new byte[]{7,1};
+        final byte[] v9b = new byte[]{9,1};
         
-        IRawStore store = new SimpleMemoryRawStore();
+        final IRawStore store = new SimpleMemoryRawStore();
         
         // two btrees with the same index UUID.
         final BTree btree1, btree2;
         {
-            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+        	final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
             
             md.setBranchingFactor(3);
             
@@ -225,6 +227,8 @@ public class TestFusedView extends AbstractBTreeTestCase {
         assertTrue(view.contains(k3));
         assertFalse(view.contains(k5));
         assertTrue(view.contains(k7));
+        assertEquals(v3a, view.putIfAbsent(k3, v3b)); // No change!
+        assertEquals(v3a, view.lookup(k3));
 
         /*
          * Write on the view.
@@ -246,6 +250,8 @@ public class TestFusedView extends AbstractBTreeTestCase {
         assertTrue(view.contains(k3));
         assertTrue(view.contains(k5));
         assertTrue(view.contains(k7));
+        assertEquals(v5a, view.putIfAbsent(k5, v5b)); // No change!
+        assertEquals(v5a, view.lookup(k5));
         
         /*
          * Write on the view.
@@ -348,6 +354,101 @@ public class TestFusedView extends AbstractBTreeTestCase {
         assertTrue(view.contains(k3));
         assertTrue(view.contains(k5));
         assertTrue(view.contains(k7));
+        assertEquals(v3b, view.putIfAbsent(k3, v3a)); // No change!
+        assertEquals(v3b, view.lookup(k3));
+        assertEquals(v7b, view.putIfAbsent(k7, v7a)); // No change!
+        assertEquals(v7b, view.lookup(k7));
+
+        /*
+         * Now we can check putIfAbsent() semantics on the fused view.
+         * 
+         * @see BLZG-1539
+		 */
+        
+        /*
+         * Write on the view.
+         * 
+         * btree1 {k3:=deleted; k5=v5b; k7=v7b}
+         * 
+         * btree2 {k3=v3a; k7=v7a}
+         */
+        assertEquals(v3b, view.remove(k3));
+        assertEquals(3, btree1.rangeCount(null, null));
+        assertEquals(2, btree2.rangeCount(null, null));
+        assertEquals(5, view.rangeCount(null, null));
+        assertSameIterator(new byte[][] { v5b, v7b }, btree1.rangeIterator(
+                null, null));
+        assertSameIterator(new byte[][] { null, v5b, v7b }, btree1
+                .rangeIterator(null, null, 0/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.DELETED, null/*filter*/));
+        assertSameIterator(new byte[][] { v3a, v7a }, btree2.rangeIterator(
+                null, null));
+        assertSameIterator(new byte[][] { v5b, v7b }, view.rangeIterator(null,
+                null));
+        assertSameIterator(new byte[][] { null, v5b, v7b }, view.rangeIterator(
+                null, null, 0/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.DELETED, null/* filter */));
+        assertFalse(view.contains(k3));
+        assertTrue(view.contains(k5));
+        assertTrue(view.contains(k7));
+        
+        /*
+         * Write on the view.
+         * 
+         * btree1 {k3:=v3b; k5=v5b; k7=v7b}
+         * 
+         * btree2 {k3=v3a; k7=v7a}
+         */
+        assertEquals(null, view.putIfAbsent(k3,v3b)); // conditional mutation occurs.
+        assertEquals(3, btree1.rangeCount(null, null));
+        assertEquals(2, btree2.rangeCount(null, null));
+        assertEquals(5, view.rangeCount(null, null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b }, btree1.rangeIterator(
+                null, null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b }, btree1
+                .rangeIterator(null, null, 0/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.DELETED, null/*filter*/));
+        assertSameIterator(new byte[][] { v3a, v7a }, btree2.rangeIterator(
+                null, null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b }, view.rangeIterator(null,
+                null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b }, view.rangeIterator(
+                null, null, 0/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.DELETED, null/* filter */));
+        assertTrue(view.contains(k3));
+        assertTrue(view.contains(k5));
+        assertTrue(view.contains(k7));
+
+        /*
+         * Write on the view.
+         * 
+         * btree1 {k3:=v3b; k5=v5b; k7=v7b; k9=v9a}
+         * 
+         * btree2 {k3=v3a; k7=v7a}
+         */
+        assertEquals(null, view.putIfAbsent(k9,v9a)); // conditional mutation occurs.
+        assertEquals(4, btree1.rangeCount(null, null));
+        assertEquals(2, btree2.rangeCount(null, null));
+        assertEquals(6, view.rangeCount(null, null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b, v9a }, btree1.rangeIterator(
+                null, null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b, v9a }, btree1
+                .rangeIterator(null, null, 0/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.DELETED, null/*filter*/));
+        assertSameIterator(new byte[][] { v3a, v7a }, btree2.rangeIterator(
+                null, null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b, v9a }, view.rangeIterator(null,
+                null));
+        assertSameIterator(new byte[][] { v3b, v5b, v7b, v9a }, view.rangeIterator(
+                null, null, 0/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.DELETED, null/* filter */));
+        assertTrue(view.contains(k3));
+        assertTrue(view.contains(k5));
+        assertTrue(view.contains(k7));
+        assertTrue(view.contains(k9));
+        
+        assertEquals(v9a, view.putIfAbsent(k9,v9b)); // conditional mutation does not occur.
+        assertEquals(v9a, view.lookup(k9)); // no change!
 
     }
 
