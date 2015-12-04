@@ -25,9 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jul 27, 2011
  */
 
-package com.bigdata.bop.solutions;
+package com.bigdata.rdf.sail.sparql;
 
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -37,13 +36,31 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IValueExpressionConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sail.sparql.ast.VisitorException;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
+import com.bigdata.rdf.sparql.ast.GroupByNode;
+import com.bigdata.rdf.sparql.ast.HavingNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * An object which encapsulates the validation and state of an aggregation
@@ -52,18 +69,18 @@ import com.bigdata.bop.aggregate.IAggregate;
  * SELECT expressions do not involve aggregates then you should not be using an
  * aggregation operator to compute the select expressions).
  * <p>
- * Note: As part of decoupling the SPARQL parser from the database in BLZG-1176,
- * a copy of this logic is now maintained in
- * {@link com.bigdata.rdf.sail.sparql.VerifyAggregates}.
+ * Note: This is a port of {@link com.bigdata.bop.solutions.GroupByState} that
+ * does not depend on the blazegraph operator model. It was developed as part of
+ * BLZG-1176 to decouple the SPARQL parser from the database.
  * 
- * @see https://jira.blazegraph.com/browse/BLZG-1176
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ *
+ * @see https://jira.blazegraph.com/browse/BLZG-1176
  */
-public class GroupByState implements IGroupByState, Serializable {
+@SuppressWarnings({ "rawtypes", "unchecked" })
+public class VerifyAggregates {
 
-    private static final long serialVersionUID = 1L;
-
-    private static final Logger log = Logger.getLogger(GroupByState.class);
+    private static final Logger log = Logger.getLogger(VerifyAggregates.class);
     
     private final IValueExpression<?>[] select;
     private final IValueExpression<?>[] groupBy;
@@ -71,10 +88,6 @@ public class GroupByState implements IGroupByState, Serializable {
     private final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
     private final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
     private final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
-    final private boolean anyDistinct;
-    final private boolean selectDependency;
-    final private boolean nestedAggregates;
-    final private boolean simpleHaving;
 
     @Override
     public String toString() {
@@ -87,78 +100,66 @@ public class GroupByState implements IGroupByState, Serializable {
         return sb.toString();
     }
     
-    @Override
-    public IValueExpression<?>[] getGroupByClause() {
-        return groupBy;
-    }
+    public VerifyAggregates(final ProjectionNode projection,
+            final GroupByNode groupBy, final HavingNode having) {
 
-    @Override
-    public LinkedHashSet<IVariable<?>> getGroupByVars() {
-        return groupByVars;
-    }
+//        // normalize an empty[] to a null.
+        this.groupBy = groupBy == null || groupBy.arity() == 0 ? null : groupBy.getValueExpressions();
+        
+        // Replacing unresolvedFunctionNodes with specific AggregateBase to be able
+        // to check for aggregates in com.bigdata.bop.solutions.GroupByState.isAggregate
+        if (projection!=null) {
+            final IValueExpression<?>[] exprs = new IValueExpression[projection.arity()];
+            int i = 0;
+            final Striterator projectionNodes = new Striterator(projection.iterator());
+            while(projectionNodes.hasMoreElements()) {
+                final AssignmentNode n = (AssignmentNode) projectionNodes.nextElement();
+                IValueExpression expr = n.getValueExpression();
+                final IValueExpressionNode exprNode = n.getValueExpressionNode();
+                if (expr == null && exprNode instanceof FunctionNode) {
+                    expr = convertAggregates((FunctionNode)exprNode);
+                }
+                exprs[i++] = new Bind(n.getVar(), expr);
+            }
+            select = exprs;
+        } else {
+            select = null;
+        }
 
-    @Override
-    public IValueExpression<?>[] getSelectClause() {
-        return select;
-    }
 
-    @Override
-    public LinkedHashSet<IVariable<?>> getSelectVars() {
-        return selectVars;
-    }
+        if (projection == null)
+            throw new IllegalArgumentException();
 
-    @Override
-    public IConstraint[] getHavingClause() {
-        return having;
-    }
+        if (projection.arity() == 0)
+            throw new IllegalArgumentException();
 
-    @Override
-    public LinkedHashSet<IVariable<?>> getColumnVars() {
-        return columnVars;
-    }
-
-//    public LinkedHashSet<IVariable<?>> getDistinctColumnVars() {
-//        return distinctColumnVars;
-//    }
-
-    @Override
-    public boolean isAnyDistinct() {
-        return anyDistinct;
-    }
-
-    @Override
-    public boolean isSelectDependency() {
-        return selectDependency;
-    }
-
-    @Override
-    public boolean isNestedAggregates() {
-        return nestedAggregates;
-    }
+        if (having!=null) {
+            final IConstraint[] exprs2 = new IConstraint[having.arity()];
+            int i = 0;
+            for (final IValueExpressionNode node : having) {
     
-    @Override
-    public boolean isSimpleHaving() {
-        return simpleHaving;
-    }
+                final IValueExpression<? extends IV> ve = node.getValueExpression();
+                if (ve!=null) {
+                    exprs2[i] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                            ve);
+                } else if (node instanceof FunctionNode) {
+                    
+                    final FunctionNode exprNode = (FunctionNode)node;
+                    final BOp expr = convertAggregates(exprNode);
+                    exprs2[i] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(new BOp[]{
+                            expr}, null);
+                    
+                    log.debug("Unknown node "+node);
+                }
+                i++;
+    
+            }
+            this.having = exprs2;
+        } else {
+            this.having = null;
+        }
 
-    public GroupByState(final IValueExpression<?>[] select,
-            final IValueExpression<?>[] groupBy, final IConstraint[] having) {
-
-        // normalize an empty[] to a null.
-        this.groupBy = groupBy != null && groupBy.length == 0 ? null : groupBy;
-
-        // must be non-null, non-empty array.
-        this.select = select;
-
-        if (select == null)
-            throw new IllegalArgumentException();
-
-        if (select.length == 0)
-            throw new IllegalArgumentException();
-
-        // normalize an empty[] to a null.
-        this.having = having != null && having.length == 0 ? null : having;
-
+        
         // true iff any aggregate expression uses DISTINCT.
         final AtomicBoolean anyDistinct = new AtomicBoolean(false);
 
@@ -180,7 +181,7 @@ public class GroupByState implements IGroupByState, Serializable {
         if (groupBy != null) {
 
             // Collect top-level variables from GROUP_BY value expressions.
-            for (IValueExpression<?> expr : groupBy) {
+            for (final IValueExpression<?> expr : this.groupBy) {
                 if (expr instanceof IVariable<?>) {
                     groupByVars.add((IVariable<?>) expr);
                 } else if (expr instanceof IBind<?>) {
@@ -216,7 +217,7 @@ public class GroupByState implements IGroupByState, Serializable {
             // true iff any aggregate expression uses a reference to another
             // aggregate expression in the select clause.
             final AtomicBoolean selectDependency = new AtomicBoolean(false);
-            for (IValueExpression<?> expr : select) {
+            for (final IValueExpression<?> expr : this.select) {
                 /*
                  * Each SELECT value expression must be either a top-level
                  * IVariable in the GROUP BY clause or an IBind wrapping a value
@@ -259,7 +260,6 @@ public class GroupByState implements IGroupByState, Serializable {
                                     + expr);
                 }
             }
-            this.selectDependency = selectDependency.get();
         }
 
         /*
@@ -276,7 +276,7 @@ public class GroupByState implements IGroupByState, Serializable {
         boolean simpleHaving = true;
         if (having != null) {
             
-            for (IConstraint c : having) {
+            for (final IConstraint c : this.having) {
 
                 /*
                  * The constraint must be an aggregate expression.
@@ -318,15 +318,36 @@ public class GroupByState implements IGroupByState, Serializable {
                 }
             }
         }
-        this.simpleHaving = simpleHaving;
 
-        // true iff any aggregate function nests another aggregate function
-        // within it.
-        this.nestedAggregates = nestedAggregates.get();
-        
-        // true iff DISTINCT used w/in aggregate function in SELECT or HAVING.
-        this.anyDistinct = anyDistinct.get();
+    }
 
+    private IValueExpression convertAggregates(final BOp exprNode) {
+        IValueExpression expr;
+        final BOp[] args = new BOp[exprNode.args().size()];
+        if (exprNode!=null && exprNode.arity()>0) {
+            for (int i=0; i<exprNode.args().size(); i++) {
+                final BOp arg = exprNode.args().get(i);
+                final IValueExpression newValue = convertAggregates(arg); 
+                if (newValue!=null) {
+                    args[i] = newValue;
+                } else {
+                    args[i] = arg;
+                }
+            }
+        }
+        if (exprNode instanceof FunctionNode) {
+            if ((exprNode instanceof FunctionNode) && FunctionRegistry.isAggregate(((FunctionNode) exprNode).getFunctionURI())) {
+                expr = new AggregateBase(args, null) {
+                    @Override public void reset() {}
+                    @Override public IV done() { return null; }
+                };
+            } else {
+                expr = new UnknownFunctionBOp(args, null);
+            }
+        } else {
+            expr = null;
+        }
+        return expr;
     }
 
     /**
@@ -390,8 +411,12 @@ public class GroupByState implements IGroupByState, Serializable {
             final AtomicBoolean isNestedAggregates,
             final AtomicBoolean isAnyDistinct) {
 
-        if (op == null)
-            throw new IllegalArgumentException();
+        if (op == null) {
+            // BOp is not prepared yet, but it is not an Aggregate,
+            // otherwise dummy aggregate BOp provided
+            // by com.bigdata.rdf.sparql.ast.ProjectionNode.getValueExpressions() 
+            return false;
+        }
 
         if (op instanceof IConstant && isSelectClause) {
             /*
@@ -413,7 +438,9 @@ public class GroupByState implements IGroupByState, Serializable {
             final AtomicBoolean isAnyDistinct,
             final boolean withinAggregateFunction) {
 
-        if (op instanceof IAggregate<?>) {
+        if (op instanceof IAggregate<?> ||
+                ((op instanceof FunctionNode) && FunctionRegistry.isAggregate(((FunctionNode) op).getFunctionURI()))
+                    ) {
             if(withinAggregateFunction) {
                 isNestedAggregates.set(true);
             }
@@ -472,9 +499,11 @@ public class GroupByState implements IGroupByState, Serializable {
         final Iterator<BOp> itr = op.argIterator();
         while (itr.hasNext()) {
             final BOp arg = itr.next();
-            if(!(arg instanceof IValueExpression<?>)) {
-                // skip non-value expression arguments.
-                continue;
+            if (selectVars.contains(arg)) {
+                if (isSelectClause)
+                    isSelectDependency.set(true);
+                isAggregate = true;
+                return true;
             }
             if (log.isTraceEnabled())
                 log.trace("op=" + op.getClass()
@@ -503,4 +532,79 @@ public class GroupByState implements IGroupByState, Serializable {
 
     }
 
+    /**
+     * Verify the various conditions that must be met when a query uses GROUP BY
+     * or when a query uses aggregates in a PROJECTION.
+     * 
+     * @param queryBase
+     *            The query.
+     * 
+     * @throws VisitorException
+     */
+    public static void verifyAggregate(final QueryBase queryBase)
+            throws VisitorException {
+
+        /*
+         * The following code has some dependencies on whether or not the
+         * value expressions have been cached. That is not done until we get
+         * into AST2BOpUtility. I have worked some hacks to support this in
+         * FunctionRegistry.isAggregate() and StaticAnalysis.isAggregate().
+         * However, the code is still hitting some edge cases.
+         * 
+         * MP: I fixed this by running the ASTSetValueOptimizer earlier in the
+         * parsing process - ie. in Bigdata2ASTSPARQLParser.parseQuery2.
+         * 
+         * There is some commented out code from openrdf that depends on setting
+         * a flag for the expression if an AggregationCollector reports at least
+         * one aggregation in a projection element. We could do this same thing
+         * here but we still need to have the logic to figure out what is an
+         * invalid aggregate.
+         * 
+         * MP: I think the place to go look for reference is Sesame's
+         * TupleExprBuilder, especially:
+         * 
+         * public TupleExpr visit(ASTSelect node, Object data)
+         * 
+         * And also look at the AggregateCollector.
+         */
+        
+        final ProjectionNode projection = queryBase.getProjection() == null ? null
+                : queryBase.getProjection().isEmpty() ? null : queryBase
+                        .getProjection();
+
+        final GroupByNode groupBy = queryBase.getGroupBy() == null ? null
+                : queryBase.getGroupBy().isEmpty() ? null : queryBase
+                        .getGroupBy();
+
+        final HavingNode having = queryBase.getHaving() == null ? null
+                : queryBase.getHaving().isEmpty() ? null : queryBase
+                        .getHaving();
+
+        // true if this is an aggregation query.
+        final boolean isAggregate = StaticAnalysis.isAggregate(projection,
+                groupBy, having);
+
+        if (isAggregate) {
+
+            if (projection.isWildcard())
+                throw new VisitorException(
+                        "Wildcard not allowed with aggregate.");
+
+            try {
+
+                /*
+                 * Delegate logic to validate the aggregate query.
+                 */
+
+                new VerifyAggregates(projection, groupBy, having);
+
+            } catch (final IllegalArgumentException ex) {
+
+                throw new VisitorException("Bad aggregate", ex);
+
+            }
+
+        }
+
+    }
 }

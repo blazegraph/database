@@ -1722,6 +1722,30 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
 
         /*
+         * Ensure that BigdataValue objects belong to the correct ValueFactory
+         * for this LexiconRelation.
+         * 
+         * @see BLZG-1593 (LexiconRelation.addTerms() does not reject
+         * BigdataValue objects from another namespace nor call asValue() on
+         * them to put them in the correct namespace)
+         */
+        {
+            final BigdataValueFactory vf = getValueFactory();
+            for (int i = 0; i < numTerms; i++) {
+                final BigdataValue tmp = vf.asValue(values[i]);
+                if (tmp != values[i]) {
+                    /*
+                     * Note: When the BigdataValue does not belong to this
+                     * namespace the IV can not be set on the BigdataValue as a
+                     * side-effect.
+                     */
+                    throw new RuntimeException("Value does not belong to this namespace: value=" + values[i]);
+                }
+                values[i] = tmp;
+            }
+        }
+        
+        /*
          * Filter out inline terms from the supplied terms array and create a
          * collections of Values which will be resolved against the
          * TERM2ID/ID2TERM index and a collection of Values which will be

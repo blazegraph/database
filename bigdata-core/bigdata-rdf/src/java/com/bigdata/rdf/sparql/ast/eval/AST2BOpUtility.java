@@ -245,8 +245,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final StaticAnalysisStats stats = new StaticAnalysisStats();
         // register parser call if parse information is available
-        if (astContainer!=null && astContainer.getQueryParseTime()!=null) {
-           stats.registerParserCall(astContainer.getQueryParseTime());
+		if (astContainer != null) {
+			stats.registerParserCall(astContainer);
         }
         ctx.setStaticAnalysisStats(stats);
         
