@@ -31,8 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.util.log.Log;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -61,9 +59,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTTRefPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTVar;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
-import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.PathNode;
 import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
 import com.bigdata.rdf.sparql.ast.PathNode.PathElt;
@@ -71,10 +67,10 @@ import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
 import com.bigdata.rdf.sparql.ast.PathNode.PathNegatedPropertySet;
 import com.bigdata.rdf.sparql.ast.PathNode.PathOneInPropertySet;
 import com.bigdata.rdf.sparql.ast.PathNode.PathSequence;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTPropertyPathOptimizer;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTPropertyPathOptimizer;
 
 /**
  * Class handles triple patterns and property paths.
@@ -1071,7 +1067,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
      * @return The SID variable.  This allows the existing code paths to
      * handle nested triple reference patterns without change.
      */
-    public ASTBase visit(final ASTTRefPattern node,
+    public TermNode visit(final ASTTRefPattern node,
             final Object data) throws VisitorException {
         
         /*
