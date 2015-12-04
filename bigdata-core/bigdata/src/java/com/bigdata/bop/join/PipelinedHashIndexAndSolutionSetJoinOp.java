@@ -37,6 +37,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.PipelineOp.Annotations;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.SubqueryAnnotations;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -185,6 +186,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *  be re-evaluated each time, it is submitted once to the hash index in the
  *  beginning and joined with every incoming binding.
  *  
+ *  3.) There exist two "implementations" of the operator, namely the
+ *  {@link JVMPipelinedHashJoinUtility} and the {@link HTreePipelinedHashJoinUtility}.
+ *  
  *  # Other remarks:
  *  There are some more technicalities like support for ASK_VAR (which is used
  *  by the FILTER (NOT) EXISTS translation scheme, which work in principle in
@@ -264,6 +268,10 @@ public class PipelinedHashIndexAndSolutionSetJoinOp extends HashIndexOp {
        
         super(op);
 
+        // max parallel must be one
+        if (getMaxParallel() != 1)
+            throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "=" + getMaxParallel());
+
     }
     
     /**
@@ -275,6 +283,10 @@ public class PipelinedHashIndexAndSolutionSetJoinOp extends HashIndexOp {
     public PipelinedHashIndexAndSolutionSetJoinOp(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
+        
+        // max parallel must be one
+        if (getMaxParallel() != 1)
+            throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "=" + getMaxParallel());
 
     }
     
