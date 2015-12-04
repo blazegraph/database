@@ -271,7 +271,12 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * operation which have a 0L term identifier in case they have
 				 * become defined through the previous update(s).
 				 * 
-				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+				 * Note: Since 2.0, also re-resolves RDF Values appearing in the
+				 * binding sets or data set.
+				 * 
+				 * @see BLZG-1176 SPARQL Parsers should not be db mode aware
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
 				ASTDeferredIVResolution.resolveUpdate(context.db,
 				      op, context.getQueryBindingSet(), context.getDataset());
