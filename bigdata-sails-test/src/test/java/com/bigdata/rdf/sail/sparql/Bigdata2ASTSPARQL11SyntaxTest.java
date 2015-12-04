@@ -158,7 +158,7 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
 
             if (useBigdataParser) {
                 // bigdata parser.
-                return new Bigdata2ASTSPARQLParser(tripleStore).parseOperation(query,
+                return new Bigdata2ASTSPARQLParser().parseOperation(query,
                         queryFileURL);
                 
             } else {

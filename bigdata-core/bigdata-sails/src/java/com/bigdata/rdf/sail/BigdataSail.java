@@ -4433,7 +4433,7 @@ public class BigdataSail extends SailBase implements Sail {
                 flushStatementBuffers(true/* assertions */, true/* retractions */);
 
                 return ASTEvalHelper.evaluateTupleQuery(getTripleStore(),
-                        astContainer, new QueryBindingSet(bindings));
+                        astContainer, new QueryBindingSet(bindings), dataset);
             
             } catch (QueryEvaluationException e) {
                                 
