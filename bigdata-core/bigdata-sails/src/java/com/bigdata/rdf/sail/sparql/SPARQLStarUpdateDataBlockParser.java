@@ -16,31 +16,19 @@
  */
 package com.bigdata.rdf.sail.sparql;
 
-import info.aduna.net.ParsedURI;
-
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.StringBufferInputStream;
 import java.io.StringReader;
-import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.repository.sail.helpers.SPARQLUpdateDataBlockParser;
-import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
-import org.openrdf.rio.helpers.BasicParserSettings;
 import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.rio.trig.TriGParser;
-import org.openrdf.rio.turtle.TurtleUtil;
 
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -48,13 +36,13 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 /**
  * An extension of {@link SPARQLUpdateDataBlockParser} that processes data in the format
  * specified in the SPARQL* grammar. This format is almost completely compatible with
- * SPARQLUpdateDataBlockParser, except for:
+ * SPARQLUpdateDataBlockParser, except:
  * <ul>
  * <li>it allows statement to be used as subject or object in another statement
- * <li>it allows statement to be used in bind clause
  * </ul>
  * 
  * @author Igor Kim (igor.kim@ms2w.com)
+ * @openrdf
  */
 public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser {
 
@@ -149,6 +137,7 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 			}
 		}
 
+		// Use our own class in recursion.
 		SPARQLStarUpdateDataBlockParser p = new SPARQLStarUpdateDataBlockParser(valueFactory);
         final List<Statement> stmts = new LinkedList<Statement>();
         final StatementCollector sc = new StatementCollector(stmts);
