@@ -58,8 +58,10 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.service.IRemoteSparqlQueryBuilder;
 import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.RemoteSparql10QueryBuilder;
+import com.bigdata.rdf.sparql.ast.service.RemoteSparql11DraftQueryBuilder;
 import com.bigdata.rdf.sparql.ast.service.RemoteSparql11QueryBuilder;
 import com.bigdata.rdf.sparql.ast.service.RemoteSparqlBuilderFactory;
+import com.bigdata.rdf.sparql.ast.service.SPARQLVersion;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -167,15 +169,21 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
 
         assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+
+        assertEquals(RemoteSparql11DraftQueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
@@ -229,15 +237,21 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
 
         assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+
+        assertEquals(RemoteSparql11DraftQueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
         
@@ -312,15 +326,21 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
 
         assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+
+        assertEquals(RemoteSparql11DraftQueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
@@ -416,15 +436,21 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
 
         assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+
+        assertEquals(RemoteSparql11DraftQueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
@@ -484,15 +510,21 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
 
         assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+
+        assertEquals(RemoteSparql11DraftQueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
@@ -559,15 +591,21 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
 
         assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+
+        assertEquals(RemoteSparql11DraftQueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
@@ -645,15 +683,21 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
 
         assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+
+        assertEquals(RemoteSparql11DraftQueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
@@ -727,13 +771,23 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
+
+        /*
+         * Still uses the SPARQL 1.0 query builder since it will not rely on the
+         * BINDINGS clause.
+         */
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
 
         /*
          * Still uses the SPARQL 1.0 query builder since it will not rely on the
@@ -820,13 +874,23 @@ public class TestRemoteSparqlBuilderFactory extends
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        options.setSparql11(false);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
 
         assertEquals(RemoteSparql10QueryBuilder.class,
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
-        options.setSparql11(true);
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
+
+        /*
+         * Still uses the SPARQL 1.0 query builder since it will not rely on the
+         * BINDINGS clause.
+         */
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+        
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
 
         /*
          * Still uses the SPARQL 1.0 query builder since it will not rely on the
@@ -836,6 +900,102 @@ public class TestRemoteSparqlBuilderFactory extends
                 RemoteSparqlBuilderFactory.get(options, serviceNode, a)
                         .getClass());
 
+    }
+    
+    public void test_service_009() throws Exception {
+        
+        final BigdataURI serviceURI = valueFactory
+                .createURI("http://www.bigdata.com/myService");
+        
+        final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
+        
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        
+        final GraphPatternGroup<IGroupMemberNode> groupNode = new JoinGroupNode();
+        {
+            groupNode.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o")));
+        }
+        
+
+        final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
+                makeIV(serviceURI)), groupNode);
+        
+        {
+            final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
+            {
+                projectedVars.add(Var.var("s"));
+ 
+            }
+
+            serviceNode.setExprImage(exprImage);
+            serviceNode.setPrefixDecls(prefixDecls);
+            serviceNode.setProjectedVars(projectedVars);
+        }
+
+        final List<BindingSet> bindingSets = new LinkedList<BindingSet>();
+       
+        { 
+        	final MapBindingSet bset = new MapBindingSet();
+            final BigdataURI tmp1 = valueFactory.createURI("p:p1");
+            final BigdataLiteral tmp2 = valueFactory.createLiteral("lit1");
+            bset.addBinding("p", tmp1);
+            bset.addBinding("o", tmp2);
+            bindingSets.add(bset);
+        }
+        
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
+
+        final RemoteServiceOptions options = new RemoteServiceOptions();        
+
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_10);
+
+        IRemoteSparqlQueryBuilder queryBuilder = RemoteSparqlBuilderFactory.get(options, serviceNode, a);
+        
+        final String actualQueryStrVersion_10 = queryBuilder.getSparqlQuery(a).replaceAll("\\s+", " ");
+        
+        final String expectedSparqlVersion_10 = new String("SELECT  ?s " + 
+											        		"WHERE { " + //
+											        		"FILTER ( sameTerm( ?p, <p:p1>) ). " + //
+											        		"FILTER ( sameTerm( ?o, \"lit1\") ). " + //
+											        		" ?s ?p ?o " + // 
+											        		"} ").replaceAll("\\s+", " ");
+        
+        assertEquals(expectedSparqlVersion_10, actualQueryStrVersion_10);
+
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11);
+
+        queryBuilder = RemoteSparqlBuilderFactory.get(options, serviceNode, a);
+        
+        final String actualQueryStrVersion_11 = queryBuilder.getSparqlQuery(a).replaceAll("\\s+", " ");
+        
+        final String expectedSparqlVersion_11 = new String("SELECT  ?s " + //
+											        		"WHERE {" + //
+											        		" ?s ?p ?o " + // 
+											        		"} " + //
+											        		"VALUES ( ?p ?o) { " + //
+											        		"( <p:p1> \"lit1\" ) " + //
+											        		"} ").replaceAll("\\s+", " ");
+        
+        assertEquals(expectedSparqlVersion_11, actualQueryStrVersion_11);
+    
+        options.setSPARQLVersion(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS);
+        
+        queryBuilder = RemoteSparqlBuilderFactory.get(options, serviceNode, a);
+        
+        final String actualQueryStrVersion_11_DRAFT_BINDINGS = queryBuilder.getSparqlQuery(a).replaceAll("\\s+", " ");
+        
+        final String expectedSparqlVersion_11_DRAFT_BINDINGS = new String("SELECT  ?s " + //
+														        		"WHERE {" + //
+														        		" ?s ?p ?o " + // 
+														        		"} " + //
+														        		"BINDINGS ?p ?o { " + //
+														        		"( <p:p1> \"lit1\" ) " + //
+														        		"} ").replaceAll("\\s+", " ");
+        
+        assertEquals(actualQueryStrVersion_11_DRAFT_BINDINGS, expectedSparqlVersion_11_DRAFT_BINDINGS);
+ 
     }
 
 }

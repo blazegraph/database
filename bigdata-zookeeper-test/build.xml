@@ -17,6 +17,9 @@
     <condition property="default.nic" value="${env.DEFAULT_NIC}" else="">
        <isset property="env.DEFAULT_NIC" />
     </condition>
+    <condition property="skipTestServices" value="${skipTests}">
+         <isset property="skipTests" />
+    </condition>
     <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
     <property name="app.home" value ="."/>
     <echo>${bigdata.fedname} ${default.nic} ${app.home}</echo>
@@ -85,7 +88,7 @@
           <antcall target="stopZookeeper"/>
     </target>
 
-    <target name="preTestPreparation">
+    <target name="preTestPreparation" unless="${skipTestServices}">
 	<antcall target = "startTestServices"/>
     </target>
 
@@ -108,7 +111,7 @@
     </target>
 
 
-    <target name = "postTestCleanup">
+    <target name = "postTestCleanup" unless="${skipTestServices}">
 	<antcall target="stopTestServices"/>
     </target>
 

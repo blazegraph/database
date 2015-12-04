@@ -1153,6 +1153,13 @@ public abstract class AbstractNode<T extends AbstractNode
      * @param delete
      *            <code>true</code> iff the entry is to marked as deleted
      *            (delete markers must be supported for if this is true).
+     * @param putIfAbsent
+     * 			  When <code>true</code>, a pre-existing entry for the key will
+     *            NOT be replaced (unless it is a deleted tuple, which is the
+     *            same as if there was no entry under the key). This should ONLY
+     *            be true when the top-level method is <code>putIfAbsent</code>.
+     *            Historical code paths should specify false for an unconditional
+     *            mutation. See BLZG-1539.
      * @param timestamp
      *            The timestamp associated with the version (the value is
      *            ignored unless version metadata is being maintained).
@@ -1164,7 +1171,7 @@ public abstract class AbstractNode<T extends AbstractNode
      * @return The <i>tuple</i> iff there was a pre-existing entry under that
      *         key and <code>null</code> otherwise.
      */
-    abstract public Tuple insert(byte[] key, byte[] val, boolean delete, long timestamp,
+    abstract public Tuple insert(byte[] key, byte[] val, boolean delete, boolean putIfAbsent, long timestamp,
             Tuple tuple);
 
     /**

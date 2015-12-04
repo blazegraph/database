@@ -173,6 +173,10 @@ public class TestAll extends TestCase {
         // Test suite with explicitly enabled hash joins.
         suite.addTestSuite(TestHashJoin.class);
 
+        // Test suite for pipelined hash join
+        suite.addTestSuite(TestPipelinedHashJoin.class);
+        
+        
         /*
          * Tests corresponding to various trouble tickets.
          */

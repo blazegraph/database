@@ -38,8 +38,8 @@ public class IndexProcedureTask<T> extends AbstractTask<T> {
 
     private final IIndexProcedure<T> proc;
 
-    public IndexProcedureTask(ConcurrencyManager concurrencyManager,
-            long startTime, String name, IIndexProcedure<T> proc) {
+    public IndexProcedureTask(final ConcurrencyManager concurrencyManager,
+            final long startTime, final String name, final IIndexProcedure<T> proc) {
 
         super(concurrencyManager, startTime, name);
 

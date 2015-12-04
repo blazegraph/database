@@ -60,12 +60,13 @@ public class VerifyStatementBuffer extends StatementBuffer {
     }
     
     /**
-     * Overriden to batch verify the terms and statements in the buffer.
+     * Overridden to batch verify the terms and statements in the buffer.
      * 
      * FIXME Verify that {@link StatementBuffer#flush()} is doing the right
      * thing for this case (esp, how it handles bnodes when appearing as
      * {s,p,o} or when appearing as the statement identifier).
      */
+    @Override
     protected void incrementalWrite() {
 
         if (log.isInfoEnabled()) {

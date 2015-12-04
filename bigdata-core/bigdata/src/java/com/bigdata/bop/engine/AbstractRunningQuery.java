@@ -1209,6 +1209,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * release of the native buffers back to the direct buffer pool until all
      * tasks for the query are known to be done.
      * 
+     * @see BLZG-1658 MemoryManager should know when it has been closed
+     * 
      * FIXME We need to have distinct events for the query evaluation life cycle
      * and the query results life cycle. Really, this means that temporary
      * solution sets are scoped to the parent query. This is a matter of the
@@ -1223,12 +1225,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         assert lock.isHeldByCurrentThread();
         
         // clear reference, returning old value.
-        final IMemoryManager memoryManager = this.memoryManager.getAndSet(null);
+        final MemoryManager memoryManager = this.memoryManager.getAndSet(null);
 
         if (memoryManager != null) {
             
-            // release resources.
-            memoryManager.clear();
+            // release resources.  See BLZG-1658
+            memoryManager.close();
             
         }
 
@@ -1600,7 +1602,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     
     @Override
     public IMemoryManager getMemoryManager() {
-        IMemoryManager memoryManager = this.memoryManager.get();
+        MemoryManager memoryManager = this.memoryManager.get();
         if (memoryManager == null) {
             lock.lock();
             try {
@@ -1615,7 +1617,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         return memoryManager;
     }
     
-    private final AtomicReference<IMemoryManager> memoryManager = new AtomicReference<IMemoryManager>();
+    private final AtomicReference<MemoryManager> memoryManager = new AtomicReference<MemoryManager>();
     
     /**
      * Allocate a memory manager for the query.
@@ -1627,7 +1629,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * @see <a href="http://jira.blazegraph.com/browse/BLZG-42" > Per query
      *      memory limit for analytic query mode. </a>
      */
-    private IMemoryManager newMemoryManager() {
+    private MemoryManager newMemoryManager() {
         
         // The native memory pool that will be used by this query.
         final DirectBufferPool pool = DirectBufferPool.INSTANCE;

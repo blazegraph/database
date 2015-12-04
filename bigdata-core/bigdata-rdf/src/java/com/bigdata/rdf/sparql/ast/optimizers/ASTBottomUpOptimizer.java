@@ -1044,7 +1044,11 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     
                     ((IGroupNode) group).removeChild(childGroup);
                     
-                    i++;
+                    /**
+                     * BLZG-1627: the group has one member less now, so
+                     * we decrease the arity to avoid running out of bounds.
+                     */
+                    arity--;
 
                 }
                 

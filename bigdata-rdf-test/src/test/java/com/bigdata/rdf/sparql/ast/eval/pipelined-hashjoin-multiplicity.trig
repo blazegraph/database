@@ -1,0 +1,12 @@
+@prefix : <http://www.bigdata.com/> .
+
+: {
+   <http://s1> <http://p1> <http://s1-p1> .
+   <http://s1> <http://p2> <http://s1-p2a> .
+   <http://s1> <http://p2> <http://s1-p2b> .
+   
+   <http://s2> <http://p1> <http://s2-p1> .
+   <http://s2> <http://p2> <http://s2-p2> .
+   
+   <http://s3> <http://p1> <http://s3-p1> .
+}
