@@ -727,7 +727,7 @@ public interface QueryHints {
    String PIPELINED_HASH_JOIN = "pipelinedHashJoin";
 
    boolean DEFAULT_PIPELINED_HASH_JOIN = Boolean.valueOf(System.getProperty(
-           QueryHints.class.getName() + "." + PIPELINED_HASH_JOIN, "true"));
+           QueryHints.class.getName() + "." + PIPELINED_HASH_JOIN, "false"));
    
    /**
     * By default, a DISTINCT filter is applied when evaluating access paths
