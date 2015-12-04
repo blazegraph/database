@@ -1091,7 +1091,7 @@ public class ASTEvalHelper {
             // Batch resolve Values to IVs and convert to bigdata binding set.
             final IBindingSet[] bindingSets = toBindingSet(resolved.bindingSet) ;
             
-            // Propogate bindings
+            // Propagate bindings
             ctx.setQueryBindingSet(bs);
             ctx.setBindings(bindingSets);
             ctx.setDataset(dataset);
