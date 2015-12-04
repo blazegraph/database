@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -58,6 +60,7 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -103,17 +106,17 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
    /**
     * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionBuffer}
     */
-   final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
+   private final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
    
    /**
     * See {@link PipelinedHashIndexAndSolutionSetJoinOp#incomingBindingsBuffer}
     */
-   final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
+   private final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
  
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionsWithoutSubqueryResult}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#rightSolutionsWithoutSubqueryResult}
     */
-   final Set<IBindingSet> distinctProjectionsWithoutSubqueryResult = new HashSet<IBindingSet>();
+   private HTree rightSolutionsWithoutSubqueryResult;
    
    /**
     * Set to true if processing binding sets are passed in via 
@@ -131,6 +134,13 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
       if (!(op instanceof PipelinedHashIndexAndSolutionSetJoinOp)) {
          throw new IllegalArgumentException();
       }
+      
+      /**
+       * Initialize htree to store solutions that did not match
+       */
+      final IMemoryManager mmgr = context.getMemoryManager(null /* use memory mgr of this query */);
+      rightSolutionsWithoutSubqueryResult = 
+          HTree.create(new MemStore(mmgr.createAllocationContext()), getIndexMetadata(op));
       
    }
 
@@ -209,7 +219,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
             }
 
             final AtomicInteger vectorSize = new AtomicInteger();
-            final BS[] a = vector(chunk, getJoinVars(), null, false, vectorSize);
+            final BS[] a = vector(chunk, projectInVars, null, false, vectorSize);
             
             final int n = vectorSize.get();
 
@@ -234,27 +244,32 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                 
                 try {
             
-                    int previousHashCode = -1; // invalid
-                    boolean previousElementHasMatch = false;
+                    // local cache (used in the subsequent for loop) to record whether the distinct bindings
+                    // joined against rightSolutions or the rightSolutionsWithoutSubqueryResult, used to
+                    // avoid redundant joins against the indices; the local cache makes particular sense
+                    // because we expect to co-occur incoming bindings with the same distinct projection
+                    final Map<IBindingSet, Boolean> joinsCache = new HashMap<IBindingSet, Boolean>();
+                    
                     for (int i=0; i<n; i++) {
                         
                         final IBindingSet curBs = a[i].bset;
                         
-                        // The next hash code to be processed.
-                        final int hashCode = a[i].hashCode;
-    
                         // the distinct projection
                         final IBindingSet bsetDistinct = curBs.copy(projectInVars);
                         
-                        // perform a lookup if the hash code of the element changed
-                        // TODO: contains is not enough!!!
-                        final boolean currentElementHasMatch = 
-                            hashCode==previousHashCode ?
-                            previousElementHasMatch :
-                            rightSolutions.contains(keyBuilder.reset().append(hashCode).getKey()) || 
-                                distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct);
-
-                        if (currentElementHasMatch) {
+                        // check whether the distinct projection joins with either rightSolutions or 
+                        // rightSolutionsWithoutSubqueryResult (we avoid re-computation if we have investigated
+                        // the same set of distinct projections in the previous iteration already)
+                        final boolean bSetDistinctJoins;
+                        if (joinsCache.containsKey(bsetDistinct)) {
+                            bSetDistinctJoins = joinsCache.get(bsetDistinct);
+                        } else {
+                            bSetDistinctJoins = 
+                                joinsWith(a[i], keyBuilder, rightSolutions, rightSolutionsWithoutSubqueryResult);
+                            joinsCache.put(bsetDistinct, bSetDistinctJoins); // cache
+                        }
+                        
+                        if (bSetDistinctJoins) {
                             
                             /*
                              * Either a match in the bucket or subquery was already
@@ -274,12 +289,9 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                         }
                         
                         naccepted++;
-                        
-                        // record previous hash code + lookup result to avoid unrequired recomputation
-                        previousHashCode = hashCode;
-                        previousElementHasMatch = currentElementHasMatch;
-                        
+
                     }
+                    
                 } catch (Throwable t) {
                     
                     final boolean isDone = context.getRunningQuery().isDone();
@@ -389,7 +401,26 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                  * to avoid unnecessary re-computation of the subqueries for
                  * these keys
                  */
-                distinctProjectionsWithoutSubqueryResult.addAll(distinctProjectionBuffer);
+                final AtomicInteger vectorSize = new AtomicInteger();
+                
+                final BS[] vectoredDistinctProjectionBuffer = 
+                    vector(distinctProjectionBuffer.toArray(new IBindingSet[0]), getJoinVars(), null, false, vectorSize);
+                
+                final int n = vectorSize.get();
+                
+                for (int i = 0; i < n; i++) {
+
+                    final BS tmp = vectoredDistinctProjectionBuffer[i];
+
+                    // Encode the key.
+                    final byte[] key = keyBuilder.reset().append(tmp.hashCode).getKey();
+
+                    // Encode the solution.
+                    final byte[] val = getEncoder().encodeSolution(tmp.bset);
+                    
+                    rightSolutionsWithoutSubqueryResult.insert(key, val);
+
+               }
                 
             } finally {
 
@@ -436,9 +467,61 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
         
         return naccepted;
 
-     }
+    }
 
-     /**
+    /**
+     * Checks whether bs joins with rightSolutions or rightSolutionsWithoutSubqueryResult.
+     * Returns false if and only if joins neither with the one nor with the other.
+     * 
+     * @param bs
+     * @param keyBuilder
+     * @param rightSolutions
+     * @param rightSolutionsWithoutSubqueryResult
+     * @return
+     */
+    protected boolean joinsWith(
+       final BS bs, final IKeyBuilder keyBuilder, final HTree rightSolutions,
+       final HTree rightSolutionsWithoutSubqueryResult) {
+        
+        return joinsWith(bs, keyBuilder, rightSolutions) ||
+                joinsWith(bs, keyBuilder, rightSolutionsWithoutSubqueryResult);
+
+     }
+     
+ 
+    /** 
+     * Checks whether bs joins with the given htree.
+     * 
+     * @param bs
+     * @param keyBuilder
+     * @param htree
+     * @return
+     */
+    protected boolean joinsWith(
+        final BS bs, final IKeyBuilder keyBuilder, final HTree htree) {
+
+        final int hashCode = bs.hashCode;
+        final byte[] key = keyBuilder.reset().append(hashCode).getKey();
+        
+        if (!htree.contains(key)) {
+            return false; // definitely no join possible
+        }
+        
+        // need to perform the join until a first match is found
+        final ITupleIterator<?> titr = htree.lookupAll(key);
+        while (titr.hasNext()) {
+            final ITuple<?> t = titr.next();
+            final IBindingSet joinCandidate = decodeSolution(t);
+            
+            if (BOpContext.bind(bs.bset, joinCandidate, null /* unconstrained */, getSelectVars())!=null) {
+                return true;
+            }
+        }
+        
+        return false; // no match detected
+    }
+
+    /**
       * Returns true if, for one of the buffers, the threshold has been
       * exceeded.
       */
@@ -867,7 +950,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
         if (getConstraints() != null)
             sb.append(",constraints=" + Arrays.toString(getConstraints()));
         sb.append(",size=" + getRightSolutionCount());
-        sb.append(", distinctProjectionsWithoutSubqueryResult=" + distinctProjectionsWithoutSubqueryResult.size());
+        sb.append(", distinctProjectionsWithoutSubqueryResult=" + rightSolutionsWithoutSubqueryResult.getEntryCount());
         sb.append(", distinctBindingSets (seen/released)=" + nDistinctBindingSets + "/" + nDistinctBindingSetsReleased);
         sb.append(", subqueriesIssued=" + nSubqueriesIssued);
         sb.append(", resultsFromSubqueries=" + nResultsFromSubqueries);        

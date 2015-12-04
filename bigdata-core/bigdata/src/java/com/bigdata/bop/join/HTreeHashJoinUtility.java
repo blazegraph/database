@@ -497,7 +497,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Setup the {@link IndexMetadata} for {@link #rightSolutions} or
      * {@link #joinSet}.
      */
-    static private HTreeIndexMetadata getIndexMetadata(final PipelineOp op) {
+    protected static HTreeIndexMetadata getIndexMetadata(final PipelineOp op) {
 
 		final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
 				UUID.randomUUID());
