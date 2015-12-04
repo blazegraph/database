@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import info.aduna.iteration.CloseableIteration;
-
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -73,7 +71,6 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -95,6 +92,7 @@ import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
+import info.aduna.iteration.CloseableIteration;
 
 /**
  * Helper class for evaluating SPARQL queries.
@@ -150,9 +148,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList =
-                new IBindingSet[] { (resolved.bindingSet == null || resolved.bindingSet.size() == 0) ? new ListBindingSet() : toBindingSet(resolved.bindingSet) }; 
-//              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -227,9 +223,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-                new IBindingSet[] { (resolved.bindingSet == null || resolved.bindingSet.size() == 0) ? new ListBindingSet() : toBindingSet(resolved.bindingSet) }; 
-//              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -307,9 +301,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-                new IBindingSet[] { (globallyScopedBS == null || globallyScopedBS.size() == 0) ? new ListBindingSet() : toBindingSet(globallyScopedBS) }; 
-//              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(globallyScopedBS) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -432,9 +424,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-                new IBindingSet[] { (globallyScopedBS == null || globallyScopedBS.size() == 0) ? new ListBindingSet() : toBindingSet(globallyScopedBS) }; 
-//              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(globallyScopedBS) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -497,9 +487,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-                new IBindingSet[] { (resolved.bindingSet == null || resolved.bindingSet.size() == 0) ? new ListBindingSet() : toBindingSet(resolved.bindingSet) }; 
-//              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
@@ -823,21 +811,25 @@ public class ASTEvalHelper {
      * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}.
      * 
      * @param src
-     *            The {@link BindingSet}.
-     *            
-     * @return The {@link IBindingSet}.
+     *            The {@link BindingSet} (optional).
+     * 
+     * @return The {@link IBindingSet}. When the source is null or empty, an
+     *         empty {@link ListBindingSet} is returned.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static IBindingSet toBindingSet(final BindingSet src) {
+    private static IBindingSet[] toBindingSet(final BindingSet src) {
         
-        if (src == null)
-            throw new IllegalArgumentException();
+        if (src == null || src.size() == 0) {
+            
+            return new IBindingSet[] { new ListBindingSet() };
+
+        }
 
         final ListBindingSet bindingSet = new ListBindingSet();
 
         final Iterator<Binding> itr = src.iterator();
 
-        while(itr.hasNext()) {
+        while (itr.hasNext()) {
 
             final Binding binding = itr.next();
 
@@ -851,7 +843,7 @@ public class ASTEvalHelper {
             
         }
         
-        return bindingSet;
+        return new IBindingSet[]{ bindingSet };
 
     }
     
@@ -1088,7 +1080,6 @@ public class ASTEvalHelper {
                 
             }
 
-
             final AST2BOpUpdateContext ctx = new AST2BOpUpdateContext(
                     astContainer, conn);
 
@@ -1098,11 +1089,7 @@ public class ASTEvalHelper {
             ctx.setIncludeInferred(includeInferred);
             
             // Batch resolve Values to IVs and convert to bigdata binding set.
-            final IBindingSet[] bindingSets = //mergeBindingSets(astContainer,
-                    new IBindingSet[] { (bs == null || bs.size() == 0) ? new ListBindingSet() : toBindingSet(resolved.bindingSet) }; 
-//                    new IBindingSet[] {
-//                        batchResolveIVs(conn.getTripleStore(), bs)
-//                    };
+            final IBindingSet[] bindingSets = toBindingSet(resolved.bindingSet) ;
             
             // Propogate bindings
             ctx.setQueryBindingSet(bs);
