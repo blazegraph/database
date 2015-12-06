@@ -795,6 +795,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		String Tuples = "Tuples";
 		/** Counters for IO. */
 		String IO = "IO";
+        /** Counters for touch(). */
+        String TOUCH = "Touch";
     
     }
 
@@ -3549,19 +3551,31 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *      readNodeOrLeaf)
      */
     private final void doSyncTouch(final AbstractNode<?> node) {
-    
+
+        final long beginNanos = System.nanoTime();
+        
         synchronized (this) {
 
             doTouch(node);
 
         }
 
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        // See BLZG-1664
+        btreeCounters.syncTouchNanos.add(elapsedNanos);
+        
     }
     
     private final void doTouch(final AbstractNode<?> node) {
         
+        final long beginNanos = System.nanoTime();
+        
+        // See BLZG-1664
+        btreeCounters.touchCount.increment();
+        
         /*
-         * We need to guarentee that touching this node does not cause it to be
+         * We need to guarantee that touching this node does not cause it to be
          * made persistent. The condition of interest would arise if the queue
          * is full and the referenceCount on the node is zero before this method
          * was called. Under those circumstances, simply appending the node to
@@ -3626,6 +3640,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //                    }
         //
 //                }
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        // See BLZG-1664
+        btreeCounters.touchNanos.add(elapsedNanos);
 
     }
 
