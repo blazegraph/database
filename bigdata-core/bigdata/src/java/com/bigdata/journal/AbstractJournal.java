@@ -3168,6 +3168,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         private final CAT elapsedNotifyCommittersNanos = new CAT();
         /**
          * Elapsed nanoseconds for {@link CommitState#writeCommitRecord()}.
+         * Note: This is also responsible for recycling the deferred frees for
+         * {@link IHistoryManager} backends.
          */
         private final CAT elapsedWriteCommitRecordNanos = new CAT();
         /**
