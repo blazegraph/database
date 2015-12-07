@@ -176,6 +176,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         // touch()
         syncTouchNanos.add(o.syncTouchNanos.get());
         touchNanos.add(o.touchNanos.get());
+        // write eviction queue
         
     }
     
@@ -400,6 +401,27 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
      * @see BLZG-1664
      */
     public final CAT touchCount = new CAT();
+
+    //
+    // write eviction queue
+    //
+    
+    /**
+     * The #of node or leaf references evicted from the write retention queue.
+     */
+    public final AtomicLong queueEvict = new AtomicLong();
+    /**
+     * The #of node or leave references evicted from the write retention queue
+     * that are no longer referenced on that queue. If the reference is dirty,
+     * it will be serialized and written on the backing store.
+     */
+    public final AtomicLong queueEvictNoRef = new AtomicLong();
+    /**
+     * The #of node or leave references evicted from the write retention queue
+     * that are no longer referenced on that queue and are dirty and thus will
+     * be immediately serialized and written on the backing store.
+     */
+    public final AtomicLong queueEvictDirty = new AtomicLong();
 
 	/**
 	 * The #of bytes in the unisolated view of the index which are being used to
@@ -1160,6 +1182,34 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
             }
 
+            // writeRetentionQueue
+            {
+                
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.WriteRetentionQueue);
+                
+                tmp.addCounter("evictCount", new Instrument<Long>() {
+                    @Override
+                    public void sample() {
+                        setValue(queueEvict.get());
+                    }
+                });
+
+                tmp.addCounter("evictCountNoRef", new Instrument<Long>() {
+                    @Override
+                    public void sample() {
+                        setValue(queueEvictNoRef.get());
+                    }
+                });
+
+                tmp.addCounter("evictCountDirty", new Instrument<Long>() {
+                    @Override
+                    public void sample() {
+                        setValue(queueEvictDirty.get());
+                    }
+                });
+
+            }
+            
 //        }
         
         return counterSet;
