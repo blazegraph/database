@@ -52,14 +52,19 @@ public class DefaultEvictionListener implements
          * information.
          */
 
+        final AbstractBTree btree = node.btree;
+
+        final BTreeCounters counters = btree.getBtreeCounters();
+
+        counters.queueEvict.incrementAndGet();
+        
         if (--node.referenceCount > 0) {
             
             return;
-
             
         }
 
-        final AbstractBTree btree = node.btree;
+        counters.queueEvictNoRef.incrementAndGet();
         
         if (btree.error != null) {
             /**
@@ -98,6 +103,8 @@ public class DefaultEvictionListener implements
 				// // this causes transient nodes to be coded on eviction.
 				// if (node.dirty) {
 
+		        counters.queueEvictDirty.incrementAndGet();
+		        
 				if (node.isLeaf()) {
 
 					/*
