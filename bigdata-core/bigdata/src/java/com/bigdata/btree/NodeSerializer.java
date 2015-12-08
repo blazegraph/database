@@ -115,7 +115,7 @@ public class NodeSerializer {
     /**
      * Factory for record-level (de-)compression of nodes and leaves (optional).
      */
-    private final IRecordCompressorFactory<?> recordCompressorFactory;
+    final IRecordCompressorFactory<?> recordCompressorFactory;
     
     /**
      * An object that knows how to (de-)compress a node or leaf (optional).
@@ -315,6 +315,27 @@ public class NodeSerializer {
 
     }
 
+    /**
+     * Report the current write buffer capacity -or- the
+     * {@link #initialBufferCapacity} if the write buffer is not allocated.
+     */
+    int getWriteBufferCapacity() {
+
+        if (readOnly) {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        final DataOutputBuffer tmp = _writeBuffer;
+        
+        if (tmp == null)
+            return initialBufferCapacity;
+
+        return tmp.capacity();
+
+    }
+    
     /**
      * Decode an {@link INodeData} or {@link ILeafData} record, wrapping the
      * underlying data record (thread-safe). The decision to decode as an

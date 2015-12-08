@@ -51,7 +51,6 @@ import com.bigdata.btree.keys.TestKeyBuilder;
  * @see src/architecture/btree.xls for the examples used in this test suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
 
@@ -120,7 +119,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         
         final int m = 3;
 
-        BTree btree = getBTree(m);
+        final BTree btree = getBTree(m);
 
         assertEquals("height", 0, btree.height);
         assertEquals("#nodes", 0, btree.nnodes);
@@ -128,7 +127,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals("#entries", 0, btree.nentries);
         assertTrue(btree.dump(System.err));
 
-        Leaf a = (Leaf) btree.getRoot();
+        final Leaf a = (Leaf) btree.getRoot();
         assertKeys(new int[]{},a);
         assertValues(new Object[]{},a);
         
@@ -230,6 +229,12 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertValues(new Object[]{v7,v8},b);
             
             assertTrue(btree.dump(System.err));
+
+            assertEquals(0, btree.getRoot().getLevel());
+            assertEquals(1, a.getLevel());
+            assertEquals(1, b.getLevel());
+            assertEquals(0, c.getLevel()); // c is the new root.
+
         }
         
         /*
@@ -303,6 +308,12 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             // validate leaf (b).
             assertKeys(new int[]{7,8},b);
             assertValues(new Object[]{v7,v8},b);
+            
+            assertEquals(0, btree.getRoot().getLevel());
+            assertEquals(1, a.getLevel());
+            assertEquals(1, b.getLevel());
+            assertEquals(0, c.getLevel()); // c is the root
+            assertEquals(1, d.getLevel());
             
         }
         
@@ -403,6 +414,15 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertKeys(new int[]{7,8},b);
             assertValues(new Object[]{v7,v8},b);
 
+            assertEquals(0, btree.getRoot().getLevel());
+            assertEquals(0, g.getLevel()); // g is the new root.
+                assertEquals(1, c.getLevel());
+                    assertEquals(2, a.getLevel());
+                    assertEquals(2, e.getLevel());
+                assertEquals(1, f.getLevel());
+                    assertEquals(2, d.getLevel());
+                    assertEquals(2, b.getLevel());
+  
         }
 
         /*
@@ -508,6 +528,12 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue(f.isDeleted());
         assertTrue(g.isDeleted());
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(0, c.getLevel()); // c is the root again.
+            assertEquals(1, a.getLevel());
+            assertEquals(1, d.getLevel());
+            assertEquals(1, b.getLevel());
+
         /*
          * step#2 : remove(2) - simple operation just removes(2) from (a).
          */
@@ -592,6 +618,8 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals("leaves",1,btree.nleaves);
         assertEquals("entries",0,btree.nentries);
         
+        assertEquals(0, b.getLevel()); // c is the new root.
+                
     }
     
     /**

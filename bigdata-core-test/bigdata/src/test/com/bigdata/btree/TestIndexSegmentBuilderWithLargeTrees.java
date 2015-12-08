@@ -41,7 +41,6 @@ import com.bigdata.journal.Options;
  * and then compares the trees for the same total ordering.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentTestCase {
 
@@ -55,6 +54,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     // all the builds in this test suite use this flag.
     static private final boolean compactingMerge = true;
 
+    @Override
     public Properties getProperties() {
 
         if (properties == null) {

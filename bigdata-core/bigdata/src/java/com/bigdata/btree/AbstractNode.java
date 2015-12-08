@@ -240,6 +240,15 @@ public abstract class AbstractNode<T extends AbstractNode
     }
 
     /**
+     * Find the level of a node or leaf by chasing its parent ref.
+     */
+    public int getLevel() {
+
+        return btree.getLevel(this);
+
+    }
+    
+    /**
      * Disallowed.
      */
     private AbstractNode() {
