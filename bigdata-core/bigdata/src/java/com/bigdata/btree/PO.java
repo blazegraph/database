@@ -32,7 +32,6 @@ import com.bigdata.btree.data.IAbstractNodeData;
  * A persistent object.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class PO implements IIdentityAccess, IDirty {
 
@@ -63,18 +62,21 @@ abstract public class PO implements IIdentityAccess, IDirty {
      *       {@link IAbstractNodeData#isReadOnly()} instead, since that reflects
      *       the concern that the node/leaf is not mutable.
      */
+    @Override
     final public boolean isPersistent() {
 
         return identity != NULL;
 
     }
 
+    @Override
     final public boolean isDeleted() {
         
         return deleted;
         
     }
     
+    @Override
     final public long getIdentity() throws IllegalStateException {
 
         if (identity == NULL) {
@@ -124,18 +126,19 @@ abstract public class PO implements IIdentityAccess, IDirty {
     }
 
     /**
-     * New objects are considered to be dirty. When an object is
-     * deserialized from the store the dirty flag MUST be explicitly
-     * cleared.
+     * New objects are considered to be dirty. When an object is deserialized
+     * from the store the dirty flag MUST be explicitly cleared.
      */
     transient protected boolean dirty = true;
 
+    @Override
     final public boolean isDirty() {
 
         return dirty;
 
     }
 
+    @Override
     final public void setDirty(final boolean dirty) {
 
         this.dirty = dirty;
@@ -147,6 +150,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * object iff the object is persistent and to mark objects that have been
      * deleted.
      */
+    @Override
     public String toString() {
 
         return toShortString();
