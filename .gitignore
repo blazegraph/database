@@ -372,3 +372,5 @@ bigdata-rdf-test/test_tiny.out
 bigdata-rdf-test/test_small.out
 
 *.out
+
+*.seg
