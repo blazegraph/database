@@ -47,6 +47,9 @@ import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -197,11 +200,26 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                 IVUtility.encode(keyBuilder, TermId.NullIV);
             } else {
                 final IV<?, ?> iv = c.get();
-                IVUtility.encode(keyBuilder, iv);
-                if (!iv.isInline() && iv.hasValue() && !filter) {
-                    ivCacheSchema.add(v);
-                    if (cache != null)
-                        cache.put(iv, iv.getValue());
+                
+                if (iv.isNullIV()) {
+                    // special case: null IV
+                    final Object val = iv.getValue();
+                    if (val instanceof BigdataURIImpl) {
+                        final FullyInlineURIIV<BigdataURI> ivToEncode = new FullyInlineURIIV<>((BigdataURIImpl)val);
+
+                        IVUtility.encode(keyBuilder, ivToEncode);
+                    } else {
+                        // TODO: implement these case
+                        throw new IllegalArgumentException();
+                    }
+                    
+                } else {
+                    IVUtility.encode(keyBuilder, iv);
+                    if (!iv.isInline() && iv.hasValue() && !filter) {
+                        ivCacheSchema.add(v);
+                        if (cache != null)
+                            cache.put(iv, iv.getValue());
+                    }
                 }
             }
         }
