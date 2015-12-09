@@ -1818,7 +1818,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      * @see BLZG-1665 (Reduce commit latency by parallel checkpoint by level of
      *      dirty pages in an index)
      */
-    @SuppressWarnings("rawtypes")
+//    @SuppressWarnings("rawtypes")
     final protected void writeNodeRecursiveConcurrent(final AbstractPage node) {
 
         final long beginNanos = System.nanoTime();
@@ -1867,7 +1867,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
          * [node] is the B+Tree root.
          */
         
-        final long beginDirtyListNanos = System.nanoTime();
+//        final long beginDirtyListNanos = System.nanoTime();
         
         final int nodeLevel = node.getLevel();
         
@@ -1902,7 +1902,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
              * Note: parent references of dirty nodes/leaves are guaranteed to
              * be non-null except for the root.
              */
-            final Integer level = nodeLevel - t.getLevel(); // FIXME Write getLevel(A,B) for HTree.
+            final Integer level = t.getLevel() - nodeLevel; // FIXME Write getLevel(A,B) for HTree. This will check for cases where [t] is not a child of [node].
 
             // Lookup dirty list for that level.
             List<AbstractPage> dirtyList = dirtyMap.get(level);
@@ -1957,7 +1957,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
             final List<AbstractPage> dirtyList = dirtyMap.get(i);
 
             if (dirtyList == null)
-                throw new AssertionError("Dirty list not found: level=" + i + ", #levels=" + dirtyLevelCount);
+                throw new AssertionError("Dirty list not found: level=" + i + ", #levels=" + dirtyLevelCount+", dirtyMap.keys="+dirtyMap.keySet());
 
             // #of dirty nodes / leaves in this level set.
             final int dirtyListSize = dirtyList.size();

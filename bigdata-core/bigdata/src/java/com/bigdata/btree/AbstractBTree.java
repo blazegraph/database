@@ -4018,7 +4018,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * [node] is the B+Tree root.
          */
         
-        final long beginDirtyListNanos = System.nanoTime();
+//        final long beginDirtyListNanos = System.nanoTime();
         
         // Visit dirty nodes and leaves.
         final Iterator<AbstractNode> itr = node.postOrderNodeIterator(
