@@ -106,7 +106,6 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * Encapsulates the sources.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private interface ISources extends Iterable<AbstractBTree> {
 
@@ -123,6 +122,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         /**
          * Visits the sources in order.
          */
+        @Override
         public Iterator<AbstractBTree> iterator();
         
         /**
@@ -137,7 +137,6 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * the {@link AbstractBTree}[].
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class HardRefSources implements ISources {
         
@@ -147,14 +146,17 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          */
         private final BTree btree;
 
+        @Override
         public BTree getMutableBTree() {
             return btree;
         }
         
+        @Override
         public int getSourceCount() {
             return srcs.length;
         }
 
+        @Override
         public Iterator<AbstractBTree> iterator() {
        
             return Arrays.asList(srcs).iterator();
@@ -173,6 +175,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          */
         private final AbstractBTree[] srcs;
 
+        @Override
         final public AbstractBTree[] getSources() {
 
             // Note: clone the array to prevent modification.
@@ -200,7 +203,6 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * {@link WeakReference} to (re-)open the {@link IndexSegment} on demand.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class WeakRefSources implements ISources {
 
@@ -228,14 +230,17 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          */
         private final IndexSegmentStore[] segmentStores;
         
+        @Override
         public BTree getMutableBTree() {
             return btree;
         }
         
+        @Override
         public int getSourceCount() {
             return count;
         }
 
+        @Override
         public AbstractBTree[] getSources() {
 
             final AbstractBTree[] a = new AbstractBTree[count];
@@ -264,6 +269,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
         }
 
+        @Override
         public Iterator<AbstractBTree> iterator() {
 
             return Arrays.asList(getSources()).iterator();
@@ -302,18 +308,21 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     
     private final ISources sources;
     
+    @Override
     final public AbstractBTree[] getSources() {
 
         return sources.getSources();
         
     }
 
+    @Override
     final public int getSourceCount() {
         
         return sources.getSourceCount();
         
     }
     
+    @Override
     final public BTree getMutableBTree() {
         
         return sources.getMutableBTree();
@@ -362,9 +371,10 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 //        
 //    };
     
+    @Override
     public String toString() {
         
-        StringBuilder sb = new StringBuilder();
+    	final StringBuilder sb = new StringBuilder();
         
         sb.append(getClass().getSimpleName());
         
@@ -389,6 +399,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
     
+    @Override
     public IResourceMetadata[] getResourceMetadata() {
 
         final int n = getSourceCount();
@@ -407,7 +418,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     }
 
-    public FusedView(AbstractBTree src1, AbstractBTree src2) {
+    public FusedView(final AbstractBTree src1, final AbstractBTree src2) {
 
         this(new AbstractBTree[] { src1, src2 });
 
@@ -511,6 +522,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
 
+    @Override
     public IndexMetadata getIndexMetadata() {
         
         return getMutableBTree().getIndexMetadata();
@@ -544,6 +556,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 //
 //    private volatile boolean noBloom = false;
 
+    @Override
     public IBloomFilter getBloomFilter() {
         
         // double checked locking.
@@ -563,6 +576,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     private volatile IBloomFilter bloomFilter = null;
 
+    @Override
     final public CounterSet getCounters() {
 
     	final CounterSet counterSet = new CounterSet();
@@ -583,6 +597,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     /**
      * The counter for the first source.
      */
+    @Override
     public ICounter getCounter() {
         
         return getMutableBTree().getCounter();
@@ -590,9 +605,12 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
     
     /**
+     * {@inheritDoc}
+     * <p>
      * Resolves the old value against the view and then directs the write to the
      * first of the sources specified to the ctor.
      */
+    @Override
     public byte[] insert(final byte[] key, final byte[] value) {
 
         final byte[] oldval = lookup(key);
@@ -600,6 +618,39 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         getMutableBTree().insert(key, value);
         
         return oldval;
+
+    }
+    
+    /**
+	 * {@inheritDoc}
+	 * <p>
+	 * This case is a bit tricky. Since it is possible for the value stored
+	 * under a key to be null, we need to obtain the Tuple for the key from the
+	 * view. If the tuple is null or deleted, then we can do an unconditional
+	 * insert. Otherwise there is an entry under the key and we return the value
+	 * of the entry from the Tuple. Note that the value COULD be a null.
+	 */
+    @Override
+    public byte[] putIfAbsent(final byte[] key, final byte[] value) {
+
+    	final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
+
+        if (tuple == null || tuple.isDeletedVersion()) {
+
+            /*
+             * Interpret a deletion marker as "not found".
+             */
+
+        	// unconditional insert.
+        	getMutableBTree().insert(key, value);
+
+        	// nothing was in the index under that key.
+            return null;
+            
+        }
+
+        // return the pre-existing value under the key.
+        return tuple.getValue();
 
     }
     
@@ -694,9 +745,12 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Return the first value for the key in an ordered search of the trees in
      * the view.
      */
+    @Override
     final public byte[] lookup(final byte[] key) {
 
         final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
@@ -715,6 +769,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
 
+    @Override
     public Object lookup(Object key) {
 
         key = getTupleSerializer().serializeKey(key);
@@ -797,11 +852,14 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     }
     
-    /**
-     * Processes the {@link AbstractBTree}s in the view in sequence and returns
-     * true iff the first {@link AbstractBTree} with an index entry under the
-     * key is non-deleted.
-     */
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Processes the {@link AbstractBTree}s in the view in sequence and returns
+	 * true iff the first {@link AbstractBTree} with an index entry under the
+	 * key is non-deleted.
+	 */
+    @Override
     final public boolean contains(final byte[] key) {
 
         final Tuple tuple = lookup(key, getMutableBTree().getContainsTuple());
@@ -820,6 +878,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
 
+    @Override
     public boolean contains(Object key) {
         
         key = getTupleSerializer().serializeKey(key);
@@ -835,18 +894,23 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
     
     /**
+     * {@inheritDoc}
+     * <p>
      * Returns the sum of the range count on each index in the view. This is the
      * maximum #of entries that could lie within that key range. However, the
      * actual number could be less if there are entries for the same key in more
      * than one source index.
      */
-    final public long rangeCount() {
+    @Override
+   final public long rangeCount() {
 
         return rangeCount(null/* fromKey */, null/* toKey */);
         
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Returns the sum of the range count on each index in the view. This is the
      * maximum #of entries that could lie within that key range. However, the
      * actual number could be less if there are entries for the same key in more
@@ -854,6 +918,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * 
      * @todo this could be done using concurrent threads.
      */
+    @Override
     final public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         if (fromKey == null || toKey == null) {
@@ -917,8 +982,11 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * The exact range count is obtained using a key-range scan over the view.
      */
+    @Override
     final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
 
         if (fromKey == null || toKey == null) {
@@ -975,11 +1043,14 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
     
     /**
+     * {@inheritDoc}
+     * <p>
      * An exact range count that includes any deleted tuples. This is obtained
      * using a key-range scan over the view.
      * 
      * @see #rangeCountExact(byte[], byte[])
      */
+    @Override
     public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
 
         if (fromKey == null || toKey == null) {
@@ -1036,6 +1107,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     }
 
+    @Override
     public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);
@@ -1043,10 +1115,13 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Returns an iterator that visits the distinct entries. When an entry
      * appears in more than one index, the entry is chosen based on the order
      * in which the indices were declared to the constructor.
      */
+    @Override
     final public ITupleIterator rangeIterator(final byte[] fromKey,
             final byte[] toKey) {
 
@@ -1081,6 +1156,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * implements the {@link ITupleCursor} extensions.
      * </p>
      */
+    @Override
     @SuppressWarnings("unchecked")
     public ITupleIterator rangeIterator(//
             byte[] fromKey,//
@@ -1287,13 +1363,14 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     }
     
-    final public Object submit(final byte[] key,
-            final ISimpleIndexProcedure proc) {
+    @Override
+	final public <T> T submit(final byte[] key, final ISimpleIndexProcedure<T> proc) {
 
         return proc.apply(this);
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     final public void submit(byte[] fromKey, byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
@@ -1336,6 +1413,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
     
+    @Override
     @SuppressWarnings("unchecked")
     public void submit(final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
@@ -1358,7 +1436,6 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * associated with each of the source indices.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected class FusedBloomFilter implements IBloomFilter {
 

@@ -35,7 +35,9 @@ import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.service.ndx.NopAggregator;
 
 /**
  * Batch insert operation.
@@ -108,9 +110,9 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         }
 
         @Override
-        public BatchInsert newInstance(IRabaCoder keysCoder,
-                IRabaCoder valsCoder, int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public BatchInsert newInstance(final IRabaCoder keysCoder,
+            	final IRabaCoder valsCoder, final int fromIndex, final int toIndex,
+                final byte[][] keys, final byte[][] vals) {
 
             return new BatchInsert(keysCoder, valsCoder, fromIndex, toIndex,
                     keys, vals, returnOldValues);
@@ -147,9 +149,9 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
      * 
      * @see BatchInsertConstructor
      */
-    protected BatchInsert(IRabaCoder keysCoder, IRabaCoder valsCoder,
-            int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            boolean returnOldValues) {
+    protected BatchInsert(final IRabaCoder keysCoder, final IRabaCoder valsCoder,
+            final int fromIndex, final int toIndex, final byte[][] keys, final byte[][] vals,
+            final boolean returnOldValues) {
 
         super(keysCoder, valsCoder, fromIndex, toIndex, keys, vals);
 
@@ -169,11 +171,11 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
      *         or a {@link ResultBuffer} containing the old values.
      */
     @Override
-    public ResultBuffer apply(final IIndex ndx) {
+    public ResultBuffer applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
         int i = 0;
         
-        final int n = getKeyCount();
+        final int n = keys.size();
 
         final byte[][] ret = (returnOldValues ? new byte[n][] : null);
         
@@ -181,9 +183,9 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         
         while (i < n) {
 
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);
             
-            final byte[] val = getValue(i);
+            final byte[] val = vals.get(i);
 
             final byte[] old = (byte[]) ndx.insert(key, val);
 
@@ -240,5 +242,20 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> im
         out.writeBoolean(returnOldValues);
 
     }
+
+	@SuppressWarnings("unchecked")
+	@Override
+	protected IResultHandler<ResultBuffer, ResultBuffer> newAggregator() {
+
+		if (!getReturnOldValues()) {
+
+			// NOP aggegrator preserves striping against the index.
+			return NopAggregator.INSTANCE;
+
+		}
+		
+		return new ResultBufferHandler(getKeys().size(), getValuesCoder());
+
+	}
 
 }

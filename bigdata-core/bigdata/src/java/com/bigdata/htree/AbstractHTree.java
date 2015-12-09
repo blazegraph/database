@@ -1517,18 +1517,30 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 	 */
 	private final void doSyncTouch(final AbstractPage node) {
 
-		synchronized (this) {
+        final long beginNanos = System.nanoTime();
+        
+        synchronized (this) {
 
-			doTouch(node);
+            doTouch(node);
 
-		}
+        }
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+
+        // See BLZG-1664
+        btreeCounters.syncTouchNanos.add(elapsedNanos);
 
 	}
 
 	private final void doTouch(final AbstractPage node) {
 
+        final long beginNanos = System.nanoTime();
+        
+        // See BLZG-1664
+        btreeCounters.touchCount.increment();
+        
 		/*
-		 * We need to guarentee that touching this node does not cause it to be
+		 * We need to guarantee that touching this node does not cause it to be
 		 * made persistent. The condition of interest would arise if the queue
 		 * is full and the referenceCount on the node is zero before this method
 		 * was called. Under those circumstances, simply appending the node to
@@ -1593,6 +1605,11 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 		// }
 		//
 		// }
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        // See BLZG-1664
+        btreeCounters.touchNanos.add(elapsedNanos);
 
 	}
 

@@ -17,6 +17,9 @@
     <condition property="default.nic" value="${env.DEFAULT_NIC}" else="">
        <isset property="env.DEFAULT_NIC" />
     </condition>
+    <condition property="skipTestServices" value="${maven.test.skip}">
+       <isset property="maven.test.skip" />
+    </condition>
     <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
     <property name="app.home" value ="."/>
     <echo>${bigdata.fedname} ${default.nic} ${app.home}</echo>
@@ -87,13 +90,13 @@
           <antcall target="stopHttpd" />
     </target>
 
-    <target name="preTestPreparation">
-        <!-- make sure we have a clean set of test reports -->
-        <delete dir="${HATest.dir}" quiet="true" />
-        <mkdir dir="${HATest.dir}" />
-        <delete dir="${test.results.dir}/surefire-reports" quiet="true" />
-        <mkdir dir="${test.results.dir}/surefire-reports" />
-	<antcall target = "startTestServices"/>
+    <target name="preTestPreparation" unless="${skipTestServices}">
+       <!-- make sure we have a clean set of test reports -->
+       <delete dir="${HATest.dir}" quiet="true" />
+       <mkdir dir="${HATest.dir}" />
+       <delete dir="${test.results.dir}/surefire-reports" quiet="true" />
+       <mkdir dir="${test.results.dir}/surefire-reports" />
+	   <antcall target = "startTestServices"/>
     </target>
 
     <target name="startTestServices" depends="getMavenDependencies" unless="${skipTestServices}">
@@ -207,9 +210,9 @@
       </java>
     </target>
 
-    <target name = "postTestCleanup">
-	<antcall target="stopTestServices"/>
-	<antcall target="testReportArchive"/>
+    <target name = "postTestCleanup" unless="${skipTestServices}">
+	   <antcall target="stopTestServices"/>
+	   <antcall target="testReportArchive"/>
     </target>
 
     <target name = "testReportArchive">

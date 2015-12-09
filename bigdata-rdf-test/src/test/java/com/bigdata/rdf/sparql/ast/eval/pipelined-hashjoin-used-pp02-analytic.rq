@@ -1,0 +1,6 @@
+SELECT * WHERE {
+  hint:Query hint:analytic "true" .
+
+  <http://TestCaseAuthor> <http://is> <http://Michael> .
+  <http://Michael> <http://knows>+ ?knows
+} LIMIT 100 # effectively all

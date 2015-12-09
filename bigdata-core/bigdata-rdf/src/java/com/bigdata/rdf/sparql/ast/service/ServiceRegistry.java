@@ -115,7 +115,7 @@ public class ServiceRegistry {
         aliases = new ConcurrentHashMap<URI, URI>();
 
         defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
-                new RemoteServiceFactoryImpl(true/* isSparql11 */));
+                new RemoteServiceFactoryImpl(SPARQLVersion.SPARQL_11));
 
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
@@ -398,6 +398,10 @@ public class ServiceRegistry {
         if (serviceURI == null)
             throw new IllegalArgumentException();
 
+        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
+            throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
+        }
+        
         final URI alias = aliases.get(serviceURI);
 
         if (alias != null) {
@@ -446,7 +450,7 @@ public class ServiceRegistry {
 
         }
 
-        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI)) {
+        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
             throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
         }
 
@@ -484,6 +488,10 @@ public class ServiceRegistry {
      *         as fallback
      */
     public ServiceFactory getServiceFactoryByServiceURI(URI serviceUri) {
+       
+       if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceUri.stringValue())) {
+          throw new IllegalArgumentException("Service URI " + serviceUri + " is not allowed");
+       }
        
        final ServiceFactory serviceFactory = 
           serviceUri==null ? 

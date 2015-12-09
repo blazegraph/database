@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -60,6 +61,7 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
@@ -90,6 +92,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.rio.IRDFParserOptions;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
@@ -113,7 +116,6 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -123,7 +125,6 @@ import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.UpdateType;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTBatchResolveTermsOptimizer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -270,11 +271,16 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * operation which have a 0L term identifier in case they have
 				 * become defined through the previous update(s).
 				 * 
-				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+				 * Note: Since 2.0, also re-resolves RDF Values appearing in the
+				 * binding sets or data set.
+				 * 
+				 * @see BLZG-1176 SPARQL Parsers should not be db mode aware
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
-				op = (Update) new ASTBatchResolveTermsOptimizer().optimize(context,
-				      new QueryNodeWithBindingSet(op, context.getBindings()))
-						.getQueryNode();
+				ASTDeferredIVResolution.resolveUpdate(context.db,
+				      op, context.getQueryBindingSet(), context.getDataset());
+				
 				batchResolveNanos = System.nanoTime() - t2;
 
 			}
@@ -419,20 +425,40 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             break;
         }
         case Clear:
-        case Drop:
+        case Drop: {
             left = convertClearOrDropGraph(left, (DropGraph) op, context);
             break;
+        }
         case InsertData:
-        case DeleteData:
+        case DeleteData: {
             left = convertInsertOrDeleteData(left, (AbstractGraphDataUpdate) op,
                     context);
             break;
-        case Load:
+        }
+        case Load: {
             left = convertLoadGraph(left, (LoadGraph) op, context);
             break;
-        case DeleteInsert:
+        }
+        case DeleteInsert: {
             left = convertDeleteInsert(left, (DeleteInsertGraph) op, context, deleteInsertWhereStats);
             break;
+        }
+        case DropEntailments: {
+        	left = convertDropEntailments(left, context);
+        	break;
+        }
+        case CreateEntailments: {
+        	left = convertCreateEntailments(left, context);
+        	break;
+        }
+        case EnableEntailments: {
+        	left = convertEnableEntailments(left, context);
+        	break;
+        }
+        case DisableEntailments: {
+        	left = convertDisableEntailments(left, context);
+        	break;
+        }
         default:
             throw new UnsupportedOperationException("updateType=" + updateType);
         }
@@ -530,6 +556,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             }
 
             final ASTContainer astContainer = new ASTContainer(queryRoot);
+            /*
+             * Inherit 'RESOLVED' flag, so resolution will not be run
+             * for ASTContainer, constracted from parts of already resolved update.
+             */
+            astContainer.setProperty(ASTContainer.Annotations.RESOLVED, context.astContainer.getProperty(ASTContainer.Annotations.RESOLVED));
 
             final QuadsDataOrNamedSolutionSet insertClause = op.getInsertClause();
 
@@ -632,7 +663,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				final MutableTupleQueryResult result = new MutableTupleQueryResult(
 						ASTEvalHelper.evaluateTupleQuery(
 								context.conn.getTripleStore(), astContainer,
-								context.getQueryBindingSet()/* bindingSets */));
+								context.getQueryBindingSet()/* bindingSets */, null /* dataset */));
 				deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
 				
 				// If the query contains a nativeDistinctSPO query hint then
@@ -1007,7 +1038,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					 */
                     final GraphQueryResult result = ASTEvalHelper
 							.evaluateGraphQuery(context.conn.getTripleStore(),
-									astContainer, context.getQueryBindingSet()/* bindingSets */);
+									astContainer, context.getQueryBindingSet()/* bindingSets */, null /* dataset */);
                     
                     try {
 
@@ -1306,7 +1337,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     private static PipelineOp convertLoadGraph(PipelineOp left,
             final LoadGraph op, final AST2BOpUpdateContext context)
             throws Exception {
-
+        
         if (!runOnQueryEngine) {
 
             final AtomicLong nmodified = new AtomicLong();
@@ -1324,9 +1355,38 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 if (log.isDebugEnabled())
                     log.debug("sourceURI=" + urlStr + ", defaultContext="
                             + defaultContext);
+
+                // Take overrides from LOAD request, defaults from triple store and fall back to static defaults.
+                final Properties defaults = context.getAbstractTripleStore().getProperties();
+                
+				final boolean verifyData = Boolean
+						.parseBoolean(op.getProperty(LoadGraph.Annotations.VERIFY_DATA, p.getProperty(
+								RDFParserOptions.Options.VERIFY_DATA, RDFParserOptions.Options.DEFAULT_VERIFY_DATA)));
+
+				final boolean preserveBlankNodeIDs = Boolean
+						.parseBoolean(op.getProperty(LoadGraph.Annotations.PRESERVE_BLANK_NODE_IDS,
+								p.getProperty(RDFParserOptions.Options.PRESERVE_BNODE_IDS,
+										RDFParserOptions.Options.DEFAULT_PRESERVE_BNODE_IDS)));
+
+				final boolean stopAtFirstError = Boolean
+						.parseBoolean(op.getProperty(LoadGraph.Annotations.STOP_AT_FIRST_ERROR,
+								p.getProperty(RDFParserOptions.Options.STOP_AT_FIRST_ERROR,
+										RDFParserOptions.Options.DEFAULT_STOP_AT_FIRST_ERROR)));
+
+				final DatatypeHandling dataTypeHandling = DatatypeHandling
+						.valueOf(op.getProperty(LoadGraph.Annotations.DATA_TYPE_HANDLING,
+								p.getProperty(RDFParserOptions.Options.DATATYPE_HANDLING,
+										RDFParserOptions.Options.DEFAULT_DATATYPE_HANDLING)));
+
+				final RDFParserOptions parserOptions = new RDFParserOptions(//
+                		verifyData,//
+                		preserveBlankNodeIDs,//
+                		stopAtFirstError,//
+                		dataTypeHandling//
+                		);
                 
                 doLoad(context.conn.getSailConnection(), sourceURL,
-                        defaultContext, op.getRDFParserOptions(), nmodified,
+                        defaultContext, parserOptions, nmodified,
                         op);
 
             } catch (Throwable t) {
@@ -1867,7 +1927,96 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         
     }
 
-    /**
+   	private static PipelineOp convertDropEntailments(final PipelineOp left,
+			final AST2BOpUpdateContext context) throws SailException {
+		
+		long stmtCount = 0;
+		
+		if (log.isDebugEnabled()) {			
+			stmtCount = context.conn.getSailConnection().getTripleStore().getStatementCount(true);			
+			log.info("begin drop entailments");
+			
+		}
+		
+		context.conn.getSailConnection().removeAllEntailments();
+				
+		if (log.isDebugEnabled()) {			
+			long removedCount = stmtCount - context.conn.getSailConnection().getTripleStore().getStatementCount(true);			
+            log.debug("Removed statements = " + removedCount);
+            
+		}
+		
+        return left;
+
+    }
+	
+	private static PipelineOp convertDisableEntailments(PipelineOp left,
+			AST2BOpUpdateContext context) {
+		
+		if (log.isDebugEnabled()) {
+            log.debug("Going to disable truth maintenance");
+		}
+		
+		
+		if (context.conn.getSailConnection().isTruthMaintenanceConfigured()) {
+			
+			context.conn.getSailConnection().setTruthMaintenance(false);
+			
+		} else {			
+			log.debug("Truth maintenance is not configured");			
+		}
+			
+		if (log.isDebugEnabled()) {			
+            log.debug("truthMaintenance = " + context.conn.getSailConnection().getTruthMaintenance());            
+		}
+		
+		return left;
+	}
+	
+	private static PipelineOp convertEnableEntailments(PipelineOp left,
+			AST2BOpUpdateContext context) {
+		
+		if (log.isDebugEnabled()) {			
+		    log.debug("Going to enable truth maintenance");            
+		}
+		
+		if (context.conn.getSailConnection().isTruthMaintenanceConfigured()) {
+			
+			context.conn.getSailConnection().setTruthMaintenance(true);
+			
+		} else {			
+			log.debug("Truth maintenance is not configured");			
+		}		
+			
+		if (log.isDebugEnabled()) {			
+            log.debug("truthMaintenance = " + context.conn.getSailConnection().getTruthMaintenance());            
+		}
+		
+		return left;
+	}
+	
+	private static PipelineOp convertCreateEntailments(PipelineOp left,
+			AST2BOpUpdateContext context) throws SailException {
+		
+		long stmtCount = 0;
+		if (log.isDebugEnabled()) {
+			stmtCount = context.conn.getSailConnection().getTripleStore().getStatementCount(true);
+			log.info("begin compute closure");
+		}
+		
+		context.conn.getSailConnection().computeClosure();
+		
+		if (log.isDebugEnabled()) {
+			long inferredCount = context.conn.getSailConnection().getTripleStore().getStatementCount(true) - stmtCount;
+            log.debug("Inferred statements = " + inferredCount);
+            
+		}
+		
+		return left;
+	}
+
+	
+	/**
 	 * GRAPHS : If the graph already exists (context has at least one
 	 * statement), then this is an error (unless SILENT). Otherwise it is a NOP.
 	 * <p>

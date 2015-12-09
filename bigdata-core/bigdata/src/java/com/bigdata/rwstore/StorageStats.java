@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 import com.bigdata.rwstore.sector.SectorAllocator;
 
@@ -75,7 +76,8 @@ public class StorageStats {
 		long m_allocationSize;
 		long m_allocations;
 		long m_deletes;
-		long m_deleteSize;
+		// See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//		long m_deleteSize;
 		
 		// By copying committed data the stats can be reset on abort
 		BlobBucket m_committed = null;
@@ -83,21 +85,25 @@ public class StorageStats {
 		public BlobBucket(final int size) {
 			m_size = size;
 		}
-		public BlobBucket(DataInputStream instr) throws IOException {
+		public BlobBucket(final DataInputStream instr) throws IOException {
 			m_size = instr.readInt();
 			m_allocationSize = instr.readLong();
 			m_allocations = instr.readLong();
-			m_deleteSize = instr.readLong();
+			// See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+			instr.readLong(); // was m_deleteSize
+//			m_deleteSize = instr.readLong();
 			m_deletes = instr.readLong();
 			
 			commit();
 		}
 		
-		public void write(DataOutputStream outstr) throws IOException {
+		public void write(final DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
 			outstr.writeLong(m_allocationSize);
 			outstr.writeLong(m_allocations);
-			outstr.writeLong(m_deleteSize);
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+            outstr.writeLong(0L); // was m_deleteSize
+//            outstr.writeLong(m_deleteSize);
 			outstr.writeLong(m_deletes);
 		}
 		public void commit() {
@@ -106,7 +112,8 @@ public class StorageStats {
 			}
 			m_committed.m_allocationSize = m_allocationSize;
 			m_committed.m_allocations = m_allocations;
-			m_committed.m_deleteSize = m_deleteSize;
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_committed.m_deleteSize = m_deleteSize;
 			m_committed.m_deletes = m_deletes;
 		}
 		
@@ -114,21 +121,24 @@ public class StorageStats {
 			if (m_committed != null) {
 				m_allocationSize = m_committed.m_allocationSize;
 				m_allocations = m_committed.m_allocations;
-				m_deleteSize = m_committed.m_deleteSize;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_deleteSize = m_committed.m_deleteSize;
 				m_deletes = m_committed.m_deletes;
 			} else {
 				m_allocationSize = 0;
 				m_allocations = 0;
-				m_deleteSize = 0;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_deleteSize = 0;
 				m_deletes = 0;
 			}
 		}
 		
-		public void delete(int sze) {
-			m_deleteSize += sze;
+		public void delete(final int sze) {
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_deleteSize += sze;
 			m_deletes++;
 		}
-		public void allocate(int sze) {
+		public void allocate(final int sze) {
 			m_allocationSize += sze;
 			m_allocations++;
 		}
@@ -140,26 +150,49 @@ public class StorageStats {
 				return 0;
 			return (int) (m_allocationSize / m_allocations);
 		}
-		public float churn() {
-			if (active() == 0)
-				return m_allocations;
-			
-			BigDecimal allocs = new BigDecimal(m_allocations);
-			BigDecimal used = new BigDecimal(active());			
-			
-			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
-		}
+
+		/*
+		 * Remove because we lack the concept of reserved slots for blobs. Just
+		 * look at the 8k allocators churn.
+		 */
+//		public float churn() {
+//			
+//		    if (active() == 0)
+//				return m_allocations;
+//			
+//			final BigDecimal allocs = new BigDecimal(m_allocations);
+//			
+//			final BigDecimal used = new BigDecimal(active());			
+//			
+//			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
+//		}
+		
 	}
 	
 	public class Bucket {
 		final int m_start;
+		/** AllocatorSize: The #of bytes in the allocated slots issued by this allocator. */
 		final int m_size;
+		/** AllocatorCount: The #of fixed allocators for that slot size. */
 		int m_allocators;
+		/** SlotsReserved: The #of slots in this slot size which have had storage reserved for them. */
 		long m_totalSlots;
+		/** SlotsAllocated: Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome). */
 		long m_slotAllocations;
+		/** SlotsRecycled: Cumulative recycled slots to date in this slot size (regardless of the transaction outcome). */
 		long m_slotDeletes;
+		/** The user bytes in use across all allocations for this slot size (does not consider recycled or deleted slots). */
 		long m_sizeAllocations;
-		long m_sizeDeletes;
+//		/**
+//		 * The user bytes that were in use across all allocations for this slot
+//		 * size that have been recycled / deleted.
+//		 * <p>
+//		 * Note: Per BLZG-1551, this value is not tracked accurately!
+//		 * 
+//		 * @see BLZG-1551 (Storage statistics documentation and corrections)
+//         * See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//		 */
+//		long m_sizeDeletes;
 		
 		// By copying committed data the stats can be reset on abort
 		Bucket m_committed = null;
@@ -168,7 +201,8 @@ public class StorageStats {
 			m_size = size;
 			m_start = startRange;
 		}
-		public Bucket(DataInputStream instr) throws IOException {
+
+		public Bucket(final DataInputStream instr) throws IOException {
 			m_size = instr.readInt();
 			m_start = instr.readInt();
 			m_allocators = instr.readInt();
@@ -176,11 +210,14 @@ public class StorageStats {
 			m_slotDeletes = instr.readLong();
 			m_totalSlots = instr.readLong();
 			m_sizeAllocations = instr.readLong();
-			m_sizeDeletes = instr.readLong();
+			// See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+            instr.readLong(); // was m_sizeDeletes
+//            m_sizeDeletes = instr.readLong();
 			
 			commit();
 		}
-		public void write(DataOutputStream outstr) throws IOException {
+		
+		public void write(final DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
 			outstr.writeInt(m_start);
 			outstr.writeInt(m_allocators);
@@ -188,7 +225,9 @@ public class StorageStats {
 			outstr.writeLong(m_slotDeletes);
 			outstr.writeLong(m_totalSlots);
 			outstr.writeLong(m_sizeAllocations);
-			outstr.writeLong(m_sizeDeletes);
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+			outstr.writeLong(0L); // was m_sizeDeletes
+//			outstr.writeLong(m_sizeDeletes);
 		}
 		
 		public void commit() {
@@ -200,7 +239,8 @@ public class StorageStats {
 			m_committed.m_slotDeletes = m_slotDeletes;
 			m_committed.m_totalSlots = m_totalSlots;
 			m_committed.m_sizeAllocations = m_sizeAllocations;
-			m_committed.m_sizeDeletes = m_sizeDeletes;
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_committed.m_sizeDeletes = m_sizeDeletes;
 		}
 		
 		public void reset() {
@@ -210,26 +250,33 @@ public class StorageStats {
 				m_slotDeletes = m_committed.m_slotDeletes;
 				m_totalSlots = m_committed.m_totalSlots;
 				m_sizeAllocations = m_committed.m_sizeAllocations;
-				m_sizeDeletes = m_committed.m_sizeDeletes;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_sizeDeletes = m_committed.m_sizeDeletes;
 			} else {
 				m_allocators = 0;
 				m_slotAllocations = 0;
 				m_slotDeletes = 0;
 				m_totalSlots =0;
 				m_sizeAllocations = 0;
-				m_sizeDeletes = 0;
+	            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//				m_sizeDeletes = 0;
 			}
 		}
 		
-		public void delete(int sze) {
+		public void delete(final int sze) {
 			if (sze < 0)
 				throw new IllegalArgumentException("delete requires positive size, got: " + sze);
 			
-			if (m_size > 64 && sze < 64) {
-				// if called from deferFree then may not include size.  If so then use
-				//	average size of slots to date as best running estimate.
-				sze = meanAllocation();
-			}
+//			if (m_size > 64 && sze < 64) {
+//				/*
+//				 * If called from deferFree then may not include size. If so
+//				 * then use average size of slots to date as best running
+//				 * estimate.
+//				 * 
+//				 * @see BLZG-1551 (Storage statistics documentation and corrections)
+//				 */
+//				sze = meanAllocation();
+//			}
 			
 			if (sze > m_size) {
 				// sze = ((sze - 1 + m_maxFixed)/ m_maxFixed) * 4; // Blob header
@@ -237,10 +284,12 @@ public class StorageStats {
 				throw new IllegalArgumentException("Deletion of address with size greater than slot - " + sze + " > " + m_size);
 			}
 			
-			m_sizeDeletes += sze;
+            // See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+//			m_sizeDeletes += sze;
 			m_slotDeletes++;
 		}
-		public void allocate(int sze) {
+		
+		public void allocate(final int sze) {
 			if (sze <= 0)
 				throw new IllegalArgumentException("allocate requires positive size, got: " + sze);
 			
@@ -248,10 +297,11 @@ public class StorageStats {
 			m_slotAllocations++;
 		}
 		
-		public void addSlots(int slots) {
+		public void addSlots(final int slots) {
 			m_totalSlots += slots;
 		}
 		
+		/** SlotsInUse: SlotsAllocated - SlotsRecycled (net slots in use for this slot size). */
 		public long usedSlots() {
 			return m_slotAllocations - m_slotDeletes;
 		}
@@ -260,47 +310,88 @@ public class StorageStats {
 			return m_totalSlots - usedSlots();
 		}
 		
+		/**
+		 * BytesAppData: The #of bytes in the allocated slots which are used by
+		 * application data (including the record checksum).
+		 * 
+		 * See BLZG-1551 : The data reported here used to be bad since 
+		 * {@link #m_sizeDeletes} could not being tracked correctly in the
+		 * {@link StorageStats} because we do not know the actual #of bytes
+		 * in the slot that contain application data when we finally recycle
+		 * the slot.
+		 * 
+		 * See BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
+		 */
 		public long usedStore() {
-			return m_sizeAllocations - m_sizeDeletes;
+		    return usedSlots() * m_size;
+//			return m_sizeAllocations - m_sizeDeletes;
 		}
 		
-		// return as percentage
+		/** %SlotWaste: How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)). */
 		public float slotWaste() {	
 			if (usedStore() == 0)
 				return 0.0f;
 			
-			BigDecimal size = new BigDecimal(reservedStore());
-			BigDecimal store = new BigDecimal(100 * (reservedStore() - usedStore()));
+			final BigDecimal size = new BigDecimal(reservedStore());
+			final BigDecimal store = new BigDecimal(100 * (reservedStore() - usedStore()));
 			if(size.signum()==0) return 0f;
 			return store.divide(size, 2, RoundingMode.HALF_UP).floatValue();
 		}
-		public float totalWaste(long total) {	
+
+		/*
+		 * TODO This is invoked for both %TotalWaste and %FileWaste. Is it
+		 * correctly invoked for both statistics? Note that we do not have an
+		 * official definition of %TotalWaste. See BLZG-1551.
+		 */
+		public float totalWaste(final long total) {	
+
 			if (total == 0)
 				return 0.0f;
 			
-			long slotWaste = reservedStore() - usedStore();
+			final long slotWaste = reservedStore() - usedStore();
 			
-			BigDecimal localWaste = new BigDecimal(100 * slotWaste);
-			BigDecimal totalWaste = new BigDecimal(total);			
+			final BigDecimal localWaste = new BigDecimal(100 * slotWaste);
+			final BigDecimal totalWaste = new BigDecimal(total);			
+			
 			if(totalWaste.signum()==0) return 0f;
+			
 			return localWaste.divide(totalWaste, 2, RoundingMode.HALF_UP).floatValue();
 		}
+		
+		/**
+		 * BytesReserved: The space reserved on the backing file for those allocation slots (AllocatorSlots * SlotsReserved). */
 		public long reservedStore() {
 			return m_size * m_totalSlots;
 		}
+		
+		public long reservedSlots() {
+			return m_totalSlots;
+		}
+		
 		public void addAlocator() {
 			m_allocators++;
 		}
+		
+		/**
+         * SlotsChurn: A measure of how frequently slots of this size are
+         * re-allocated provided by slotsAllocated/slotsReserved. This metric is
+         * higher when there are more allocations made against a given #of slots
+         * reserved.
+         */
 		public float slotChurn() {
-			// Handle case where we may have deleted all allocations
-			if (usedSlots() == 0)
-				return m_slotAllocations;
+		
+            final BigDecimal slotsAllocated = new BigDecimal(m_slotAllocations);
+            
+			final BigDecimal slotsReserved = new BigDecimal(m_totalSlots);
 			
-			BigDecimal allocs = new BigDecimal(m_slotAllocations);
-			BigDecimal used = new BigDecimal(usedSlots());			
-			if(used.signum()==0) return 0f;
-			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
+			if (slotsReserved.signum() == 0)
+				return 0f;
+			
+			return slotsAllocated.divide(slotsReserved, 2, RoundingMode.HALF_UP).floatValue();
+			
 		}
+		
+		/** %SlotsUnused: The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)). */
 		public float slotsUnused() {
 			if (m_totalSlots == 0) {
 				return 0.0f;
@@ -311,26 +402,51 @@ public class StorageStats {
 			if(total.signum()==0) return 0f;
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
-		public float percentAllocations(long totalAllocations) {
+		
+		/**
+		 * %SlotsAllocated: SlotsAllocated/(Sum of SlotsAllocated across all
+		 * slot sizes).
+		 * 
+		 * @param totalAllocations
+		 *            The #of allocations across all slot sizes.
+		 * @return
+		 */
+		public float percentAllocations(final long totalAllocations) {
 			if (totalAllocations == 0) {
 				return 0.0f;
 			}
 			
-			BigDecimal used = new BigDecimal(100 * m_slotAllocations);			
-			BigDecimal total = new BigDecimal(totalAllocations);
+			final BigDecimal used = new BigDecimal(100 * m_slotAllocations);			
+			final BigDecimal total = new BigDecimal(totalAllocations);
 			if(total.signum()==0) return 0f;
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
-		public float percentSlotsInuse(long totalInuse) {
+		
+		/**
+		 * %SlotsInUse: SlotsInUse / (total SlotsInUse across all slots sizes).
+		 * 
+		 * @param totalInuse
+		 *            The total of SlotsInUse across all slot sizes.
+		 */
+		public float percentSlotsInuse(final long totalInuse) {
+			
 			if (totalInuse == 0) {
 				return 0.0f;
 			}
 			
-			BigDecimal used = new BigDecimal(100 * usedSlots());			
-			BigDecimal total = new BigDecimal(totalInuse);
+			final BigDecimal used = new BigDecimal(100 * usedSlots());	
+			
+			final BigDecimal total = new BigDecimal(totalInuse);
+			
 			if(total.signum()==0) return 0f;
+			
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
+		
+		/**
+		 * MeanAllocation: (total application bytes used across all allocations for this slot size) / SlotsAllocated
+		 * @return
+		 */
 		public int meanAllocation() {
 			if (m_slotAllocations == 0)
 				return 0;
@@ -437,6 +553,15 @@ public class StorageStats {
 		findBlobBucket(sze).delete(sze);
 	}
 	
+	public Bucket findBucket(final int sze) {
+		for (Bucket b : m_buckets) {
+			if (sze == b.m_size)
+				return b;
+		}
+		
+		throw new IllegalStateException("Buckets have not been correctly set");
+	}
+	
 	private BlobBucket findBlobBucket(final int sze) {
 		for (BlobBucket b : m_blobBuckets) {
 			if (sze < b.m_size)
@@ -469,35 +594,29 @@ public class StorageStats {
 	 * <dl>
 	 * <dt>AllocatorSize</dt><dd>The #of bytes in the allocated slots issued by this allocator.</dd>
 	 * <dt>AllocatorCount</dt><dd>The #of fixed allocators for that slot size.</dd>
-	 * <dt>SlotsInUse</dt><dd>The difference between the two previous columns (net slots in use for this slot size).</dd>
-	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
 	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>%SlotsAllocated</dt><dd>SlotsAllocated/(Sum of SlotsAllocated across all slot sizes).</dd>
 	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
-	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsInUse/SlotsAllocated).</dd>
+	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsAllocated/SlotsReserved).</dd>
+	 * <dt>SlotsInUse</dt><dd>SlotsAllocated - SlotsRecycled (net slots in use for this slot size).</dd>
+	 * <dt>%SlotsInUse</dt><dd>SlotsInUse / (total SlotsInUse across all slots sizes).</dd>
+	 * <dt>MeanAllocation</dt><dd>((Total application bytes used across all allocations for this slot size) / SlotsAllocated).</dd>
+	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
 	 * <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
-	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots</dd>
-	 * <dt>BytesAppData</dt><dd>The #of bytes in the allocated slots which are used by application data (including the record checksum).</dd>
+	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots (AllocatorSlots * SlotsReserved).</dd>
+	 * <dt>UsedStore</dt><dd>The #of bytes in the allocated slots.</dd>
 	 * <dt>%SlotWaste</dt><dd>How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)).</dd>
 	 * <dt>%AppData</dt><dd>How much of your data is stored by each allocator (BytesAppData/Sum(BytesAppData)).</dd>
 	 * <dt>%StoreFile</dt><dd>How much of the backing file is reserved for each allocator (BytesReserved/Sum(BytesReserved)).</dd>
+	 * TODO TotalWaste
 	 * <dt>%StoreWaste</dt><dd>How much of the total waste on the store is waste for this allocator size ((BytesReserved-BytesAppData)/(Sum(BytesReserved)-Sum(BytesAppData))).</dd>
 	 * </dl>
 	 * 
-	 * @param str
+	 * @param str The allocator statistics will be appended to the caller's buffer.
 	 * 
-	 * FIXME Javadoc edit - this has diverged from the comments above. Also, there 
-	 * is also a divideByZero which can appear (this has been fixed).<pre>
-     [java] Exception in thread "main" java.lang.ArithmeticException: / by zero
-     [java] 	at java.math.BigDecimal.divideAndRound(BigDecimal.java:1407)
-     [java] 	at java.math.BigDecimal.divide(BigDecimal.java:1381)
-     [java] 	at java.math.BigDecimal.divide(BigDecimal.java:1491)
-     [java] 	at com.bigdata.rwstore.StorageStats$Bucket.slotsUnused(StorageStats.java:240)
-     [java] 	at com.bigdata.rwstore.StorageStats.showStats(StorageStats.java:448)
-     [java] 	at com.bigdata.rwstore.RWStore.showAllocators(RWStore.java:2620)
-     [java] 	at com.bigdata.rdf.store.DataLoader.main(DataLoader.java:1415)
-     </pre>
+     * @see BLZG-1646 BytesAppData counter can not be tracked accurately and should be removed
 	 */
-	public void showStats(StringBuilder str) {
+	public void showStats(final StringBuilder str) {
 		str.append("\n-------------------------\n");
 		str.append("RWStore Allocator Summary\n");
 		str.append("-------------------------\n");
@@ -522,79 +641,91 @@ public class StorageStats {
 				"%FileWaste"
 				));
 		
-		long totalAppData = 0;
-		long totalFileStore = 0;
-		long totalAllocations = 0;
-		long totalInuse = 0;
+		// aggregate over all slot sizes
+		long totalAppData = 0; // total BytesAppData across all slot sizes.
+		long totalFileStore = 0; // total BytesReserved across all slot sizes.
+		long totalAllocations = 0; // total SlotsAllocated across all slot sizes.
+		long totalInuse = 0; // total SlotsInUse across all slots sizes.
 		for (Bucket b: m_buckets) {
 			totalAppData += b.usedStore();
 			totalFileStore += b.reservedStore();
 			totalAllocations += b.m_slotAllocations;
 			totalInuse += b.usedSlots();
 		}
-		long totalWaste = totalFileStore - totalAppData;
+		final long totalWaste = totalFileStore - totalAppData;
 		
 		for (Bucket b: m_buckets) {
 			str.append(String.format("%-16d %16d %16d %16.2f %16d %16.2f %16d %16.2f %16d %16d %16.2f %16d %16d %16.2f %16.2f %16.2f %16.2f  %16.2f \n",
-				b.m_size,
-				b.m_allocators,
-				b.m_slotAllocations,
-				b.percentAllocations(totalAllocations),
-				b.m_slotDeletes,
-				b.slotChurn(),
-				b.usedSlots(),
-				b.percentSlotsInuse(totalInuse),
-				b.meanAllocation(),
-				b.m_totalSlots,
-				b.slotsUnused(),
-				b.reservedStore(),
-				b.usedStore(),
-				b.slotWaste(),
-				dataPercent(b.usedStore(), totalAppData),
-				dataPercent(b.reservedStore(), totalFileStore),
-				b.totalWaste(totalWaste),
-				b.totalWaste(totalFileStore)
+				b.m_size, // AllocatorSize
+				b.m_allocators, // AllocatorCount
+				b.m_slotAllocations, // SlotsAllocated
+				b.percentAllocations(totalAllocations), // %SlotsAllocated 
+				b.m_slotDeletes, // SlotsRecycled
+				b.slotChurn(), // SlotChurn
+				b.usedSlots(), // SlotsInUse
+				b.percentSlotsInuse(totalInuse), // %SlotsInUse
+				b.meanAllocation(), // MeanAllocation
+				b.m_totalSlots, // SlotsReserved
+				b.slotsUnused(), // %SlotsUnused
+				b.reservedStore(), // BytesReserved
+				b.usedStore(), // UsedStore 
+				b.slotWaste(), // %SlotWaste
+				dataPercent(b.usedStore(), totalAppData), // %AppData
+				dataPercent(b.reservedStore(), totalFileStore), // %StoreFile
+				b.totalWaste(totalWaste), // %TotalWaste
+				b.totalWaste(totalFileStore) // %FileWaste
 			));
 		}
 		
 		str.append("\n-------------------------\n");
 		str.append("BLOBS\n");
 		str.append("-------------------------\n");
-		str.append(String.format("%-10s %12s %12s %12s %12s %12s %12s %12s %12s\n", 
+		str.append(String.format("%-10s %12s %12s %12s %12s %12s\n",// %12s\n", 
 			"Bucket(K)",
 			"Allocations",
 			"Allocated",
 			"Deletes",
-			"Deleted",
+//			"Deleted", // 4
 			"Current",
-			"Data",
-			"Mean",
-			"Churn"));
+//			"Data", // 6
+			"Mean"
+//			"Churn"
+			));
 
 		for (BlobBucket b: m_blobBuckets) {
-			str.append(String.format("%-10d %12d %12d %12d %12d %12d %12d %12d %12.2f\n", 
-				b.m_size/1024,
-				b.m_allocations,
-				b.m_allocationSize,
-				b.m_deletes,
-				b.m_deleteSize,
-				(b.m_allocations - b.m_deletes),
-				(b.m_allocationSize - b.m_deleteSize),
-				b.meanAllocation(),
-				b.churn()
+			str.append(String.format("%-10d %12d %12d %12d %12d %12d\n",// %12.2f\n", 
+				b.m_size/1024, // Bucket(K)
+				b.m_allocations, // Allocations
+				b.m_allocationSize, // Allocated
+				b.m_deletes, // Deletes
+//				b.m_deleteSize, // Deleted
+				(b.m_allocations - b.m_deletes), // Current
+//				(b.m_allocationSize - b.m_deleteSize), // Data
+				b.meanAllocation() // Mean
+//				b.churn()
 			));
 		}
 		
 	}
 
-	private float dataPercent(long usedData, long totalData) {
+	/**
+	 * Helper method returns the ratio <code>(usedData/totalData)</code> as a
+	 * percentage.
+	 * 
+	 * @param usedData
+	 * @param totalData
+	 * @return
+	 */
+	static private float dataPercent(final long usedData, final long totalData) {
+
 		if (totalData == 0)
 			return 0.0f;
 		
-		BigDecimal used = new BigDecimal(100 * usedData);
-		BigDecimal total = new BigDecimal(totalData);
+		final BigDecimal used = new BigDecimal(100 * usedData);
+		final BigDecimal total = new BigDecimal(totalData);
 		
 		return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
+
 	}
 
 	public void register(SectorAllocator allocator, boolean init) {
@@ -616,5 +747,9 @@ public class StorageStats {
 		for (BlobBucket b: m_blobBuckets) {
 			b.reset();
 		}
+	}
+	
+	public Iterator<Bucket> getBuckets() {
+		return m_buckets.iterator();
 	}
 }

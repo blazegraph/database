@@ -143,6 +143,7 @@ import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151106;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -685,7 +686,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = DefaultBigdataVocabulary.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151106.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -948,17 +949,21 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_TEXT_INDEX = "true";
 
         /**
-         * Boolean option (default <code>true</code>) enables support for a
-         * full text index that may be used to lookup literals by tokens found
-         * in the text of those literals.
-         * 
-         * @see #TEXT_INDEXER_CLASS
-         * @see #TEXT_INDEX_DATATYPE_LITERALS
-         * @see #INLINE_TEXT_LITERALS
-         * @see #MAX_INLINE_TEXT_LENGTH
-         */
+		 * Boolean option (default <code>true</code>) enables support for a full
+		 * text index that may be used to lookup literals by tokens found in the
+		 * text of those literals.
+		 * 
+		 * @see #TEXT_INDEXER_CLASS
+		 * @see #TEXT_INDEX_DATATYPE_LITERALS
+		 * @see #INLINE_TEXT_LITERALS
+		 * @see #MAX_INLINE_TEXT_LENGTH
+		 * @deprecated Feature was never completed due to scalability issues.
+		 *             See BZLG-1548, BLZG-563.
+		 */
+        @Deprecated
         String SUBJECT_CENTRIC_TEXT_INDEX = AbstractTripleStore.class.getName() + ".subjectCentricTextIndex";
 
+        @Deprecated
         String DEFAULT_SUBJECT_CENTRIC_TEXT_INDEX = "false";
 
 		/**
@@ -2621,8 +2626,8 @@ abstract public class AbstractTripleStore extends
          * Note: This uses the batch API.
          */
 
-        final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
-                this, 1);
+		final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(null/* focusStore */, this,
+				1/* capacity */, 0/* queueCapacity */);
 
         buffer.add(s, p, o, c);
 

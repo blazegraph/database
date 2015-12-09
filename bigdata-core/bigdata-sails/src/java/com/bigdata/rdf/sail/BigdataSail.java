@@ -57,8 +57,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.iteration.CloseableIteration;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -97,7 +95,6 @@ import org.openrdf.sail.SailException;
 import org.openrdf.sail.UnknownSailTransactionStateException;
 import org.openrdf.sail.UpdateContext;
 
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
@@ -155,7 +152,6 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.ChunkedOrderedStriterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
@@ -164,6 +160,7 @@ import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
+import info.aduna.iteration.CloseableIteration;
 
 /**
  * <p>
@@ -293,18 +290,42 @@ public class BigdataSail extends SailBase implements Sail {
 //        public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
     
         /**
-         * The capacity of the statement buffer used to absorb writes.
-         * If this capacity is exceeded, then an incremental flush will
-         * push assertions and/or retractions to the statement indices.
-         * 
-         * @see #DEFAULT_BUFFER_CAPACITY
-         */
+		 * The capacity of the statement buffer used to absorb writes. If this
+		 * capacity is exceeded, then an incremental flush will push assertions
+		 * and/or retractions to the statement indices.
+		 * <p>
+		 * Note: With BLGZ-1522, the {@link #QUEUE_CAPACITY} can increase the
+		 * effective amount of data that is being buffered quite significantly.
+		 * Caution is recommended when overriding the {@link #BUFFER_CAPACITY}
+		 * in combination with a non-zero value of the {@link #QUEUE_CAPACITY}.
+		 * The best performance will probably come from small (10k - 20k) buffer
+		 * capacity values combined with a queueCapacity of 5-20. Larger values
+		 * will increase the GC burden and could require a larger heap, but the
+		 * net throughput might also increase.
+		 * 
+		 * @see #DEFAULT_BUFFER_CAPACITY
+		 */
         public static final String BUFFER_CAPACITY = BigdataSail.class
                 .getPackage().getName()
                 + ".bufferCapacity";
     
         public static final String DEFAULT_BUFFER_CAPACITY = "10000";
         
+		/**
+		 * Optional property specifying the capacity of blocking queue used by
+		 * the {@link StatementBuffer} -or- ZERO (0) to disable the blocking
+		 * queue and perform synchronous writes (default is
+		 * {@value #DEFAULT_QUEUE_CAPACITY} statements). The blocking queue
+		 * holds parsed data pending writes onto the backing store and makes it
+		 * possible for the parser to race ahead while writer is blocked writing
+		 * onto the database indices.
+		 * 
+		 * @see BLZG-1552
+		 */
+		String QUEUE_CAPACITY = BigdataSail.class.getPackage().getName() + ".queueCapacity";
+
+		String DEFAULT_QUEUE_CAPACITY = "10";
+		
         /**
          * Option (default <code>true</code>) may be used to explicitly disable
          * query-time expansion for entailments NOT computed during closure. In
@@ -504,6 +525,13 @@ public class BigdataSail extends SailBase implements Sail {
      * @see Options#BUFFER_CAPACITY
      */
     final private int bufferCapacity;
+    
+    /**
+     * The configured capacity for blocking queue backing the statement buffer(s).
+     * 
+     * @see Options#QUEUE_CAPACITY
+     */
+    final private int queueCapacity;
     
     /**
      * When true, the SAIL is in the "quads" mode.
@@ -1060,6 +1088,19 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.BUFFER_CAPACITY + "="
                         + bufferCapacity);
+
+        }
+
+        // queueCapacity
+        {
+            
+            queueCapacity = Integer.parseInt(properties.getProperty(
+                    BigdataSail.Options.QUEUE_CAPACITY,
+                    BigdataSail.Options.DEFAULT_QUEUE_CAPACITY));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.QUEUE_CAPACITY + "="
+                        + queueCapacity);
 
         }
 
@@ -1852,7 +1893,7 @@ public class BigdataSail extends SailBase implements Sail {
                 if (truthMaintenance) {
 
                     assertBuffer = new StatementBuffer<Statement>(tm
-                            .newTempTripleStore(), database, bufferCapacity);
+                            .newTempTripleStore(), database, bufferCapacity, queueCapacity);
 
                 } else {
 
@@ -1906,7 +1947,7 @@ public class BigdataSail extends SailBase implements Sail {
             if (retractBuffer == null && truthMaintenance) {
 
                 retractBuffer = new StatementBuffer<Statement>(tm
-                        .newTempTripleStore(), database, bufferCapacity);
+                        .newTempTripleStore(), database, bufferCapacity, queueCapacity);
 
                 // FIXME bnodes : Must also track the reverse mapping [bnodes2].
                 retractBuffer.setBNodeMap(bnodes);
@@ -2079,6 +2120,10 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
+        public boolean isTruthMaintenanceConfigured() {
+        	return truthMaintenanceIsSupportable && unisolated;
+        }
+        
         /**
          * Enable or suppress incremental truth maintenance for this
          * {@link BigdataSailConnection}. Truth maintenance MUST be configured
@@ -3860,9 +3905,13 @@ public class BigdataSail extends SailBase implements Sail {
 
                     if (getTruthMaintenance()) {
 
-                        // do TM, writing on the database.
-                        tm.assertAll((TempTripleStore) assertBuffer
-                                .getStatementStore(), changeLog);
+                        TempTripleStore statementStore = (TempTripleStore) assertBuffer.getStatementStore();
+                        // statementStore could be null if statement buffer was created after disabling entailments,
+                        // in this case TM handled manually and does not require execution over assertBuffer
+                        if (statementStore != null) {
+                        	// do TM, writing on the database.
+                        	tm.assertAll(statementStore, changeLog);
+                        }
 
                         // must be reallocated on demand.
                         assertBuffer = null;
@@ -4384,7 +4433,7 @@ public class BigdataSail extends SailBase implements Sail {
                 flushStatementBuffers(true/* assertions */, true/* retractions */);
 
                 return ASTEvalHelper.evaluateTupleQuery(getTripleStore(),
-                        astContainer, new QueryBindingSet(bindings));
+                        astContainer, new QueryBindingSet(bindings), dataset);
             
             } catch (QueryEvaluationException e) {
                                 

@@ -33,6 +33,7 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.sparql.TestVerifyAggregates;
 import com.bigdata.rdf.sail.tck.BigdataComplexSparqlQueryTest;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
 import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateConformanceTest;
@@ -101,6 +102,9 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         
         suite.addTestSuite(TestInlineValues.class);
 
+        // Validation logic for aggregation operators.
+        suite.addTestSuite(TestVerifyAggregates.class);
+        
         suite.addTestSuite(TestConcurrentKBCreate.TestWithGroupCommit.class);
         suite.addTestSuite(TestConcurrentKBCreate.TestWithoutGroupCommit.class);
 
@@ -136,8 +140,6 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
         suite.addTestSuite(com.bigdata.rdf.sail.TestNoExceptions.class);
 
-        suite.addTestSuite(com.bigdata.rdf.sail.TestInlineURIs.class);
-        
         // The Sesame TCK, including the SPARQL test suite.
         {
 

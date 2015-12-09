@@ -28,16 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters;
 
+import com.bigdata.util.DaemonThreadFactory;
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
-import org.apache.log4j.Logger;
-
-import com.bigdata.util.DaemonThreadFactory;
 
 /**
  * Command manages the execution and termination of a native process and an
@@ -64,6 +63,11 @@ public class ActiveProcess {
     protected InputStream is = null;
 
     protected volatile Future readerFuture;
+
+    // This is used in tests
+    protected ActiveProcess() {
+
+    }
 
     /**
      * 

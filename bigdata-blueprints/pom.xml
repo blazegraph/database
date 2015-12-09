@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-blueprints</artifactId>
-  <version>1.5.3-master-SNAPSHOT</version>
+  <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph Blueprints API</name>
   <packaging>jar</packaging>
   <build>
@@ -121,31 +121,31 @@ ga('send', 'pageview');
       <version>${junit-ext.version}</version>
     </dependency>
     <dependency>
-	<groupId>com.tinkerpop.blueprints</groupId>
-	<artifactId>blueprints-core</artifactId>
-	<version>${blueprints.version}</version>
+       <groupId>com.tinkerpop.blueprints</groupId>
+       <artifactId>blueprints-core</artifactId>
+       <version>${blueprints.version}</version>
     </dependency>
     <dependency>
-	<groupId>com.tinkerpop.blueprints</groupId>
-	<artifactId>blueprints-test</artifactId>
-	<version>${blueprints.version}</version>
+      <groupId>com.tinkerpop.blueprints</groupId>
+      <artifactId>blueprints-test</artifactId>
+      <version>${blueprints.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
-	<groupId>com.tinkerpop.rexster</groupId>
-	<artifactId>rexster-core</artifactId>
-	<version>${rexster.version}</version>
-     </dependency>
-     <dependency>
-	<groupId>org.codehaus.jettison</groupId>
-	<artifactId>jettison</artifactId>
-	<version>${jettison.version}</version>
+      <groupId>com.tinkerpop.rexster</groupId>
+      <artifactId>rexster-core</artifactId>
+      <version>${rexster.version}</version>
     </dependency>
     <dependency>
-	<groupId>commons-configuration</groupId>
-	<artifactId>commons-configuration</artifactId>
-	<!--<version>${apache.commons_configuration.version}</version>-->
-	<version>1.10</version>
-    </dependency> 
+      <groupId>org.codehaus.jettison</groupId>
+      <artifactId>jettison</artifactId>
+      <version>${jettison.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-configuration</groupId>
+      <artifactId>commons-configuration</artifactId>
+      <version>${apache.commons_configuration.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>

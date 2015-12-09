@@ -35,7 +35,6 @@ import com.bigdata.service.Split;
  * Aggregates result into a list of results.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @param <R>
  * @param <A>
  */
@@ -49,7 +48,8 @@ public class ListResultAggregator<R, A extends List<R>> implements
     @SuppressWarnings("unchecked")
     private final A results = (A) new LinkedList<R>();
 
-    public void aggregate(R result, Split split) {
+    @Override
+    public void aggregate(final R result, final Split split) {
 
         synchronized(results) {
         
@@ -59,9 +59,12 @@ public class ListResultAggregator<R, A extends List<R>> implements
 
     }
 
+    @Override
     public A getResult() {
 
-        return results;
+		synchronized (results) {
+			return results;
+		}
 
     }
 

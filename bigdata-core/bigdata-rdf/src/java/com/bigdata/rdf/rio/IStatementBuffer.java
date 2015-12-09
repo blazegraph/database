@@ -48,7 +48,6 @@ import com.bigdata.relation.accesspath.IBuffer;
  * {@link AbstractTripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IStatementBuffer<F extends Statement> extends IBuffer<F> {
 
@@ -74,6 +73,7 @@ public interface IStatementBuffer<F extends Statement> extends IBuffer<F> {
      *            database as axioms) but the term identifiers on the <i>stmt</i>'s
      *            values will be ignored.
      */
+    @Override
     public void add(F stmt);
 
     /**

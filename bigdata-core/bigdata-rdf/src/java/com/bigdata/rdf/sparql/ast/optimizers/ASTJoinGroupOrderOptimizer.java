@@ -455,12 +455,52 @@ implements IASTOptimizer {
          reorderer.reorderNodes(partition);
       }
 
+      // the non-VALUE nodes that will be placed (some lines below)
+      final List<IGroupMemberNode> nonValueNodesToBePlaced =
+            new LinkedList<IGroupMemberNode>();
+         nonValueNodesToBePlaced.addAll(classifier.get(AssignmentNode.class));
+         nonValueNodesToBePlaced.addAll(classifier.get(ServiceNode.class));
+         nonValueNodesToBePlaced.addAll(classifier.get(IGroupMemberNode.class));
+      
       /**
-       * Place the VALUES nodes.
+       * Place the VALUES nodes. Generally, it is desirable to place the VALUES
+       * clause at the first contributing position. However, in some cases
+       * (see e.g. https://jira.blazegraph.com/browse/BLZG-1463) the VALUES
+       * clause may introduce variables for the remainingToBePlaced constructs
+       * (e.g., a subsequent BIND node, as in the ticket example) s.t. it is
+       * desirable to place the VALUES clause early on: this clears the way
+       * for placing subsequent nodes earlier in the query execution plan.
+       * 
+       * We therefore check the variables in the remainingToBePlaced array
+       * for dependencies towards variables introduced in our bindings clauses.
+       * If there are such dependencies, we place the VALUES clauses at the
+       * first possible position, otherwise we choose the first contributing
+       * position.
        */
       for (IGroupMemberNode node : classifier.get(BindingsClause.class)) {
-         partition.placeAtFirstContributingPosition(node,
-            knownBoundFromPrevPartitions, false /* requires all bound */);
+         
+         final BindingsClause bc = (BindingsClause)node;
+         final Set<IVariable<?>> declaredVars = bc.getDeclaredVariables();
+         
+         final Set<IVariable<?>> intersectionWithNonValueNodesToBePlaced = 
+            new HashSet<IVariable<?>>();
+         
+         // start out with all non value nodes to be placed and intersect
+         for (final IGroupMemberNode cur : nonValueNodesToBePlaced) {
+            intersectionWithNonValueNodesToBePlaced.addAll(
+               bindingInfoMap.get(cur).leftToBeBound(knownBoundFromPrevPartitions));
+         }
+         intersectionWithNonValueNodesToBePlaced.retainAll(declaredVars);
+         
+         if (intersectionWithNonValueNodesToBePlaced.isEmpty()) {
+            // case 1: no dependencies -> late placement
+            partition.placeAtFirstContributingPosition(node,
+                  knownBoundFromPrevPartitions, false /* requires all bound */);            
+         } else {
+            // case 1: dependencies -> early placement
+            partition.placeAtFirstPossiblePosition(node,
+               knownBoundFromPrevPartitions, false /* requires all bound */);
+         }
       }
 
       /**
@@ -473,16 +513,10 @@ implements IASTOptimizer {
             partition.definitelyProduced);
 
       // ... order the bind and SERVICE nodes according to dependencies,
-      // essentially constructing a dependency graph over these nodes
-      final List<IGroupMemberNode> remainingToBePlaced =
-         new LinkedList<IGroupMemberNode>();
-      remainingToBePlaced.addAll(classifier.get(AssignmentNode.class));
-      remainingToBePlaced.addAll(classifier.get(ServiceNode.class));
-      remainingToBePlaced.addAll(classifier.get(IGroupMemberNode.class));
-      
+      // essentially constructing a dependency graph over these nodes      
       final List<IGroupMemberNode> orderedNodes = 
          orderNodesByDependencies(
-            remainingToBePlaced, partition.bindingInfoMap,
+            nonValueNodesToBePlaced, partition.bindingInfoMap,
             knownBoundSomewhere);
 
       // ... and place the bind nodes

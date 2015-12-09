@@ -347,6 +347,20 @@ public class AST2BOpJoins extends AST2BOpFilters {
 			final AST2BOpContext ctx//
 			) {
 
+		if ( ctx.gpuEvaluation != null
+		     && pred.getProperty(GpuAnnotations.EVALUATE_ON_GPU,
+		                         GpuAnnotations.DEFAULT_EVALUATE_ON_GPU) )
+		{
+         return ctx.gpuEvaluation.fastRangeCountJoin( left,
+                                                      anns,
+                                                      pred,
+                                                      dataset,
+                                                      cutoffLimitIsIgnored,
+                                                      fastRangeCountVar,
+                                                      queryHints,
+                                                      ctx );
+		}
+
 		anns.add(new NV(FastRangeCountOp.Annotations.COUNT_VAR,
 				fastRangeCountVar.getValueExpression()));
 
@@ -671,7 +685,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+            return newJoin(left, anns, ctx.defaultGraphDistinctFilter, summary,
                     cutoffLimit, queryHints, ctx);
 
         }
@@ -931,7 +945,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+            return newJoin(left, anns, ctx.defaultGraphDistinctFilter, summary,
                     cutoffLimit, queryHints, ctx);
 
         } else {
@@ -1019,7 +1033,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
            
-            return newJoin(left, anns, true/* defaultGraphFilter */, summary,
+            return newJoin(left, anns, ctx.defaultGraphDistinctFilter, summary,
                     cutoffLimit, queryHints, ctx);
 
         }
@@ -1309,9 +1323,13 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Publish the NamedSolutionSetRef. This makes updates in the state
              * of the hash join visible from the NanoSparqlServer. (Both
              * versions of the operator require this attribute.)
+             * 
+             * BLZG-1608: this needs to be locally scoped, since the named subquery
+             * may be executed multiple times (e.g., when part of an inner subquery
+             * executed through the PipelinedHashIndexAndSolutionSetJoinOp.
              */
             map.put(HashJoinOp.Annotations.NAMED_SET_REF,
-                    NamedSolutionSetRefUtility.newInstance(ctx.queryId,
+                    NamedSolutionSetRefUtility.newInstance(null,
                             "--namedSet-" + ctx.nextId(), joinVars));
 
             /*

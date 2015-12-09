@@ -23,19 +23,29 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal;
 
+import java.io.Serializable;
 import java.util.Arrays;
 
+import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
-public class IPv4Address {
+/**
+ * Class models an IPv4 address.
+ */
+public class IPv4Address implements Serializable, Comparable<IPv4Address> {
 
-	final byte[] address;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 8707927477744805951L;
+    
+	final private byte[] address;
 
-	public IPv4Address(byte[] address) {
+	public IPv4Address(final byte[] address) {
 		this.address = address;
 	}
 	
-	public IPv4Address(IPv4Address ip) {
+	public IPv4Address(final IPv4Address ip) {
 		this.address = ip.getBytes();
 	}
 
@@ -54,14 +64,14 @@ public class IPv4Address {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
+	public boolean equals(final Object obj) {
 		if (this == obj)
 			return true;
 		if (obj == null)
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		IPv4Address other = (IPv4Address) obj;
+		final IPv4Address other = (IPv4Address) obj;
 
 		return UnsignedByteArrayComparator.INSTANCE.compare(address,
 				other.address) == 0;
@@ -70,6 +80,7 @@ public class IPv4Address {
 	/**
 	 * Return printable version of the IP address
 	 */
+	@Override
 	public String toString() {
 		return byteArrayToIPString(address);
 		
@@ -88,9 +99,9 @@ public class IPv4Address {
         	   (netmask <= 32 ? "/" + netmask : ""); 
 	}
 	
-	public static IPv4Address IPv4Factory(String... s) {
+	public static IPv4Address IPv4Factory(final String... s) {
 
-		byte[] address = new byte[5];
+		final byte[] address = new byte[5];
 		long longVal;
 
 		if(s.length == 4) {
@@ -122,5 +133,10 @@ public class IPv4Address {
 
 		return new IPv4Address(address);
 	}
+
+    @Override
+    public int compareTo(IPv4Address other) {
+        return UnsignedByteArrayComparator.INSTANCE.compare(address, other.address);
+    }
 
 }

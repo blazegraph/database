@@ -28,24 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import com.bigdata.counters.*;
+import com.bigdata.counters.linux.SarCpuUtilizationCollector.DI;
+import com.bigdata.util.Bytes;
+
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.bigdata.counters.AbstractProcessCollector;
-import com.bigdata.counters.AbstractProcessReader;
-import com.bigdata.counters.ActiveProcess;
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterHierarchy;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IInstrument;
-import com.bigdata.counters.IProcessCounters;
-import com.bigdata.counters.ProcessReaderHelper;
-import com.bigdata.counters.linux.SarCpuUtilizationCollector.DI;
-import com.bigdata.util.Bytes;
 
 /**
  * Collects statistics on the JVM process relating to CPU, memory, and IO
@@ -242,8 +234,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 
         this.pid = pid;
         
-        perProcessIOData = kernelVersion.version >= 2
-                && kernelVersion.major >= 6 && kernelVersion.minor >= 20;
+        perProcessIOData = kernelVersion.version > 2 || (kernelVersion.version == 2
+                && kernelVersion.major >= 6 && kernelVersion.minor >= 20);
 
     }
 
@@ -368,6 +360,17 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      */
     protected class PIDStatReader extends ProcessReaderHelper {
 
+        private static final String PIDSTAT_FIELD_CPU_PERCENT_USR = "%usr";
+        private static final String PIDSTAT_FIELD_CPU_PERCENT = "%CPU";
+        private static final String PIDSTAT_FIELD_CPU_PERCENT_SYSTEM = "%system";
+        private static final String PIDSTAT_FIELD_MEM_MINOR_FAULTS_PERS = "minflt/s";
+        private static final String PIDSTAT_FIELD_MEM_MAJOR_FAULTS_PERS = "majflt/s";
+        private static final String PIDSTAT_FIELD_MEM_VIRTUAL_SIZE = "VSZ";
+        private static final String PIDSTAT_FIELD_MEM_RESIDENT_SET_SIZE = "RSS";
+        private static final String PIDSTAT_FIELD_MEM_SIZE_PERCENT = "%MEM";
+        private static final String PIDSTAT_FIELD_DISK_KB_READ_PERS = "kB_rd/s";
+        private static final String PIDSTAT_FIELD_DISK_KB_WRITTEN_PERS = "kB_wr/s";
+
         @Override
         protected ActiveProcess getActiveProcess() {
             
@@ -471,8 +474,20 @@ public class PIDStatCollector extends AbstractProcessCollector implements
              * to do.
              */
             lastModified.set(System.currentTimeMillis());
-                            
-            if(header.contains("%CPU")) {
+
+            final Map<String, String> fields = SysstatUtil.getDataMap(header, data);
+            if (log.isInfoEnabled()) {
+                StringBuilder sb = new StringBuilder();
+                for ( Map.Entry<String, String> e: fields.entrySet()) {
+                    sb.append(e.getKey());
+                    sb.append("=");
+                    sb.append(e.getValue());
+                    sb.append(", ");
+                }
+                log.info(sb.toString());
+                log.info(header + ";" + data);
+            }
+            if(fields.containsKey(PIDSTAT_FIELD_CPU_PERCENT)) {
                 
                 /*
                  * CPU data for the specified process.
@@ -481,108 +496,59 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 // 06:35:15 AM       PID   %user %system    %CPU   CPU  Command
                 // 06:35:15 AM       501    0.00    0.01    0.00     1  kjournald
                 
-//                final String user    = data.substring(22-1,30-1).trim();
-//                final String system  = data.substring(30-1,38-1).trim();
-//                final String cpu     = data.substring(38-1,46-1).trim();
-                
-                final String[] fields = SysstatUtil.splitDataLine(data);
-                
-                final String user   = fields[2];
-                final String system = fields[3];
-                final String cpu    = fields[4];
-                
-                if (log.isInfoEnabled())
-                        log.info("\n%user=" + user + ", %system=" + system
-                                + ", %cpu=" + cpu + "\n" + header + "\n"
-                                + data);
-                
+
                 vals.put(IProcessCounters.CPU_PercentUserTime,
-                        Double.parseDouble(user));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_CPU_PERCENT_USR)));
 
                 vals.put(IProcessCounters.CPU_PercentSystemTime,
-                        Double.parseDouble(system));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_CPU_PERCENT_SYSTEM)));
                 
                 vals.put(IProcessCounters.CPU_PercentProcessorTime,
-                        Double.parseDouble(cpu));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_CPU_PERCENT)));
 
-            } else if(header.contains("RSS")) {
+            } else if(fields.containsKey("RSS")) {
                 
                 /*
                  * Memory data for the specified process.
+                 *
+                 *       06:35:15 AM       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command
+                 *       06:35:15 AM       501      0.00      0.00       0      0   0.00  kjournald
                  */
-                
-//                  *       06:35:15 AM       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command
-//                  *       06:35:15 AM       501      0.00      0.00       0      0   0.00  kjournald
-              
-//                final String minorFaultsPerSec = data.substring(22-1,32-1).trim();
-//                final String majorFaultsPerSec = data.substring(32-1,42-1).trim();
-//                final String virtualSize       = data.substring(42-1,50-1).trim();
-//                final String residentSetSize   = data.substring(50-1,57-1).trim();
-//                final String percentMemory     = data.substring(57-1,64-1).trim();
-                
-                final String[] fields = SysstatUtil.splitDataLine(data);
-                
-                final String minorFaultsPerSec = fields[2];
-                final String majorFaultsPerSec = fields[3];
-                final String virtualSize       = fields[4];
-                final String residentSetSize   = fields[5];
-                final String percentMemory     = fields[6];
 
-                if(log.isInfoEnabled())
-                    log.info("\nminorFaultsPerSec="
-                            + minorFaultsPerSec
-                            + ", majorFaultsPerSec="
-                            + majorFaultsPerSec + ", virtualSize="
-                            + virtualSize + ", residentSetSize="
-                            + residentSetSize + ", percentMemory="
-                            + percentMemory + "\n"+header+"\n"+data);
-                
+
                 vals.put(IProcessCounters.Memory_minorFaultsPerSec,
-                        Double.parseDouble(minorFaultsPerSec));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_MEM_MINOR_FAULTS_PERS)));
                 
                 vals.put(IProcessCounters.Memory_majorFaultsPerSec,
-                        Double.parseDouble(majorFaultsPerSec));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_MEM_MAJOR_FAULTS_PERS)));
                 
                 vals.put(IProcessCounters.Memory_virtualSize, 
-                        Long.parseLong(virtualSize));
+                        Long.parseLong(fields.get(PIDSTAT_FIELD_MEM_VIRTUAL_SIZE)));
                 
                 vals.put(IProcessCounters.Memory_residentSetSize,
-                        Long.parseLong(residentSetSize));
+                        Long.parseLong(fields.get(PIDSTAT_FIELD_MEM_RESIDENT_SET_SIZE)));
                 
                 vals.put(IProcessCounters.Memory_percentMemorySize, 
-                        Double.parseDouble(percentMemory));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_MEM_SIZE_PERCENT)));
 
             } else if(perProcessIOData && header.contains("kB_rd/s")) {
 
                 /*
                  * IO data for the specified process.
-                 */
-                
-//                    *         06:35:15 AM       PID   kB_rd/s   kB_wr/s kB_ccwr/s  Command
-//                    *         06:35:15 AM       501      0.00      1.13      0.00  kjournald
-
-//                final String kBrdS = data.substring(22-1, 32-1).trim();
-//                final String kBwrS = data.substring(32-1, 42-1).trim();
-                
-                final String[] fields = SysstatUtil.splitDataLine(data);
-                
-                final String kBrdS = fields[2];
-                final String kBwrS = fields[3];
-
-                if(log.isInfoEnabled())
-                log.info("\nkB_rd/s=" + kBrdS + ", kB_wr/s="
-                            + kBwrS + "\n" + header + "\n" + data);
+                 *
+                 *         06:35:15 AM       PID   kB_rd/s   kB_wr/s kB_ccwr/s  Command
+                 *         06:35:15 AM       501      0.00      1.13      0.00  kjournald
+                */
 
                 vals.put(IProcessCounters.PhysicalDisk_BytesReadPerSec,
-                        Double.parseDouble(kBrdS));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_DISK_KB_READ_PERS)));
                 
                 vals.put(IProcessCounters.PhysicalDisk_BytesWrittenPerSec,
-                        Double.parseDouble(kBrdS));
+                        Double.parseDouble(fields.get(PIDSTAT_FIELD_DISK_KB_WRITTEN_PERS)));
                 
             } else {
                 
                 log.warn("Could not identify event type from header: ["+header+"]");
-
                 continue;
                 
             }

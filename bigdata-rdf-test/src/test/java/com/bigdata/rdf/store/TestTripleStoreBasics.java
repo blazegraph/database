@@ -102,6 +102,9 @@ public class TestTripleStoreBasics extends TestCase2 {
          */
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
+        // the DataLoader utility.
+        suite.addTestSuite(TestDataLoader.class);
+        
 		/**
 		 * Test suite for configuration of the BLOBS index support.
 		 * 
@@ -112,7 +115,11 @@ public class TestTripleStoreBasics extends TestCase2 {
         
 //        // magic sets support (still under development).
 //        suite.addTest(com.bigdata.rdf.magic.TestAll.suite());
-        
+
+        // integration test suite for inline URIs.
+        // See BLZG-1507 (Implement support for DTE extension types for URIs)
+        suite.addTestSuite(com.bigdata.rdf.store.TestInlineURIs.class);
+
         return suite;
 
     }

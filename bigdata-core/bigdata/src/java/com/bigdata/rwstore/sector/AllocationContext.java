@@ -88,7 +88,8 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	 * is shared by the top-level {@link MemoryManager} to avoid lock ordering
 	 * problems.
 	 */
-	private final ReentrantLock lock; 
+	private final Lock writeLock; 
+	private final Lock readLock; 
 
 	/**
 	 * All addresses allocated either directly by this {@link AllocationContext}
@@ -126,7 +127,8 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 		m_parent = root;
 		
-		lock = root.m_allocationLock;
+		writeLock = root.m_allocationLock.writeLock();
+		readLock = m_root.m_allocationLock.readLock();
 
 	}
 	
@@ -139,7 +141,8 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 		m_parent = parent;
 		
-		lock = m_root.m_allocationLock;
+		writeLock = m_root.m_allocationLock.writeLock();
+		readLock = m_root.m_allocationLock.readLock();
 		
 		m_isolated = parent.m_isolated;
 		
@@ -186,7 +189,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	@Override
 	public long allocate(final int nbytes, final boolean blocks) {
 
-		lock.lock();
+		writeLock.lock();
 		try {
 
 			final long addr = m_parent.allocate(nbytes, blocks);
@@ -205,7 +208,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 			return addr;
 
 		} finally {
-			lock.unlock();
+			writeLock.unlock();
 		}
 
 	}
@@ -213,7 +216,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	@Override
 	public void clear() {
 
-		lock.lock();
+		writeLock.lock();
 		try {
 
 			if(log.isDebugEnabled())
@@ -232,7 +235,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 			m_slotBytes.set(0);
 
 		} finally {
-			lock.unlock();
+			writeLock.unlock();
 		}
 
 	}
@@ -244,7 +247,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 		final int size = MemoryManager.getAllocationSize(addr);
 		final int offset = SectorAllocator.getSectorOffset(rwaddr);
 
-		lock.lock();
+		writeLock.lock();
 		try {
 
 			final SectorAllocator sector = m_root.getSector(rwaddr);
@@ -258,7 +261,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 			m_slotBytes.addAndGet(-sector.getPhysicalSize(offset));
 
 		} finally {
-			lock.unlock();
+			writeLock.unlock();
 		}
 
 	}
@@ -376,8 +379,13 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 		/**
 		 * TBD: this could probably be more efficient!
 		 */
-		final ByteBuffer rbuf = m_root.getBuffer((int) l, buf.length);	
-		rbuf.get(buf);
+		readLock.lock();
+		try {
+			final ByteBuffer rbuf = m_root.getBuffer((int) l, buf.length);
+			rbuf.get(buf);
+		} finally {
+			readLock.unlock();
+		}
 	}
 
 	@Override

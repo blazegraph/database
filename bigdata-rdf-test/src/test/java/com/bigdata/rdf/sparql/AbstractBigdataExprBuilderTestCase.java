@@ -32,8 +32,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Properties;
 
-import junit.framework.TestCase;
-
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 
@@ -49,12 +47,14 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.sparql.BatchRDFValueResolver;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.sparql.BigdataASTContext;
 import com.bigdata.rdf.sail.sparql.BigdataExprBuilder;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.CreateGraph.Annotations;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
@@ -63,6 +63,8 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
+
+import junit.framework.TestCase;
 
 /**
  * Abstract base class for tests of the {@link BigdataExprBuilder} and friends.
@@ -99,8 +101,6 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
     protected BigdataValueFactory valueFactory = null;
 
-    protected BigdataASTContext context;
-
     @Override
     protected void setUp() throws Exception {
         
@@ -109,8 +109,6 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         lex = tripleStore.getLexiconRelation().getNamespace();
         
         valueFactory = tripleStore.getValueFactory();
-        
-        this.context = new BigdataASTContext(tripleStore);
         
     }
 
@@ -130,8 +128,6 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         lex = null;
         
         valueFactory = null;
-        
-        context = null;
         
     }
 
@@ -162,8 +158,6 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
      * never have anything in the database (unless there is a Vocabulary or it
      * is otherwise inline, in which case this code is sufficient to resolve the
      * inline IV).
-     * 
-     * @see {@link BatchRDFValueResolver}.
      */
     @SuppressWarnings("unchecked")
     protected IV<BigdataValue, ?> makeIV(final BigdataValue value) {
@@ -249,8 +243,13 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     public QueryRoot parse(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
-        final QueryRoot ast = new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,
-                baseURI).getOriginalAST();
+    	final Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser();
+        
+    	final ASTContainer astContainer = parser.parseQuery2(queryStr, baseURI);
+        
+    	ASTDeferredIVResolution.resolveQuery(tripleStore, astContainer);
+        
+        final QueryRoot ast = astContainer.getOriginalAST();
         
         final Collection<ValueExpressionNode> nodes = 
         		new LinkedList<ValueExpressionNode>();
@@ -279,8 +278,10 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     protected UpdateRoot parseUpdate(final String updateStr, final String baseURI)
             throws MalformedQueryException {
 
-        return new Bigdata2ASTSPARQLParser(tripleStore).parseUpdate2(updateStr,
-                baseURI).getOriginalUpdateAST();
+        Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser();
+        ASTContainer ast = parser.parseUpdate2(updateStr, baseURI);
+        ASTDeferredIVResolution.resolveUpdate(tripleStore, ast);
+        return ast.getOriginalUpdateAST();
 
     }
 
@@ -323,6 +324,20 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             }
             
         }
+        if (actual instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)actual).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
+        if (expected instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)expected).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
 
         if (!expected.equals(actual)) {
 

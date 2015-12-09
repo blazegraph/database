@@ -27,21 +27,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.join.FastRangeCountOp;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Interface for an external evaluation of {@link JoinGroupNode}s.
  * 
  * @author <a href="http://olafhartig.de">Olaf Hartig</a>
- * @version $Id$
  */
-public interface IExternalAST2BOp {
-    
+public interface IExternalAST2BOp
+{
     /**
      * Translate the given join group.
      * 
@@ -51,9 +57,23 @@ public interface IExternalAST2BOp {
      * @param start
      * @param ctx
      */
-    abstract public PipelineOp convertJoinGroup(PipelineOp left,
+    PipelineOp convertJoinGroup( final PipelineOp left,
             final JoinGroupNode joinGroup,
             final Set<IVariable<?>> doneSet,
             final AtomicInteger start,
             final AST2BOpContext ctx);
+
+    /**
+     * Use a {@link FastRangeCountOp}.
+     *
+     * @see https://github.com/SYSTAP/bigdata-gpu/issues/101
+     */
+    PipelineOp fastRangeCountJoin( final PipelineOp left,
+                                   final List<NV> anns,
+                                   final Predicate<?> pred,
+                                   final DatasetNode dataset,
+                                   final Long cutoffLimitIsIgnored,
+                                   final VarNode fastRangeCountVar,
+                                   final Properties queryHints,
+                                   final AST2BOpContext ctx );
 }

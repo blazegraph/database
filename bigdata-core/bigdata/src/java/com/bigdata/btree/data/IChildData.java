@@ -30,7 +30,6 @@ package com.bigdata.btree.data;
  * Interface for data access to children of an index node.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: ILeafData.java 4388 2011-04-11 13:35:47Z thompsonbry $
  */
 public interface IChildData {
 

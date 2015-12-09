@@ -1,0 +1,10 @@
+SELECT * WITH {
+   SELECT ?s
+   WHERE
+   {  
+     VALUES (?obj) { ( <http://o> ) } 
+     bind (?obj as ?obj2) 
+     ?s <http://p> ?obj2 . 
+   }
+} AS %sub
+WHERE {  include %sub }

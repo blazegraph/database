@@ -29,16 +29,21 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-zookeeper-test</artifactId>
-  <version>1.5.3-master-SNAPSHOT</version>
+  <version>1.6.0-master-SNAPSHOT</version>
   <name>Blazegraph Zookeeper and Quorum Tests</name>
   <packaging>jar</packaging>
-
+  <properties>
+     <!-- Used to prevent ant from starting test services -->
+     <maven.test.skip>false</maven.test.skip>
+     <!-- Use skipTests as maven.test.skip doesn't build the test jar artifacts.  Set it to the value of the maven.test.skip to allow override -->
+     <skipTests>${maven.test.skip}</skipTests>
+  </properties>
     <profiles>
      <profile>
       <id>localZookeeper</id>
@@ -104,7 +109,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         <version>2.18.1</version>
         <configuration>
 	 <basedir>${basedir}</basedir>
-         <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
+         <argLine>-server -ea -Xms512m -Xmx4g -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
 	 <forkCount>1</forkCount>
          <reuseForks>true</reuseForks>
          <printSummary>false</printSummary>
@@ -124,7 +129,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>process-test-resources</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="preTestPreparation"/>
+                   <ant antfile="build.xml" target="preTestPreparation">
+                       <property name="maven.test.skip" value="${maven.test.skip}"/>
+                       <property name="skipTests" value="${skipTests}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>
@@ -136,7 +144,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>test</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="postTestCleanup"/>
+                   <ant antfile="build.xml" target="postTestCleanup">
+                       <property name="maven.test.skip" value="${maven.test.skip}"/>
+                       <property name="skipTests" value="${skipTests}"/>
+                   </ant>
                  </target>
                </configuration>
              </execution>

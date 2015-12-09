@@ -28,6 +28,8 @@ package com.bigdata.htree;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.EvictionError;
 import com.bigdata.btree.IEvictionListener;
 import com.bigdata.btree.PO;
@@ -59,6 +61,12 @@ public class DefaultEvictionListener implements
          * information.
          */
 
+        final AbstractHTree htree = node.htree;
+
+        final BTreeCounters counters = htree.getBtreeCounters();
+
+        counters.queueEvict.incrementAndGet();
+        
         if (--node.referenceCount > 0) {
             
             return;
@@ -66,7 +74,7 @@ public class DefaultEvictionListener implements
             
         }
 
-        final AbstractHTree htree = node.htree;
+        counters.queueEvictNoRef.incrementAndGet();
 
         if (htree.error != null) {
             /**
@@ -105,9 +113,11 @@ public class DefaultEvictionListener implements
 //            // this causes transient nodes to be coded on eviction.
 //            if (node.dirty) {
 
-			if (log.isDebugEnabled())
-				log.debug("Evicting: " + (node.isLeaf() ? "leaf" : "node")
-						+ " : " + node.toShortString());
+            counters.queueEvictDirty.incrementAndGet();
+            
+//			if (log.isDebugEnabled())
+//				log.debug("Evicting: " + (node.isLeaf() ? "leaf" : "node")
+//						+ " : " + node.toShortString());
         	
             if (node.isLeaf()) {
 

@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-rdf-test</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph RDF Tests</name>
     <description>Blazegraph(TM) Maven Build</description>
@@ -101,7 +101,7 @@ dependencies.
           <reuseForks>true</reuseForks>
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
-          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:src/test/resources/log4j.properties</argLine>
+          <argLine>-server -ea -Xms512m -Xmx4g -Dlog4j.configuration=file:src/test/resources/log4j.properties</argLine>
 	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>

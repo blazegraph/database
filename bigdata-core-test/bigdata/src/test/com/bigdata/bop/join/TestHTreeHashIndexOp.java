@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
@@ -119,7 +120,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                 new NV(HashIndexOp.Annotations.SELECT, selected),//
                 new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                         HTreeHashJoinUtility.factory),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(IPredicate.Annotations.RELATION_NAME, "kb")
         );
 
         // Must run on the query controller.
@@ -135,7 +137,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                     new NV(HashIndexOp.Annotations.SELECT, selected),//
                     new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                             HTreeHashJoinUtility.factory),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, "kb")
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -155,7 +158,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                     new NV(HashIndexOp.Annotations.SELECT, selected),//
                     new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                             HTreeHashJoinUtility.factory),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, "kb")
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -176,7 +180,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                     new NV(HashIndexOp.Annotations.SELECT, selected),//
                     new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                             HTreeHashJoinUtility.factory),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, "kb")
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -195,7 +200,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                 new NV(HashIndexOp.Annotations.SELECT, selected),//
                 new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                         HTreeHashJoinUtility.factory),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(IPredicate.Annotations.RELATION_NAME, "kb")
         );
 
         // Join vars must be specified.
@@ -211,7 +217,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                     new NV(HashIndexOp.Annotations.SELECT, selected),//
                     new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                             HTreeHashJoinUtility.factory),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, "kb")
             );
         } catch(IllegalStateException ex) {
             if(log.isInfoEnabled())
@@ -230,7 +237,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                 new NV(HashIndexOp.Annotations.SELECT, selected),//
                 new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                         HTreeHashJoinUtility.factory),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(IPredicate.Annotations.RELATION_NAME, "kb")
         );
         
         // The selected variables annotation is optional.
@@ -245,7 +253,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                 new NV(HashIndexOp.Annotations.SELECT, null),//
                 new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
                         HTreeHashJoinUtility.factory),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(IPredicate.Annotations.RELATION_NAME, "kb")
         );
         
         // The IHashJoinUtility must be specified.
@@ -261,7 +270,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                     new NV(HashIndexOp.Annotations.SELECT, selected),//
 //                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
 //                            HTreeHashJoinUtility.factory),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, "kb")
             );
         } catch(IllegalStateException ex) {
             if(log.isInfoEnabled())
@@ -280,8 +290,30 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
                     new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HashIndexOp.Annotations.SELECT, selected),//
                     new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
-                            HTreeHashJoinUtility.factory)//
+                            HTreeHashJoinUtility.factory),//
 //                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(IPredicate.Annotations.RELATION_NAME, "kb")
+            );
+        } catch(IllegalStateException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+        
+        // The relation name must be set
+        try {
+            new HashIndexOp(BOp.NOARGS,//
+                    new NV(BOp.Annotations.BOP_ID, 1),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
+                    new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                            HTreeHashJoinUtility.factory),//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+//                    new NV(IPredicate.Annotations.RELATION_NAME, "kb")
             );
         } catch(IllegalStateException ex) {
             if(log.isInfoEnabled())

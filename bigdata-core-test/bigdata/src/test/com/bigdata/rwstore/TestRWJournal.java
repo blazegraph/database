@@ -71,6 +71,7 @@ import com.bigdata.journal.VerifyCommitRecordIndex;
 import com.bigdata.util.Bytes;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PseudoRandom;
@@ -674,6 +675,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		protected IRawStore getSmallSlotStore(final int slotSize) {
 
+			return getSmallSlotStore(slotSize, 100 /*nallocators*/, 0.2f /*candiateWasteThreshold*/);
+
+		}
+
+		protected IRawStore getSmallSlotStore(final int slotSize, final int nWasteAllocators, final float maxWaste) {
+
             final Properties properties = new Properties(getProperties());
 
             properties.setProperty(
@@ -681,6 +688,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             properties.setProperty(
                     RWStore.Options.SMALL_SLOT_TYPE, "" + slotSize);
+
+            properties.setProperty(
+                    RWStore.Options.SMALL_SLOT_WASTE_CHECK_ALLOCATORS, "" + nWasteAllocators);
+
+            properties.setProperty(
+                    RWStore.Options.SMALL_SLOT_HIGH_WASTE, "" + maxWaste);
 
             return getStore(properties);
 
@@ -982,6 +995,81 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			}
 
+		}
+		
+		/**
+         * At scale the small slot handling can lead to large amounts of store
+         * waste, tending to the small slot allocation thresholds of 50%,
+         * dependent on use case.
+         * <p>
+         * To mitigate this problem, when more than some minimum number of
+         * allocators are in use the storage stats are used to check on overall
+         * usage. If the waste is above some specified amount, then an attempt
+         * is made to locate a "reasonable" candidate allocator to be used.
+         * <p>
+         * To test below sets thresholds to quickly trigger this behaviour, with
+         * a low minimum number of allocators, and low "candidate" re-use
+         * threshold.
+         * 
+         * @see BLZG-1278 (Small slot optimization to minimize waste).
+         */
+		public void test_smallSlotWasteRecylcing() {
+			// Note that the Waste parameter effectively controls the recycling in high waste scenarios
+			final Journal store = (Journal) getSmallSlotStore(1024, 10 /*min allocators to check*/, 20.0f/* % waste of store total slot waste before checking for candidates*/);
+			try {
+
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				final int cSlotSize = 128;
+				final int cAllocSize = 99;
+				
+				int breaks = 0;
+				int contiguous = 0;
+				
+				ArrayList<Integer> recycle = new ArrayList<Integer>();
+				
+				long pap = rw.physicalAddress(rw.alloc(cAllocSize, null));
+				for (int i = 0; i < 500000; i++) {
+					final int a = rw.alloc(cSlotSize, null);
+					final long pa = rw.physicalAddress(a);
+					
+					if (r.nextInt(7) < 3) { // less than 50% recycle, so will not be added automatically to free list
+						recycle.add(a);
+					}
+					
+					if (pa == (pap+cSlotSize)) {
+						contiguous++;
+					} else {
+						breaks++;
+					}
+					
+					if ((i+1) % 20000 == 0) {
+						// add intermediate commit to stress correct recycling
+						store.commit();
+					}
+					
+					pap = pa;
+					
+					if (recycle.size() > 5000) {
+						log.warn("Transient Frees for immediate recyling");
+						for (int e : recycle) {
+							rw.free(e, cAllocSize);
+						}
+						recycle.clear();
+					}
+				}
+				
+				store.commit();
+				
+				final StringBuilder sb = new StringBuilder();
+				rw.showAllocators(sb);
+				
+				log.warn("Contiguous: " + contiguous + ", breaks: " + breaks + "\n" + sb.toString());
+
+			} finally {
+				store.destroy();
+			}
 		}
 
 		/**
@@ -2295,16 +2383,20 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		/**
-		 * To stress teh sesion protection, we will allocate a batch of
+		 * To stress the session protection, we will allocate a batch of
 		 * addresses, then free half with protection.  Then reallocate half
 		 * again after releasing the session.
 		 * This should result in all the original batch being allocated,
 		 * exercising both session protection and write cache clearing
 		 */
 		public void test_stressSessionProtection() {
-			// Sequential logic
+			stressSessionProtection(0); // no small slots
+			stressSessionProtection(1024); // standard small slots
+		}
 
-			final Journal store = (Journal) getStore();
+		void stressSessionProtection(final int smallSlotSize) {
+			// ensure smallslots WILL recycle "high-waste" immediately for even single allocator
+			final Journal store = (Journal) getSmallSlotStore(smallSlotSize, 1, 0.2f);
 			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 			final RWStore rw = bs.getStore();
@@ -2320,41 +2412,101 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// We just want to stress a single allocator, so make 5000
 			// allocations to force multiple allocBlocks.
 			
-			for (int i = 0; i < 5000; i++) {
+			for (int i = 0; i < 10000; i++) {
 				addrs.add(bs.write(bb));
 				bb.flip();
 			}
+			
+			final Bucket bucket =  findBucket(rw, buf.length+4); // allow for checksum
+			
+			store.commit();
 
-			for (int i = 0; i < 5000; i+=2) {
+			for (int i = 0; i < addrs.size(); i+=2) {
 				bs.delete(addrs.get(i));
+			}
+
+			store.commit();
+
+			for (int i = 0; i < addrs.size(); i++) {
+				bs.write(bb);
+				bb.flip();
+			}
+
+			
+			{
+				long used = bucket.usedSlots();
+				long reserved = bucket.reservedSlots();
+	
+				assertTrue(reserved > used);
+				assertTrue(reserved-used > (addrs.size()/2)); // must not have reclaimed recycled slots
 			}
 
 			// now release session to make addrs reavailable
 			tx.close();
-
-
-			for (int i = 0; i < 5000; i+=2) {
+			
+			store.commit();
+			
+			for (int i = 0; i < addrs.size(); i++) {
 				bs.write(bb);
 				bb.flip();
 			}
 
 			store.commit();
+			
+			{
+				long used = bucket.usedSlots();
+				long reserved = bucket.reservedSlots();
+	
+				assertTrue(reserved > used);
 
-			bb.position(0);
-
-			for (int i = 0; i < 3000; i++) {
-				bb.position(0);
-				
-				ByteBuffer rdBuf = bs.read(addrs.get(i));
-
-				// should be able to
-				assertEquals(bb, rdBuf);
+				// check should be okay for small slots if high waste check is always triggered!
+				assertTrue(reserved-used < (addrs.size()/2)); // must have reclaimed recycled slots
 			}
 
-			store.commit();
 			} finally {
 			    store.destroy();
 			}
+		}
+		
+		private Bucket findBucket(RWStore rws, final int dataSize) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			while (buckets.hasNext()) {
+				final Bucket bucket = buckets.next();
+				
+				if (bucket.m_size > dataSize) {
+					return bucket;
+				}
+			}
+			
+			return null;
+		}
+		
+		private int getTotalAllocatedSlots(RWStore rws) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			
+			int allocated = 0;
+			while (buckets.hasNext()) {
+				allocated += buckets.next().usedSlots();
+			}
+			
+			return allocated;
+		}
+		
+		private int getTotalReservedSlots(RWStore rws) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			
+			int reserved = 0;
+			while (buckets.hasNext()) {
+				reserved += buckets.next().reservedSlots();
+			}
+			
+			return reserved;
 		}
 		
 		/**
@@ -2679,22 +2831,36 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * This test releases over a blobs worth of deferred frees
 		 */
 		public void test_blobDeferredFrees() {
+			doBlobDeferredFrees(4000); // standard
+		}
+		
+		/**
+		 * This is the test that was able to reproduce the recycler failure for
+		 * BLZG-1236 when run with 10M deferred frees.
+		 * 
+		 * @see BLZG-1236 (recycler error)
+		 */
+		public void test_stressBlobDeferredFrees() {
+			doBlobDeferredFrees(10000000); // 10M (40M data)
+		}
+		
+		void doBlobDeferredFrees(final int cAddrs) {
 
-            final Properties properties = new Properties(getProperties());
+			final Properties properties = new Properties(getProperties());
 
             properties.setProperty(
                     AbstractTransactionService.Options.MIN_RELEASE_AGE, "4000");
 
             properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
-                    "1,2,3,5,8,12,16,24,32"); // 2K
+                    "1,2,3,5,8,12,16"); // 1K
 
-			Journal store = (Journal) getStore(properties);
+			final Journal store = (Journal) getStore(properties);
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
-            	ArrayList<Long> addrs = new ArrayList<Long>();
-            	for (int i = 0; i < 4000; i++) {
+            	final ArrayList<Long> addrs = new ArrayList<Long>();
+            	for (int i = 0; i < cAddrs; i++) {
             		addrs.add(bs.write(randomData(45)));
             	}
             	store.commit();
@@ -2702,7 +2868,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	for (long addr : addrs) {
             		bs.delete(addr);
             	}
-                for (int i = 0; i < 4000; i++) {
+                for (int i = 0; i < cAddrs; i++) {
                     if(!bs.isCommitted(addrs.get(i))) {
                         fail("i="+i+", addr="+addrs.get(i));
                     }

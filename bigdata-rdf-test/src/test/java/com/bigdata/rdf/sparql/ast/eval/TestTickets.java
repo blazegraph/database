@@ -27,7 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
@@ -1282,5 +1289,193 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         ).runTest();       
      }
 
+    /**
+     * Query having *no* bottom-up issues.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463a() throws Exception {
+       new TestHelper(
+             "ticket_bg1463a",// testURI,
+             "ticket_bg1463a.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463a.srx"// resultFileURL
+          ).runTest();
+    }
+    
+    /**
+     * Query having bottom-up issues.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463b() throws Exception {
+       new TestHelper(
+             "ticket_bg1463b",// testURI,
+             "ticket_bg1463b.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463b.srx"// resultFileURL
+          ).runTest();       
+    }
+    
+    /**
+     * Same as 1463a, just nested into subquery.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463c() throws Exception {
+       new TestHelper(
+             "ticket_bg1463c",// testURI,
+             "ticket_bg1463c.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463c.srx"// resultFileURL
+          ).runTest();   
+    }
 
+    /**
+     * Same as 1463b, just nested into subquery.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1463d() throws Exception {
+       new TestHelper(
+             "ticket_bg1463d",// testURI,
+             "ticket_bg1463d.rq",// queryFileURL
+             "ticket_bg1463.trig",// dataFileURL
+             "ticket_bg1463d.srx"// resultFileURL
+          ).runTest();   
+    }
+
+    /**
+     * Ticket 1627: minus fails when preceded by property path.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627a() throws Exception {
+       new TestHelper(
+             "ticket_bg1627a",// testURI,
+             "ticket_bg1627a.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1627b: minus fails when preceded by property path.
+     * Variant of the query where MINUS is indeed eliminated.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627b() throws Exception {
+       new TestHelper(
+             "ticket_bg1627b",// testURI,
+             "ticket_bg1627b.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1627c: minus fails when preceded by property path
+     * - variant of 1627a with different style of property path.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627c() throws Exception {
+       new TestHelper(
+             "ticket_bg1627c",// testURI,
+             "ticket_bg1627c.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1627d: minus fails when preceded by property path
+     * - variant of 1627d with different style of property path.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627d() throws Exception {
+       new TestHelper(
+             "ticket_bg1627d",// testURI,
+             "ticket_bg1627d.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1498: Query hint optimizer:None ignored for property
+     * path queries. This is related to ticket 1627, caused
+     * by appending property path decompositions at the end. It
+     * has been fixed along the lines with the previous one.
+     * 
+     * @throws Exception
+     */
+    @SuppressWarnings("unchecked")
+    public void test_ticket_1498() throws Exception {
+       final ASTContainer container = new TestHelper(
+             "ticket_bg1498",// testURI,
+             "ticket_bg1498.rq",// queryFileURL
+             "ticket_bg1498.trig",// dataFileURL
+             "ticket_bg1498.srx"// resultFileURL
+          ).runTest();   
+       
+       /**
+        * We assert that, in the optimized AST and given the input
+        * 
+        * SELECT (count(*) as ?c)
+        * WHERE {
+        *   hint:Query hint:optimizer "None" .
+        *   ?s <http://p1>/<http://p2> "A" . 
+        *   ?s rdf:type <http://T> . 
+        * }
+        * 
+        * the triples pattern ?s rdf:type <http://T> is still at
+        * the last position, i.e. the optimizer hint is considered.
+        */
+       final GraphPatternGroup<IGroupMemberNode> whereClause = 
+           container.getOptimizedAST().getWhereClause();
+       final BOp lastInGroup = whereClause.get(whereClause.arity()-1);
+       
+       final StatementPatternNode sp = (StatementPatternNode)lastInGroup;
+       final VarNode subj = (VarNode)sp.get(0);
+       final ConstantNode pred = (ConstantNode)sp.get(1);
+       final ConstantNode obj = (ConstantNode)sp.get(2);
+       
+       // the statement pattern node is the only node (?s, <const>, <const>),
+       // so the checks below are sufficient to verify our claim
+       assertTrue(subj.getValueExpression().getName().equals("s"));
+       assertTrue(pred.isConstant());
+       assertTrue(obj.isConstant());
+    }
+    
+    /**
+     * Ticket 1524: MINUS being ignored.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1542a() throws Exception {
+       new TestHelper(
+             "ticket_bg1542a",// testURI,
+             "ticket_bg1542a.rq",// queryFileURL
+             "ticket_bg1542.trig",// dataFileURL
+             "ticket_bg1542a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1524: MINUS being ignored. Analogous test
+     * case for OPTIONAL case.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1542b() throws Exception {
+       new TestHelper(
+             "ticket_bg1542b",// testURI,
+             "ticket_bg1542b.rq",// queryFileURL
+             "ticket_bg1542.trig",// dataFileURL
+             "ticket_bg1542b.srx"// resultFileURL
+          ).runTest();   
+    }
 }

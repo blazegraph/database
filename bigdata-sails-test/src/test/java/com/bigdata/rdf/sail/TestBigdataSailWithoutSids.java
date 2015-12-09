@@ -32,6 +32,7 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.sparql.TestVerifyAggregates;
 
 /**
  * Test suite for the {@link BigdataSail} with statement identifiers enabled.
@@ -77,6 +78,9 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         
         suite.addTestSuite(TestInlineValues.class);
         
+        // Validation logic for aggregation operators.
+        suite.addTestSuite(TestVerifyAggregates.class);
+        
         suite.addTestSuite(TestConcurrentKBCreate.TestWithGroupCommit.class);
         suite.addTestSuite(TestConcurrentKBCreate.TestWithoutGroupCommit.class);
 
@@ -106,8 +110,6 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket610.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket669.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket693.class);
-        
-        suite.addTestSuite(com.bigdata.rdf.sail.TestInlineURIs.class);
         
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1388.class);
         

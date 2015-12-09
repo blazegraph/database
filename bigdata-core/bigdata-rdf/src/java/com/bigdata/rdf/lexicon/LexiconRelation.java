@@ -838,12 +838,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     private final boolean textIndex;
     
     /**
-     * When <code>true</code> a secondary subject-centric full text index is 
-     * maintained.
-     * 
-     * @see AbstractTripleStore.Options#SUBJECT_CENTRIC_TEXT_INDEX
-     */
+	 * When <code>true</code> a secondary subject-centric full text index is
+	 * maintained.
+	 * 
+	 * @see AbstractTripleStore.Options#SUBJECT_CENTRIC_TEXT_INDEX
+	 * @deprecated Feature was never completed due to scalability issues. See
+	 *             BZLG-1548, BLZG-563.
+	 */
+    @Deprecated
     private final boolean subjectCentricTextIndex;
+    
     /**
      * When <code>true</code> the kb is using told blank nodes semantics.
      * 
@@ -992,10 +996,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
-     * <code>true</code> iff the subject-centric full text index is enabled.
-     * 
-     * @see AbstractTripleStore.Options#SUBJECT_CENTRIC_TEXT_INDEX
-     */
+	 * <code>true</code> iff the subject-centric full text index is enabled.
+	 * 
+	 * @see AbstractTripleStore.Options#SUBJECT_CENTRIC_TEXT_INDEX
+	 * 
+	 * @deprecated Feature was never completed due to scalability issues. See
+	 *             BZLG-1548, BLZG-563.
+	 */
+    @Deprecated
     final public boolean isSubjectCentricTextIndex() {
         
         return subjectCentricTextIndex;
@@ -1219,15 +1227,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
-     * A factory returning the softly held singleton for the
-     * {@link FullTextIndex} representing the subject-centric full text index.
-     * 
-     * @see AbstractTripleStore.Options#TEXT_INDEX
-     * 
-     * @todo replace with the use of the {@link IResourceLocator} since it
-     *       already imposes a canonicalizing mapping within for the index name
-     *       and timestamp inside of a JVM.
-     */
+	 * A factory returning the softly held singleton for the
+	 * {@link FullTextIndex} representing the subject-centric full text index.
+	 * 
+	 * @see AbstractTripleStore.Options#TEXT_INDEX
+	 * @deprecated Feature was never completed due to scalability issues. See
+	 *             BZLG-1548, BLZG-563.
+	 */
+    @Deprecated
     public ISubjectCentricTextIndexer<?> getSubjectCentricSearchEngine() {
 
     	if (!subjectCentricTextIndex)
@@ -1715,6 +1722,30 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
 
         /*
+         * Ensure that BigdataValue objects belong to the correct ValueFactory
+         * for this LexiconRelation.
+         * 
+         * @see BLZG-1593 (LexiconRelation.addTerms() does not reject
+         * BigdataValue objects from another namespace nor call asValue() on
+         * them to put them in the correct namespace)
+         */
+        {
+            final BigdataValueFactory vf = getValueFactory();
+            for (int i = 0; i < numTerms; i++) {
+                final BigdataValue tmp = vf.asValue(values[i]);
+                if (tmp != values[i]) {
+                    /*
+                     * Note: When the BigdataValue does not belong to this
+                     * namespace the IV can not be set on the BigdataValue as a
+                     * side-effect.
+                     */
+                    throw new RuntimeException("Value does not belong to this namespace: value=" + values[i]);
+                }
+                values[i] = tmp;
+            }
+        }
+        
+        /*
          * Filter out inline terms from the supplied terms array and create a
          * collections of Values which will be resolved against the
          * TERM2ID/ID2TERM index and a collection of Values which will be
@@ -1839,7 +1870,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         
         if (this.textIndex && textIndex.size() > 0) {
-            
+			/*
+			 * There were some inline literals that need to make it into the
+			 * text index. That is handled here.
+			 * 
+			 * See BLZG-1525
+			 */
             try {
                 
                 stats.fullTextIndexTime
@@ -2281,23 +2317,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	 * 
 	 * (t,s) => s.len, termWeight
 	 * 
-	 * Where s is the subject's IV. The term weight has the same
-	 * interpretation, but it is across all literals which are linked to that
-	 * subject and which contain the given token.  This index basically
-	 * pre-computes the (?s ?p ?o) join that sometimes follows the (?o
-	 * bd:search "xyz") request.
+	 * Where s is the subject's IV. The term weight has the same interpretation,
+	 * but it is across all literals which are linked to that subject and which
+	 * contain the given token. This index basically pre-computes the (?s ?p ?o)
+	 * join that sometimes follows the (?o bd:search "xyz") request.
 	 * <p>
 	 * Truth Maintenance
 	 * <p>
 	 * We will need to perform truth maintenance on the subject-centric text
 	 * index, that is - the index will need to be updated as statements are
 	 * added and removed (to the extent that those statements involving a
-	 * literal in the object position).  Adding a statement is the easier
-	 * case because we will never need to remove entries from the index, we
-	 * can simply write over them with new relevance values.  All that is
-	 * involved with truth maintenance for adding a statement is taking a post-
-	 * commit snapshot of the subject in the statement and running it through
-	 * the indexer (a "subject-refresh").
+	 * literal in the object position). Adding a statement is the easier case
+	 * because we will never need to remove entries from the index, we can
+	 * simply write over them with new relevance values. All that is involved
+	 * with truth maintenance for adding a statement is taking a post- commit
+	 * snapshot of the subject in the statement and running it through the
+	 * indexer (a "subject-refresh").
 	 * <p>
 	 * The same "subject-refresh" will be necessary for truth maintenance for
 	 * removal, but an additional step will be necessary beforehand - the index
@@ -2308,11 +2343,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	 * <p>
 	 * It looks like the right place to hook in truth maintenance for add is
 	 * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, com.bigdata.relation.accesspath.IElementFilter)}
-	 * after the ISPOs are added to the SPORelation.
-	 * Likewise, the place to hook in truth maintenance for delete is
-	 * {@link AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)} 
+	 * after the ISPOs are added to the SPORelation. Likewise, the place to hook
+	 * in truth maintenance for delete is
+	 * {@link AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)}
 	 * after the ISPOs are removed from the SPORelation.
+	 * 
+	 * @deprecated Feature was never completed due to scalability issues. See
+	 *             BZLG-1548, BLZG-563.
 	 */
+    @Deprecated
     @SuppressWarnings("unchecked")
     public void buildSubjectCentricTextIndex() {
 

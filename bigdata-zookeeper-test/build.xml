@@ -17,6 +17,9 @@
     <condition property="default.nic" value="${env.DEFAULT_NIC}" else="">
        <isset property="env.DEFAULT_NIC" />
     </condition>
+    <condition property="skipTestServices" value="${skipTests}">
+         <isset property="skipTests" />
+    </condition>
     <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
     <property name="app.home" value ="."/>
     <echo>${bigdata.fedname} ${default.nic} ${app.home}</echo>
@@ -31,12 +34,16 @@
   	</dirset>
     </path>
 
+    <target name="zookeeperAvailable">
+        <available file="${test.zookeeper.installDir}/bin/zkServer.sh" property="zookeeper.present"/>
+    </target>
+
     <!-- Note: It appears to be necessary to spawn the script which starts -->
     <!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
     <!-- though it will start without being spawned under others (OSX).    -->
     <!-- However, this change appears to result in zookeeper not running   -->
     <!-- so I have backed it out for now.                                  -->
-    <target name="startZookeeper">
+    <target name="startZookeeper" depends="zookeeperAvailable" if="zookeeper.present">
 
         <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
         <echo>bin/zkServer.(sh|cmd) start</echo>
@@ -66,7 +73,7 @@
     </target>
 
 
-    <target name="stopZookeeper">
+    <target name="stopZookeeper" depends="zookeeperAvailable" if="zookeeper.present">
     <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
     <echo>bin/zkServer.(sh|cmd) stop</echo>
     <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
@@ -81,7 +88,7 @@
           <antcall target="stopZookeeper"/>
     </target>
 
-    <target name="preTestPreparation">
+    <target name="preTestPreparation" unless="${skipTestServices}">
 	<antcall target = "startTestServices"/>
     </target>
 
@@ -104,7 +111,7 @@
     </target>
 
 
-    <target name = "postTestCleanup">
+    <target name = "postTestCleanup" unless="${skipTestServices}">
 	<antcall target="stopTestServices"/>
     </target>
 

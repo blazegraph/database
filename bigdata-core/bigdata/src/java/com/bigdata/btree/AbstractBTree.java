@@ -795,6 +795,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		String Tuples = "Tuples";
 		/** Counters for IO. */
 		String IO = "IO";
+        /** Counters for touch(). */
+        String TOUCH = "Touch";
     
     }
 
@@ -2035,7 +2037,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         value = metadata.getTupleSerializer().serializeVal(value);
         
         final ITuple tuple = insert((byte[]) key, (byte[]) value,
-                false/* delete */, getRevisionTimestamp(), getWriteTuple());
+                false/* delete */, false/*putIfAbsent*/, getRevisionTimestamp(), getWriteTuple());
         
         if (tuple == null || tuple.isDeletedVersion()) {
             
@@ -2055,7 +2057,23 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (key == null)
             throw new IllegalArgumentException();
 
-        final Tuple tuple = insert(key, value, false/* deleted */,
+        // non-conditional insert.
+        final Tuple tuple = insert(key, value, false/* deleted */, false/*putIfAbsent*/,
+                getRevisionTimestamp(), getWriteTuple());
+
+        return tuple == null || tuple.isDeletedVersion() ? null : tuple
+                .getValue();
+
+    }
+
+    @Override
+    final public byte[] putIfAbsent(final byte[] key, final byte[] value) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        // Conditional insert. See BLZG-1539.
+        final Tuple tuple = insert(key, value, false/* deleted */, true/*putIfAbsent*/,
                 getRevisionTimestamp(), getWriteTuple());
 
         return tuple == null || tuple.isDeletedVersion() ? null : tuple
@@ -2074,6 +2092,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            <code>true</code> iff the index entry should be marked as
      *            deleted (this behavior is supported iff the btree supports
      *            delete markers).
+     * @param putIfAbsent
+     * 			  When <code>true</code>, a pre-existing entry for the key will
+     *            NOT be replaced (unless it is a deleted tuple, which is the
+     *            same as if there was no entry under the key). This should ONLY
+     *            be true when the top-level method is <code>putIfAbsent</code>.
+     *            Historical code paths should specify false for an unconditional
+     *            mutation. See BLZG-1539.
      * @param timestamp
      *            The timestamp to be associated with the new or updated index
      *            entry (required iff the btree supports transactional isolation
@@ -2088,11 +2113,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @throws UnsupportedOperationException
      *             if the index is read-only.
-     * 
-     * @todo add putIfAbsent() variant for insert methods?
      */
     final public Tuple insert(final byte[] key, final byte[] value,
-            final boolean delete, final long timestamp, final Tuple tuple) {
+            final boolean delete, final boolean putIfAbsent, final long timestamp, final Tuple tuple) {
 
         assert delete == false || getIndexMetadata().getDeleteMarkers();
 
@@ -2111,7 +2134,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         btreeCounters.ninserts.incrementAndGet();
         
-        final Tuple oldTuple = getRootOrFinger(key).insert(key, value, delete,
+        final Tuple oldTuple = getRootOrFinger(key).insert(key, value, delete, putIfAbsent,
                 timestamp, tuple);
 
         if (oldTuple == null) {
@@ -2180,7 +2203,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (getIndexMetadata().getDeleteMarkers()) {
         
             // set the delete marker.
-            tuple = insert((byte[]) key, null/* val */, true/* delete */,
+            tuple = insert((byte[]) key, null/* val */, true/* delete */, false/*putIfAbsent*/,
                     getRevisionTimestamp(), getWriteTuple());
             
         } else {
@@ -2207,7 +2230,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (getIndexMetadata().getDeleteMarkers()) {
 
             // set the delete marker.
-            tuple = insert(key, null/* val */, true/* delete */,
+            tuple = insert(key, null/* val */, true/* delete */,false/*putIfAbsent*/,
                     getRevisionTimestamp(), getWriteTuple());
             
         } else {
@@ -3154,12 +3177,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
                 if (deletedVersion) {
 
-                    insert(key, null/* value */, true/* delete */, timestamp,
+                    insert(key, null/* value */, true/* delete */, false/*putIfAbsent*/, timestamp,
                             null/* tuple */);
 
                 } else {
 
-                    insert(key, val, false/* delete */, timestamp, null/* tuple */);
+                    insert(key, val, false/* delete */, false/*putIfAbsent*/, timestamp, null/* tuple */);
 
                 }
 
@@ -3184,7 +3207,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     @Override
-    public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
+    public <T> T submit(final byte[] key, final ISimpleIndexProcedure<T> proc) {
 
         // conditional range check on the key.
         if (key != null)
@@ -3528,19 +3551,31 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *      readNodeOrLeaf)
      */
     private final void doSyncTouch(final AbstractNode<?> node) {
-    
+
+        final long beginNanos = System.nanoTime();
+        
         synchronized (this) {
 
             doTouch(node);
 
         }
 
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        // See BLZG-1664
+        btreeCounters.syncTouchNanos.add(elapsedNanos);
+        
     }
     
     private final void doTouch(final AbstractNode<?> node) {
         
+        final long beginNanos = System.nanoTime();
+        
+        // See BLZG-1664
+        btreeCounters.touchCount.increment();
+        
         /*
-         * We need to guarentee that touching this node does not cause it to be
+         * We need to guarantee that touching this node does not cause it to be
          * made persistent. The condition of interest would arise if the queue
          * is full and the referenceCount on the node is zero before this method
          * was called. Under those circumstances, simply appending the node to
@@ -3605,6 +3640,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //                    }
         //
 //                }
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+        
+        // See BLZG-1664
+        btreeCounters.touchNanos.add(elapsedNanos);
 
     }
 

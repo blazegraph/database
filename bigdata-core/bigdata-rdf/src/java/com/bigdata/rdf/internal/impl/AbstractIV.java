@@ -34,18 +34,23 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.DTEExtension;
 import com.bigdata.rdf.internal.IExtensionIV;
 import com.bigdata.rdf.internal.IInlineUnicode;
+import com.bigdata.rdf.internal.IPv4Address;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUnicode;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.InlineLiteralIV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
@@ -138,10 +143,17 @@ import com.bigdata.rdf.model.BigdataValue;
  * </dl>
  * 
  * <pre>
+ * ---------- byte boundary (IFF DTE == DTE.Extension) ----------
+ * </pre>
+ * 
+ * If the DTE value was <code>DTE.Extension</code> was, then the next byte(s) encode
+ * the DTEExtension (extended intrinsic datatype aka primitive datatype).
+ * 
+ * <pre>
  * ---------- byte boundary ----------
  * </pre>
  * 
- * If <code>extension</code> was true, then then the next byte(s) encode
+ * If <code>extension</code> was true, then the next byte(s) encode
  * information about the source data type URI (its {@link IV}) and the key space
  * will be partitioned based on the extended data type URI.
  * 
@@ -202,8 +214,6 @@ import com.bigdata.rdf.model.BigdataValue;
  * normalization imposed by the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
- *          $
  * @param <V>
  *            The generic type for the RDF {@link Value} implementation.
  * @param <T>
@@ -424,6 +434,11 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
         return DTE.valueOf((byte) ((flags & DTE_MASK) & 0xff));
 
+    }
+
+    @Override
+    public DTEExtension getDTEX() {
+        return null;
     }
 
     /**
@@ -766,6 +781,18 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
         // The datatype.
         final DTE dte = getDTE();
+        final DTEExtension dtex;
+        if (dte == DTE.Extension) {
+            /*
+             * @see BLZG-1507 (Implement support for DTE extension types for
+             * URIs)
+             * 
+             * @see BLZG-1595 ( DTEExtension for compressed timestamp)
+             */
+            dtex = getDTEX();
+            keyBuilder.append(dtex.v());
+        } else
+            dtex = null;
 
         /*
          * We are dealing with some kind of inlined Literal. It may either be a
@@ -887,9 +914,40 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                     .setByteLength(1/* flags */+ 1/* termCode */+ b.length);
             return keyBuilder;
         }
-//        case Extension: {
-            // handled by IPv4AddrIV.encode()
-//        }
+        case Extension: {
+            switch(dtex) {
+            case IPV4: {
+                // Append the IPv4Address
+                keyBuilder.append(((IPv4Address) t.getInlineValue()).getBytes());
+                break;
+            }
+            case PACKED_LONG: {
+                // Third, emit the packed long's byte value
+                ((KeyBuilder) keyBuilder).pack(((Long) t.getInlineValue()).longValue());
+                break;
+            }
+            case ARRAY: {
+                final InlineLiteralIV[] ivs = ((LiteralArrayIV) t).getIVs();
+                /*
+                 * Append the length of the array as a byte. InlineLiteralIV
+                 * only supports arrays of length (1...256).
+                 */
+                // int(1...256) --> byte(0...255)
+                final byte len = (byte) (ivs.length-1);
+                keyBuilder.append(len);
+                /*
+                 * Then append the ivs one by one.
+                 */
+                for (InlineLiteralIV<?,?> iv : ivs) {
+                    iv.encode(keyBuilder);
+                }
+                break;
+            }
+            default:
+                throw new UnsupportedOperationException("DTExtension=" + dtex);
+            }
+            break;
+        }
         default:
             throw new AssertionError(toString());
         }

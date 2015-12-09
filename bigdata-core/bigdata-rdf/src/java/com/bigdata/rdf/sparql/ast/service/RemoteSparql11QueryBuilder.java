@@ -43,7 +43,7 @@ import com.bigdata.rdf.sail.webapp.client.AST2SPARQLUtil;
 
 /**
  * Utility class constructs a valid SPARQL query for a remote
- * <code>SPARQL 1.1</code> using the <code>BINDINGS</code> clause to vector
+ * <code>SPARQL 1.1</code> using the <code>VALUES</code> clause to vector
  * solutions into that remote end point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -58,22 +58,22 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
 //    private final ServiceNode serviceNode;
 
     /** The text "image" of the SERVICE clause. */
-    private final String exprImage;
+    protected final String exprImage;
 
     /**
      * The prefix declarations used within the SERVICE clause (from the original
      * query).
      */
-    private final Map<String, String> prefixDecls;
+    protected final Map<String, String> prefixDecls;
 
-    private final AST2SPARQLUtil util;
+    protected final AST2SPARQLUtil util;
     
     /**
      * The distinct variables "projected" by the SERVICE group graph pattern.
      * The order of this set is not important, but the variables must be
      * distinct.
      * */
-    private final Set<IVariable<?>> projectedVars;
+    protected final Set<IVariable<?>> projectedVars;
 
 //    private final BindingSet[] bindingSets;
 
@@ -140,7 +140,7 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
      * 
      * @return The distinct, ordered collection of variables used.
      */
-    private LinkedHashSet<String> getDistinctVars(final BindingSet[] bindingSets) {
+    protected LinkedHashSet<String> getDistinctVars(final BindingSet[] bindingSets) {
 
         final LinkedHashSet<String> vars = new LinkedHashSet<String>();
 
@@ -282,18 +282,19 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
         }
 
         /*
-         * BINDINGS clause.
+         * VALUES clause.
          * 
-         * Note: The BINDINGS clause is used to vector the SERVICE request.
+         * Note: The VALUES clause is used to vector the SERVICE request.
          * 
-         * BINDINGS ?book ?title { (:book1 :title1) (:book2 UNDEF) }
+         * VALUES (?book ?title) { (:book1 :title1) (:book2 UNDEF) }
          */
         if (!singleEmptyBindingSet) {
 
             // Variables in a known stable order.
             final LinkedHashSet<String> vars = getDistinctVars(bindingSets);
 
-            sb.append("BINDINGS");
+            sb.append("VALUES");
+            sb.append(" (");
 
             // Variable declarations.
             {
@@ -303,6 +304,8 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
                     sb.append(v);
                 }
             }
+            
+            sb.append(")");
 
             // Bindings.
             {
@@ -354,7 +357,7 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
      * 
      * @see RemoteSparql10QueryBuilder
      */
-    static private Map<BNode, Set<String>> getCorrelatedVariables(
+    protected static Map<BNode, Set<String>> getCorrelatedVariables(
            final BindingSet[] bindingSets) {
         Map<BNode, Set<String/* vars */>> bnodes = null;
         for (BindingSet bindingSet : bindingSets) {
