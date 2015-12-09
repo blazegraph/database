@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.Constant;
@@ -45,12 +46,18 @@ import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.MockedValueIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
-import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * A utility class for generating and processing compact representations of
@@ -66,6 +73,11 @@ import com.bigdata.rdf.model.BigdataValue;
 public class IVBindingSetEncoder implements IBindingSetEncoder,
         IBindingSetDecoder {
 
+    /**
+     * Value factory
+     */
+    protected final BigdataValueFactory vf;
+    
     /**
      * <code>true</code> iff this is in support of a DISTINCT filter.
      * <p>
@@ -105,7 +117,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
     private final IKeyBuilder keyBuilder;
     
     /**
-     * 
+     * @param store the backing store
      * @param filter
      *            <code>true</code> iff this is in support of a DISTINCT filter.
      *            <p>
@@ -113,8 +125,10 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
      *            DISTINCT filter since the original solutions flow through the
      *            filter.
      */
-    public IVBindingSetEncoder(final boolean filter) {
+    public IVBindingSetEncoder(final BigdataValueFactory vf, final boolean filter) {
 
+        this.vf = vf;
+        
         this.filter = filter;
         
         this.schema = new LinkedHashSet<IVariable<?>>();
@@ -202,16 +216,47 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                 final IV<?, ?> iv = c.get();
                 
                 if (iv.isNullIV()) {
-                    // special case: null IV
-                    final Object val = iv.getValue();
-                    if (val instanceof BigdataURIImpl) {
-                        final FullyInlineURIIV<BigdataURI> ivToEncode = new FullyInlineURIIV<>((BigdataURIImpl)val);
 
-                        IVUtility.encode(keyBuilder, ivToEncode);
+                    /**
+                     * BLZG-611 (https://jira.blazegraph.com/browse/BLZG-611):
+                     * we need to properly encode (and later on, decode)
+                     * mocked IVs, which have either been constructed at runtime or 
+                     * represent values that are not present in the database. We do
+                     * this by wrapping fully inlined IV types (for URIs, literals,
+                     * or blank nodes) into MockedValueIV, which will be properly
+                     * decoded as a mocked IV later on.
+                     */
+                    final Object val = iv.getValue();
+                    
+                    final IV<?,?> ivToEncode;
+                    if (val instanceof BigdataURIImpl) {
+
+                        // create fully inlined URI IV
+                        ivToEncode = new FullyInlineURIIV<>((BigdataURIImpl)val);
+                        
+                    } else if (val instanceof BigdataLiteralImpl) {
+                        
+                        // create fully inlined literal IV
+                        final BigdataLiteralImpl valAsLiteral = (BigdataLiteralImpl)val;
+                        ivToEncode = 
+                            new FullyInlineTypedLiteralIV<>(
+                                valAsLiteral.getLabel(), 
+                                ((BigdataLiteralImpl) val).getLanguage(),
+                                ((BigdataLiteralImpl) val).getDatatype());
+                        
+                    } else if (val instanceof BigdataBNodeImpl) {
+
+                        // create fully inlined blank node IV
+                        final BigdataBNodeImpl valAsBNode = (BigdataBNodeImpl)val;
+                        ivToEncode = new FullyInlineUnicodeBNodeIV<>(valAsBNode.getID());
+                        
                     } else {
-                        // TODO: implement these case
-                        throw new IllegalArgumentException();
+                        
+                        // unreachable code, just in case...
+                        throw new IllegalArgumentException("Uncovered iv.getValue() type in encode.");
                     }
+
+                    IVUtility.encode(keyBuilder, new MockedValueIV(ivToEncode));
                     
                 } else {
                     IVUtility.encode(keyBuilder, iv);
@@ -236,6 +281,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
         
     }
     
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
     public IBindingSet decodeSolution(final byte[] val, final int off,
             final int len, final boolean resolveCachedValues) {
@@ -264,9 +310,61 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                 continue;
                 
             }
+            
+            /**
+             * BLZG-611 (https://jira.blazegraph.com/browse/BLZG-611):
+             * decoding of MockeedValueIV, see encodeSolution() for more information.
+             */
+            if (iv instanceof MockedValueIV) {
 
-            bset.set(v, new Constant<IV<?, ?>>(iv));
+                final MockedValueIV mvIv = (MockedValueIV)iv;
+                final IV<?,?> innerIv = mvIv.getIV();
+                
+                final BigdataValue value; // set inside subsequent if block
+                if (innerIv instanceof FullyInlineURIIV) {
+                    
+                    final FullyInlineURIIV innerIvAsUri = (FullyInlineURIIV)innerIv;
+                    
+                    final URI inlineUri = innerIvAsUri.getInlineValue();
+                    
+                    value = vf.createURI(inlineUri.stringValue());
+                    
+                } else if (innerIv instanceof FullyInlineTypedLiteralIV) {
 
+                    final FullyInlineTypedLiteralIV innerIvAsLiteral = 
+                        (FullyInlineTypedLiteralIV)innerIv;
+
+                    value = vf.createLiteral(
+                            innerIvAsLiteral.getLabel(), 
+                            innerIvAsLiteral.getDatatype(), 
+                            innerIvAsLiteral.getLanguage());
+                    
+
+                } else if (innerIv instanceof FullyInlineUnicodeBNodeIV) {
+                    
+                    final FullyInlineUnicodeBNodeIV innerIvAsBNode = 
+                            (FullyInlineUnicodeBNodeIV)innerIv;
+
+                    value = vf.createBNode(innerIvAsBNode.getID());
+
+                } else {
+                    
+                    // unreachable code, just in case...
+                    throw new IllegalArgumentException("Uncovered inner IV type in decode");
+                }
+
+                // re-construct original mock IV
+                final TermId mockIv = TermId.mockIV(VTE.URI); // populated subsequently
+                mockIv.setValue(value);
+                value.setIV(mockIv);
+
+                bset.set(v, new Constant<IV<?, ?>>(mockIv));
+
+            } else {
+                
+                bset.set(v, new Constant<IV<?, ?>>(iv));
+                
+            }
         }
         
         if(resolveCachedValues)
