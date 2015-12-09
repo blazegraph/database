@@ -69,7 +69,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
-import com.bigdata.rdf.internal.gis.CoordinateDD;
 import com.bigdata.rdf.internal.gis.CoordinateUtility;
 import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -107,8 +106,9 @@ import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialCounters;
-import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
+import com.bigdata.service.geospatial.IGeoSpatialQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
+import com.bigdata.service.geospatial.impl.GeoSpatialQuery;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 import com.bigdata.util.BytesUtil;
@@ -126,7 +126,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
-
 
    private static final Logger log = Logger
          .getLogger(GeoSpatialServiceFactory.class);
@@ -617,7 +616,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        * @return an iterator over the search results
        */
       public ICloseableIterator<IBindingSet> search(
-            final GeoSpatialSearchQuery query, final AbstractTripleStore kb) {
+            final GeoSpatialQuery query, final AbstractTripleStore kb) {
 
          final BOpContextBase context = new BOpContextBase(
             QueryEngineFactory.getInstance().getQueryController(kb.getIndexManager()));
@@ -635,7 +634,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          final FutureTask<Void> ft = 
             new FutureTask<Void>(new GeoSpatialServiceCallTask(
-               buffer, query, kb, vars, context, globals, vf, geoSpatialCounters, 
+               buffer, query.normalize(), kb, vars, context, globals, vf, geoSpatialCounters, 
                executor, numTasks, minDatapointsPerTask, threadLocalBufferCapacity, stats));
          
          buffer.setFuture(ft); // set the future on the buffer
@@ -652,7 +651,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       }
       
       /**
-       * A single serice call request
+       * A single serice call request, which may handle a list of 
+       * {@link GeoSpatialQuery}s.
        * 
        * @author msc
        */
@@ -663,7 +663,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          
          final private Executor executor;
          
-         final private GeoSpatialSearchQuery query;
+         final private List<IGeoSpatialQuery> queries;
          final private AbstractTripleStore kb;
          final private IVariable<?>[] vars;
          
@@ -689,10 +689,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private List<GeoSpatialServiceCallSubRangeTask> tasks;
          
          /**
-          * 
+          * Constructor creating a {@link GeoSpatialServiceCallTask}. Expects
+          * a list of normalized queries as input, see {@link IGeoSpatialQuery#isNormalized()}.
           */
          public GeoSpatialServiceCallTask(
-            final BlockingBuffer<IBindingSet[]> buffer, final GeoSpatialSearchQuery query,
+            final BlockingBuffer<IBindingSet[]> buffer, 
+            final List<IGeoSpatialQuery> queries,
             final AbstractTripleStore kb, final IVariable<?>[] vars,
             final BOpContextBase context,
             final GlobalAnnotations globals, final BigdataValueFactory vf,
@@ -701,7 +703,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final int threadLocalBufferCapacity, final BaseJoinStats stats) {
             
             this.buffer = buffer;
-            this.query = query;
+            this.queries = queries;
             this.kb = kb;
             this.vars = vars;
             this.context = context;
@@ -735,183 +737,119 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           */
          @SuppressWarnings("rawtypes")
          protected List<GeoSpatialServiceCallSubRangeTask> getSubTasks() {
-            
+                          
             final List<GeoSpatialServiceCallSubRangeTask> subTasks =
                new LinkedList<GeoSpatialServiceCallSubRangeTask>();
 
-            /**
-             * Collect metadata. Note that the filters are not thread-safe, so we need to set 
-             * up one filter objects for the individual threads and cannot do that here. 
-             */
-            final Long timeStart = query.getTimeStart();
-            final Long timeEnd = query.getTimeEnd();
-            final PointLatLonTime upperLeftWithTime;     // upper left as point
-            final PointLatLonTime lowerRightWithTime;    // lower right as point
-            final Object[] lowerBorderComponents;        // upper left as array
-            final Object[] upperBorderComponents;        // lower right as point
-            switch (query.getSearchFunction()) {
-            case IN_CIRCLE: 
-               {
-                  final PointLatLon centerPoint = query.getSpatialCircleCenter();
-                  
-                  final CoordinateDD centerPointDD = centerPoint.asCoordinateDD();
-                  
-                  final Double distance = query.getSpatialCircleRadius();
-                  final UNITS spatialUnit = query.getSpatialUnit();
-                  
-                  final CoordinateDD upperLeft = 
-                     CoordinateUtility.boundingBoxUpperLeft(
-                        centerPointDD, distance, spatialUnit);
-                  
-                  final CoordinateDD lowerRight = 
-                     CoordinateUtility.boundingBoxLowerRight(
-                        centerPointDD, distance, spatialUnit);
-                  
-                  // construct the points with time
-                  upperLeftWithTime = new PointLatLonTime(upperLeft, timeStart);
-                  lowerRightWithTime = new PointLatLonTime(lowerRight, timeEnd);
-      
-                  // convert to component strings
-                  lowerBorderComponents = PointLatLonTime.toComponentString(upperLeftWithTime);
-                  upperBorderComponents = PointLatLonTime.toComponentString(lowerRightWithTime);
-               }
-               break;
+            for (IGeoSpatialQuery query : queries) {
 
-            case IN_RECTANGLE: 
-               {
-                  final PointLatLon upperLeft = query.getSpatialRectangleUpperLeft();
-                  final PointLatLon lowerRight = query
-                        .getSpatialRectangleLowerRight();
-      
-                  // construct the points with time
-                  upperLeftWithTime = new PointLatLonTime(upperLeft, timeStart);
-                  lowerRightWithTime = new PointLatLonTime(lowerRight, timeEnd);
-      
-                  // convert to component strings
-                  lowerBorderComponents = PointLatLonTime.toComponentString(upperLeftWithTime);
-                  upperBorderComponents = PointLatLonTime.toComponentString(lowerRightWithTime);
-               }
-               break;
-
-            default:
-               throw new RuntimeException("Unknown geospatial search function.");
-            }
-
-            /**
-             * Assert that the search request is valid in the sense that we have no unsatisfiable ranges
-             * in the search query. In case we have, no subtasks will be generated and hence no results
-             * will be generated (no need to throw a hard error here).
-             */
-            if (upperLeftWithTime.getLat()>lowerRightWithTime.getLat()) {
-               if (log.isInfoEnabled()) {
-                  log.info("Search rectangle upper left latitude (" + upperLeftWithTime.getLat() + 
-                     ") is larger than rectangle lower righ latitude (" + lowerRightWithTime.getLat() + 
-                     ". Search request will give no results.");
-               }
-               return subTasks;
-            }
-            if (upperLeftWithTime.getLon()>lowerRightWithTime.getLon()) {
-               if (log.isInfoEnabled()) {
-                  log.info("Search rectangle upper left longitude (" + upperLeftWithTime.getLon() + 
-                     ") is larger than rectangle lower right longitude (" + lowerRightWithTime.getLon() + 
-                     ". Search request will give no results.");
-               }
-               return subTasks;
-            }
-            if (upperLeftWithTime.getTimestamp()>lowerRightWithTime.getTimestamp()) {
-               if (log.isInfoEnabled()) {
-                  log.info("Search rectangle upper left timestamp (" + upperLeftWithTime.getTimestamp() + 
-                     ") is larger than rectangle lower right timestamp (" + lowerRightWithTime.getTimestamp() + 
-                     ". Search request will give no results.");
-               }
-               return subTasks;
-            }
-
-            
-            /**
-             * We proceed as follows:
-             * 
-             * 1.) Estimate the number of total points in the search range
-             * 2.) Based on the config parameter telling us how many points to process per thread, we obtain the #subtasks
-             * 3.) Knowing the number of subtasks, we split the range into #subtasks equal-length subranges
-             * 4.) For each of these subranges, we set up a subtask to process the subrange
-             */
-            final AccessPath<ISPO> accessPath = getAccessPath(lowerBorderComponents, upperBorderComponents);
-            final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
-            
-            // TODO: rangeCount() returns quite strange results, e.g. for 3.3.1 we get >1M although the range
-            // is quite small; need to check what's going on there...
-            
-            stats.accessPathRangeCount.add(totalPointsInRange);
-
-            /**
-             * The number of subtasks is calculated based on two parameters. First, there is a
-             * minumum number of datapoints per task, which is considered a hard limit. This means,
-             * we generate *at most* (totalPointsInRange/minDatapointsPerTask) tasks.
-             * 
-             * The second parameter is the numTasks parameter, which tells us the "desired"
-             * number of tasks. 
-             * 
-             * The number of subranges is then defined as follows:
-             * - If the desired number of tasks is larger than the hard limit, we choose the hard limit
-             * - Otherwise, we choose the desired number of tasks
-             * 
-             * Effectively, this means choosing the smaller of the two values (MIN).
-             */
-            final long maxTasksByDatapointRestriction = totalPointsInRange/minDatapointsPerTask;
-            final long desiredNumTasks = Math.max(numTasks, 1); /* at least one subrange */
-            
-            long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
-            
-            LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
-            LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
-            
-            if (log.isDebugEnabled()) {
-               
-               log.debug("[OuterRange] Scanning from " + lowerBorderIV.getDelegate().integerValue() 
-                     + " / " + litExt.toComponentString(0, 2, lowerBorderIV));
-               log.debug("[OuterRange]            to " + upperBorderIV.getDelegate().integerValue()
-                     + " / " +  litExt.toComponentString(0, 2, upperBorderIV));
-
-            }
-            
-            // split range into nrSubRanges, equal-length pieces
-            final GeoSpatialSubRangePartitioner partitioner = 
-               new GeoSpatialSubRangePartitioner(upperLeftWithTime, lowerRightWithTime, nrSubRanges, litExt);
-            
-            // set up tasks for partitions
-            final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder(); // will be the same for all partitions
-            final int subjectPos = keyOrder.getPositionInIndex(SPOKeyOrder.S);
-            final int objectPos = keyOrder.getPositionInIndex(SPOKeyOrder.O);
-            for (GeoSpatialSubRangePartition partition : partitioner.getPartitions()) {
-               
-               // set up a subtask for the partition
-               final GeoSpatialServiceCallSubRangeTask subTask = 
-                  getSubTask(upperLeftWithTime, lowerRightWithTime, 
-                     partition.lowerBorder, partition.upperBorder, keyOrder, subjectPos, objectPos, stats);
-               
-               if (subTask!=null) { // if satisfiable
-                  subTasks.add(subTask);
-               }
-               
-               if (log.isDebugEnabled()) {
-
-                  final Object[] lowerBorderComponentsPart = 
-                     PointLatLonTime.toComponentString(partition.lowerBorder);
-                  final Object[] upperBorderComponentsPart = 
-                     PointLatLonTime.toComponentString(partition.upperBorder);
-                  
-                  LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorderComponentsPart);
-                  LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorderComponentsPart);
-
-                  log.debug("[InnerRange] Scanning from " + lowerBorderIVPart.getDelegate().integerValue() 
-                        + " / " + litExt.toComponentString(0, 2, lowerBorderIVPart) 
-                        + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(lowerBorderComponentsPart)));
-                  log.debug("[InnerRange]            to " + upperBorderIVPart.getDelegate().integerValue() 
-                        + " / " +  litExt.toComponentString(0, 2, upperBorderIVPart) 
-                        + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorderComponentsPart)));
-               }
-
+                // queries must be normalized at this point
+                if (!query.isNormalized()) {
+                    throw new IllegalArgumentException("Expected list of normalized query as input.");
+                }
+                
+                /**
+                 * Get the bounding boxes for the subsequent scan
+                 */
+                final PointLatLonTime upperLeftWithTime = 
+                    query.getBoundingBoxUpperLeftWithTime(); 
+                final Object[] lowerBorderComponents = 
+                        PointLatLonTime.toComponentString(upperLeftWithTime);
+                    
+                final PointLatLonTime lowerRightWithTime =
+                    query.getBoundingBoxLowerRightWithTime();
+                final Object[] upperBorderComponents =
+                    PointLatLonTime.toComponentString(lowerRightWithTime);
+    
+                /**
+                 * We proceed as follows:
+                 * 
+                 * 1.) Estimate the number of total points in the search range
+                 * 2.) Based on the config parameter telling us how many points to process per thread, we obtain the #subtasks
+                 * 3.) Knowing the number of subtasks, we split the range into #subtasks equal-length subranges
+                 * 4.) For each of these subranges, we set up a subtask to process the subrange
+                 */
+                final AccessPath<ISPO> accessPath = 
+                    getAccessPath(lowerBorderComponents, upperBorderComponents, query);
+                
+                final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
+                
+                // TODO: rangeCount() returns quite strange results, e.g. for 3.3.1 we get >1M although the range
+                // is quite small; need to check what's going on there...
+                
+                stats.accessPathRangeCount.add(totalPointsInRange);
+    
+                /**
+                 * The number of subtasks is calculated based on two parameters. First, there is a
+                 * minumum number of datapoints per task, which is considered a hard limit. This means,
+                 * we generate *at most* (totalPointsInRange/minDatapointsPerTask) tasks.
+                 * 
+                 * The second parameter is the numTasks parameter, which tells us the "desired"
+                 * number of tasks. 
+                 * 
+                 * The number of subranges is then defined as follows:
+                 * - If the desired number of tasks is larger than the hard limit, we choose the hard limit
+                 * - Otherwise, we choose the desired number of tasks
+                 * 
+                 * Effectively, this means choosing the smaller of the two values (MIN).
+                 */
+                final long maxTasksByDatapointRestriction = totalPointsInRange/minDatapointsPerTask;
+                final long desiredNumTasks = Math.max(numTasks, 1); /* at least one subrange */
+                
+                long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
+                
+                LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
+                LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
+                
+                if (log.isDebugEnabled()) {
+                   
+                   log.debug("[OuterRange] Scanning from " + lowerBorderIV.getDelegate().integerValue() 
+                         + " / " + litExt.toComponentString(0, 2, lowerBorderIV));
+                   log.debug("[OuterRange]            to " + upperBorderIV.getDelegate().integerValue()
+                         + " / " +  litExt.toComponentString(0, 2, upperBorderIV));
+    
+                }
+                
+                // split range into nrSubRanges, equal-length pieces
+                final GeoSpatialSubRangePartitioner partitioner = 
+                   new GeoSpatialSubRangePartitioner(upperLeftWithTime, lowerRightWithTime, nrSubRanges, litExt);
+                
+                // set up tasks for partitions
+                final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder(); // will be the same for all partitions
+                final int subjectPos = keyOrder.getPositionInIndex(SPOKeyOrder.S);
+                final int objectPos = keyOrder.getPositionInIndex(SPOKeyOrder.O);
+                for (GeoSpatialSubRangePartition partition : partitioner.getPartitions()) {
+                   
+                   // set up a subtask for the partition
+                   final GeoSpatialServiceCallSubRangeTask subTask = 
+                      getSubTask(upperLeftWithTime, lowerRightWithTime, 
+                         partition.lowerBorder, partition.upperBorder, 
+                         keyOrder, subjectPos, objectPos, stats, query);
+                   
+                   if (subTask!=null) { // if satisfiable
+                      subTasks.add(subTask);
+                   }
+                   
+                   if (log.isDebugEnabled()) {
+    
+                      final Object[] lowerBorderComponentsPart = 
+                         PointLatLonTime.toComponentString(partition.lowerBorder);
+                      final Object[] upperBorderComponentsPart = 
+                         PointLatLonTime.toComponentString(partition.upperBorder);
+                      
+                      LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorderComponentsPart);
+                      LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorderComponentsPart);
+    
+                      log.debug("[InnerRange] Scanning from " + lowerBorderIVPart.getDelegate().integerValue() 
+                            + " / " + litExt.toComponentString(0, 2, lowerBorderIVPart) 
+                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(lowerBorderComponentsPart)));
+                      log.debug("[InnerRange]            to " + upperBorderIVPart.getDelegate().integerValue() 
+                            + " / " +  litExt.toComponentString(0, 2, upperBorderIVPart) 
+                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorderComponentsPart)));
+                   }
+    
+                }
+                
             }
 
             return subTasks;
@@ -943,7 +881,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final PointLatLonTime subRangeUpperLeftWithTime,      /* upper left of the subtask */
             final PointLatLonTime subRangeLowerRightWithTime,     /* lower right of the subtask */
             final SPOKeyOrder keyOrder, final int subjectPos, 
-            final int objectPos, final BaseJoinStats stats) {
+            final int objectPos, final BaseJoinStats stats, 
+            final IGeoSpatialQuery query) {
             
             /**
              * Compose the surrounding filter. The filter is based on the outer range.
@@ -952,7 +891,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             switch (query.getSearchFunction()) {
             case IN_CIRCLE: 
                {
-                  // TODO: could reuse GeoSpatialLiteralExtension within thread
                   filter = new GeoSpatialInCircleFilter(
                      query.getSpatialCircleCenter(),  query.getSpatialCircleRadius(), query.getSpatialUnit(), 
                      outerRangeUpperLeftWithTime.getTimestamp(), outerRangeLowerRightWithTime.getTimestamp(), 
@@ -963,7 +901,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             case IN_RECTANGLE: 
                {
-                  // TODO: could reuse GeoSpatialLiteralExtension within thread
                   filter = new GeoSpatialInRectangleFilter(
                      outerRangeUpperLeftWithTime, outerRangeLowerRightWithTime,
                      new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation()), geoSpatialCounters);
@@ -1011,7 +948,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             // get the access path for the sub range
             final AccessPath<ISPO> accessPath = 
-               getAccessPath(subRangeUpperLeftComponents, subRangeLowerRightComponents);
+               getAccessPath(subRangeUpperLeftComponents, subRangeLowerRightComponents, query);
             
             if (accessPath==null) {
                return null;
@@ -1034,7 +971,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final Var<?> var = Var.var(vars[0].getName());
             final IBindingSet incomingBindingSet = query.getIncomingBindings();
 
-            // TODO: could reuse GeoSpatialLiteralExtension within thread
             final GeoSpatialServiceCallResolver resolver = 
                   new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
                         timeVar, locationAndTimeVar, subjectPos, objectPos, vf, 
@@ -1048,7 +984,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          @SuppressWarnings({ "unchecked", "rawtypes" })
          protected AccessPath<ISPO> getAccessPath(
-            final Object[] lowerBorderComponents, final Object[] upperBorderComponents) {
+            final Object[] lowerBorderComponents, final Object[] upperBorderComponents,
+            final IGeoSpatialQuery query) {
 
             // set up range scan
             final Var oVar = Var.var(); // object position variable
@@ -1596,7 +1533,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Long timeStart = resolveAsLong(this.timeStart, bs);
          final Long timeEnd = resolveAsLong(this.timeEnd, bs);
 
-         GeoSpatialSearchQuery sq = new GeoSpatialSearchQuery(searchFunction,
+         GeoSpatialQuery sq = new GeoSpatialQuery(searchFunction,
                bs.get(searchVar), predicate, context, spatialCircleCenter, 
                spatialCircleRadius, spatialRectangleUpperLeft, 
                spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, 
@@ -2114,23 +2051,5 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       return requiredBound;
    }
-   
-   // TODO: not sure if we want to have this code in, it's a quite generic assumption
-   //       and I'm not sure this is a good heuristics in the general case
-//   @Override
-//   public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-//      
-//      /**
-//       * It is desirably to have the subject position variable bound, as it provides
-//       * us with a way to implement efficient index lookups.
-//       */
-//      final Set<IVariable<?>> desiredBound = new HashSet<IVariable<?>>();
-//      for (StatementPatternNode sp : getStatementPatterns(serviceNode)) {
-//         desiredBound.add((IVariable<?>)sp.s().getValue());
-//      }
-//
-//      return desiredBound;
-//      
-//   }
-   
+
 }
