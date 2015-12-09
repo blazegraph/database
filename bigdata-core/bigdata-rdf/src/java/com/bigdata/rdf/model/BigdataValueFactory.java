@@ -124,6 +124,8 @@ public interface BigdataValueFactory extends ValueFactory {
 
     BigdataLiteral createLiteral(String label, URI datatype);
 
+    BigdataLiteral createLiteral(String label, URI datatype, String language);
+
     BigdataURI createURI(String uriString);
 
     BigdataURI createURI(String namespace, String localName);
