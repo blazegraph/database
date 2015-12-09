@@ -26,16 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.geospatial;
 
-import java.io.Serializable;
+import java.util.List;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.sparql.ast.TermNode;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
+import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 
 /**
  * Interface for geospatial queries and their execution.
@@ -45,135 +45,108 @@ import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
  */
 public interface IGeoSpatialQuery {
 
+    /**
+     * @return the search function underlying the query
+     */
+    public GeoFunction getSearchFunction();
 
-   /**
-    * Execute a GeoSpatial query.
-    * 
-    * @param query the query to execute
-    * @param indexManager the index manager
-    * @return a result iterator
-    */
-   public GeoSpatialQueryHiterator search(
-      final GeoSpatialSearchQuery query, final AbstractTripleStore tripleStore);
+    /**
+     * @return the constant representing the search subject
+     */
+    public IConstant<?> getSubject();
 
-   /**
-    * Representation of a GeoSpatial query. See {@link GeoSpatial} service
-    * for details.
-    */
-   public static class GeoSpatialSearchQuery implements Serializable {
+    /**
+     * @return the term node representing the search predicate
+     */
+    public TermNode getPredicate();
 
-      private static final long serialVersionUID = -2509557655519603130L;
+    /**
+     * @return the term node representing the search context (named graph)
+     */
+    public TermNode getContext();
 
-      final GeoFunction searchFunction;
-      final IConstant<?> subject;
-      final TermNode predicate;
-      final TermNode context;
-      final PointLatLon spatialCircleCenter;
-      final Double spatialCircleRadius;
-      final PointLatLon spatialRectangleUpperLeft;
-      final PointLatLon spatialRectangleLowerRight;
-      final UNITS spatialUnit;
-      final Long timeStart;
-      final Long timeEnd;
-      final IVariable<?> locationVar;
-      final IVariable<?> timeVar;
-      final IVariable<?> locationAndTimeVar;
-      final IBindingSet incomingBindings;
+    /**
+     * @return the spatial circle center, in case this 
+     *          is a {@link GeoFunction#IN_CIRCLE} query
+     */
+    public PointLatLon getSpatialCircleCenter();
 
+    /**
+     * @return the spatial circle radius, in case this 
+     *          is a {@link GeoFunction#IN_CIRCLE} query
+     */
+    public Double getSpatialCircleRadius();
 
-      /**
-       * Constructor
-       */
-      public GeoSpatialSearchQuery(final GeoFunction searchFunction, 
-            final IConstant<?> subject, final TermNode predicate, 
-            final TermNode context, final PointLatLon spatialCircleCenter, 
-            final Double spatialCircleRadius,
-            PointLatLon spatialRectangleUpperLeft,
-            PointLatLon spatialRectangleLowerRight,
-            final UNITS spatialUnit, final Long timeStart,
-            final Long timeEnd, final IVariable<?> locationVar,
-            final IVariable<?> timeVar, final IVariable<?> locationAndTimeVar, 
-            final IBindingSet incomingBindings) {
+    /**
+     * @return the boundary box'es upper left
+     */
+    public PointLatLon getSpatialRectangleUpperLeft();
 
-         this.searchFunction = searchFunction;
-         this.subject = subject;
-         this.predicate = predicate;
-         this.context = context;
-         this.spatialCircleCenter = spatialCircleCenter;
-         this.spatialCircleRadius = spatialCircleRadius;
-         this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
-         this.spatialRectangleLowerRight = spatialRectangleLowerRight;
-         this.spatialUnit = spatialUnit;
-         this.timeStart = timeStart;
-         this.timeEnd = timeEnd;
-         this.locationVar = locationVar;
-         this.timeVar = timeVar;
-         this.locationAndTimeVar = locationAndTimeVar;
-         this.incomingBindings = incomingBindings;
+    /**
+     * @return the boundary box'es lower right
+     */
+    public PointLatLon getSpatialRectangleLowerRight();
 
-      }
-      
-      public GeoFunction getSearchFunction() {
-         return searchFunction;
-      }
-      
-      public IConstant<?> getSubject() {
-         return subject;
-      }
+    /**
+     * @return the spatial unit underlying the query
+     */
+    public UNITS getSpatialUnit();
 
-      public TermNode getPredicate() {
-         return predicate;
-      }
+    /**
+     * @return the start timestamp
+     */
+    public Long getTimeStart();
 
-      public TermNode getContext() {
-          return context;
-       }
+    /**
+     * @return the end timestamp
+     */
+    public Long getTimeEnd();
 
-      public PointLatLon getSpatialCircleCenter() {
-         return spatialCircleCenter;
-      }
+    /**
+     * @return the variable to which the location will be bound (if defined)
+     */
+    public IVariable<?> getLocationVar();
 
-      public Double getSpatialCircleRadius() {
-         return spatialCircleRadius;
-      }
+    /**
+     * @return the variable to which the time will be bound (if defined)
+     */
+    public IVariable<?> getTimeVar();
 
-      public PointLatLon getSpatialRectangleUpperLeft() {
-         return spatialRectangleUpperLeft;
-      }
+    /**
+     * @return the variable to which the location+time will be bound (if defined)
+     */
+    public IVariable<?> getLocationAndTimeVar();
 
-      public PointLatLon getSpatialRectangleLowerRight() {
-         return spatialRectangleLowerRight;
-      }
+    /**
+     * @return the incoming bindings to join with
+     */
+    public IBindingSet getIncomingBindings();
 
-      public UNITS getSpatialUnit() {
-         return spatialUnit;
-      }
+    
+    /**
+     * Get a bounding box including timestamp representing the upper left.
+     */
+    public PointLatLonTime getBoundingBoxUpperLeftWithTime();
+    
+    /**
+     * Get a bounding box including timestamp representing the lower right.
+     */
+    public PointLatLonTime getBoundingBoxLowerRightWithTime();
 
-      public Long getTimeStart() {
-         return timeStart;
-      }
+    
+    /**
+     * Normalizes a GeoSpatial query by converting it into an list of GeoSpatial
+     * queries that are normalized, see isNormalized(). The list of queries may
+     * be empty if the given query contains unsatisfiable range restrictions
+     * (e.g., a timestamp or longitude range from [9;8]. However, note that a
+     * latitude range from [10;0] will be interpreted as "everything not in the
+     * interval ]0;10[.
+     */
+    public List<IGeoSpatialQuery> normalize();
 
-      public Long getTimeEnd() {
-         return timeEnd;
-      }
-      
-      public IVariable<?> getLocationVar() {
-         return locationVar;
-      }
-
-      public IVariable<?> getTimeVar() {
-         return timeVar;
-      }
-
-      public IVariable<?> getLocationAndTimeVar() {
-         return locationAndTimeVar;
-      }
-
-      
-      public IBindingSet getIncomingBindings() {
-         return incomingBindings;
-      }
-
-   }
+    /**
+     * @return true if the query is normalized. See
+     */
+    public boolean isNormalized();
 
 }
