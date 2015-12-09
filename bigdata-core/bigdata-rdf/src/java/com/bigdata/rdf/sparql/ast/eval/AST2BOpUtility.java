@@ -1196,7 +1196,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         /**
          * This is a special handling for external services, which might create
          * values that are reused/joined with IVs. We need to properly resolve
-         * them in order to make subsequen joins successful.
+         * them in order to make subsequent joins successful.
          */
         if (!varsToMockResolve.isEmpty()) {
            
@@ -5730,6 +5730,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
           anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
           anns.add(new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
                        namedSolutionSet));
+          anns.add(new NV(IPredicate.Annotations.RELATION_NAME, 
+                  new String[]{ctx.getLexiconNamespace()}));
+
           
           left = new HTreeDistinctBindingSetsOp(leftOrEmpty(left),//
               anns.toArray(new NV[anns.size()]));
