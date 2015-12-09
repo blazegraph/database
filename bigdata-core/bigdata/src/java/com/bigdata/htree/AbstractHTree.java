@@ -1940,9 +1940,9 @@ abstract public class AbstractHTree implements ICounterSetAccess,
          */
         final int dirtyLevelCount = dirtyMap.size();
 
-        // max would be the B+Tree height+1 (if evicting the root).
-        assert dirtyLevelCount <= getHeight() + 1 : "dirtyLevelCount=" + dirtyLevelCount + ", height=" + getHeight()
-                + ", dirtyMap.keys=" + dirtyMap.keySet();
+//        // max would be the B+Tree height+1 (if evicting the root).
+//        assert dirtyLevelCount <= getHeight() + 1 : "dirtyLevelCount=" + dirtyLevelCount + ", height=" + getHeight()
+//                + ", dirtyMap.keys=" + dirtyMap.keySet();
 
         /*
          * Now evict each dirtyList in parallel starting at the deepest, and
