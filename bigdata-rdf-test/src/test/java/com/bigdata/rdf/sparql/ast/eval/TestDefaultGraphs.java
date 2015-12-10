@@ -27,6 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.ap.filter.BOpResolver;
+import com.bigdata.bop.join.AccessPathJoinAnnotations;
+import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.spo.SPOPredicate;
+
 /**
  * Unit tests for default graph semantics ported from the old
  * TestDefaultGraphAccessPath class. The data set for these tests is:
@@ -216,4 +225,97 @@ public class TestDefaultGraphs extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * Default graph is null (that is, it is not specified at the SPARQL level
+     * or at the protocol level and therefore defaults to addressing ALL graphs
+     * in the kb instance). In addition, we have a query hint disabling the
+     * default graph access filter.
+     * 
+     * Given that there are no duplicate triples (i.e., no triple resides in
+     * more than one named graph), this query still gives us the correct result. 
+     * We also check that there is no distinct filter in the query plan.
+     */
+    public void test_defaultGraphs_01i() throws Exception {
+
+        if(!store.isQuads())
+            return;
+        
+        final ASTContainer astContainer = new TestHelper(
+                "default-graphs-01i",// testURI
+                "default-graphs-01i.rq", // queryURI
+                "default-graphs-01.trig", // dataURI
+                "default-graphs-01i.srx" // resultURI
+                ).runTest();
+        
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+        final BOp pipelineJoin = queryPlan.get(0);
+        final SPOPredicate spoPred = (SPOPredicate)pipelineJoin.annotations().get(AccessPathJoinAnnotations.PREDICATE);
+        final Object filter = spoPred.annotations().get(IPredicate.Annotations.ACCESS_PATH_FILTER);
+
+        // distinct filter disabled via query hint
+        assertFalse(filter instanceof NativeDistinctFilter);
+
+    }
+    
+    /**
+     * We add another, duplicate triple to the dataset, namely:
+     * :c5 { :paul :loves :sam . } (which already occurs in :c4) and submit a
+     * simple query extracting all triples (without query hint). This test 
+     * ensures that, in the standard configuration, the distinct filter is
+     * applied and our result contains the triple only once.
+     * We also check that there is a distinct filter in the query plan.
+     */
+
+    public void test_defaultGraphs_01j() throws Exception {
+
+        if(!store.isQuads())
+            return;
+        
+        final ASTContainer astContainer = new TestHelper(
+                "default-graphs-01j",// testURI
+                "default-graphs-01j.rq", // queryURI
+                "default-graphs-01jk.trig", // dataURI
+                "default-graphs-01j.srx" // resultURI
+                ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+        final BOp pipelineJoin = queryPlan.get(0);
+        final SPOPredicate spoPred = (SPOPredicate)pipelineJoin.annotations().get(AccessPathJoinAnnotations.PREDICATE);
+        final Object filter = spoPred.annotations().get(IPredicate.Annotations.ACCESS_PATH_FILTER);
+
+        // distinct filter must be enabled by default
+        assertTrue(filter.toString().contains("DistinctFilter()"));
+
+    }
+    
+    
+    /**
+     * We add another, duplicate triple to the dataset, namely:
+     * :c5 { :paul :loves :sam . } (which already occurs in :c4) and submit a
+     * simple query extracting all triples with query hint disabling the default
+     * path access filter. Consequently, we get the wrong result, with the triple
+     * above being contained twice in the result.
+     */
+    public void test_defaultGraphs_01k() throws Exception {
+
+        if(!store.isQuads())
+            return;
+        
+        final ASTContainer astContainer = new TestHelper(
+                "default-graphs-01k",// testURI
+                "default-graphs-01k.rq", // queryURI
+                "default-graphs-01jk.trig", // dataURI
+                "default-graphs-01k.srx" // resultURI
+                ).runTest();
+        
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+        final BOp pipelineJoin = queryPlan.get(0);
+        final SPOPredicate spoPred = (SPOPredicate)pipelineJoin.annotations().get(AccessPathJoinAnnotations.PREDICATE);
+        final Object filter = spoPred.annotations().get(IPredicate.Annotations.ACCESS_PATH_FILTER);
+
+        // distinct filter disabled via query hint
+        assertFalse(filter instanceof NativeDistinctFilter);
+
+    }
+    
 }

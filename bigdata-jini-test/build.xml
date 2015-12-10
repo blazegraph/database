@@ -17,8 +17,8 @@
     <condition property="default.nic" value="${env.DEFAULT_NIC}" else="">
        <isset property="env.DEFAULT_NIC" />
     </condition>
-    <condition property="skipTestServices" value="${maven.test.skip}">
-       <isset property="maven.test.skip" />
+    <condition property="skipTestServices" value="${skipTests}">
+         <isset property="skipTests" />
     </condition>
     <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
     <property name="app.home" value ="."/>

@@ -41,6 +41,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <properties>
      <!-- Used to prevent ant from starting test services -->
      <maven.test.skip>false</maven.test.skip>
+     <!-- Use skipTests as maven.test.skip doesn't build the test jar artifacts.  Set it to the value of the maven.test.skip to allow override -->
+     <skipTests>${maven.test.skip}</skipTests>
   </properties>
     <profiles>
      <profile>
@@ -129,6 +131,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                  <target>
                    <ant antfile="build.xml" target="preTestPreparation">
                        <property name="maven.test.skip" value="${maven.test.skip}"/>
+                       <property name="skipTests" value="${skipTests}"/>
                    </ant>
                  </target>
                </configuration>
@@ -143,6 +146,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                  <target>
                    <ant antfile="build.xml" target="postTestCleanup">
                        <property name="maven.test.skip" value="${maven.test.skip}"/>
+                       <property name="skipTests" value="${skipTests}"/>
                    </ant>
                  </target>
                </configuration>

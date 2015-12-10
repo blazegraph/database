@@ -51,9 +51,13 @@ import com.bigdata.bop.aggregate.IAggregate;
  * optional HAVING clause. The SELECT expressions MUST be aggregates (if the
  * SELECT expressions do not involve aggregates then you should not be using an
  * aggregation operator to compute the select expressions).
+ * <p>
+ * Note: As part of decoupling the SPARQL parser from the database in BLZG-1176,
+ * a copy of this logic is now maintained in
+ * {@link com.bigdata.rdf.sail.sparql.VerifyAggregates}.
  * 
+ * @see https://jira.blazegraph.com/browse/BLZG-1176
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class GroupByState implements IGroupByState, Serializable {
 

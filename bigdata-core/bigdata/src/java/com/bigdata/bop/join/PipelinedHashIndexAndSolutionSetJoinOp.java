@@ -37,6 +37,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.PipelineOp.Annotations;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.SubqueryAnnotations;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -185,6 +186,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *  be re-evaluated each time, it is submitted once to the hash index in the
  *  beginning and joined with every incoming binding.
  *  
+ *  3.) There exist two "implementations" of the operator, namely the
+ *  {@link JVMPipelinedHashJoinUtility} and the {@link HTreePipelinedHashJoinUtility}.
+ *  
  *  # Other remarks:
  *  There are some more technicalities like support for ASK_VAR (which is used
  *  by the FILTER (NOT) EXISTS translation scheme, which work in principle in
@@ -200,7 +204,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
-public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
+public class PipelinedHashIndexAndSolutionSetJoinOp extends HashIndexOp {
 
    private static final long serialVersionUID = 3473675701742394157L;
 
@@ -226,7 +230,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         * from outside are visible in the inner filter.
         */
        String PROJECT_IN_VARS = 
-           PipelinedHashIndexAndSolutionSetOp.class.getName() + ".projectInVars";
+           PipelinedHashIndexAndSolutionSetJoinOp.class.getName() + ".projectInVars";
 
        /**
         * The threshold defining when to release the distinctProjectionBuffer.
@@ -234,7 +238,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         * distinctProjectionBuffer at the same time.
         */
        String DISTINCT_PROJECTION_BUFFER_THRESHOLD = 
-           PipelinedHashIndexAndSolutionSetOp.class.getName() 
+           PipelinedHashIndexAndSolutionSetJoinOp.class.getName() 
            + ".distinctProjectionBufferThreshold";
        
        // set default to have a default's chunk size default
@@ -247,7 +251,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         * distinctProjectionBuffer at the same time.
         */
        String INCOMING_BINDINGS_BUFFER_THRESHOLD = 
-           PipelinedHashIndexAndSolutionSetOp.class.getName() 
+           PipelinedHashIndexAndSolutionSetJoinOp.class.getName() 
            + ".incomingBindingsBuffer";
        
        // having buffered 1000 incoming bindings, we release both buffers;
@@ -260,9 +264,13 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
     /**
       * Deep copy constructor.
       */
-    public PipelinedHashIndexAndSolutionSetOp(final PipelinedHashIndexAndSolutionSetOp op) {
+    public PipelinedHashIndexAndSolutionSetJoinOp(final PipelinedHashIndexAndSolutionSetJoinOp op) {
        
         super(op);
+
+        // max parallel must be one
+        if (getMaxParallel() != 1)
+            throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "=" + getMaxParallel());
 
     }
     
@@ -272,13 +280,17 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
      * @param args
      * @param annotations
      */
-    public PipelinedHashIndexAndSolutionSetOp(final BOp[] args, final Map<String, Object> annotations) {
+    public PipelinedHashIndexAndSolutionSetJoinOp(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
+        
+        // max parallel must be one
+        if (getMaxParallel() != 1)
+            throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "=" + getMaxParallel());
 
     }
     
-    public PipelinedHashIndexAndSolutionSetOp(final BOp[] args, final NV... annotations) {
+    public PipelinedHashIndexAndSolutionSetJoinOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -347,7 +359,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
         
         final int incomingBindingsBufferThreshold;
         
-        public ChunkTask(final PipelinedHashIndexAndSolutionSetOp op,
+        public ChunkTask(final PipelinedHashIndexAndSolutionSetJoinOp op,
                 final BOpContext<IBindingSet> context, 
                 final PipelineOp subquery, 
                 final IBindingSet[] bsFromBindingsSetSource,
@@ -387,9 +399,8 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
 
                     if (context.isLastInvocation()) {
 
-                        // Checkpoint the solution set.
-                        checkpointSolutionSet();
-
+                        // Done. Release the allocation context.
+                        state.release();
 
                     }
 
@@ -400,8 +411,8 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
                         // Accept ALL solutions.
                         acceptAndOutputSolutions();
                         
-                        // Checkpoint the generated solution set index.
-                        checkpointSolutionSet();
+                        // Done. Release the allocation context.
+                        state.release();
                         
                     }
 
@@ -478,7 +489,7 @@ public class PipelinedHashIndexAndSolutionSetOp extends HashIndexOp {
             }
             
             
-            ((JVMPipelinedHashJoinUtility)state).acceptAndOutputSolutions(
+            ((PipelinedHashJoinUtility)state).acceptAndOutputSolutions(
                unsyncBuffer, src, stats, joinConstraints, subquery,
                bsFromBindingsSetSource, projectInVars, askVar,
                context.isLastInvocation(), distinctProjectionBufferThreshold,
