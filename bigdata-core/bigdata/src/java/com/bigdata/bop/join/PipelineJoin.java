@@ -223,7 +223,9 @@ public class PipelineJoin<E> extends PipelineOp implements
 
         /**
          * The minimum number of (estimated) data points assigned to a task. This basically
-         * defines the threshold upon which parallelization starts to pay out.
+         * defines the threshold upon which parallelization starts to pay out. Currently only
+         * implemented for the geospatial feature (see BLZG-1478), but this might be implemented
+         * more generally for the pipelined join in the future
          */
         public String MIN_DATAPOINTS_PER_TASK = 
                 (PipelineJoin.class.getName() + ".minDatapointsPerTask").intern();
@@ -246,6 +248,9 @@ public class PipelineJoin<E> extends PipelineOp implements
          * 
          * Note that this is an upper bound only: we always consider the MIN_DATAPOINTS_PER_TASK
          * threshold in order to avoid generating threads with a low workload.
+         * 
+         * Currently only implemented for the geospatial feature (see BLZG-1478), but this might be 
+         * implemented more generally for the pipelined join in the future.
          * 
          * Must be a value >= 1.
          */

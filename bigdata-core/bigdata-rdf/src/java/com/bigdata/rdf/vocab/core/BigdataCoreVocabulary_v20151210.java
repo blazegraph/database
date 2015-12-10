@@ -29,6 +29,7 @@ import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
+import com.bigdata.rdf.vocab.decls.GeoSpatialVocabularyDecl;
 
 /**
  * Core Bigdata vocabulary.
@@ -37,12 +38,12 @@ import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
  * extends this one and edit
  * {@link AbstractTripleStore.Options#DEFAULT_VOCABULARY_CLASS}.
  */
-public class BigdataCoreVocabulary_v20151106 extends DefaultBigdataVocabulary {
+public class BigdataCoreVocabulary_v20151210 extends DefaultBigdataVocabulary {
 
     /**
      * De-serialization ctor.
      */
-    public BigdataCoreVocabulary_v20151106() {
+    public BigdataCoreVocabulary_v20151210() {
         
         super();
         
@@ -54,7 +55,7 @@ public class BigdataCoreVocabulary_v20151106 extends DefaultBigdataVocabulary {
      * @param namespace
      *            The namespace of the KB instance.
      */
-    public BigdataCoreVocabulary_v20151106(final String namespace) {
+    public BigdataCoreVocabulary_v20151210(final String namespace) {
 
         super(namespace);
         
@@ -64,6 +65,7 @@ public class BigdataCoreVocabulary_v20151106 extends DefaultBigdataVocabulary {
     protected void addValues() {
 
         super.addValues();
+        addDecl(new GeoSpatialVocabularyDecl());
         
         /*
          * Some new URIs for inline URI handling.

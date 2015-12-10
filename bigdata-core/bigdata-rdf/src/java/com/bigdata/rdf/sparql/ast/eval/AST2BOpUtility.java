@@ -3587,7 +3587,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final List<IConstraint> constraints = new LinkedList<IConstraint>();
 
-        // convert constraints to join constraints
+        // convert constraints to join constraints (BLZG-1648).
         for (FilterNode filter : joinConstraints) {
         
             constraints

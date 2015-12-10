@@ -51,12 +51,12 @@ dependencies.
     <parent>
         <groupId>com.blazegraph</groupId>
         <artifactId>blazegraph-parent</artifactId>
-        <version>1.6.0-load-performance-geo-SNAPSHOT</version>
+        <version>1.6.0-master-SNAPSHOT</version>
         <relativePath>../blazegraph-parent/pom.xml</relativePath>
     </parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>sparql-grammar</artifactId>
-    <version>1.6.0-load-performance-geo-SNAPSHOT</version>
+    <version>1.6.0-master-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Blazegraph Sparql Grammar</name>
     <description>Blazegraph(TM) Maven Build</description>
