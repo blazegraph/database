@@ -116,7 +116,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
              IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
              IndexMetadata.Options.BTREE_BRANCHING_FACTOR,
              RelationSchema.CLASS,
-             AbstractTransactionService.Options.MIN_RELEASE_AGE)
+             AbstractTransactionService.Options.MIN_RELEASE_AGE,
+             RelationSchema.NAMESPACE,
+             RelationSchema.CONTAINER)
              );
 
     public MultiTenancyServlet() {
@@ -432,10 +434,6 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                    
                                	   
                }
-                
-               effectiveProperties.put(RelationSchema.NAMESPACE, namespace);
-                
-               effectiveProperties.put(RelationSchema.CONTAINER, namespace);
 
              }
              
