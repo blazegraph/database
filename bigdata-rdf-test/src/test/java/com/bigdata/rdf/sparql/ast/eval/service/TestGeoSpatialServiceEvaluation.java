@@ -1096,72 +1096,72 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
             "geo-grid180-rectangle03.srx").runTest();     
     }
     
-//    /**
-//     * Circle test q query on grid ranging from [-179;180] longitude
-//     * and [-5;5] latitude and fixed "0" timestamp, aiming
-//     * covering edge cases overlapping the -180 and +180
-//     * longitude values.
-//     * 
-//     * @throws Exception
-//     */
-//    public void testGrid180x5vCircle01() throws Exception {
-//        new TestHelper(
-//            "geo-grid180-circle01",
-//            "geo-grid180-circle01.rq", 
-//            "geo-grid180x5.n3",
-//            "geo-grid180-circle01.srx").runTest();     
-//    }
-//
-//    
-//    /**
-//     * Circle test query on grid ranging from [-179;180] longitude
-//     * and [-5;5] latitude and fixed "0" timestamp, aiming
-//     * covering edge cases overlapping the -180 and +180
-//     * longitude values.
-//     * 
-//     * @throws Exception
-//     */
-//    public void testGrid180x5vCircle02() throws Exception {
-//        new TestHelper(
-//            "geo-grid180-circle02",
-//            "geo-grid180-circle02.rq", 
-//            "geo-grid180x5.n3",
-//            "geo-grid180-circle02.srx").runTest();     
-//    }
-//
-//    
-//    /**
-//     * Circle test q query on grid ranging from [-179;180] longitude
-//     * and [-5;5] latitude and fixed "0" timestamp, aiming
-//     * covering edge cases overlapping the -180 and +180
-//     * longitude values.
-//     * 
-//     * @throws Exception
-//     */
-//    public void testGrid180x5vCircle03() throws Exception {
-//        new TestHelper(
-//            "geo-grid180-circle03",
-//            "geo-grid180-circle03.rq", 
-//            "geo-grid180x5.n3",
-//            "geo-grid180-circle03.srx").runTest();     
-//    }
-//
-//    
-//    /**
-//     * Circle test q query on grid ranging from [-179;180] longitude
-//     * and [-5;5] latitude and fixed "0" timestamp, aiming
-//     * covering edge cases overlapping the -180 and +180
-//     * longitude values.
-//     * 
-//     * @throws Exception
-//     */
-//    public void testGrid180x5vCircle04() throws Exception {
-//        new TestHelper(
-//            "geo-grid180-circle04",
-//            "geo-grid180-circle04.rq", 
-//            "geo-grid180x5.n3",
-//            "geo-grid180-circle04.srx").runTest();     
-//    }
+    /**
+     * Circle test q query on grid ranging from [-179;180] longitude
+     * and [-5;5] latitude and fixed "0" timestamp, aiming
+     * covering edge cases overlapping the -180 and +180
+     * longitude values.
+     * 
+     * @throws Exception
+     */
+    public void testGrid180x5vCircle01() throws Exception {
+        new TestHelper(
+            "geo-grid180-circle01",
+            "geo-grid180-circle01.rq", 
+            "geo-grid180x5.n3",
+            "geo-grid180-circle01.srx").runTest();     
+    }
+
+    
+    /**
+     * Circle test query on grid ranging from [-179;180] longitude
+     * and [-5;5] latitude and fixed "0" timestamp, aiming
+     * covering edge cases overlapping the -180 and +180
+     * longitude values.
+     * 
+     * @throws Exception
+     */
+    public void testGrid180x5vCircle02() throws Exception {
+        new TestHelper(
+            "geo-grid180-circle02",
+            "geo-grid180-circle02.rq", 
+            "geo-grid180x5.n3",
+            "geo-grid180-circle02.srx").runTest();     
+    }
+
+    
+    /**
+     * Circle test q query on grid ranging from [-179;180] longitude
+     * and [-5;5] latitude and fixed "0" timestamp, aiming
+     * covering edge cases overlapping the -180 and +180
+     * longitude values.
+     * 
+     * @throws Exception
+     */
+    public void testGrid180x5vCircle03() throws Exception {
+        new TestHelper(
+            "geo-grid180-circle03",
+            "geo-grid180-circle03.rq", 
+            "geo-grid180x5.n3",
+            "geo-grid180-circle03.srx").runTest();     
+    }
+
+    
+    /**
+     * Circle test q query on grid ranging from [-179;180] longitude
+     * and [-5;5] latitude and fixed "0" timestamp, aiming
+     * covering edge cases overlapping the -180 and +180
+     * longitude values.
+     * 
+     * @throws Exception
+     */
+    public void testGrid180x5vCircle04() throws Exception {
+        new TestHelper(
+            "geo-grid180-circle04",
+            "geo-grid180-circle04.rq", 
+            "geo-grid180x5.n3",
+            "geo-grid180-circle04.srx").runTest();     
+    }
 
     
     @Override

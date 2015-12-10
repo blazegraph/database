@@ -147,9 +147,22 @@ public class CoordinateUtility {
        final Double currentLat = start.northSouth;
        
        final Double deltaEastWest = (1 / (111320 * Math.cos(currentLat/360*2*Math.PI))) * distanceAsMeters;
+
+       Double lon = start.eastWest - deltaEastWest;
+       
+       /** 
+        * over case where we go "beyond" the -180 degrees border. If the search range
+        * is smaller than 360 (=everything), we just convert a value such as -190 into
+        * (180 - 10) = 170. Our search range should then later be from [170;180].
+        */
+       if (deltaEastWest<360) {
+           if (lon<=-180) { 
+               lon = 180 + (lon%180);
+           }
+       }
        
        final CoordinateDD ret = new CoordinateDD(
-             start.northSouth - deltaNorthSouth, start.eastWest - deltaEastWest, true);
+             start.northSouth - deltaNorthSouth, lon, true);
        
        return ret;
     }
@@ -168,8 +181,22 @@ public class CoordinateUtility {
           final Double currentLat = start.northSouth;
           final Double deltaEastWest = (1 / (111320 * Math.cos(currentLat/360*2*Math.PI))) * distanceAsMeters;
 
+          Double lon = start.eastWest + deltaEastWest;
+          
+          /** 
+           * over case where we go "beyond" the 180 degrees border. If the search range
+           * is smaller than 360 (=everything), we just convert a value such as 190 into
+           * (=180 + 10) =-170 and start search from there.
+           * Our search range should then later be from [-180;-170].
+           */
+          if (deltaEastWest<360) {          
+              if (lon>=180) {
+                  lon = -180 + (lon%180);
+              }
+          }
+          
           final CoordinateDD ret = new CoordinateDD(
-                start.northSouth + deltaNorthSouth, start.eastWest + deltaEastWest, true);
+                start.northSouth + deltaNorthSouth, lon, true);
           
           return ret;
 
