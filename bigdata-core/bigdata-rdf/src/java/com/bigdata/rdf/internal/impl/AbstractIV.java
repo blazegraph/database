@@ -52,6 +52,7 @@ import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.MockedValueIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
@@ -924,6 +925,11 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             case PACKED_LONG: {
                 // Third, emit the packed long's byte value
                 ((KeyBuilder) keyBuilder).pack(((Long) t.getInlineValue()).longValue());
+                break;
+            }
+            case MOCKED_IV: {
+                final IV<?,?> iv = ((MockedValueIV) t).getIV();
+                iv.encode(keyBuilder);
                 break;
             }
             case ARRAY: {

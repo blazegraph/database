@@ -82,109 +82,140 @@ public class BNodeContextFactory implements BigdataValueFactory {
      * Delegate pattern.
      */
 
+	@Override
     public BigdataValue asValue(Value v) {
         return valueFactory.asValue(v);
     }
 
+    @Override
 	public BigdataBNode createBNode(String id) {
         return valueFactory.createBNode(id);
     }
 
+    @Override
 	public BigdataBNode createBNode(BigdataStatement stmt) {
         return valueFactory.createBNode(stmt);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(boolean arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(byte arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(double arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(float arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(int arg0, boolean unsigned) {
         return valueFactory.createLiteral(arg0, unsigned);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(long arg0, boolean unsigned) {
         return valueFactory.createLiteral(arg0, unsigned);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(short arg0, boolean unsigned) {
         return valueFactory.createLiteral(arg0, unsigned);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(byte arg0, boolean unsigned) {
         return valueFactory.createLiteral(arg0, unsigned);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(int arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(long arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(short arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(String label, String language) {
         return valueFactory.createLiteral(label, language);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(String label, URI datatype) {
         return valueFactory.createLiteral(label, datatype);
     }
+	
+    @Override
+	public BigdataLiteral createLiteral(String label, URI datatype, String language) {
+	    return valueFactory.createLiteral(label, datatype, language);
+	}
 
+    @Override
 	public BigdataLiteral createLiteral(String label) {
         return valueFactory.createLiteral(label);
     }
 
+    @Override
 	public BigdataLiteral createLiteral(XMLGregorianCalendar arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
     public BigdataLiteral createLiteral(Date arg0) {
         return valueFactory.createLiteral(arg0);
     }
 
+    @Override
 	public BigdataStatement createStatement(Resource s, URI p, Value o) {
         return valueFactory.createStatement(s, p, o);
     }
 
+    @Override
 	public BigdataStatement createStatement(Resource s, URI p, Value o,
             Resource c) {
         return valueFactory.createStatement(s, p, o, c);
     }
 
+    @Override
 	public BigdataStatement createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type) {
         return valueFactory.createStatement(s, p, o, c, type, false);
     }
 	
+    @Override
 	public BigdataStatement createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type, boolean userFlag) {
         return valueFactory.createStatement(s, p, o, c, type, userFlag);
     }
 	
+    @Override
 	public BigdataURI createURI(String namespace, String localName) {
         return valueFactory.createURI(namespace, localName);
     }
 
+    @Override
 	public BigdataURI createURI(String uriString) {
         return valueFactory.createURI(uriString);
     }
 
+    @Override
 	public BigdataValueSerializer<BigdataValue> getValueSerializer() {
         return valueFactory.getValueSerializer();
     }
@@ -192,26 +223,32 @@ public class BNodeContextFactory implements BigdataValueFactory {
     /**
 	 * Recursive contexts are not available (should not be necessary, right?)
      */
+    @Override
     public BigdataValueFactory newBNodeContext() {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public BigdataResource asValue(Resource v) {
         return valueFactory.asValue(v);
     }
 
+    @Override
     public BigdataURI asValue(URI v) {
         return valueFactory.asValue(v);
     }
 
+    @Override
     public BigdataLiteral asValue(Literal v) {
         return valueFactory.asValue(v);
     }
 
+    @Override
     public BigdataBNode asValue(BNode v) {
         return valueFactory.asValue(v);
     }
 
+    @Override
     public BigdataLiteral createXSDDateTime(long timestamp) {
         return valueFactory.createXSDDateTime(timestamp);
     }
