@@ -184,6 +184,11 @@ public class QueryHintRegistry {
          */
         add(new PipelinedHashJoinHint());
         
+        /*
+         * Disable default graph distinct filter
+         */
+        add(new DefaultGraphDistinctFilterHint());
+        
     }
 
 }

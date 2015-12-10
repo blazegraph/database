@@ -49,6 +49,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 import com.bigdata.rdf.sparql.ast.eval.TestNamedGraphs;
 
 /**
@@ -117,8 +118,10 @@ public class TestASTGraphGroupOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -214,8 +217,10 @@ public class TestASTGraphGroupOptimizer extends
        store.getLexiconRelation()
                .addTerms(values, values.length, false/* readOnly */);
 
-       final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+       final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                .parseQuery2(queryStr, baseURI);
+
+       ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -306,7 +311,7 @@ public class TestASTGraphGroupOptimizer extends
                 + "  }\n"//
                 + "}";
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -336,7 +341,7 @@ public class TestASTGraphGroupOptimizer extends
                 + "}";
 
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);

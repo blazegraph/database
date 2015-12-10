@@ -312,6 +312,14 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * (aka as-bound data set join) approach.
      */
     public boolean accessPathScanAndFilter = QueryHints.DEFAULT_ACCESS_PATH_SCAN_AND_FILTER;
+    
+    /**
+     * Whether or not a distinct filter is applied over triples extracted from
+     * the default graph (applies in quads mode only). While such a filter in the
+     * general case is required for correctness, it might be omitted whenever
+     * we know that no triple resides in more than one named graph.
+     */
+    public boolean defaultGraphDistinctFilter = QueryHints.DEFAULT_DEFAULT_GRAPH_DISTINCT_FILTER;
 
     private int varIdFactory = 0;
 

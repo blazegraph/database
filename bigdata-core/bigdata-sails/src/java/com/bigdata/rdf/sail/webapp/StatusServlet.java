@@ -944,6 +944,8 @@ public class StatusServlet extends BigdataRDFServlet {
         final UpdateTask updateTask = (UpdateTask) acceptedQuery.queryTask;
 
         final long elapsedMillis = updateTask.getElapsedExecutionMillis();
+        
+        final long mutationCount = updateTask.getMutationCount();
 
         current.node("h1", "Update");
         {
@@ -964,7 +966,10 @@ public class StatusServlet extends BigdataRDFServlet {
             .text("elapsed=").node("span")
                .attr("class", "elapsed").text("" + elapsedMillis).close()
             .text("ms")
-            //
+            // TODO HERE
+            // See BLZG-1661
+            .text(", ").text("mutationCount=").node("span")
+            .attr("class", "mutationCount").text("" + mutationCount).close()
             .text(", ").node("a").attr("href", detailsURL)
             .attr("class", "details-url")
             .text("details").close()//

@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="s"/>
+    <variable name="p"/>
+    <variable name="o"/>
+  </head>
+  <results>
+    <result>
+      <binding name="s">
+      	<uri>http://bigdata.com/john</uri>
+      </binding>
+      <binding name="p">
+      	<uri>http://bigdata.com/loves</uri>
+      </binding>
+      <binding name="o">
+      	<uri>http://bigdata.com/mary</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+      	<uri>http://bigdata.com/mary</uri>
+      </binding>
+      <binding name="p">
+      	<uri>http://bigdata.com/loves</uri>
+      </binding>
+      <binding name="o">
+      	<uri>http://bigdata.com/paul</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+      	<uri>http://bigdata.com/paul</uri>
+      </binding>
+      <binding name="p">
+      	<uri>http://bigdata.com/loves</uri>
+      </binding>
+      <binding name="o">
+      	<uri>http://bigdata.com/sam</uri>
+      </binding>
+    </result>
+  </results>
+</sparql>

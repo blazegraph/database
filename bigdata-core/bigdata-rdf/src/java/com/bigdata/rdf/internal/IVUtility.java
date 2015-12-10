@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -917,6 +918,22 @@ public class IVUtility {
         } else {
             final String type = s.substring(0, s.indexOf('(')); 
             final String val = s.substring(s.indexOf('('), s.length()-1);
+            return decode(val, type);
+        }
+    }
+
+    /**
+     * Decode an IV from its string representation and type, provided in as ASTRDFLiteral node in AST model
+     * 
+     * @param val
+     *            the string representation
+     * @param type
+     *            value type
+     * @return the IV
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1176
+     */
+    public static IV decode(final String val, final String type) {
             final DTE dte = Enum.valueOf(DTE.class, type);
             switch (dte) {
             case XSDBoolean: {
@@ -963,6 +980,9 @@ public class IVUtility {
                 final BigDecimal x = new BigDecimal(val);
                 return new XSDDecimalIV<BigdataLiteral>(x);
             }
+            case XSDString: {
+                return new FullyInlineTypedLiteralIV(val, null, XMLSchema.STRING);
+            }
                 // case XSDUnsignedByte:
                 // keyBuilder.appendUnsigned(t.byteValue());
                 // break;
@@ -978,7 +998,6 @@ public class IVUtility {
             default:
                 throw new UnsupportedOperationException("dte=" + dte);
             }
-        }
     }
     
 }
