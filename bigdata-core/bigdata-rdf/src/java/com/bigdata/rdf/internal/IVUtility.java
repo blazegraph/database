@@ -58,6 +58,7 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.MockedValueIV;
 import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
@@ -722,25 +723,27 @@ public class IVUtility {
             return decodeInlineUnicodeLiteral(key,o);
         }
         case Extension: {
-            /*
-			 * Handle an extension of the intrinsic data types.
-			 * 
-			 * @see BLZG-1507 (Implement support for DTE extension types for
-			 * URIs)
-	 * 
-             * @see BLZG-1595 ( DTEExtension for compressed timestamp)
-	 */
+        /*
+         * Handle an extension of the intrinsic data types.
+         * 
+         * @see BLZG-1507 (Implement support for DTE extension types for URIs)
+         * @see BLZG-1595 (DTEExtension for compressed timestamp)
+         * @see BLZG-611 (MockValue problems in hash join)
+         */
 		switch (dtex) {
-		case IPV4: {
-			final byte[] addr = new byte[5];
-			System.arraycopy(key, o, addr, 0, 5);
-			final IPv4Address ip = new IPv4Address(addr);
-			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
-			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
-		}
+    		case IPV4: {
+    			final byte[] addr = new byte[5];
+    			System.arraycopy(key, o, addr, 0, 5);
+    			final IPv4Address ip = new IPv4Address(addr);
+    			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
+    			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
+    		}
             case PACKED_LONG: {
                 final AbstractLiteralIV iv = new PackedLongIV<>(LongPacker.unpackLong(key, o));
                 return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
+            }
+            case MOCKED_IV: {
+                return new MockedValueIV(decodeFromOffset(key,o));
             }
             case ARRAY: {
                 // byte(0...255) --> int(1...256) 
