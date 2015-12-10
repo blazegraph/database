@@ -108,17 +108,17 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
     private static final String namespaceRegex = "[^.]+\\Z";
     
-    private final Set<String> propertiesBlackList = new HashSet<String>(Arrays.asList(
-    		 Journal.Options.BUFFER_MODE,
-             Journal.Options.FILE,
-             Journal.Options.INITIAL_EXTENT,
-             Journal.Options.MAXIMUM_EXTENT,
-             IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
-             IndexMetadata.Options.BTREE_BRANCHING_FACTOR,
-             RelationSchema.CLASS,
-             AbstractTransactionService.Options.MIN_RELEASE_AGE,
-             RelationSchema.NAMESPACE,
-             RelationSchema.CONTAINER)
+    public static final Set<String> propertiesBlackList = new HashSet<String>(Arrays.asList(
+	    		 Journal.Options.BUFFER_MODE,
+	             Journal.Options.FILE,
+	             Journal.Options.INITIAL_EXTENT,
+	             Journal.Options.MAXIMUM_EXTENT,
+	             IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
+	             IndexMetadata.Options.BTREE_BRANCHING_FACTOR,
+	             RelationSchema.CLASS,
+	             AbstractTransactionService.Options.MIN_RELEASE_AGE,
+	             RelationSchema.NAMESPACE,
+	             RelationSchema.CONTAINER)
              );
 
     public MultiTenancyServlet() {

@@ -54,6 +54,7 @@ import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -328,6 +329,16 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         
         assertTrue(p.containsKey("com.bigdata.namespace." + namespace + ".spo.com.bigdata.btree.BTree.branchingFactor"));
         assertTrue(p.containsKey("com.bigdata.namespace." + namespace + ".lex.com.bigdata.btree.BTree.branchingFactor"));
+        
+        assertFalse(p.containsKey("com.bigdata.namespace." + RemoteRepository.DEFAULT_NAMESPACE + ".spo.com.bigdata.btree.BTree.branchingFactor"));
+        assertFalse(p.containsKey("com.bigdata.namespace." + RemoteRepository.DEFAULT_NAMESPACE + ".lex.com.bigdata.btree.BTree.branchingFactor"));
+        
+        //test blacklist
+        Iterator<String> it = MultiTenancyServlet.propertiesBlackList.iterator();
+        while(it.hasNext()) {
+        	assertFalse(p.containsKey(it.next()));
+        }
+        
                 
 		//check fail if  properties are not compatible
 		properties.put("com.bigdata.rdf.sail.truthMaintenance", "true");
