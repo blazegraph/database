@@ -34,7 +34,8 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 
 /**
  * <p>
- * A vocabulary for geospatial extension querying.
+ * A vocabulary for geospatial extension querying, designed to operate over the
+ * default index configuration (lat, lon, time).
  * <p>
  * 
  * Example: find all points in the rectangle spanned from (0.00001, 0.00002)
@@ -136,21 +137,74 @@ public interface GeoSpatial {
     */
    final URI DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
 
-   // TODO: documentation of vocabulary once finalized
+   /**
+    * The name of the search function, pointing to a {@link GeoFunction}.
+    */
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
+   
+   /**
+    * Pointer to the predicate used in scanned triples.
+    */
    final URI PREDICATE = new URIImpl(NAMESPACE + "predicate");
+   
+   /**
+    * Pointer to the context used in scanned triples.
+    */
    final URI CONTEXT = new URIImpl(NAMESPACE + "context");
+   
+   /**
+    * In case of a {@link GeoFunction#IN_CIRCLE} query only: center point of the bounding circle.
+    */
    final URI SPATIAL_CIRCLE_CENTER = new URIImpl(NAMESPACE + "spatialCircleCenter");
+   
+   /**
+    * In case of a {@link GeoFunction#IN_CIRCLE} query only: radius of the bounding circle,
+    * specified in SPATIAL_UNIT.
+    */   
    final URI SPATIAL_CIRCLE_RADIUS = new URIImpl(NAMESPACE + "spatialCircleRadius");
+   
+   /**
+    * In case of a {@link GeoFunction#IN_RECTANGLE} query only: upper left of the bounding rectangle.
+    * TODO: northWest would probably be more appropriate
+    */
    final URI SPATIAL_RECTANGLE_UPPER_LEFT = new URIImpl(NAMESPACE + "spatialRectangleUpperLeft");
+   
+   /**
+    * In case of a {@link GeoFunction#IN_RECTANGLE} query only: lower right of the bounding rectangle.
+    * TODO: southEast would probably be more appropriate
+    */   
    final URI SPATIAL_RECTANGLE_LOWER_RIGHT = new URIImpl(NAMESPACE + "spatialRectangleLowerRight");
+   
+   /**
+    * The spatial unit used for distances specified in the geospatial search request.
+    */
    final URI SPATIAL_UNIT = new URIImpl(NAMESPACE + "spatialUnit");
+
+   /**
+    * Start time of the time interval to scan for.
+    */
    final URI TIME_START = new URIImpl(NAMESPACE + "timeStart");
+   
+   
+   /**
+    * End time of the time interval to scan for.
+    */
    final URI TIME_END = new URIImpl(NAMESPACE + "timeEnd");
    
-   // output
+   /**
+    * Output variable; if set, this variable is bound to the locations component of the search result.
+    */
    final URI LOCATION_VALUE = new URIImpl(NAMESPACE + "locationValue");
+
+   /**
+    * Output variable; if set, this variable is bound to the time component of the search result.
+    */
    final URI TIME_VALUE = new URIImpl(NAMESPACE + "timeValue");
+   
+   /**
+    * Output variable; if set, this variable is bound to a combined representation of the
+    * locations + time component of the search result.
+    */
    final URI LOCATION_AND_TIME_VALUE = new URIImpl(NAMESPACE + "locationAndTimeValue");
    
    

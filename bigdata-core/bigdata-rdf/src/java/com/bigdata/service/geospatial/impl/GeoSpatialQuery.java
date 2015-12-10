@@ -46,7 +46,7 @@ import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 
 /**
- * Interface for geospatial queries and their execution.
+ * Implementation of the {@link IGeoSpatialQuery} interface.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$

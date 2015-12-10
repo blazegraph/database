@@ -31,7 +31,6 @@ import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
-import com.bigdata.rdf.sparql.ast.eval.GeoSpatialServiceFactory;
 
 /**
  * Counters related to the usage of GeoSpatial services
@@ -206,77 +205,6 @@ public class GeoSpatialCounters implements ICounterSetAccess {
               setValue(filterCalculationTime.get()/1000000);
           }
        });
-//       
-//       root.addCounter("ctr0", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr0.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr1", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr1.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr2", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr2.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr3", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr3.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr4", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr4.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr5", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr5.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr6", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr6.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr7", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr7.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr8", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr8.get()/1000000);
-//          }
-//       });
-//       
-//       root.addCounter("ctr9", new Instrument<Long>() {
-//          @Override 
-//          public void sample() {
-//              setValue(ctr9.get()/1000000);
-//          }
-//       });
-//       
        
        return root;
 
