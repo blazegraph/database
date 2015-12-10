@@ -41,7 +41,12 @@ import com.bigdata.util.BytesUtil;
  * inlined literal/blank node, respectively). It is just a wrapper to indicate
  * that the delegate is to be translated back into a mocked value.
  * 
- * @author msc
+ * Note that this inherits from {@link AbstractLiteralIV}, but does not necessarily
+ * reflect a literal: the reflected type depends on the inner type. We do not
+ * expose this to the outside (i.e., there's no datatype that can be used for
+ * constructing these literals), but this is for internal use only. See BLZG-611.
+ * 
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
 public class MockedValueIV extends AbstractLiteralIV<BigdataLiteral, IV<?,?>> {
 

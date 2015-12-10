@@ -321,6 +321,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                 final IV<?,?> innerIv = mvIv.getIV();
                 
                 final BigdataValue value; // set inside subsequent if block
+                final TermId mockIv; // populated subsequently
                 if (innerIv instanceof FullyInlineURIIV) {
                     
                     final FullyInlineURIIV innerIvAsUri = (FullyInlineURIIV)innerIv;
@@ -328,6 +329,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                     final URI inlineUri = innerIvAsUri.getInlineValue();
                     
                     value = vf.createURI(inlineUri.stringValue());
+                    mockIv = TermId.mockIV(VTE.URI);
                     
                 } else if (innerIv instanceof FullyInlineTypedLiteralIV) {
 
@@ -338,7 +340,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                             innerIvAsLiteral.getLabel(), 
                             innerIvAsLiteral.getDatatype(), 
                             innerIvAsLiteral.getLanguage());
-                    
+                    mockIv = TermId.mockIV(VTE.LITERAL);
 
                 } else if (innerIv instanceof FullyInlineUnicodeBNodeIV) {
                     
@@ -346,6 +348,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                             (FullyInlineUnicodeBNodeIV)innerIv;
 
                     value = vf.createBNode(innerIvAsBNode.getID());
+                    mockIv = TermId.mockIV(VTE.BNODE);
 
                 } else {
                     
@@ -354,7 +357,6 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                 }
 
                 // re-construct original mock IV
-                final TermId mockIv = TermId.mockIV(VTE.URI); // populated subsequently
                 mockIv.setValue(value);
                 value.setIV(mockIv);
 
