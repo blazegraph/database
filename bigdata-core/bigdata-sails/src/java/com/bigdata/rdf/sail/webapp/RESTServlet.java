@@ -67,7 +67,7 @@ public class RESTServlet extends BigdataRDFServlet {
     private UpdateServlet m_updateServlet;
     private WorkbenchServlet m_workbenchServlet;
     private BlueprintsServletProxy m_blueprintsServlet;
-    
+       
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
      *      DESCRIBE CACHE </a>
@@ -92,7 +92,7 @@ public class RESTServlet extends BigdataRDFServlet {
         m_deleteServlet = new DeleteServlet();
         m_describeServlet = new DescribeCacheServlet();
         m_workbenchServlet = new WorkbenchServlet();
-        
+               
         final String provider = this
 				.getInitParameter(ConfigParams.BLUEPRINTS_SERVLET_PROVIDER); 
        
@@ -110,7 +110,7 @@ public class RESTServlet extends BigdataRDFServlet {
         m_describeServlet.init(getServletConfig());
         m_workbenchServlet.init(getServletConfig());
         m_blueprintsServlet.init(getServletConfig());
-        
+               
     }
     
     /**

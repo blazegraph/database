@@ -706,7 +706,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             }
 
             // rebuild the full text index.
-            store.getLexiconRelation().rebuildTextIndex();
+            store.getLexiconRelation().rebuildTextIndex(false);
             
             /*
              * re-open the store before search to verify that the data were made

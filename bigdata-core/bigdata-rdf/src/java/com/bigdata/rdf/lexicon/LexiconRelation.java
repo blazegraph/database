@@ -76,8 +76,10 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
@@ -104,11 +106,14 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.sail.BigdataSailHelper;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ArrayAccessPath;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
@@ -117,6 +122,7 @@ import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -835,7 +841,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      * @see AbstractTripleStore.Options#TEXT_INDEX
      */
-    private final boolean textIndex;
+    private boolean textIndex;
     
     /**
 	 * When <code>true</code> a secondary subject-centric full text index is
@@ -2148,18 +2154,47 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link FullTextIndex} class.
      */
     @SuppressWarnings("unchecked")
-    public void rebuildTextIndex() {
+    public void rebuildTextIndex(boolean forceCreate) {
 
         if (getTimestamp() != ITx.UNISOLATED)
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException("Unisolated connection required to rebuild full text index");
+        
+        final IValueCentricTextIndexer<?> textIndexer;
+        
+        if (textIndex) {
+        	
+        	textIndexer = getSearchEngine();
 
-        if (!textIndex)
-            throw new UnsupportedOperationException();
+        	// destroy the existing text index.
+        	textIndexer.destroy();
+        
+        } else if (forceCreate) {
+        	
+        	textIndex = true;
+        	
+        	textIndexer = getSearchEngine();
+        	
+        	SparseRowStore global = indexManager.getGlobalRowStore();
+        	
+            Map<String, Object> map = global.read(
+                    RelationSchema.INSTANCE, getContainerNamespace());
 
-        final IValueCentricTextIndexer<?> textIndexer = getSearchEngine();
+        	map.put(AbstractTripleStore.Options.TEXT_INDEX, Boolean.TRUE.toString());
+        	
+        	global.write(RelationSchema.INSTANCE, map);
+        	
+        	if (indexManager instanceof IJournal) {
 
-        // destroy the existing text index.
-        textIndexer.destroy();
+                // make the changes restart safe (not required for federation).
+                ((IJournal) indexManager).commit();
+
+            }
+        	
+        } else {
+        	
+        	throw new UnsupportedOperationException("Could not rebuild full text index, because it is not enabled");
+        	
+        }
 
         // create a new index.
         textIndexer.create();

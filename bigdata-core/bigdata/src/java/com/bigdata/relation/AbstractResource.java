@@ -83,7 +83,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
     protected final transient static Logger log = Logger.getLogger(AbstractResource.class);
 
-    final private IIndexManager indexManager;
+    protected final IIndexManager indexManager;
     
     final private String namespace;
 

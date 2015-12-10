@@ -242,7 +242,7 @@ function getNamespaces(synchronous) {
                } else {
                   use = '<a href="#" class="use-namespace">Use</a>';
                }
-               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
+               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="namespace-rebuild-text-index">Rebuild Full Text Index</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
             }
            $('.use-namespace').click(function(e) {
               e.preventDefault();
@@ -260,6 +260,10 @@ function getNamespaces(synchronous) {
               e.preventDefault();
               getNamespaceProperties($(this).parents('tr').data('name'), 'java');
            });
+           $('.namespace-rebuild-text-index').click(function(e) {
+               e.preventDefault();
+               rebuildTextIndex($(this).parents('tr').data('name'), true);
+            });
            $('.clone-namespace').click(function(e) {
               e.preventDefault();
               cloneNamespace($(this).parents('tr').data('name'));
@@ -315,6 +319,7 @@ function getNamespaceProperties(namespace, download) {
          $('#namespace-properties h1').html(namespace);
          $('#namespace-properties table').empty();
          $('#namespace-properties').show();
+         $('#namespace-rebuild-text-index').hide();
       }
    $.get(url, function(data) {
       var java = '';
@@ -329,6 +334,46 @@ function getNamespaceProperties(namespace, download) {
          downloadFile(java, 'text/x-java-properties', this.url.split('/')[3] + '.properties');
       }
    });
+}
+
+function rebuildTextIndex(namespace) {
+	var url = RO_URL_PREFIX + 'namespace/' + namespace + '/textIndex';
+	
+		
+	
+	
+	$('#namespace-rebuild-text-index h1').html(namespace);
+	$('#namespace-rebuild-text-index p').empty();
+    $('#namespace-properties table').empty();
+    $('#namespace-properties').hide();
+    $('#namespace-rebuild-text-index').show();
+	
+	var settings = {
+		      type: 'POST',
+		      success: function(data) { 
+							$('#namespace-rebuild-text-index h1').html(namespace); 
+							$('#namespace-rebuild-text-index p').html(data); 
+						},
+		      error: function(jqXHR, textStatus, errorThrown) {
+							
+							if (errorThrown.indexOf('not enabled')!=-1 && confirm('Full text index does not exist. Do you want to create it?')) {
+							
+								url += '?force-index-create=true';
+								var settings = {
+									      type: 'POST',
+									      success: function(data) { 
+														$('#namespace-rebuild-text-index h1').html(namespace); 
+														$('#namespace-rebuild-text-index p').html(data); 
+													},
+									      error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
+									   };
+								$.ajax(url, settings);
+							}
+							
+						}
+		   };
+	$.ajax(url, settings);
+
 }
 
 function cloneNamespace(namespace) {

@@ -34,12 +34,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.Tx;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.relation.locator.ILocatableResource;
 
 /**
  *
@@ -96,7 +94,7 @@ public class TestRebuildTextIndex extends AbstractTripleStoreTestCase {
 			}
 			
 	    };
-	    journal.getResourceLocator().locate(namespace, timestamp)
+	   // journal.getResourceLocator().locate(namespace, timestamp)
 	    
 
        // journal.getProperties().setProperty(AbstractTripleStore.Options.);
@@ -109,7 +107,7 @@ public class TestRebuildTextIndex extends AbstractTripleStoreTestCase {
 
             final BigdataValueFactory f = store.getValueFactory();
             
-            store.getLexiconRelation().rebuildTextIndex();
+            store.getLexiconRelation().rebuildTextIndex(false);
             
             
           
