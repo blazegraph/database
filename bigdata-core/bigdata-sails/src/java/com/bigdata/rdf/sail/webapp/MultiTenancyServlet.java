@@ -24,6 +24,7 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -108,7 +109,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
     private static final String namespaceRegex = "[^.]+\\Z";
     
-    public static final Set<String> propertiesBlackList = new HashSet<String>(Arrays.asList(
+    public static final Set<String> PROPERTIES_BLACK_LIST = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
 	    		 Journal.Options.BUFFER_MODE,
 	             Journal.Options.FILE,
 	             Journal.Options.INITIAL_EXTENT,
@@ -119,7 +120,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 	             AbstractTransactionService.Options.MIN_RELEASE_AGE,
 	             RelationSchema.NAMESPACE,
 	             RelationSchema.CONTAINER)
-             );
+             ));
 
     public MultiTenancyServlet() {
 
@@ -412,7 +413,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
              	   final String name = (String) it.next();
 
      				//remove journal related properties
-                   if(propertiesBlackList.contains(name)) {
+                   if(PROPERTIES_BLACK_LIST.contains(name)) {
                    	
                 	   effectiveProperties.remove(name);
                    	
