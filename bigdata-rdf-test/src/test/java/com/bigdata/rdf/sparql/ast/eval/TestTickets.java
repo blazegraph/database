@@ -1451,6 +1451,34 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
+     * Ticket 1648: proper handling of join constraints in merge join.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1648a() throws Exception {
+       new TestHelper(
+             "ticket_bg1648a",// testURI,
+             "ticket_bg1648a.rq",// queryFileURL
+             "ticket_bg1648.trig",// dataFileURL
+             "ticket_bg1648.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1648: proper handling of join constraints in merge join.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1648b() throws Exception {
+       new TestHelper(
+             "ticket_bg1648b",// testURI,
+             "ticket_bg1648b.rq",// queryFileURL
+             "ticket_bg1648.trig",// dataFileURL
+             "ticket_bg1648.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /*
      * Ticket 1524: MINUS being ignored.
      * 
      * @throws Exception

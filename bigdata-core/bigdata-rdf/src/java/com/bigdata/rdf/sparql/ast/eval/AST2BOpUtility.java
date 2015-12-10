@@ -983,7 +983,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
                     .toServiceCall(ctx.db,
                             ctx.queryEngine.getClientConnectionManager(),
-                            serviceURI, serviceNode);
+                            serviceURI, serviceNode, null /* BOpStats not yet available */);
 
             /*
              * true IFF this is a registered bigdata aware service running in
@@ -3584,8 +3584,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * merge join operators first.  Right now, the merge join does not
          * properly handle join constraints.
          */
-        final IConstraint[] c = joinConstraints.toArray(new IConstraint[0]);
 
+        final List<IConstraint> constraints = new LinkedList<IConstraint>();
+
+        // convert constraints to join constraints (BLZG-1648).
+        for (FilterNode filter : joinConstraints) {
+        
+            constraints
+                    .add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                            filter.getValueExpression()));
+            
+        }
+        final IConstraint[] c = constraints.toArray(new IConstraint[0]);
+        
         /*
          * FIXME Update the doneSet *after* the merge join based on the doneSet
          * for each INCLUDE which is folded into the merge join.
