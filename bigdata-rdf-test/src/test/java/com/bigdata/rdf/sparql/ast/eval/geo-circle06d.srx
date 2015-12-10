@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="res"/>
+  </head>
+  <results>
+     <result>
+      <binding name="res"><uri>http://s.9#9#5</uri></binding>
+     </result>
+     
+     <result>
+      <binding name="res"><uri>http://s.8#9#5</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.10#9#5</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.9#8#5</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.9#10#5</uri></binding>
+     </result>
+     
+     <result>
+      <binding name="res"><uri>http://s.8#8#5</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.8#10#5</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.10#8#5</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.10#10#5</uri></binding>
+     </result>
+
+     <result>
+      <binding name="res"><uri>http://s.7#9#5</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.9#7#5</uri></binding>
+     </result>
+
+     
+  </results>
+</sparql>
