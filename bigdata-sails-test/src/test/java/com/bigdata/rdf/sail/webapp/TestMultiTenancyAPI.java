@@ -312,10 +312,38 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
     }
     
     /**
-     * Verify the ability to obtain the effective configuration properties for 
-     * a namespace.
+     * Verify fail create properties if
+     * properties are not compatible.
      */
-    public void test_getPreparedProperties() throws Exception {
+    public void test_getPreparedPropertiesCompatibility() throws Exception {
+    	
+    	String namespace = "newNamespace";
+
+        Properties properties = new Properties();
+        
+        properties.put(RemoteRepository.OPTION_CREATE_KB_NAMESPACE, namespace);
+        
+        final Properties p = m_mgr.getPreparedProperties(namespace, properties);
+        
+		properties.put("com.bigdata.rdf.sail.truthMaintenance", "true");
+		properties.put("com.bigdata.rdf.store.AbstractTripleStore.quads", "true");
+				
+		try {
+
+			m_mgr.getPreparedProperties(namespace, properties);
+
+            fail("Expecting: " + HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+
+        } catch (HttpException ex) {
+            assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
+        }
+
+    }
+    
+    /**
+     * Test verifies properties were renamed correctly. 
+     */
+    public void test_PreparedPropertiesContainNewValues() throws Exception {
     	
     	String namespace = "newNamespace";
 
@@ -329,33 +357,56 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         
         assertTrue(p.containsKey("com.bigdata.namespace." + namespace + ".spo.com.bigdata.btree.BTree.branchingFactor"));
         assertTrue(p.containsKey("com.bigdata.namespace." + namespace + ".lex.com.bigdata.btree.BTree.branchingFactor"));
+               
+    }
+    
+    /**
+     * Test verifies prepared properties 
+     * do not contain old properties. 
+     */
+    public void test_PreparedPropertiesNotContainOldValues() throws Exception {
+    	
+    	String namespace = "newNamespace";
+
+        Properties properties = new Properties();
+        
+        properties.put(RemoteRepository.OPTION_CREATE_KB_NAMESPACE, namespace);
+        properties.put("com.bigdata.namespace." + RemoteRepository.DEFAULT_NAMESPACE + ".spo.com.bigdata.btree.BTree.branchingFactor", "1024");
+        properties.put("com.bigdata.namespace." + RemoteRepository.DEFAULT_NAMESPACE + ".lex.com.bigdata.btree.BTree.branchingFactor", "400");
+        
+        final Properties p = m_mgr.getPreparedProperties(namespace, properties);
         
         assertFalse(p.containsKey("com.bigdata.namespace." + RemoteRepository.DEFAULT_NAMESPACE + ".spo.com.bigdata.btree.BTree.branchingFactor"));
         assertFalse(p.containsKey("com.bigdata.namespace." + RemoteRepository.DEFAULT_NAMESPACE + ".lex.com.bigdata.btree.BTree.branchingFactor"));
-        
-        //test blacklist
-        Iterator<String> it = MultiTenancyServlet.propertiesBlackList.iterator();
-        while(it.hasNext()) {
-        	assertFalse(p.containsKey(it.next()));
-        }
-        
-                
-		//check fail if  properties are not compatible
-		properties.put("com.bigdata.rdf.sail.truthMaintenance", "true");
-		properties.put("com.bigdata.rdf.store.AbstractTripleStore.quads", "true");
-				
-		try {
-
-			final Properties p1 = m_mgr.getPreparedProperties(namespace, properties);
-
-            fail("Expecting: " + HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-
-        } catch (HttpException ex) {
-            assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
-        }
-
+               
     }
     
+    /**
+     * Test verifies prepared properties 
+     * do not contain blacklisted properties. 
+     */
+    public void test_PropertiesBlackList() throws Exception {
+    	
+    	String namespace = "newNamespace";
+
+        Properties properties = new Properties();
+
+        properties.put(RemoteRepository.OPTION_CREATE_KB_NAMESPACE, namespace);
+
+        assertTrue(MultiTenancyServlet.PROPERTIES_BLACK_LIST.contains(Journal.Options.FILE));
+
+        properties.put(Journal.Options.FILE, Boolean.TRUE.toString());
+
+        final Properties p = m_mgr.getPreparedProperties(namespace, properties);
+        
+        for (String property : MultiTenancyServlet.PROPERTIES_BLACK_LIST) {
+
+        	assertFalse(p.containsKey(property));
+        	
+        }
+               
+    }
+     
     /**
      * Unit test creates one (or more) namespaces, verifies that we can list the
      * namespaces, verifies that we can obtain the effective properties for each
