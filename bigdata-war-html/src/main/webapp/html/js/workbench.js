@@ -421,6 +421,7 @@ function cloneNamespace(namespace) {
       $('#new-namespace-inference').prop('checked', params[NAMESPACE_PARAMS.axioms] == 'com.bigdata.rdf.axioms.OwlAxioms');
       $('#new-namespace-textIndex').prop('checked', params[NAMESPACE_PARAMS.textIndex] == 'true');
       $('#new-namespace-isolatableIndices').prop('checked', params[NAMESPACE_PARAMS.isolatableIndices] == 'true');
+	  changeNamespaceMode();
 
       $('#new-namespace-name').focus();
    });
