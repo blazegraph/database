@@ -305,7 +305,7 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
          * If the node is not a constant, adding it as a range restriction won't
          * help us: com.bigdata.rdf.internal.constraints.RangeBOp.isFromBound(),
          * which is called when deciding whether to apply a range scan, will
-         * simply ignore non-constant range nodes.
+         * simply ignore non-constant range nodes. See BLZG-1635.
          */
 
         if (!(ve instanceof ConstantNode)) {

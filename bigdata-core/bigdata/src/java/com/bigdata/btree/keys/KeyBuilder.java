@@ -1903,7 +1903,7 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
        // we're operating over Long
        final int bytesTotal = Long.SIZE / Byte.SIZE * numDimensions;
 
-       byte[] zOrderArr = new byte[bytesTotal]; // target buffer
+       final byte[] zOrderArr = new byte[bytesTotal]; // target buffer
 
        // we compose the original components into the the z-order bit array
        for (int dimIt = 0; dimIt < numDimensions; dimIt++) { // iterate dimensions
@@ -1941,7 +1941,7 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
       // we're operating over Long
       final int bytesTotal = Long.SIZE / Byte.SIZE * numDimensions;
 
-      byte[] componentArr = new byte[bytesTotal]; // target buffer
+      final byte[] componentArr = new byte[bytesTotal]; // target buffer
 
       // we compose the original components into the the z-order bit array
       for (int bufIt=0; bufIt< Long.SIZE * numDimensions; ) {

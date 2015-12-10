@@ -151,6 +151,7 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
         		
         	}
 
+        	// see BLZG-1488 for this change
 			if (src.hasNext()) {
 
 				final ITuple<E> tuple = src.next(); // cache tuple.
