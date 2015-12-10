@@ -983,18 +983,18 @@ public class IVUtility {
             case XSDString: {
                 return new FullyInlineTypedLiteralIV(val, null, XMLSchema.STRING);
             }
-                // case XSDUnsignedByte:
-                // keyBuilder.appendUnsigned(t.byteValue());
-                // break;
-                // case XSDUnsignedShort:
-                // keyBuilder.appendUnsigned(t.shortValue());
-                // break;
-                // case XSDUnsignedInt:
-                // keyBuilder.appendUnsigned(t.intValue());
-                // break;
-                // case XSDUnsignedLong:
-                // keyBuilder.appendUnsigned(t.longValue());
-                // break;
+            case XSDUnsignedByte: {
+                return new XSDUnsignedByteIV<>(Byte.valueOf(val));
+            }
+            case XSDUnsignedShort: {
+                return new XSDUnsignedShortIV<>(Short.valueOf(val));                
+            }
+            case XSDUnsignedInt: {
+                return new XSDUnsignedIntIV(Integer.valueOf(val));
+            }
+            case XSDUnsignedLong: {
+                return new XSDUnsignedLongIV<>(Long.valueOf(val));
+            }
             default:
                 throw new UnsupportedOperationException("dte=" + dte);
             }
