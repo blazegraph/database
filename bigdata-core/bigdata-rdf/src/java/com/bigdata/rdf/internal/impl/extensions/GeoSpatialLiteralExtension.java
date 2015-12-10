@@ -75,9 +75,6 @@ import com.bigdata.service.geospatial.GeoSpatial;
  * 
  * Note: this class is *not* thread-safe (reusable key builder).
  * 
- * TODO:
- * - push logics into object where we don't need to re-allocate arrays
- * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
