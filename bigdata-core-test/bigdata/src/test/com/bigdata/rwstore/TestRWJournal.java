@@ -1839,6 +1839,76 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		/**
+		 * Test to determine that allocation performance does not degrade at scale.
+		 * 
+		 * The idea is to first create 128K  allocations, and measure recycling
+		 * performance.
+		 * 
+		 * Then to add an additional 128K allocations and re-measure recycling to
+		 * observe if performance degrades.
+		 * 
+		 * The test is "observational" and console output should be monitored.
+		 * 
+		 * Should be disabled for CI.
+		 */
+		public void notest_stress_alloc_performance() {
+            final Properties properties = new Properties(getProperties());
+
+            // we want lots of allocators, but avoid a large file
+            properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,4,5,6,7,8"); // 512 max
+
+			final Journal store = (Journal) getStore(properties);
+
+			try {
+
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				
+				System.out.println("File: " + rw.getStoreFile().getAbsolutePath());
+
+				final ArrayList<Integer> addrs = new ArrayList<Integer>();
+				
+				final Random r = new Random();
+				
+				for (int i = 0; i < 2048*64; i++) {
+					addrs.add(rw.alloc(1+r.nextInt(500), null));
+				}
+				
+				final long s1 = System.nanoTime();
+				for (int t = 0; t < 1024 * 1024; t++) {
+					final int i = r.nextInt(addrs.size());
+				}
+				final long s2 = System.nanoTime();
+				System.out.println("Random iter: " + (s2-s1) + "ns");
+
+				System.out.println("File size: " + rw.getStoreFile().length());
+				
+				for (int run = 0; run < 20; run++) {
+					for (int i = 0; i < 2048*64; i++) {
+						addrs.add(rw.alloc(1+r.nextInt(500), null));
+					}
+					final long s3 = System.nanoTime();
+					for (int t = 0; t < 1024 * 1024; t++) {
+						final int i = r.nextInt(addrs.size());
+						rw.free(addrs.get(i), 1);
+						addrs.set(i, rw.alloc(1+r.nextInt(500), null));
+					}
+					final long s4 = System.nanoTime();
+					System.out.println("Test1 Alloc: " + (s4-s3) + "ns");
+					System.out.println("File size: " + rw.getStoreFile().length());
+				}
+				
+
+			} finally {
+
+				store.destroy();
+
+			}
+
+		}
+
+		/**
 		 * Test of blob allocation, does not check on read back, just the
 		 * allocation
 		 */
