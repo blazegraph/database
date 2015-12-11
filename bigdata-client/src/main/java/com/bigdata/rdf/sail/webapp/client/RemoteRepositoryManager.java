@@ -23,9 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
@@ -801,6 +804,69 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
             checkResponseCode(response = doConnect(opts));
         } finally {
+        	if (response != null)
+        		response.abort();
+
+        }
+        
+    }
+    
+    /**
+     * 
+     * 
+     * @param 
+     * @param 
+     * 
+     * @return 
+     * 
+     * @throws Exception
+     */
+    public void rebuildTextIndex(final String namespace,
+            final boolean forceBuildTextIndex) throws Exception {
+    	rebuildTextIndex(namespace, forceBuildTextIndex, UUID.randomUUID());
+    }
+    
+    public void rebuildTextIndex(final String namespace,
+    		final boolean forceBuildTextIndex, final UUID uuid) throws Exception {
+
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
+        final String endpointURL = baseServiceURL + "/namespace/" + namespace + "/textIndex"; 
+        
+        
+       
+        /*
+         * Note: This operation does not currently permit embedding into a
+         * read/write tx.
+         */
+        final ConnectOptions opts = newConnectOptions(endpointURL, uuid, null/* tx */);
+        
+        if (forceBuildTextIndex) {
+        	
+        	opts.addRequestParam(RemoteRepositoryDecls.FORCE_INDEX_CREATE, "true");
+        	
+        } 
+ 
+        JettyResponseListener response = null;
+
+        boolean consumeNeeded = true;
+        
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+            
+            consumeNeeded = false;
+            
+        } catch (Exception e) {
+            consumeNeeded = !InnerCause.isInnerCause(e,
+                    HttpException.class);
+        	throw e;
+        	
+        } finally {
+        	
         	if (response != null)
         		response.abort();
 
