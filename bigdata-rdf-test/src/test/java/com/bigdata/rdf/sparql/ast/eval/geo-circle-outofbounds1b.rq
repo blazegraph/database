@@ -1,0 +1,12 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT * WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inCircle" .
+    ?res geo:predicate <http://p> .
+    ?res geo:spatialCircleCenter "27.9932#182" .
+    ?res geo:spatialCircleRadius "10000000" . # spans all earth
+    ?res geo:timeStart "0" .
+    ?res geo:timeEnd "0" .
+  }
+} 

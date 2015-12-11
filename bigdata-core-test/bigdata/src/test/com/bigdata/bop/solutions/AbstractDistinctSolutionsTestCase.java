@@ -44,6 +44,7 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
@@ -246,7 +247,7 @@ abstract public class AbstractDistinctSolutionsTestCase extends TestCase2 {
         final IVariable<?>[] vars = new IVariable[]{x};
         
         final int distinctId = 1;
-        
+
         final PipelineOp query = newDistinctBindingSetsOp(new BOp[]{},
                     new NV(HTreeDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.VARIABLES,vars),//
@@ -255,7 +256,8 @@ abstract public class AbstractDistinctSolutionsTestCase extends TestCase2 {
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1)//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(IPredicate.Annotations.RELATION_NAME,  new String[]{"dummy"})              
                     );
         
         // the expected solutions

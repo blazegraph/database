@@ -509,6 +509,13 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     @Override
     public BigdataLiteralImpl createLiteral(final String label, URI datatype) {
 
+        return createLiteral(label, datatype, null);
+    }
+
+    @Override
+    public BigdataLiteralImpl createLiteral(String label, URI datatype, String language) {
+        
+
         /*
          * Note: The datatype parameter may be null per the Sesame API.
          * 
@@ -516,14 +523,14 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
          */
         if (datatype != null && !(datatype instanceof BigdataURIImpl)) {
 
-        	datatype = createURI(datatype.stringValue());
-        	
+            datatype = createURI(datatype.stringValue());
+            
         }
 
-        return new BigdataLiteralImpl(this, label, null,
+        return new BigdataLiteralImpl(this, label, language,
                 (BigdataURIImpl) datatype);
-
     }
+
 
     @Override
     public BigdataURIImpl createURI(final String uriString) {
