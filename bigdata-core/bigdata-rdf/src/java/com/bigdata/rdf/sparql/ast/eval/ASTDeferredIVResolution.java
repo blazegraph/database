@@ -1208,9 +1208,16 @@ public class ASTDeferredIVResolution {
                     } else {
                         if (v instanceof Literal) {
                             /*
-                             * FIXME Why is this code here? It is a bit like an
-                             * asValue() call.
-                             */
+							 * This code path handles IVs not resolved by
+							 * ASTDeferredIVResolutionInitializer, for example
+							 * bindings, nor resolved by LexiconRelation, so we
+							 * could not provide Term IV for a literal from a
+							 * triple store, which configured to not use inlined
+							 * values, due to that this value is not available
+							 * in lexicon, thus there is no other was as to
+							 * create it as inlined IV.
+							 * 
+							 */
                             final String label = ((Literal) v).getLabel();
                             final URI dataType = ((Literal) v).getDatatype();
                             final String language = ((Literal) v).getLanguage();

@@ -87,11 +87,21 @@ import com.bigdata.rdf.store.BD;
  * in the {@link ASTDatasetClause}, which are matched as either {@link ASTIRI}
  * or {@link ASTQName}.
  * <p>
- * Note: This is a part of deferred IV batch resolution, which is intended 
- * to replace the functionality of the {@link BigdataValueReplacer}.
+ * Note: This is a part of deferred IV batch resolution, which is intended to
+ * replace the functionality of the {@link BigdataValueReplacer}.
  * <p>
  * Note: {@link IValueExpression} nodes used in {@link SPARQLConstraint}s are
  * allowed to use values not actually in the database. MP
+ * 
+ * IVUtility.decode is used by ASTDeferredIVResolutionInitializer in
+ * to convert parsed AST objects (ASTRDFLiteral and ASTNumericalLiteral)
+ * to IVs wrapped up as BigdataValues, which are required
+ * on later stages of processing.
+ * 
+ * There's no LexiconRelation available at this point, so all values converted
+ * in inlined mode. ASTDeferredIVResolution converts these inlined IVs to term
+ * IV by getLexiconRelation().addTerms in case if triple store configured to not
+ * use inlined values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @openrdf
@@ -101,7 +111,6 @@ import com.bigdata.rdf.store.BD;
  * @see https://jira.blazegraph.com/browse/BLZG-1519 (Refactor test suite to
  *      remove tight coupling with IVs while checking up parsed queries)
  */
-// FIXME RENAME THIS CLASS.
 public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     private final static Logger log = Logger
