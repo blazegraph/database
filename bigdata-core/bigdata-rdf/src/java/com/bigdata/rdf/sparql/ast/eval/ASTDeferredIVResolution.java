@@ -1129,138 +1129,90 @@ public class ASTDeferredIVResolution {
 
                 final BigdataValue v = values[i];
 
-                if (false) {
+                final IV iv;
+                if (v.isRealIV()) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("RESOLVED: " + v + " => " + v.getIV());
 
                     /*
-                     * This is based on the BigdataRDFValueResolver code path.
-                     * 
-                     * FIXME Why does this old code path produce some test
-                     * failures (AST test suite)?
+                     * Note: If the constant is an effective constant
+                     * because it was given in the binding sets then we also
+                     * need to capture the variable name associated with
+                     * that constant.
                      */
-                    
-                    final IV iv = v.getIV();
 
-                    if (iv == null) {
-
-                        /*
-                         * Since the term identifier is NULL this value is not
-                         * known to the kb.
-                         */
-
-                        if (log.isInfoEnabled())
-                            log.info("Not in knowledge base: " + v);
-
-                        /*
-                         * Create a dummy iv and cache the unknown value on it
-                         * so that it can be used during query evaluation.
-                         */
-                        final IV dummyIV = TermId.mockIV(VTE.valueOf(v));
-
-                        v.setIV(dummyIV);
-
-                        dummyIV.setValue(v);
-
-                        // } else {
-                        //
-                        // iv.setValue(v);
-
-                    } else {
-                        //
-                        // if (iv != null) {
-                        iv.setValue(v);
-                        // v.setIV(iv); // Done by addTerms()
-
-                        final List<Handler> deferredHandlers = deferred.get(v);
-                        if (deferredHandlers != null) {
-                            /*
-                             * No handlers are usually defined for vocab values
-                             * (see above).
-                             */
-                            for (final Handler handler : deferredHandlers) {
-                                handler.handle(iv);
-                            }
-                        }
-                        // overwrite entry with unresolved key by entry with
-                        // resolved key
-                        resolvedValues.put(v, iv);
-                    }
-
+                    iv = v.getIV();
                 } else {
-                    
-                    /*
-                     * This is the code path proposed by Igor.
-                     */
-                    
-                    final IV iv;
-                    if (v.isRealIV()) {
-
-                        if (log.isInfoEnabled())
-                            log.info("RESOLVED: " + v + " => " + v.getIV());
-
+                    if (v instanceof Literal) {
                         /*
-                         * Note: If the constant is an effective constant
-                         * because it was given in the binding sets then we also
-                         * need to capture the variable name associated with
-                         * that constant.
+                         * This code path handles IVs not resolved by
+                         * ASTDeferredIVResolutionInitializer, for example
+                         * bindings, nor resolved by LexiconRelation, so we
+                         * could not provide Term IV for a literal from a triple
+                         * store, which configured to not use inlined values,
+                         * due to that this value is not available in lexicon,
+                         * thus there is no other was as to create it as inlined
+                         * IV.
+                         * 
+                         * BBT: This appears to be related to the need to
+                         * represent in the query constants that are not in the
+                         * database but which nevertheless need to be captured
+                         * in the query. For example, a constant might appear in
+                         * VALUES () which is then used in a FILTER or a BIND().
+                         * Or a constant could appear in a BIND(?x as 12). For
+                         * those cases the Literal is being represented as a
+                         * fully inline value. A number of SPARQL tests will
+                         * fail if this code path is disabled, but note that the
+                         * test will only fail if openrdf Value objects are
+                         * being provided rather than BigdataValue objects, so
+                         * the issue only shows up with embedded SPARQL query
+                         * use.
+                         * 
+                         * @see com.bigdata.rdf.sail.TestBigdataValueReplacer.test_dropUnusedBindings()
+                         * @see TestRollbacks
                          */
-
-                        iv = v.getIV();
-                    } else {
-                        if (v instanceof Literal) {
-                            /*
-							 * This code path handles IVs not resolved by
-							 * ASTDeferredIVResolutionInitializer, for example
-							 * bindings, nor resolved by LexiconRelation, so we
-							 * could not provide Term IV for a literal from a
-							 * triple store, which configured to not use inlined
-							 * values, due to that this value is not available
-							 * in lexicon, thus there is no other was as to
-							 * create it as inlined IV.
-							 * 
-							 */
-                            final String label = ((Literal) v).getLabel();
-                            final URI dataType = ((Literal) v).getDatatype();
-                            final String language = ((Literal) v).getLanguage();
-                            final BigdataValue resolved;
-                            if (language != null) {
-                                resolved = vf.createLiteral(label, language);
-                            } else {
-                                resolved = vf.createLiteral(label, dataType);
-                            }
-                            final DTE dte = DTE.valueOf(dataType);
-                            if (dte != null) {
-                                iv = IVUtility.decode(label, dte.name());
-                            } else {
-                                iv = TermId.mockIV(VTE.valueOf(v));
-                            }
-                            iv.setValue(resolved);
-                            resolved.setIV(iv);
-                        } else if (ivs[i] != null) {
-                            iv = ivs[i];
+                        final String label = ((Literal) v).getLabel();
+                        final URI dataType = ((Literal) v).getDatatype();
+                        final String language = ((Literal) v).getLanguage();
+                        final BigdataValue resolved;
+                        if (language != null) {
+                            resolved = vf.createLiteral(label, language);
                         } else {
-                            iv = TermId.mockIV(VTE.valueOf(v)); // to support bindings, which were not resolved to IVs
+                            resolved = vf.createLiteral(label, dataType);
+                        }
+                        final DTE dte = DTE.valueOf(dataType);
+                        if (dte != null) {
+                            iv = IVUtility.decode(label, dte.name());
+                        } else {
+                            iv = TermId.mockIV(VTE.valueOf(v));
+                        }
+                        iv.setValue(resolved);
+                        resolved.setIV(iv);
+                    } else if (ivs[i] != null) {
+                        iv = ivs[i];
+                    } else {
+                        iv = TermId.mockIV(VTE.valueOf(v)); // to support bindings, which were not resolved to IVs
+                    }
+                }
+
+                if (iv != null) {
+                    iv.setValue(v);
+                    v.setIV(iv);
+
+                    final List<Handler> deferredHandlers = deferred.get(v);
+                    if (deferredHandlers != null) {
+                        /*
+                         * No handlers are usually defined for vocab values
+                         * (see above).
+                         */
+                        for (final Handler handler : deferredHandlers) {
+                            handler.handle(iv);
                         }
                     }
-
-                    if (iv != null) {
-                        iv.setValue(v);
-                        v.setIV(iv);
-
-                        final List<Handler> deferredHandlers = deferred.get(v);
-                        if (deferredHandlers != null) {
-                            /*
-                             * No handlers are usually defined for vocab values
-                             * (see above).
-                             */
-                            for (final Handler handler : deferredHandlers) {
-                                handler.handle(iv);
-                            }
-                        }
-                        // overwrite entry with unresolved key by entry with
-                        // resolved key
-                        resolvedValues.put(v, iv);
-                    }
-
+                    // overwrite entry with unresolved key by entry with
+                    // resolved key
+                    resolvedValues.put(v, iv);
                 }
 
             }

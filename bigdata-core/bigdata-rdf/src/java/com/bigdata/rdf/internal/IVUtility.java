@@ -901,29 +901,34 @@ public class IVUtility {
         return iv;
     }
 
-    /**
-     * Decode an IV from its string representation as encoded by
-     * {@link BlobIV#toString()} and {@link AbstractInlineIV#toString()} (this
-     * is used by the prototype IRIS integration.)
-     * 
-     * @param s
-     *            the string representation
-     * @return the IV
-     */
-    public static final IV fromString(final String s) {
-        if (s.startsWith("TermIV")) {
-            return TermId.fromString(s);
-        } else if (s.startsWith("BlobIV")) {
-                return BlobIV.fromString(s);
-        } else {
-            final String type = s.substring(0, s.indexOf('(')); 
-            final String val = s.substring(s.indexOf('('), s.length()-1);
-            return decode(val, type);
-        }
-    }
+//    /**
+//     * Decode an IV from its string representation as encoded by
+//     * {@link BlobIV#toString()} and {@link AbstractInlineIV#toString()} (this
+//     * is used by the prototype IRIS integration.)
+//     * 
+//     * @param s
+//     *            the string representation
+//     * @return the IV
+//     */
+//    public static final IV fromString(final String s) {
+//        if (s.startsWith("TermIV")) {
+//            return TermId.fromString(s);
+//        } else if (s.startsWith("BlobIV")) {
+//                return BlobIV.fromString(s);
+//        } else {
+//            final String type = s.substring(0, s.indexOf('(')); 
+//            final String val = s.substring(s.indexOf('('), s.length()-1);
+//            return decode(val, type);
+//        }
+//    }
 
     /**
-     * Decode an IV from its string representation and type, provided in as ASTRDFLiteral node in AST model
+     * Decode an IV from its string representation and type, provided in as
+     * ASTRDFLiteral node in AST model.
+     * <p>
+     * Note: This is a very special case method. Normally logic should go
+     * through the ILexiconRelation to resolve inline IVs. This always uses
+     * inline IVs, and thus defeats the ILexiconConfiguration for the namespace.
      * 
      * @param val
      *            the string representation
@@ -931,7 +936,7 @@ public class IVUtility {
      *            value type
      * @return the IV
      * 
-     * @see https://jira.blazegraph.com/browse/BLZG-1176
+     * @see https://jira.blazegraph.com/browse/BLZG-1176 (SPARQL QUERY/UPDATE should not use db connection)
      */
     public static IV decode(final String val, final String type) {
             final DTE dte = Enum.valueOf(DTE.class, type);
