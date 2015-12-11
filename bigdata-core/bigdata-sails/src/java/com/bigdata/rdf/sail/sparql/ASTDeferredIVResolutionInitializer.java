@@ -59,7 +59,7 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryHeadlessImpl;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
@@ -130,7 +130,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
         // of BigdataValue, which are required by existing test suite.
         // See also task https://jira.blazegraph.com/browse/BLZG-1519
 //        this.valueFactory = BigdataValueFactoryImpl.getInstance("parser"+UUID.randomUUID().toString().replaceAll("-", ""));
-        this.valueFactory = new BigdataValueFactoryHeadlessImpl();
+        this.valueFactory = new BigdataValueFactoryImpl();
         
         this.nodes = new LinkedHashMap<>();
         

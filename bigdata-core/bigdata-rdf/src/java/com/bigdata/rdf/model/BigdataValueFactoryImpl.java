@@ -34,8 +34,6 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 
-import javax.xml.datatype.DatatypeConfigurationException;
-import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.BNode;
@@ -48,16 +46,13 @@ import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
-import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.util.concurrent.CanonicalFactory;
-import com.bigdata.util.InnerCause;
 
 /**
  * An implementation using {@link BigdataValue}s and {@link BigdataStatement}s.
@@ -80,11 +75,29 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 	@Override
 	public String getNamespace() {
 		
-		return namespace;
+	    if (namespace != null) {
+	        
+	        return namespace;
+	        
+	    } else {
+	        
+	        throw new RuntimeException("Headless value factory should not be asked for its namespace");
+	        
+	    }
 		
 	}
 	
     /**
+     * WARNING: This constructor provides 'headless' instance of Bigdata ValueFactory,
+     * which is used for query/update parsing. It should not be used in code working with triple-store.
+     */
+    public BigdataValueFactoryImpl() {
+
+        this(null);
+
+    }
+
+	/**
      * WARNING: Use {@link #getInstance(String)} NOT this constructor.
      */
     private BigdataValueFactoryImpl(final String namespace) {
