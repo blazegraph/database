@@ -88,8 +88,15 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 	}
 	
     /**
-     * WARNING: This constructor provides 'headless' instance of Bigdata ValueFactory,
-     * which is used for query/update parsing. It should not be used in code working with triple-store.
+     * WARNING: Use {@link #getInstance(String)} NOT this constructor.
+     * <p>
+     * WARNING: This constructor provides 'headless' (not associated with any
+     * namespace) instance of the {@link BigdataValueFactory}, which is used for
+     * query/update parsing. It SHOULD NOT be used in code working with
+     * triple-store.
+     * 
+     * @see BLZG-1678 (remove "headless" BigdataValueFactory impl class)
+     * @see BLZG-1176 (SPARQL Query/Update parser should not use db connection)
      */
     public BigdataValueFactoryImpl() {
 

@@ -93,16 +93,6 @@ import com.bigdata.rdf.store.BD;
  * Note: {@link IValueExpression} nodes used in {@link SPARQLConstraint}s are
  * allowed to use values not actually in the database. MP
  * 
- * IVUtility.decode is used by ASTDeferredIVResolutionInitializer in
- * to convert parsed AST objects (ASTRDFLiteral and ASTNumericalLiteral)
- * to IVs wrapped up as BigdataValues, which are required
- * on later stages of processing.
- * 
- * There's no LexiconRelation available at this point, so all values converted
- * in inlined mode. ASTDeferredIVResolution converts these inlined IVs to term
- * IV by getLexiconRelation().addTerms in case if triple store configured to not
- * use inlined values.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @openrdf
  * 
@@ -329,11 +319,22 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     /**
      * Reconstructs BigdataValue out of IV, creating literals if needed
+     * <p>
+     * {@link IVUtility#decode(String, String)} is used by
+     * {@link ASTDeferredIVResolutionInitializer} in to convert parsed AST
+     * objects (ASTRDFLiteral and ASTNumericalLiteral) to IVs wrapped up as
+     * BigdataValues, which are required on later stages of processing.
+     * <p>
+     * There's no LexiconRelation available at this point, so all values
+     * converted in inlined mode. {@link ASTDeferredIVResolution} converts these
+     * inlined IVs to term IV by getLexiconRelation().addTerms in case if triple
+     * store configured to not use inlined values.
      * 
-     * @param iv the IV
+     * @param iv
+     *            the IV
      * 
-     * @param dte data type of IV
-     * 
+     * @param dte
+     *            data type of IV
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private BigdataValue getBigdataValue(final String value, final DTE dte) {
