@@ -28,22 +28,37 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.lexicon;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
 
+import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.util.iterators.Iterators;
 
+import com.bigdata.btree.ChunkedLocalRangeIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.rio.IStatementBuffer;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.TestSPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
@@ -611,34 +626,51 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         try {
 
             assertNotNull(store.getLexiconRelation().getSearchEngine());
-
-            final BigdataValueFactory f = store.getValueFactory();
+            
+            BigdataValueFactory f = store.getValueFactory();
             
             final LiteralImpl largeLiteral = getLargeLiteral(store);
 
-            final BigdataValue[] terms = new BigdataValue[] {//
-                    f.createLiteral("abc"),//
-                    f.createLiteral("abc", "en"),//
-                    f.createLiteral("good day", "en"),//
-                    f.createLiteral("gutten tag", "de"),//
-                    f.createLiteral("tag team", "en"),//
-                    f.createLiteral("the first day", "en"),// // 'the' is a stopword.
+            {
+            
+	            final BigdataValue[] terms = new BigdataValue[] {//
+	                    f.createLiteral("abc"),//
+	                    f.createLiteral("abc", "en"),//
+	                    f.createLiteral("good day", "en"),//
+	                    f.createLiteral("gutten tag", "de"),//
+	                    f.createLiteral("tag team", "en"),//
+	                    f.createLiteral("the first day", "en"),// // 'the' is a stopword.
+	
+	                    f.createURI("http://www.bigdata.com"),//
+	                    f.asValue(RDF.TYPE),//
+	                    f.asValue(RDFS.SUBCLASSOF),//
+	                    f.asValue(XMLSchema.DECIMAL),//
+	
+	                    f.createBNode(UUID.randomUUID().toString()),//
+	                    f.createBNode("a12"),//
+	                    
+	                    f.asValue(largeLiteral),//
+	
+	            };
+	            
+				Resource s = f.createURI("x:s");
+				
+	        	URI p = f.createURI("x:p");
+	            
+        		final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(null/* focusStore */, store,
+        				terms.length/* capacity */, 0/* queueCapacity */);
 
-                    f.createURI("http://www.bigdata.com"),//
-                    f.asValue(RDF.TYPE),//
-                    f.asValue(RDFS.SUBCLASSOF),//
-                    f.asValue(XMLSchema.DECIMAL),//
+        		for (int i = 0; i < terms.length; i++) {
 
-                    f.createBNode(UUID.randomUUID().toString()),//
-                    f.createBNode("a12"),//
-                    
-                    f.asValue(largeLiteral),//
+	                buffer.add(s, p, terms[i]);
 
-            };
+	            }
 
-            store.addTerms(terms);
+        		buffer.flush();
+            
+            }
 
-			if (log.isInfoEnabled()) {
+            if (log.isInfoEnabled()) {
 				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
 			}
@@ -705,9 +737,101 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
             }
 
-            // rebuild the full text index.
-            store.getLexiconRelation().rebuildTextIndex(false);
+            // Ruin full text index
+            {
             
+            	final String name = store.getLexiconRelation().getNamespace() + "." + BigdataValueCentricFullTextIndex.NAME_SEARCH;
+            
+            	IIndex btree = store.getIndexManager().getIndex(name, store.getTimestamp());
+	            
+	            /*
+	             * Range delete the keys matching the filter.
+	             */
+	            {
+	                final ChunkedLocalRangeIterator<?> itr = new ChunkedLocalRangeIterator(
+	                        btree,
+	                        null/* fromKey */,
+	                        null/* toKey */,
+	                        100/* capacity */,
+	                        IRangeQuery.KEYS | IRangeQuery.VALS | IRangeQuery.REMOVEALL,
+	                        new TupleFilter() {
+	                            protected boolean isValid(ITuple tuple) { return true; }
+	                        });
+	
+	                while (itr.hasNext()) {
+	
+	                    ITuple<?> x = itr.next();
+	                    System.out.println(x);
+	
+	                }
+	            }
+            }
+
+            /*
+             * re-open the store before search to verify that the data were made
+             * restart safe.
+             */
+            if (store.isStable()) {
+
+                store.commit();
+
+                store = reopenStore(store);
+
+            }
+
+            // verify that full text index is  broken.
+            {
+
+                assertNotNull(store.getLexiconRelation().getSearchEngine());
+                
+                assertExpectedHits(store, "abc", null/* languageCode */,
+                        new BigdataValue[] { //
+                        });
+
+                assertExpectedHits(store, "tag", "en", new BigdataValue[] {//
+                        });
+
+                assertExpectedHits(store, "tag", "de", new BigdataValue[] {//
+                        });
+
+                assertExpectedHits(store, "GOOD DAY", "en", //
+                        .0f, // minCosine
+                        new BigdataValue[] {//
+                        });
+
+                assertExpectedHits(store, "GOOD DAY", "en", //
+                        .5f, // minCosine
+                        new BigdataValue[] {//
+                        });
+
+                assertExpectedHits(store, "day", "en", //
+                        .0f, // minCosine
+                        new BigdataValue[] {
+                		});
+                
+                // BLOB
+                assertExpectedHits(store, largeLiteral.getLabel(), null/*lang*/, //
+                        .0f, // minCosine
+                        new BigdataValue[] {
+                        });
+                
+            }
+
+            // rebuild the full text index.
+            {
+            	store.getLexiconRelation().rebuildTextIndex(/* forceCreate */ false);
+
+            	final String name = store.getLexiconRelation().getNamespace() + "." + BigdataValueCentricFullTextIndex.NAME_SEARCH;
+	            
+	            IIndex btree = store.getIndexManager().getIndex(name, store.getTimestamp());
+	            
+	            ITupleIterator itr = btree.rangeIterator();
+	            while (itr.hasNext()) {
+	            	System.out.println("fixed: "+itr.next());
+	            }
+            }
+
+
             /*
              * re-open the store before search to verify that the data were made
              * restart safe.
@@ -722,6 +846,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             
             // re-verify the full text index.
             {
+                f = store.getValueFactory();
 
                 assertNotNull(store.getLexiconRelation().getSearchEngine());
                 
