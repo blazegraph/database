@@ -35,7 +35,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * 
  * @author <a href="ms@metaphacts.com">Michael Schmidt</a>
  */
-public class GeoExtensionFactory extends DefaultExtensionFactory {
+public class CompressedTimestampExtensionFactory extends DefaultExtensionFactory {
 
     protected void _init(final IDatatypeURIResolver resolver,
             final ILexiconConfiguration<BigdataValue> lex,

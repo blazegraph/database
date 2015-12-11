@@ -1,0 +1,5 @@
+<http://Berlin> <http://coord> "52.516666#13.38333#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://Bremen> <http://coord> "53.07694#8.808888#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://Barcelona> <http://coord> "41.3825#2.17694#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://SanFrancisco> <http://coord> "37.76666#-122.43333#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://Johannesburg> <http://coord> "-26.145#2.77777#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .

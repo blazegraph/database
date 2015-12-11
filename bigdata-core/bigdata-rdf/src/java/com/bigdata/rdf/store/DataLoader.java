@@ -1248,6 +1248,7 @@ public class DataLoader {
 
             final File[] files = (filter != null ? file.listFiles(filter)
                     : file.listFiles());
+            Arrays.sort(files);
 
             for (int i = 0; i < files.length; i++) {
 

@@ -362,6 +362,18 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
             case XSDDecimal:
                 bigdataValue = valueFactory.createLiteral(iv.stringValue(), DTE.XSDDecimal.getDatatypeURI());
                 break;
+            case XSDUnsignedShort:
+                bigdataValue = valueFactory.createLiteral(iv.stringValue(), DTE.XSDUnsignedShort.getDatatypeURI());
+                break;
+            case XSDUnsignedInt:
+                bigdataValue = valueFactory.createLiteral(iv.stringValue(), DTE.XSDUnsignedInt.getDatatypeURI());
+                break;
+            case XSDUnsignedByte:
+                bigdataValue = valueFactory.createLiteral(iv.stringValue(), DTE.XSDUnsignedByte.getDatatypeURI());
+                break;
+            case XSDUnsignedLong:
+                bigdataValue = valueFactory.createLiteral(iv.stringValue(), DTE.XSDUnsignedLong.getDatatypeURI());
+                break;
             default:
                 throw new RuntimeException("unknown DTE " + dte);
             }

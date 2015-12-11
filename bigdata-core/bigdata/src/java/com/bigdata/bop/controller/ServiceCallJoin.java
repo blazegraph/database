@@ -49,6 +49,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JoinAnnotations;
@@ -57,8 +58,8 @@ import com.bigdata.htree.HTree;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
-import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
+import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
 import com.bigdata.rdf.sparql.ast.service.RemoteServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
@@ -197,6 +198,14 @@ public class ServiceCallJoin extends PipelineOp {
 
     }
 
+    @Override
+    public BaseJoinStats newStats() {
+
+       return new BaseJoinStats();
+
+    }
+
+    
     /**
      * Evaluates the {@link ServiceCall} for each source binding set. If the
      * outer operator is interrupted, then the {@link ServiceCall} is cancelled
@@ -531,7 +540,7 @@ public class ServiceCallJoin extends PipelineOp {
                 final BigdataURI serviceURI) {
 
             final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
-                    .toServiceCall(db, cm, serviceURI, serviceNode);
+                    .toServiceCall(db, cm, serviceURI, serviceNode, (BaseJoinStats)context.getStats());
 
             return serviceCall;
 

@@ -173,10 +173,10 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     /*
      * Constants corresponding to the columns of the SPO(C) relation.
      */
-    private final static transient int S = 0;
-    private final static transient int P = 1;
-    private final static transient int O = 2;
-    private final static transient int C = 3;
+    public final static transient int S = 0;
+    public final static transient int P = 1;
+    public final static transient int O = 2;
+    public final static transient int C = 3;
     
     /**
      * The permutation order for the keys for each of the natural key orders.
@@ -327,6 +327,30 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         return orders[index][keyPos];
 
     }
+    
+    /**
+     * Returns the position of the given spoIdentifier in the index. For
+     * instance, if the index is POS and spoIdentfier==0 (representing the
+     * subject, then 2 is returned (since the subject shows up in index position
+     * 2 in POS).
+     * 
+     * @param spoIdentifier identifier, either being 0=subject, 1=predicate,
+     *         2=object, or 3=context
+     * @return the position in the key or -1 if not matchable (e.g., if we're
+     *         in triples mode and request the index for c)
+     */
+    final public int getPositionInIndex(final int spoIdentifier) {
+       
+       final int[] keyOrder = orders[index];
+       
+       for (int i=0; i<keyOrder.length; i++) {
+          if (keyOrder[i]==spoIdentifier)
+             return i;
+       }
+       
+       return -1; // fallback: not found
+    }
+    
     
     /**
      * The integer used to represent the {@link SPOKeyOrder}. For a triple

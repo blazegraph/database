@@ -42,7 +42,7 @@ public class KeyOutOfRangeException extends IllegalArgumentException {
      */
     private static final long serialVersionUID = -261275967781245769L;
 
-    protected KeyOutOfRangeException(String msg) {
+    public KeyOutOfRangeException(String msg) {
 
         super(msg);
 

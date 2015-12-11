@@ -266,7 +266,8 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
     public IVBindingSetEncoderWithIVCache(final IRawStore store,
             final boolean filter, final BOp op) {
 
-        super(filter);
+        super(BigdataValueFactoryImpl.getInstance(((String[]) op
+                .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0]), filter);
 
         if (!filter) {
 
