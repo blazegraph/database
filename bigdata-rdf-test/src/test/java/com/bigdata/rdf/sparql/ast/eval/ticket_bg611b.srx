@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+  <head>
+    <variable name="s"/>
+    <variable name="p"/>
+    <variable name="o"/>
+  </head>
+  <results>
+    <result>
+      <binding name="s">
+         <uri>http://example.com/person/peter</uri>
+      </binding>
+      <binding name="p">
+         <uri>http://xmlns.com/foaf/0.1/knows</uri>
+      </binding>
+      <binding name="o">
+         <uri>http://example.com/person/michael</uri>
+      </binding>
+    </result>
+  </results>
+</sparql>

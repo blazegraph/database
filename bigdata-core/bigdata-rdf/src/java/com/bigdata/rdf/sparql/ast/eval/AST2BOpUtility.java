@@ -983,7 +983,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
                     .toServiceCall(ctx.db,
                             ctx.queryEngine.getClientConnectionManager(),
-                            serviceURI, serviceNode);
+                            serviceURI, serviceNode, null /* BOpStats not yet available */);
 
             /*
              * true IFF this is a registered bigdata aware service running in
@@ -1196,7 +1196,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         /**
          * This is a special handling for external services, which might create
          * values that are reused/joined with IVs. We need to properly resolve
-         * them in order to make subsequen joins successful.
+         * them in order to make subsequent joins successful.
          */
         if (!varsToMockResolve.isEmpty()) {
            
@@ -3584,8 +3584,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * merge join operators first.  Right now, the merge join does not
          * properly handle join constraints.
          */
-        final IConstraint[] c = joinConstraints.toArray(new IConstraint[0]);
 
+        final List<IConstraint> constraints = new LinkedList<IConstraint>();
+
+        // convert constraints to join constraints (BLZG-1648).
+        for (FilterNode filter : joinConstraints) {
+        
+            constraints
+                    .add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                            filter.getValueExpression()));
+            
+        }
+        final IConstraint[] c = constraints.toArray(new IConstraint[0]);
+        
         /*
          * FIXME Update the doneSet *after* the merge join based on the doneSet
          * for each INCLUDE which is folded into the merge join.
@@ -5730,6 +5741,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
           anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
           anns.add(new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
                        namedSolutionSet));
+          anns.add(new NV(IPredicate.Annotations.RELATION_NAME, 
+                  new String[]{ctx.getLexiconNamespace()}));
+
           
           left = new HTreeDistinctBindingSetsOp(leftOrEmpty(left),//
               anns.toArray(new NV[anns.size()]));

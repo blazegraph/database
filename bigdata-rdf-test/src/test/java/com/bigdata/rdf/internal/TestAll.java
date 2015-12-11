@@ -94,6 +94,12 @@ public class TestAll extends TestCase {
         // test suite for encode/decode of xsd:integer IVs
         suite.addTestSuite(TestEncodeDecodeXSDIntegerIVs.class);
 
+        // test suite for encode/decode of GeoSpatial literals
+        suite.addTestSuite(TestEncodeDecodeGeoSpatialLiteralIVs.class);
+        
+        // test suite for GeoSpatial utility
+        suite.addTestSuite(TestZOrderRangeScanUtility.class);
+
         // test suite for encode/decode of xsd:decimal IVs
         suite.addTestSuite(TestEncodeDecodeXSDDecimalIVs.class);
 
@@ -140,9 +146,19 @@ public class TestAll extends TestCase {
 
         // xpath abs(), ceil(), floor(), and round()
         suite.addTestSuite(TestXPathFunctions.class);
-        
+
+        // geospatial format handling.
+        suite.addTest(com.bigdata.rdf.internal.gis.TestAll.suite());
+
         // DTEExtension encoding of packed long integer representing a timestamp.
-        suite.addTestSuite(TestEncodeDecodeCompressedTimestamp.class);
+        suite.addTestSuite(TestEncodeDecodePackedLongIVs.class);
+        suite.addTestSuite(TestPackedLongIVs.class);
+        
+        // DTEExtension.IPV4
+        suite.addTestSuite(TestEncodeDecodeIPv4AddrIV.class);
+        
+        // DTEExtension.ARRAY
+        suite.addTestSuite(TestEncodeDecodeLiteralArrayIVs.class);
         
         // DTEExtension.IPV4
         suite.addTestSuite(TestEncodeDecodeIPv4AddrIV.class);
