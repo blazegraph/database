@@ -124,7 +124,7 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
          * TODO Use the {@link QueryBase.Annotations#PROJECTION} for this?
          */
         String PROJECTED_VARS = "projectedVars";
-
+        
     }
 
     /**

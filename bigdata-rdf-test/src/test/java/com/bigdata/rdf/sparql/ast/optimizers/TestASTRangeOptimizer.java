@@ -663,6 +663,9 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
      *   ?s2  <p> ?o2 .
      *   filter (?o2 > (?o1 - 10) && ?o2 < (?o1 + 10)) .
      * }
+     * 
+     * Since the range is not complex, it is not attached as RangeBop.
+     * See https://jira.blazegraph.com/browse/BLZG-1635.
      */
     @SuppressWarnings("rawtypes")
     public void test_Complex() {
@@ -728,9 +731,6 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 
         final AST2BOpContext ctx = new AST2BOpContext(new ASTContainer(given), store);
         
-        final GlobalAnnotations globals = new GlobalAnnotations(
-        		ctx.getLexiconNamespace(), ctx.getTimestamp());
-        
         // The expected AST after the rewrite.
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
@@ -776,14 +776,6 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 	        final StatementPatternNode sp = new StatementPatternNode(
 	                new VarNode("s"), new ConstantNode(p), new VarNode("o2"));
 	        sp.setQueryHint(QueryHints.RANGE_SAFE, "true");
-	        
-            final RangeNode range = new RangeNode(new VarNode("o2"));
-            range.setFrom(FunctionNode.subtract(new VarNode("o1"), new ConstantNode(ten)));
-            range.setTo(FunctionNode.add(new VarNode("o1"), new ConstantNode(ten)));
-            
-            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
-            
-            sp.setRange(range);
             
             where.addChild(sp);
 	        }
@@ -808,8 +800,11 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
      *   <s2> <p> ?o3 .
      *   ?s <p> ?o .
      *   filter (?o < ?o1 && ?o < ?o2) .
-     *   filter (?o < ?o3) .
+     *   filter (?o < "100") .
      * }
+     * 
+     * Only the constant node is attached as range.
+     * See https://jira.blazegraph.com/browse/BLZG-1635.
      */
     @SuppressWarnings("rawtypes")
     public void test_Complex2() {
@@ -847,10 +842,11 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 	                            new VarNode("o"), new VarNode("o2")
 	                });
 	
+	            final IV upper = new XSDNumericIV(100);
 	            final FunctionNode f3 = 
 	                new FunctionNode(FunctionRegistry.LT, null,
 	                        new ValueExpressionNode[] {
-	                            new VarNode("o"), new VarNode("o3")
+	                            new VarNode("o"), new ConstantNode(upper)
 	                });
 	
 	            final FunctionNode and = FunctionNode.AND(f1, f2);
@@ -916,10 +912,11 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 	                            new VarNode("o"), new VarNode("o2")
 	                });
 	
+	            final IV upper = new XSDNumericIV(100);
 	            final FunctionNode f3 = 
 	                new FunctionNode(FunctionRegistry.LT, null,
 	                        new ValueExpressionNode[] {
-	                            new VarNode("o"), new VarNode("o3")
+	                            new VarNode("o"), new ConstantNode(upper)
 	                });
 	
 	            final FunctionNode and = FunctionNode.AND(f1, f2);
@@ -934,12 +931,6 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         		final StatementPatternNode sp = new StatementPatternNode(
 		                new ConstantNode(s1), new ConstantNode(p), new VarNode("o1"));
         		
-	            final RangeNode range = new RangeNode(new VarNode("o1"));
-	            range.setFrom(new VarNode("o"));
-	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
-	            
-//	            sp.setRange(range);
-        		
 	        	where.addChild(sp);
 
         	}
@@ -949,12 +940,6 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         		final StatementPatternNode sp = new StatementPatternNode(
 		                new ConstantNode(s2), new ConstantNode(p), new VarNode("o2"));
         		
-	            final RangeNode range = new RangeNode(new VarNode("o2"));
-	            range.setFrom(new VarNode("o"));
-	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
-        		
-//	            sp.setRange(range);
-        		
 	        	where.addChild(sp);
 
         	}
@@ -963,13 +948,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 
         		final StatementPatternNode sp = new StatementPatternNode(
 		                new ConstantNode(s3), new ConstantNode(p), new VarNode("o3"));
-        		
-	            final RangeNode range = new RangeNode(new VarNode("o3"));
-	            range.setFrom(new VarNode("o"));
-	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
-        		
-//	            sp.setRange(range);
-        		
+        		        		
 	        	where.addChild(sp);
 
         	}
@@ -980,10 +959,10 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 	        			new VarNode("s"), new ConstantNode(p), new VarNode("o"));
 	        	sp.setQueryHint(QueryHints.RANGE_SAFE, "true");
 	        	
+
+	        	final IV upper = new XSDNumericIV(100);
 	            final RangeNode range = new RangeNode(new VarNode("o"));
-	            range.setTo(
-	            		FunctionNode.MIN(
-	            				FunctionNode.MIN(new VarNode("o1"), new VarNode("o2")), new VarNode("o3"))); 
+	            range.setTo(new ConstantNode(upper)); 
 	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
 	            
 	            sp.setRange(range);

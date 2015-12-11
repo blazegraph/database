@@ -92,6 +92,7 @@ dependencies.
         <configuration>
           <includes>
 	    <include>com/bigdata/rdf/TestAll.java</include>
+ 	     <include>com/bigdata/rdf/internal/gis/TestAll.java</include>
            </includes>
            <excludes>
     	    <exclude>com/bigdata/TestAll.java</exclude>
@@ -157,8 +158,9 @@ dependencies.
 	<resource>
             <directory>src/test/java</directory>
             <includes>
-		<include>**/*.n3</include>
+		        <include>**/*.n3</include>
                 <include>**/*.nt</include>
+                <include>**/*.nq</include>
                 <include>**/*.owl</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>

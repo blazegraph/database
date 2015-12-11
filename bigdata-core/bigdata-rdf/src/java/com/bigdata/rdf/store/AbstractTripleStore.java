@@ -139,11 +139,10 @@ import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.spo.XXXCShardSplitHandler;
 import com.bigdata.rdf.vocab.BaseVocabulary;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
-import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151209;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151210;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -686,7 +685,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151209.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151210.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -1298,6 +1297,20 @@ abstract public class AbstractTripleStore extends
         String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".rdrHistoryClass";
 
+        /**
+         * Enable GeoSpatial support. See https://jira.blazegraph.com/browse/BLZG-249.
+         */
+        String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
+      
+        String DEFAULT_GEO_SPATIAL = "false";
+
+        /**
+         * GeoSpatial configuration. See https://jira.blazegraph.com/browse/BLZG-249.
+         */
+        String GEO_SPATIAL_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialConfig";
+      
+        String DEFAULT_GEO_SPATIAL_CONFIG = null;
+        
         /**
          * If this option is set to false, do not compute closure for sids.
          */

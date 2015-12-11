@@ -1,0 +1,5 @@
+<http://default> {
+  <http://s1> <http://o> "a" .
+  <http://s2> <http://o> <http://p> .
+  <http://s3> <http://o> "a"^^<http://my.datatype>.  
+}

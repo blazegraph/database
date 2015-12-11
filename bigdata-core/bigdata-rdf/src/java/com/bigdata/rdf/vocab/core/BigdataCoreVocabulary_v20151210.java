@@ -30,6 +30,7 @@ import com.bigdata.rdf.sail.RDRHistory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.GeoSpatialVocabularyDecl;
 
 /**
  * Core Bigdata vocabulary.
@@ -38,12 +39,12 @@ import com.bigdata.rdf.vocab.BaseVocabularyDecl;
  * extends this one and edit
  * {@link AbstractTripleStore.Options#DEFAULT_VOCABULARY_CLASS}.
  */
-public class BigdataCoreVocabulary_v20151209 extends BigdataCoreVocabulary_v20151106 {
+public class BigdataCoreVocabulary_v20151210 extends BigdataCoreVocabulary_v20151106 {
 
     /**
      * De-serialization ctor.
      */
-    public BigdataCoreVocabulary_v20151209() {
+    public BigdataCoreVocabulary_v20151210() {
         
         super();
         
@@ -55,7 +56,7 @@ public class BigdataCoreVocabulary_v20151209 extends BigdataCoreVocabulary_v2015
      * @param namespace
      *            The namespace of the KB instance.
      */
-    public BigdataCoreVocabulary_v20151209(final String namespace) {
+    public BigdataCoreVocabulary_v20151210(final String namespace) {
 
         super(namespace);
         
@@ -65,7 +66,8 @@ public class BigdataCoreVocabulary_v20151209 extends BigdataCoreVocabulary_v2015
     protected void addValues() {
 
         super.addValues();
-        
+        addDecl(new GeoSpatialVocabularyDecl());
+
         /*
          * Some new URIs for graph and RDR management.
          */
