@@ -2154,7 +2154,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link FullTextIndex} class.
      */
     @SuppressWarnings("unchecked")
-    public void rebuildTextIndex(boolean forceCreate) {
+    public void rebuildTextIndex(final boolean forceCreate) {
 
         if (getTimestamp() != ITx.UNISOLATED)
             throw new UnsupportedOperationException("Unisolated connection required to rebuild full text index");
@@ -2176,20 +2176,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         	
         	SparseRowStore global = indexManager.getGlobalRowStore();
         	
-            Map<String, Object> map = global.read(
-                    RelationSchema.INSTANCE, getContainerNamespace());
+        	// Update "namespace" properties
+            updateTextIndexConfiguration(global, getContainerNamespace());
 
-        	map.put(AbstractTripleStore.Options.TEXT_INDEX, Boolean.TRUE.toString());
+            // Update "namespace.lex" properties
+            updateTextIndexConfiguration(global, getNamespace());
         	
-        	global.write(RelationSchema.INSTANCE, map);
-        	
-        	if (indexManager instanceof IJournal) {
-
-                // make the changes restart safe (not required for federation).
-                ((IJournal) indexManager).commit();
-
-            }
-        	
+            // Warning: only container and lexicon properties are updated
+            // with new text index configuration, other indexes may require update as well 
         } else {
         	
         	throw new UnsupportedOperationException("Could not rebuild full text index, because it is not enabled");
@@ -2199,6 +2193,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // create a new index.
         textIndexer.create();
 
+    	if (indexManager instanceof IJournal) {
+
+            // make the changes restart safe (not required for federation).
+            ((IJournal) indexManager).commit();
+
+        }
+    	
         // TermIVs
         {
             // The index to scan for the RDF Literals.
@@ -2246,11 +2247,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             final int capacity = 10000;
 
-            while (itr.hasNext()) {
-
-                textIndexer.index(capacity, itr);
-
-            }
+            textIndexer.index(capacity, itr);
 
         }
 
@@ -2310,6 +2307,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
 
     }
+
+	private void updateTextIndexConfiguration(final SparseRowStore global, final String namespace) {
+		
+		Map<String, Object> map = global.read(
+		        RelationSchema.INSTANCE, namespace);
+
+		map.put(AbstractTripleStore.Options.TEXT_INDEX, "true");
+
+        map.put(FullTextIndex.Options.FIELDS_ENABLED, "false");
+        
+        if (getNamespace().equals(namespace)) {
+            map.put(FullTextIndex.Options.OVERWRITE, "false");
+
+        }
+
+		global.write(RelationSchema.INSTANCE, map);
+		
+	}
     
     /**
      * Batch resolution of internal values to {@link BigdataValue}s.
