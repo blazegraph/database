@@ -653,9 +653,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 	
 	            };
 	            
-				Resource s = f.createURI("x:s");
+				final Resource s = f.createURI("x:s");
 				
-	        	URI p = f.createURI("x:p");
+				final URI p = f.createURI("x:p");
 	            
         		final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(null/* focusStore */, store,
         				terms.length/* capacity */, 0/* queueCapacity */);
@@ -742,7 +742,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             
             	final String name = store.getLexiconRelation().getNamespace() + "." + BigdataValueCentricFullTextIndex.NAME_SEARCH;
             
-            	IIndex btree = store.getIndexManager().getIndex(name, store.getTimestamp());
+            	final IIndex btree = store.getIndexManager().getIndex(name, store.getTimestamp());
 	            
 	            /*
 	             * Range delete the keys matching the filter.
@@ -760,8 +760,8 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 	
 	                while (itr.hasNext()) {
 	
-	                    ITuple<?> x = itr.next();
-	                    System.out.println(x);
+	                    final ITuple<?> x = itr.next();
+	                    log.info("removed FTS value: " + x);
 	
 	                }
 	            }
@@ -823,12 +823,16 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
             	final String name = store.getLexiconRelation().getNamespace() + "." + BigdataValueCentricFullTextIndex.NAME_SEARCH;
 	            
-	            IIndex btree = store.getIndexManager().getIndex(name, store.getTimestamp());
+            	final IIndex btree = store.getIndexManager().getIndex(name, store.getTimestamp());
 	            
-	            ITupleIterator itr = btree.rangeIterator();
-	            while (itr.hasNext()) {
-	            	System.out.println("fixed: "+itr.next());
-	            }
+            	final ITupleIterator itr = btree.rangeIterator();
+	            
+            	while (itr.hasNext()) {
+	            
+            		log.info("fixed FTS value: "+itr.next());
+	            
+            	}
+
             }
 
 
