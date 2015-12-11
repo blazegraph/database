@@ -48,6 +48,9 @@ import com.bigdata.rwstore.RWStore.AllocationStats;
 public class AllocBlock {
 
     private static final Logger log = Logger.getLogger(AllocBlock.class);
+    // Profiling for BLZG-1667 indicated that checking logging level is more expensive than expected
+    private static final boolean s_islogDebug = log.isDebugEnabled();
+    private static final boolean s_islogTrace = log.isTraceEnabled();
     
     /**
 	 * The FixedAllocator owning this block.  The callback reference is needed
@@ -182,7 +185,7 @@ public class AllocBlock {
 			RWStore.setBit(m_isoFrees, bit);
 		}
 		
-		if (log.isTraceEnabled()) {
+		if (s_islogTrace) {
 			log.trace("Freeing " + bitPhysicalAddress(bit) + " sessionProtect: " + sessionProtect);
 		}
 
@@ -370,7 +373,7 @@ public class AllocBlock {
 				if ((chkbits & (1 << b)) != 0) {
 					final long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * (startBit + b));
 					
-					if (log.isTraceEnabled())
+					if (s_islogTrace)
 						log.trace("releasing address: " + clr);
 					
 					// obtained the latched address for that bit.
