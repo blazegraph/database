@@ -794,10 +794,7 @@ public class ASTDeferredIVResolution {
     private URI handleDatasetGraph(final AbstractTripleStore store, final URI uri) {
         URI value = uri;
         if (value!= null && !(value instanceof BigdataValue)) {
-            BigdataURI bValue = store.getValueFactory().asValue(value);
-            bValue.setIV(TermId.mockIV(VTE.valueOf(bValue)));
-            bValue.getIV().setValue(bValue);
-            value = bValue;
+            value = store.getValueFactory().asValue(value);
         }
 
         if (value instanceof BigdataValue) {
