@@ -24,11 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.vocab.core;
 
-import com.bigdata.rdf.internal.impl.extensions.CompressedTimestampExtension;
-import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
+import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.sail.RDRHistory;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.decls.GeoSpatialVocabularyDecl;
 
 /**
@@ -38,7 +39,7 @@ import com.bigdata.rdf.vocab.decls.GeoSpatialVocabularyDecl;
  * extends this one and edit
  * {@link AbstractTripleStore.Options#DEFAULT_VOCABULARY_CLASS}.
  */
-public class BigdataCoreVocabulary_v20151210 extends DefaultBigdataVocabulary {
+public class BigdataCoreVocabulary_v20151210 extends BigdataCoreVocabulary_v20151106 {
 
     /**
      * De-serialization ctor.
@@ -66,14 +67,20 @@ public class BigdataCoreVocabulary_v20151210 extends DefaultBigdataVocabulary {
 
         super.addValues();
         addDecl(new GeoSpatialVocabularyDecl());
-        
+
         /*
-         * Some new URIs for inline URI handling.
+         * Some new URIs for graph and RDR management.
          */
-        addDecl(new BaseVocabularyDecl(
-                PackedLongIV.PACKED_LONG, // supported range: [0;72057594037927935L].
-                CompressedTimestampExtension.COMPRESSED_TIMESTAMP                
-                ));
+		addDecl(new BaseVocabularyDecl(
+				new URIImpl(BD.NAMESPACE + "Vertex"), // BigdataRDFFactory.VERTEX,
+				new URIImpl(BD.NAMESPACE + "Edge"), // BigdataRDFFactory.EDGE,
+				new URIImpl("attr:/type"), // GPO.tid,
+				BD.SID,
+				BD.STATEMENT_TYPE,
+				BD.NULL_GRAPH,
+				BD.VIRTUAL_GRAPH,
+				RDRHistory.Vocab.ADDED,
+				RDRHistory.Vocab.REMOVED));
 
     }
 
