@@ -59,7 +59,7 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryHeadlessImpl;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
@@ -87,8 +87,8 @@ import com.bigdata.rdf.store.BD;
  * in the {@link ASTDatasetClause}, which are matched as either {@link ASTIRI}
  * or {@link ASTQName}.
  * <p>
- * Note: This is a part of deferred IV batch resolution, which is intended 
- * to replace the functionality of the {@link BigdataValueReplacer}.
+ * Note: This is a part of deferred IV batch resolution, which is intended to
+ * replace the functionality of the {@link BigdataValueReplacer}.
  * <p>
  * Note: {@link IValueExpression} nodes used in {@link SPARQLConstraint}s are
  * allowed to use values not actually in the database. MP
@@ -101,7 +101,6 @@ import com.bigdata.rdf.store.BD;
  * @see https://jira.blazegraph.com/browse/BLZG-1519 (Refactor test suite to
  *      remove tight coupling with IVs while checking up parsed queries)
  */
-// FIXME RENAME THIS CLASS.
 public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     private final static Logger log = Logger
@@ -130,7 +129,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
         // of BigdataValue, which are required by existing test suite.
         // See also task https://jira.blazegraph.com/browse/BLZG-1519
 //        this.valueFactory = BigdataValueFactoryImpl.getInstance("parser"+UUID.randomUUID().toString().replaceAll("-", ""));
-        this.valueFactory = new BigdataValueFactoryHeadlessImpl();
+        this.valueFactory = new BigdataValueFactoryImpl();
         
         this.nodes = new LinkedHashMap<>();
         
@@ -320,11 +319,22 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     /**
      * Reconstructs BigdataValue out of IV, creating literals if needed
+     * <p>
+     * {@link IVUtility#decode(String, String)} is used by
+     * {@link ASTDeferredIVResolutionInitializer} in to convert parsed AST
+     * objects (ASTRDFLiteral and ASTNumericalLiteral) to IVs wrapped up as
+     * BigdataValues, which are required on later stages of processing.
+     * <p>
+     * There's no LexiconRelation available at this point, so all values
+     * converted in inlined mode. {@link ASTDeferredIVResolution} converts these
+     * inlined IVs to term IV by getLexiconRelation().addTerms in case if triple
+     * store configured to not use inlined values.
      * 
-     * @param iv the IV
+     * @param iv
+     *            the IV
      * 
-     * @param dte data type of IV
-     * 
+     * @param dte
+     *            data type of IV
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private BigdataValue getBigdataValue(final String value, final DTE dte) {

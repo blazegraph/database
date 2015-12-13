@@ -75,11 +75,36 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 	@Override
 	public String getNamespace() {
 		
-		return namespace;
+	    if (namespace != null) {
+	        
+	        return namespace;
+	        
+	    } else {
+	        
+	        throw new RuntimeException("Headless value factory should not be asked for its namespace");
+	        
+	    }
 		
 	}
 	
     /**
+     * WARNING: Use {@link #getInstance(String)} NOT this constructor.
+     * <p>
+     * WARNING: This constructor provides 'headless' (not associated with any
+     * namespace) instance of the {@link BigdataValueFactory}, which is used for
+     * query/update parsing. It SHOULD NOT be used in code working with
+     * triple-store.
+     * 
+     * @see BLZG-1678 (remove "headless" BigdataValueFactory impl class)
+     * @see BLZG-1176 (SPARQL Query/Update parser should not use db connection)
+     */
+    public BigdataValueFactoryImpl() {
+
+        this(null);
+
+    }
+
+	/**
      * WARNING: Use {@link #getInstance(String)} NOT this constructor.
      */
     private BigdataValueFactoryImpl(final String namespace) {
