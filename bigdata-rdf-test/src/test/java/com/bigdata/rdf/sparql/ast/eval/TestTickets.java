@@ -1871,4 +1871,31 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_bg1643g.srx"// resultFileURL
           ).runTest();   
     }  
+    
+   /**
+    * BLZG-1683: Required property relationName for HTreeDistinctBindingSetsOp
+    * (analytic version).
+    */
+   public void test_ticket_1683a() throws Exception {
+      new TestHelper(
+          "ticket_bg1683a",// testURI,
+          "ticket_bg1683a.rq",// queryFileURL
+          "ticket_bg1683.trig",// dataFileURL
+          "ticket_bg1683.srx"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+    * BLZG-1683: Required property relationName for HTreeDistinctBindingSetsOp
+    * (non-analytic version).
+    */
+   public void test_ticket_1683b() throws Exception {
+      new TestHelper(
+          "ticket_bg1683b",// testURI,
+          "ticket_bg1683b.rq",// queryFileURL
+          "ticket_bg1683.trig",// dataFileURL
+          "ticket_bg1683.srx"// resultFileURL
+         ).runTest();   
+   }
+
 }
