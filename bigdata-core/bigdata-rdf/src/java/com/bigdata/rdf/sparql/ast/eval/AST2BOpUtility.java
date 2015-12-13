@@ -4388,8 +4388,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
                            namedSolutionSet),//
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// for live stat updates.
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1)//
-            );
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, 
+                            new String[]{ctx.getLexiconNamespace()})            );
         }
 
         // Note: applies query hints to JVM or HTree based DISTINCT.
