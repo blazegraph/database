@@ -724,7 +724,17 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      */
     protected void addRangeCountOptimizer() {
 
-       final IASTOptimizer o = initGPURangeCountOptimizer();
+        /*
+         * Note: We have not implemented the GPU based range count optimizer
+         * yet. When that operator is implemented, this code should be modified
+         * to conditionally instantiate the GPU based triple pattern range 
+         * count optimizer.
+         * 
+         * See https://github.com/SYSTAP/mapgraph-operators/issues/7 Implement
+         * operator to obtain range counts for a set of triple patterns
+         */
+       final IASTOptimizer o = null; // initGPURangeCountOptimizer();
+//       final IASTOptimizer o = initGPURangeCountOptimizer();
        if ( o != null ) {
           add(o);
        } else {
