@@ -210,6 +210,9 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
                         if (!bigdataValue.stringValue().equals(rdfNode.getLabel().getValue())) {
                             // Data loss could occur if inline IV will be used, as string representation of original value differ from decoded value
                             bigdataValue = valueFactory.createLiteral(rdfNode.getLabel().getValue(), dataTypeUri);
+                            iv = TermId.mockIV(VTE.valueOf(bigdataValue));
+                            bigdataValue.setIV(iv);
+                            iv.setValue(bigdataValue);
                         }
                     } else { 
                         iv = new TermId<BigdataValue>(VTE.LITERAL,0);
