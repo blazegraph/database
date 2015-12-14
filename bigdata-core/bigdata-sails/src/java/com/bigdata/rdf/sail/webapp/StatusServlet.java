@@ -702,6 +702,25 @@ public class StatusServlet extends BigdataRDFServlet {
 						.close();
 			}
 
+			{ // Report the git commit when available.  See BLZG-1688
+				String gitCommit = Banner.getBuildInfo().get(Banner.BuildInfoMeta.gitCommit);
+				if (gitCommit == null )
+					gitCommit = "N/A";
+				current.node("p").text("Build Git Commit=").node("span")
+						.attr("id", "gitCommit").text(gitCommit).close()
+						.close();
+			}
+
+			{ // Report the git branch when available.  See BLZG-1688
+				String gitBranch = Banner.getBuildInfo().get(Banner.BuildInfoMeta.gitBranch);
+				if (gitBranch == null )
+					gitBranch = "N/A";
+				current.node("p").text("Build Git Branch=").node("span")
+						.attr("id", "gitBranch").text(gitBranch).close()
+						.close();
+			}
+
+
             current.node("p").text("Accepted query count=")
                .node("span").attr("id", "accepted-query-count")
                .text("" +getBigdataRDFContext().getQueryIdFactory().get())
