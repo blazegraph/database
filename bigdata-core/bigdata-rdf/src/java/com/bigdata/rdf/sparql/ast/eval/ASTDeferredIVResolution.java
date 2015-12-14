@@ -694,16 +694,12 @@ public class ASTDeferredIVResolution {
     
                     final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
                             .get(i);
-    
-                    final GroupNodeBase<IGroupMemberNode> whereClause = namedSubquery
-                            .getWhereClause();
-    
-                    if (whereClause != null) {
-    
-                        fillInIV(store, whereClause);
-                        
-                    }
-    
+
+                    // process subquery recursively, handling all the clauses of the subquery
+                    // @see https://jira.blazegraph.com/browse/BLZG-1682
+                    
+                    prepare(store, namedSubquery);
+
                 }
     
             }
