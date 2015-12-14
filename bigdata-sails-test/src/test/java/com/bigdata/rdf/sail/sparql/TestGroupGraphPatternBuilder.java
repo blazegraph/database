@@ -30,12 +30,21 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.InlineUnsignedIntegerURIHandler;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.constraints.ComputedIN;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.MockedValueIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
@@ -54,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.store.TestInsertRate.XMLSchema;
 
 /**
  * Test suite for translating the openrdf SPARQL AST nodes for
@@ -770,6 +780,61 @@ public class TestGroupGraphPatternBuilder extends
 
             whereClause.addChild(new FilterNode(ve));
            
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for empty group in the default context with a FILTER.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o FILTER ?s = ?o}
+     * </pre>
+     */
+    public void test_empty_group_with_filter()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "select * where { "+
+                "FILTER (?a >= \"1\"^^xsd:unsignedLong) "+
+                "FILTER (?b >= \"1\"^^xsd:unsignedLong) "+
+                "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("*"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            ILexiconConfiguration<BigdataValue> lexiconConfiguration = tripleStore.getLexiconRelation().getLexiconConfiguration();
+            
+            final ValueExpressionNode ve1 = new FunctionNode(
+                    FunctionRegistry.GE, null/* scalarValues */,
+                    new ValueExpressionNode[] { new VarNode("a"),
+                            new ConstantNode(lexiconConfiguration.createInlineIV(new LiteralImpl("1", XSD.UNSIGNED_LONG))) });
+
+            whereClause.addChild(new FilterNode(ve1));
+
+            
+            final ValueExpressionNode ve2 = new FunctionNode(
+                    FunctionRegistry.GE, null/* scalarValues */,
+                    new ValueExpressionNode[] { new VarNode("b"),
+                            new ConstantNode(lexiconConfiguration.createInlineIV(new LiteralImpl("1", XSD.UNSIGNED_LONG))) });
+
+            whereClause.addChild(new FilterNode(ve2));
+
         }
 
         final QueryRoot actual = parse(sparql, baseURI);
