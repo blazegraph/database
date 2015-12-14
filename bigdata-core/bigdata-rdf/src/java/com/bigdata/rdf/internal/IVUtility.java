@@ -992,16 +992,16 @@ public class IVUtility {
                 return new FullyInlineTypedLiteralIV(val, null, XMLSchema.STRING);
             }
             case XSDUnsignedByte: {
-                return new XSDUnsignedByteIV<>(Byte.valueOf(val));
+                return new XSDUnsignedByteIV<>((byte) (Byte.valueOf(val) + Byte.MIN_VALUE));
             }
             case XSDUnsignedShort: {
-                return new XSDUnsignedShortIV<>(Short.valueOf(val));                
+                return new XSDUnsignedShortIV<>((short) (Short.valueOf(val) + Short.MIN_VALUE));
             }
             case XSDUnsignedInt: {
-                return new XSDUnsignedIntIV(Integer.valueOf(val));
+                return new XSDUnsignedIntIV((int) (Integer.valueOf(val) + Integer.MIN_VALUE));
             }
             case XSDUnsignedLong: {
-                return new XSDUnsignedLongIV<>(Long.valueOf(val));
+                return new XSDUnsignedLongIV<>(Long.valueOf(val) + Long.MIN_VALUE);
             }
             default:
                 throw new UnsupportedOperationException("dte=" + dte);

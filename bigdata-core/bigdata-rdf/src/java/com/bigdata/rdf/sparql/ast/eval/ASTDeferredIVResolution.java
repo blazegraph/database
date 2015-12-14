@@ -694,16 +694,12 @@ public class ASTDeferredIVResolution {
     
                     final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
                             .get(i);
-    
-                    final GroupNodeBase<IGroupMemberNode> whereClause = namedSubquery
-                            .getWhereClause();
-    
-                    if (whereClause != null) {
-    
-                        fillInIV(store, whereClause);
-                        
-                    }
-    
+
+                    // process subquery recursively, handling all the clauses of the subquery
+                    // @see https://jira.blazegraph.com/browse/BLZG-1682
+                    
+                    prepare(store, namedSubquery);
+
                 }
     
             }
@@ -953,10 +949,9 @@ public class ASTDeferredIVResolution {
             final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
             if (fve instanceof IVValueExpression) {
                 for (int k = 0; k < fve.arity(); k++) {
-                    final IValueExpression<? extends IV> ve = ((FunctionNode)bop).getValueExpression();
-                    final BOp pathBop = ve.get(k);
-                    if (pathBop instanceof Constant && ((Constant)pathBop).get() instanceof TermId) {
-                        final BigdataValue v = ((TermId) ((Constant)pathBop).get()).getValue();
+                    final BOp veBop = fve.get(k);
+                    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
+                        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
                         final int fk = k;
                         defer(v, new Handler(){
                             @Override
@@ -966,7 +961,11 @@ public class ASTDeferredIVResolution {
                                     resolved.setIV(newIV);
                                     newIV.setValue(resolved);
                                     final Constant newConstant = new Constant(newIV);
-                                    ((FunctionNode)bop).setValueExpression((IValueExpression<? extends IV>) ((IVValueExpression) ve).setArg(fk, newConstant));
+                                    // we need to reread value expression from the node, as it might get changed by sibling nodes resolution
+                                    // @see https://jira.blazegraph.com/browse/BLZG-1682
+                                    final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
+                                    IValueExpression<? extends IV> newVe = (IValueExpression<? extends IV>) ((IVValueExpression) fve).setArg(fk, newConstant);
+                                    ((FunctionNode)bop).setValueExpression(newVe);
                                     ((FunctionNode) bop).setArg(fk, new ConstantNode(newConstant));
                                 }
                             }
