@@ -2163,11 +2163,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         if (textIndex) {
         	
-        	textIndexer = getSearchEngine();
+        	IValueCentricTextIndexer<?> oldTextIndexer = getSearchEngine();
 
         	// destroy the existing text index.
-        	textIndexer.destroy();
-        
+        	oldTextIndexer.destroy();
+
+        	// clear reference to the old FTS
+        	viewRef.set(null);
+
+        	// get a new instance of FTS
+            textIndexer = getSearchEngine();
+
         } else if (forceCreate) {
         	
         	textIndex = true;
