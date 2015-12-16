@@ -2095,7 +2095,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * The aim is to reduce latency when reading blobs from disk as it will enable the disk controllers
      * to re-order IO requests nd where possible process in parallel.
      * This should benefit all Blob reads but specifically helps large deferredFree data to reduce commit latency
-     * as described in BLZG-641.
+     * as described in BLZG-1663.
      */
     static boolean s_readBlobsAsync = true;
     
