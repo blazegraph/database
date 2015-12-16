@@ -795,8 +795,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		String Tuples = "Tuples";
 		/** Counters for IO. */
 		String IO = "IO";
-        /** Counters for touch(). */
-        String TOUCH = "Touch";
+//        /** Counters for touch(). */
+//        String TOUCH = "Touch";
     
     }
 
@@ -1219,7 +1219,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        if (log.isInfoEnabled() || BigdataStatics.debug) {
+        if (INFO || BigdataStatics.debug) {
 
             final String msg = "BTree close: name="
                     + metadata.getName()
@@ -1233,7 +1233,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                     + (this instanceof BTree ? ((BTree) this).getCheckpoint()
                             .toString() : getClass().getSimpleName());
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(msg);
 
             if (BigdataStatics.debug)
@@ -3552,7 +3552,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     private final void doSyncTouch(final AbstractNode<?> node) {
 
-        final long beginNanos = System.nanoTime();
+//        final long beginNanos = System.nanoTime();
         
         synchronized (this) {
 
@@ -3560,19 +3560,19 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        final long elapsedNanos = System.nanoTime() - beginNanos;
-        
-        // See BLZG-1664
-        btreeCounters.syncTouchNanos.add(elapsedNanos);
+//        final long elapsedNanos = System.nanoTime() - beginNanos;
+//        
+//        // See BLZG-1664
+//        btreeCounters.syncTouchNanos.add(elapsedNanos);
         
     }
     
     private final void doTouch(final AbstractNode<?> node) {
         
-        final long beginNanos = System.nanoTime();
-        
-        // See BLZG-1664
-        btreeCounters.touchCount.increment();
+//        final long beginNanos = System.nanoTime();
+//        
+//        // See BLZG-1664
+//        btreeCounters.touchCount.increment();
         
         /*
          * We need to guarantee that touching this node does not cause it to be
@@ -3641,10 +3641,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         //
 //                }
 
-        final long elapsedNanos = System.nanoTime() - beginNanos;
-        
-        // See BLZG-1664
-        btreeCounters.touchNanos.add(elapsedNanos);
+//        final long elapsedNanos = System.nanoTime() - beginNanos;
+//        
+//        // See BLZG-1664
+//        btreeCounters.touchNanos.add(elapsedNanos);
 
     }
 
@@ -3733,7 +3733,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if (log.isInfoEnabled() || elapsed > 5000) {
+        if (INFO || elapsed > 5000) {
 
             /*
              * Note: latency here is nearly always a side effect of GC. Unless

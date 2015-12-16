@@ -755,7 +755,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
 
             writeNodeRecursive(root);
             
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info("flushed root: addr=" + root.identity);
             
             return true;
@@ -1039,14 +1039,14 @@ public class BTree extends AbstractBTree implements //ICommitter,
         // write it on the store.
         checkpoint.write(store);
         
-        if (BigdataStatics.debug||log.isInfoEnabled()) {
+        if (BigdataStatics.debug||INFO) {
             final String msg = "name=" + metadata.getName()
                     + ", writeQueue{size=" + writeRetentionQueue.size()
                     + ",distinct=" + ndistinctOnWriteRetentionQueue + "} : "
                     + checkpoint;
             if (BigdataStatics.debug)
                 System.err.println(msg);
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(msg);
         }
         
@@ -1853,7 +1853,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
 					+ store + ", checkpoint=" + checkpoint, t);
 		}
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             // Note: this is the scale-out index name for a partitioned index.
             final String name = metadata.getName();

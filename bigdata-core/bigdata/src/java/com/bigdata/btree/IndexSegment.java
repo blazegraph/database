@@ -1051,8 +1051,8 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
                     // no more leaves.
 
-                    if (INFO)
-                        log.info("No more leaves");
+                    if (DEBUG)
+                        log.debug("No more leaves");
 
                     return null;
 
@@ -1071,8 +1071,8 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
                     // no more leaves.
 
-                    if (INFO)
-                        log.info("No more leaves");
+                    if (DEBUG)
+                        log.debug("No more leaves");
 
                     return null;
 

@@ -103,7 +103,7 @@ public class HTree extends AbstractHTree
 //  IRangeQuery
 {
 
-    private static final transient Logger log = Logger.getLogger(HTree.class);
+//    private static final transient Logger log = Logger.getLogger(HTree.class);
 
     /**
      * The #of bits of distinction to be made each time we split a directory
@@ -703,6 +703,7 @@ public class HTree extends AbstractHTree
         
     }
     
+    @Override
     final public void setLastCommitTime(final long lastCommitTime) {
         
         if (lastCommitTime == 0L)
@@ -716,7 +717,7 @@ public class HTree extends AbstractHTree
             
         }
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("old=" + this.lastCommitTime + ", new=" + lastCommitTime);
         // Note: Commented out to allow replay of historical transactions.
         /*if (this.lastCommitTime != 0L && this.lastCommitTime > lastCommitTime) {
@@ -799,7 +800,7 @@ public class HTree extends AbstractHTree
 
             writeNodeRecursive(root);
             
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info("flushed root: addr=" + root.getIdentity());
             
             return true;
@@ -1031,14 +1032,14 @@ public class HTree extends AbstractHTree
         // write it on the store.
         checkpoint.write(store);
         
-        if (BigdataStatics.debug||log.isInfoEnabled()) {
+        if (BigdataStatics.debug||INFO) {
             final String msg = "name=" + metadata.getName()
                     + ", writeQueue{size=" + writeRetentionQueue.size()
                     + ",distinct=" + ndistinctOnWriteRetentionQueue + "} : "
                     + checkpoint;
             if (BigdataStatics.debug)
                 System.err.println(msg);
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(msg);
         }
         
@@ -1379,8 +1380,8 @@ public class HTree extends AbstractHTree
 	 */
 	public byte[] insert(final byte[] key, final byte[] value) {
 
-        if (log.isInfoEnabled())
-            log.info("key=" + BytesUtil.toString(key) + ", value="
+        if (DEBUG)
+            log.debug("key=" + BytesUtil.toString(key) + ", value="
                     + Arrays.toString(value));
 
 		if (key == null)
@@ -1419,8 +1420,8 @@ public class HTree extends AbstractHTree
 					// and frig prefixlength to come back in
 					prefixLength -= current.globalDepth;
 					
-					if (log.isDebugEnabled())
-						log.debug("frig prefixLength: " + prefixLength);
+//					if (DEBUG)
+//						log.debug("frig prefixLength: " + prefixLength);
 				} else {
 					child = current.lastChild();
 				}
@@ -1521,8 +1522,8 @@ public class HTree extends AbstractHTree
 		if (key == null)
 			throw new IllegalArgumentException();
 		
-		if (log.isInfoEnabled())
-			log.info("key=" + BytesUtil.toString(key));
+		if (DEBUG)
+			log.debug("key=" + BytesUtil.toString(key));
 
 		// the current directory page.
 		DirectoryPage current = getRoot(); // start at the root.
@@ -1944,7 +1945,7 @@ public class HTree extends AbstractHTree
 					+ store + ", checkpoint=" + checkpoint, t);
 		}
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             // Note: this is the scale-out index name for a partitioned index.
             final String name = metadata.getName();
