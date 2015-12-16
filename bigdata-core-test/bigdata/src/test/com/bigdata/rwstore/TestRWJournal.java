@@ -1946,6 +1946,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		/**
 		 * Test of blob allocation and read-back, firstly from cache and then
 		 * from disk.
+		 * @throws InterruptedException 
 		 */
 		public void test_blob_readBack() {
 
@@ -1978,10 +1979,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				// Now reset - clears writeCache and reinits from disk
 				rw.reset();
+				
+				// RWStore.reset() no longer resets the write cache, we need to do that explicitly!
+				rw.getWriteCacheService().resetAndClear();
 
 				rdBuf = bs.read(faddr);
 				assertEquals(bb, rdBuf);
 
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
 			} finally {
 
 				store.destroy();
@@ -2043,6 +2049,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				// Now reset - clears writeCache and reinits from disk
 				rw.reset();
+
+				// RWStore.reset() no longer resets the write cache, we need to do that explicitly!
+				rw.getWriteCacheService().resetAndClear();
 
 				rdBuf = bs.read(faddr);
 				assertEquals(bb, rdBuf);

@@ -33,9 +33,13 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -48,6 +52,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -2085,6 +2090,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
     }
     
+    /*
+     * Set the option below to true to enable asynchronous reads of blob data.
+     * The aim is to reduce latency when reading blobs from disk as it will enable the disk controllers
+     * to re-order IO requests nd where possible process in parallel.
+     * This should benefit all Blob reads but specifically helps large deferredFree data to reduce commit latency
+     * as described in BLZG-641.
+     */
+    static boolean s_readBlobsAsync = true;
+    
     public void getData(final long addr, final byte buf[], final int offset,
             final int length) {
 
@@ -2138,14 +2152,49 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         blobHdr[i] = hdrstr.readInt();
                     }
                     // Now we have the header addresses, we can read MAX_FIXED_ALLOCS until final buffer
-                    int cursor = 0;
-                    int rdlen = m_maxFixedAlloc;
-                    for (int i = 0; i < nblocks; i++) {
-                        if (i == (nblocks - 1)) {
-                            rdlen = length - cursor;
-                        }
-                        getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
-                        cursor += rdlen-4; // but only increase cursor by data
+                    if (!s_readBlobsAsync) { // synchronous read of blob data
+	                    int cursor = 0;
+	                    int rdlen = m_maxFixedAlloc;
+	                    for (int i = 0; i < nblocks; i++) {
+	                        if (i == (nblocks - 1)) {
+	                            rdlen = length - cursor;
+	                        }
+	                        getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
+	                        cursor += rdlen-4; // but only increase cursor by data
+	                    }
+                    } else { // s_readBlobsAsync
+                    	final Path fpath = Paths.get(m_fd.getAbsolutePath());
+	                    final AsynchronousFileChannel channel = AsynchronousFileChannel.open(fpath, StandardOpenOption.READ);
+						try {
+							final ArrayList<Future> reads = new ArrayList<Future>();
+							int cursor = 0;
+							int rdlen = m_maxFixedAlloc;
+							int cacheReads = 0;
+							for (int i = 0; i < nblocks; i++) {
+								if (i == (nblocks - 1)) {
+									rdlen = length - cursor;
+								}
+								final ByteBuffer bb = ByteBuffer.wrap(buf,
+										cursor, rdlen-4); // strip off checksum to avoid overlapping buffer reads!
+								final long paddr = physicalAddress(blobHdr[i]);
+								final ByteBuffer cache = m_writeCacheService._readFromCache(paddr, rdlen);
+								if (cache != null) {
+									bb.put(cache); // write cached data!
+									cacheReads++;
+								} else {
+									reads.add(channel.read(bb,
+											paddr));
+								}
+								cursor += rdlen - 4; // but only increase cursor by data
+							}
+							for (Future r : reads) {
+								r.get();
+							}
+						} catch (Exception e) {
+	                         throw new IOException("Error from async IO", e);
+	    				} finally {
+	                    	channel.close();
+	                    }
                     }
                     
                     return;
@@ -2154,7 +2203,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     log.error(e,e);
                     
                     throw new IllegalStateException("Unable to restore Blob allocation", e);
-                }
+				}
             }
 
             {
