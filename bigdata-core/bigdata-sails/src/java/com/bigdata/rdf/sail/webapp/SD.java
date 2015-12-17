@@ -50,6 +50,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.ClassPathUtil;
 
 /**
  * SPARQL 1.1 Service Description vocabulary class.
@@ -733,6 +734,28 @@ public class SD {
         }
         if (entailmentRegime != null)
             g.add(aService, SD.entailmentRegime, entailmentRegime);
+
+    }
+
+    /**
+     * Return true iff the namespace is compatible with GPU acceleration.
+     * 
+     * @see https://github.com/SYSTAP/bigdata-gpu/issues/134 (Need means to
+     *      publish/update/drop graph in the mapgraph-runtime)
+     */
+    boolean isGpuCompatible() {
+
+        final IFeatureSupported obj = ClassPathUtil.classForName(//
+                "com.blazegraph.rdf.gpu.MapgraphCompatibleNamespace", // preferredClassName,
+                null, // defaultClass,
+                IFeatureSupported.class, // sharedInterface,
+                getClass().getClassLoader() // classLoader
+        );
+
+        if (obj == null)
+            return false;
+
+        return obj.isSupported(tripleStore);
 
     }
     
