@@ -99,7 +99,6 @@ dependencies.
       <jettison.version>1.3.3</jettison.version>
       <rexster.version>2.5.0</rexster.version>
       <striterator.version>1.0</striterator.version>
-      <jini.version>2.2.1</jini.version>
       <!-- <junit-ext.version>1.1-b3-dev</junit-ext.version> -->
       <junit-ext.version>${project.version}</junit-ext.version>
       <junit4.version>4.11</junit4.version>
@@ -206,21 +205,12 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
-    <module>../bigdata-zookeeper</module>
-    <module>../bigdata-jini</module>
-    <module>../bigdata-jini-test</module>
-    <module>../bigdata-ha</module>
-<!-- Disable the automatic test execution for now. 
-     It is run as a separate Jenkins job.
-    <module>../bigdata-ha-test</module>
--->
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
     <module>../bigdata-blueprints</module>
     <module>../bigdata-jar</module>
     <module>../bigdata-runtime</module>
     <module>../bigdata-core-test/</module>
-    <module>../bigdata-zookeeper-test</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
     <module>../blazegraph-deb/</module>
