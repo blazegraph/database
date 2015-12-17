@@ -1,1 +1,0 @@
-Use the BigdataFederationSparqlTest to test for SPARQL compliance against a running federation.
