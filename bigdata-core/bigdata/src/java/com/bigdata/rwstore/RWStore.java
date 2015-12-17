@@ -5101,9 +5101,63 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     public void deferFree(final int rwaddr, final int sze) {
         m_allocationWriteLock.lock();
         try {
-            if (sze > (this.m_maxFixedAlloc-4)) {
+            if (sze > (this.m_maxFixedAlloc-4)) {          	
                 m_deferredFreeOut.writeInt(-rwaddr);
                 m_deferredFreeOut.writeInt(sze);
+                
+            	/*
+            	 * rather than write out blob address, instead flatten the blob addresses and
+            	 * write all to remove the latency on commit caused by reading potentially many blob headers.
+            	 * 
+            	 * This idea was propposed to support BLZG-641/BLZG-1663 to redcue commit latency.
+            	 * 
+            	 * However, it appears that deferFree is not called with the raw blob size and is already
+            	 * reduced to the blob part addrs.
+            	 */
+                log.debug("Unexpected code path deferring free of direct blob address");
+
+//                final int alloc = m_maxFixedAlloc-4;
+//                final int nblocks = (alloc - 1 + (sze-4))/alloc;
+//                if (nblocks < 0)
+//                    throw new IllegalStateException(
+//                            "Allocation error, m_maxFixedAlloc: "
+//                                    + m_maxFixedAlloc);
+//
+//                final byte[] hdrbuf = new byte[4 * (nblocks + 1) + 4]; // plus 4 bytes for checksum
+//                if (hdrbuf.length > m_maxFixedAlloc) {
+//                    if (log.isInfoEnabled()) {
+//                        log.info("LARGE BLOB - header is BLOB");
+//                    }
+//                }
+//                
+//                getData(rwaddr, hdrbuf); // will work even if header is also a blob
+//                
+//                // deferFree header
+//                deferFree(rwaddr, hdrbuf.length);
+//                
+//                // Now read all blob part addresses
+//                final DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
+//                final int rhdrs = hdrstr.readInt();
+//                if (rhdrs != nblocks) {
+//                    throw new IllegalStateException(
+//                            "Incompatible BLOB header record, expected: "
+//                                    + nblocks + ", got: " + rhdrs);
+//                }
+//                
+//                int remaining = sze;
+//                int partSize = alloc;
+//                for (int i = 0; i < nblocks; i++) {
+//                    final int blobpartAddr = hdrstr.readInt();
+//                    // deferFree(blobpartAddr, partSize);
+//                    m_deferredFreeOut.writeInt(blobpartAddr);             
+//                    
+//                    remaining -= partSize;
+//                    
+//                    if (remaining < partSize) {
+//                    	partSize = remaining;
+//                    }                  
+//                }
+
             } else {
                 m_deferredFreeOut.writeInt(rwaddr);             
             }
