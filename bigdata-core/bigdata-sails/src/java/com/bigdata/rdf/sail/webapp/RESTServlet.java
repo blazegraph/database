@@ -67,6 +67,7 @@ public class RESTServlet extends BigdataRDFServlet {
     private UpdateServlet m_updateServlet;
     private WorkbenchServlet m_workbenchServlet;
     private BlueprintsServletProxy m_blueprintsServlet;
+    private MapgraphServletProxy m_mapgraphServlet;
     
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
@@ -93,15 +94,29 @@ public class RESTServlet extends BigdataRDFServlet {
         m_describeServlet = new DescribeCacheServlet();
         m_workbenchServlet = new WorkbenchServlet();
         
-        final String provider = this
-				.getInitParameter(ConfigParams.BLUEPRINTS_SERVLET_PROVIDER); 
-       
-		final String blueprintsProvider = provider == null
-				|| provider.equals("") ? ConfigParams.DEFAULT_BLUEPRINTS_SERVLET_PROVIDER
-				: provider;
-        
-		m_blueprintsServlet = BlueprintsServletProxy.BlueprintsServletFactory
-				.getInstance(blueprintsProvider);
+        {
+            final String provider = this
+    				.getInitParameter(ConfigParams.BLUEPRINTS_SERVLET_PROVIDER); 
+           
+    		final String blueprintsProvider = provider == null
+    				|| provider.equals("") ? ConfigParams.DEFAULT_BLUEPRINTS_SERVLET_PROVIDER
+    				: provider;
+            
+            m_blueprintsServlet = BlueprintsServletProxy.BlueprintsServletFactory
+                    .getInstance(blueprintsProvider);
+        }
+
+        {
+            final String provider = this
+                    .getInitParameter(ConfigParams.MAPGRAPH_SERVLET_PROVIDER); 
+           
+            final String mapgraphProvider = provider == null
+                    || provider.equals("") ? ConfigParams.DEFAULT_MAPGRAPH_SERVLET_PROVIDER
+                    : provider;
+            
+            m_mapgraphServlet = MapgraphServletProxy.MapgraphServletFactory
+                .getInstance(mapgraphProvider);
+        }
 
         m_queryServlet.init(getServletConfig());
         m_insertServlet.init(getServletConfig());
@@ -110,6 +125,7 @@ public class RESTServlet extends BigdataRDFServlet {
         m_describeServlet.init(getServletConfig());
         m_workbenchServlet.init(getServletConfig());
         m_blueprintsServlet.init(getServletConfig());
+        m_mapgraphServlet.init(getServletConfig());
         
     }
     
@@ -152,6 +168,11 @@ public class RESTServlet extends BigdataRDFServlet {
         if (m_blueprintsServlet != null) {
             m_blueprintsServlet.destroy();
             m_blueprintsServlet = null;
+        }
+
+        if (m_mapgraphServlet != null) {
+            m_mapgraphServlet.destroy();
+            m_mapgraphServlet = null;
         }
 
         super.destroy();
@@ -271,6 +292,10 @@ public class RESTServlet extends BigdataRDFServlet {
         } else if (req.getParameter(BlueprintsServletProxy.ATTR_BLUEPRINTS) != null) {
             
             m_blueprintsServlet.doPostRequest(req, resp);
+            
+        } else if (req.getParameter(MapgraphServletProxy.ATTR_MAPGRAPH) != null) {
+            
+            m_mapgraphServlet.doPostRequest(req, resp);
             
         } else if (req.getParameter("uri") != null) {
 
