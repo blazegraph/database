@@ -84,6 +84,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.FileChannelUtility.AsyncTransfer;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.MergeStreamWithSnapshotData;
@@ -2162,40 +2163,70 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	                        getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
 	                        cursor += rdlen-4; // but only increase cursor by data
 	                    }
-                    } else { // s_readBlobsAsync
-                    	final Path fpath = Paths.get(m_fd.getAbsolutePath());
-	                    final AsynchronousFileChannel channel = AsynchronousFileChannel.open(fpath, StandardOpenOption.READ);
-						try {
-							final ArrayList<Future> reads = new ArrayList<Future>();
+//                    } else { // s_readBlobsAsync
+//	                    final AsynchronousFileChannel channel = m_reopener.getAsyncChannel();
+//						final ArrayList<Future<Integer>> reads = new ArrayList<Future<Integer>>();
+//						try {
+//							int cursor = 0;
+//							int rdlen = m_maxFixedAlloc;
+//							int cacheReads = 0;
+//							for (int i = 0; i < nblocks; i++) {
+//								if (i == (nblocks - 1)) {
+//									rdlen = length - cursor;
+//								}
+//								final ByteBuffer bb = ByteBuffer.wrap(buf,
+//										cursor, rdlen-4); // strip off checksum to avoid overlapping buffer reads!
+//								final long paddr = physicalAddress(blobHdr[i]);
+//								final ByteBuffer cache = m_writeCacheService._readFromCache(paddr, rdlen);
+//								if (cache != null) {
+//									bb.put(cache); // write cached data!
+//									cacheReads++;
+//								} else {
+//									reads.add(channel.read(bb,
+//											paddr));
+//								}
+//								cursor += rdlen - 4; // but only increase cursor by data
+//							}
+//							for (Future<Integer> r : reads) {
+//								r.get();
+//							}
+//						} catch (Exception e) {
+//	                         throw new IOException("Error from async IO", e);
+//	    				} finally {
+//							for (Future r : reads) {
+//								r.cancel(true);
+//							}
+//	                    }
+					} else { // read non-cached data with FileChannelUtility
+						final ArrayList<AsyncTransfer> transfers = new ArrayList<AsyncTransfer>();
 							int cursor = 0;
 							int rdlen = m_maxFixedAlloc;
-							int cacheReads = 0;
 							for (int i = 0; i < nblocks; i++) {
 								if (i == (nblocks - 1)) {
 									rdlen = length - cursor;
 								}
 								final ByteBuffer bb = ByteBuffer.wrap(buf,
-										cursor, rdlen-4); // strip off checksum to avoid overlapping buffer reads!
+										cursor, rdlen - 4); // strip off
+															// checksum to avoid
+															// overlapping
+															// buffer reads!
 								final long paddr = physicalAddress(blobHdr[i]);
-								final ByteBuffer cache = m_writeCacheService._readFromCache(paddr, rdlen);
+								final ByteBuffer cache;
+								try {
+									cache = m_writeCacheService._readFromCache(paddr, rdlen);
+								} catch (Exception e) {
+									throw new IOException("Error from async IO", e);
+								}
 								if (cache != null) {
 									bb.put(cache); // write cached data!
-									cacheReads++;
 								} else {
-									reads.add(channel.read(bb,
-											paddr));
+									transfers.add(new AsyncTransfer(paddr, bb));
 								}
-								cursor += rdlen - 4; // but only increase cursor by data
+								cursor += rdlen - 4; // but only increase cursor
+														// by data
 							}
-							for (Future r : reads) {
-								r.get();
-							}
-						} catch (Exception e) {
-	                         throw new IOException("Error from async IO", e);
-	    				} finally {
-	                    	channel.close();
-	                    }
-                    }
+							FileChannelUtility.readAllAsync(m_reopener, transfers);
+					}
                     
                     return;
                     
@@ -4846,14 +4877,18 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * backing store.
      */
     private class ReopenFileChannel implements
-            IReopenChannel<FileChannel> {
+            IReopenChannel<FileChannel>, FileChannelUtility.IAsyncOpener {
 
         final private File file;
 
         private final String mode;
 
         private volatile RandomAccessFile raf;
+        
+        private final Path path;
 
+        private volatile AsynchronousFileChannel asyncChannel;
+        
         public ReopenFileChannel(final File file, final RandomAccessFile raf,
                 final String mode) throws IOException {
 
@@ -4862,9 +4897,26 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             this.mode = mode;
             
             this.raf = raf;
+            
+            this.path = Paths.get(file.getAbsolutePath());
 
             reopenChannel();
 
+        }
+        
+        public AsynchronousFileChannel getAsyncChannel() {
+        	if (asyncChannel != null) {
+        		if (asyncChannel.isOpen())
+        			return asyncChannel;
+        	}
+        	
+        	try {
+				asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+        	
+        	return asyncChannel;
         }
 
         public String toString() {

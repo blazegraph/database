@@ -1996,7 +1996,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 		
-		public void notest_stressBlobReadBack() {
+		public void test_stressBlobReadBack() {
 			for (int i = 0; i < 100; i++) {
 				test_blob_readBack();
 			}
@@ -2052,6 +2052,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				// RWStore.reset() no longer resets the write cache, we need to do that explicitly!
 				rw.getWriteCacheService().resetAndClear();
+				rw.getWriteCacheService().setExtent(rw.getStoreFile().length());
 
 				rdBuf = bs.read(faddr);
 				assertEquals(bb, rdBuf);
