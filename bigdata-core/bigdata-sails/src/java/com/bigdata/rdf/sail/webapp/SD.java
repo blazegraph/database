@@ -194,6 +194,19 @@ public class SD {
             + "ScaleOut");
 
     /**
+     * This indicates that the namespace is compatible with mapgraph (aka GPU)
+     * acceleration, but this does not indicate whether or not the namespace is
+     * currently loaded in the mapgraph-runtime.
+     */
+    static public final URI MapgraphCompatible = new URIImpl(BDFNS + "MapgraphCompatible");
+
+    /**
+     * This indicates that the namespace is currently loaded within the
+     * mapgraph-runtime.
+     */
+    static public final URI MapgraphAcceleration = new URIImpl(BDFNS + "MapgraphAcceleration");
+
+    /**
      * The <code>namespace</code> for this KB instance as configured by the
      * {@link BigdataSail.Options#NAMESPACE} property.
      */
@@ -677,6 +690,18 @@ public class SD {
 
         }
 
+        if (isMapgraphCompatible()) {
+
+            g.add(aService, SD.feature, MapgraphCompatible);
+
+            if (isMapgraphAccelerated()) {
+
+                g.add(aService, SD.feature, MapgraphAcceleration);
+
+            }
+
+        }
+
         {
 
             final IIndexManager indexManager = tripleStore.getIndexManager();
@@ -738,15 +763,37 @@ public class SD {
     }
 
     /**
-     * Return true iff the namespace is compatible with GPU acceleration.
+     * Return true iff the namespace is compatible with mapgraph acceleration.
      * 
      * @see https://github.com/SYSTAP/bigdata-gpu/issues/134 (Need means to
      *      publish/update/drop graph in the mapgraph-runtime)
      */
-    boolean isGpuCompatible() {
+    boolean isMapgraphCompatible() {
 
         final IFeatureSupported obj = ClassPathUtil.classForName(//
                 "com.blazegraph.rdf.gpu.MapgraphCompatibleNamespace", // preferredClassName,
+                null, // defaultClass,
+                IFeatureSupported.class, // sharedInterface,
+                getClass().getClassLoader() // classLoader
+        );
+
+        if (obj == null)
+            return false;
+
+        return obj.isSupported(tripleStore);
+
+    }
+    
+    /**
+     * Return true iff the namespace is currently loaded in the mapgraph runtime.
+     * 
+     * @see https://github.com/SYSTAP/bigdata-gpu/issues/134 (Need means to
+     *      publish/update/drop graph in the mapgraph-runtime)
+     */
+    boolean isMapgraphAccelerated() {
+
+        final IFeatureSupported obj = ClassPathUtil.classForName(//
+                "com.blazegraph.rdf.gpu.MapgraphAcceleratedNamespace", // preferredClassName,
                 null, // defaultClass,
                 IFeatureSupported.class, // sharedInterface,
                 getClass().getClassLoader() // classLoader
