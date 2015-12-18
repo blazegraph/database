@@ -82,6 +82,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.ClassPathUtil;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -215,6 +216,11 @@ public class StatusServlet extends BigdataRDFServlet {
      * Request basic server health information.
      */
     static final String HEALTH = "health";
+    
+    /**
+     * Request information on the mapgraph-runtime.
+     */
+    static final String MAPGRAPH = "mapgraph";
     
     /**
      * Handles CANCEL requests (terminate a running query).
@@ -455,18 +461,33 @@ public class StatusServlet extends BigdataRDFServlet {
                 && getIndexManager() instanceof AbstractJournal
         		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
 
-            HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doHAStatus(req, resp);
+            new HAStatusServletUtilProxy.HAStatusServletUtilFactory().getInstance(getIndexManager()).doHAStatus(req, resp);
 
             return;
         }
 
-      if (req.getParameter(HEALTH) != null) {
+        if (req.getParameter(HEALTH) != null) {
 
-    	  HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doHealthStatus(req, resp);
+            new HAStatusServletUtilProxy.HAStatusServletUtilFactory().getInstance(getIndexManager()).doHealthStatus(req,
+                    resp);
 
-         return;
-      }
-      
+            return;
+        }
+
+        if (req.getParameter(MAPGRAPH) != null) {
+
+            final IServletDelegate delegate = ClassPathUtil.classForName(//
+                        "com.blazegraph.gpu.webapp.MapgraphStatusServletDelegate", // preferredClassName,
+                        ServletDelegateBase.class, // defaultClass,
+                        IServletDelegate.class, // sharedInterface,
+                        getClass().getClassLoader() // classLoader
+                );
+
+            delegate.doGet(req, resp);
+
+            return;
+        }
+
 		final String acceptHeader = ConnegUtil
 				.getMimeTypeForQueryParameterServiceRequest(
 						req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
@@ -686,7 +707,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 if (quorum != null) {//&& quorum.isHighlyAvailable()) {
 
-                	HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doGet(req, resp,
+                	new HAStatusServletUtilProxy.HAStatusServletUtilFactory().getInstance(getIndexManager()).doGet(req, resp,
                             current);
 
                 }

@@ -2714,7 +2714,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
 
-	/*package*/ List<String> getNamespacesTx(long tx) {
+	public List<String> getNamespacesTx(long tx) {
 
 		final IIndexManager indexManager = getIndexManager();
 		
