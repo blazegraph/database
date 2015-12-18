@@ -201,6 +201,7 @@ dependencies.
     <module>../sparql-grammar</module>
     <module>../bigdata-util</module>
     <module>../bigdata-common-util</module>
+    <module>../bigdata-statics</module>
     <module>../bigdata-cache</module>
     <module>../bigdata-client</module>
     <module>../bigdata-ganglia</module>
