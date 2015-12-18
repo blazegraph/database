@@ -115,12 +115,27 @@ public class HAStatusServletUtilProxy {
 	
 	public static class HAStatusServletUtilFactory {
 		
-		public static HAStatusServletUtilProxy getInstance(IIndexManager indexManager) {
+		public /*static*/ HAStatusServletUtilProxy getInstance(IIndexManager indexManager) {
 			return getInstance(DEFAULT_PROVIDER, indexManager);
 		}
-		
-		public static HAStatusServletUtilProxy getInstance(final String provider, IIndexManager indexManager) {
+
+		/*
+         * TODO This uses an unknown classloader . I suggest changing things (as
+         * I have) to make the getInstance() method non-static and use the
+         * ClassPathUtil as indicated so it uses the class loader of the caller.
+         * Rather than initialize the proxy servlet with the IIndexManager in
+         * the constructor, the caller can just attach this as a servlet request
+         * attribute and pass it through that way.
+         */
+		public HAStatusServletUtilProxy getInstance(final String provider, IIndexManager indexManager) {
 			
+//            return ClassPathUtil.classForName(//
+//                    provider, // preferredClassName,
+//                    HAStatusServletUtilProxy.class, // defaultClass,
+//                    HAStatusServletUtilProxy.class, // sharedInterface,
+//                    getClass().getClassLoader() // classLoader
+//            );
+            
 			try {
 				final Class<?> c = Class.forName(provider);
 				final Constructor<?> cons = c.getConstructor(IIndexManager.class);
