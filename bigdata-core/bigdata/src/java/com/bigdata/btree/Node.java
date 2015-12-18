@@ -2586,6 +2586,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * for this case.
              */
 
+            // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss).
+            btree.getBtreeCounters().cacheMisses.increment();
+            
             return _getChild(index, null/* req */);
 
         }
@@ -2628,7 +2631,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * the Memoizer and then return the new value of childRefs[index].
          */
 
-        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        /*
+         * See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+         * 
+         * Note: This is done in the caller rather than _getChild() since the
+         * latter may be called from the memoizer, in which case only one thread
+         * will actually invoke _getChild() while the others will just obtain
+         * the child through the memoized Future.
+         */
         btree.getBtreeCounters().cacheMisses.increment();
         
         return btree.loadChild(this, index);

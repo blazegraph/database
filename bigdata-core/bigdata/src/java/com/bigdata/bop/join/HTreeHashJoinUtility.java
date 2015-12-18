@@ -225,6 +225,22 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
 
+    protected AtomicBoolean getOpen() {
+        return open;
+    }
+
+    protected IVBindingSetEncoderWithIVCache getEncoder() {
+        return encoder;
+    }
+
+    protected long getNoJoinVarsLimit() {
+        return noJoinVarsLimit;
+    }
+    
+    protected boolean getOutputDistintcJVs() {
+        return outputDistinctJVs;
+    }
+    
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.
      */
@@ -332,22 +348,22 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     /**
      * The #of left solutions considered for a join.
      */
-    private final CAT nleftConsidered = new CAT();
+    protected final CAT nleftConsidered = new CAT();
 
     /**
      * The #of right solutions considered for a join.
      */
-    private final CAT nrightConsidered = new CAT();
+    protected final CAT nrightConsidered = new CAT();
 
     /**
      * The #of solution pairs considered for a join.
      */
-    private final CAT nJoinsConsidered = new CAT();
+    protected final CAT nJoinsConsidered = new CAT();
     
     /**
      * The hash index.
      */
-    private HTree getRightSolutions() {
+    protected HTree getRightSolutions() {
         
         return rightSolutions.get();
         
@@ -358,7 +374,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * maintained iff the join is optional and is <code>null</code>
      * otherwise.
      */
-    private HTree getJoinSet() {
+    protected HTree getJoinSet() {
 
         return joinSet.get();
         
@@ -422,7 +438,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     }
 
-    private long getJoinSetSize() {
+    protected long getJoinSetSize() {
 
         final HTree htree = getJoinSet();
 
@@ -481,7 +497,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Setup the {@link IndexMetadata} for {@link #rightSolutions} or
      * {@link #joinSet}.
      */
-    static private HTreeIndexMetadata getIndexMetadata(final PipelineOp op) {
+    protected static HTreeIndexMetadata getIndexMetadata(final PipelineOp op) {
 
 		final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
 				UUID.randomUUID());
@@ -720,6 +736,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     public long acceptSolutions(final ICloseableIterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
+        if (!open.get())
+            throw new IllegalStateException();
+        
         if (itr == null)
             throw new IllegalArgumentException();
         
@@ -924,7 +943,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * 
      * @return The decoded {@link IBindingSet}.
      */
-    private IBindingSet decodeSolution(final ITuple<?> t) {
+    protected IBindingSet decodeSolution(final ITuple<?> t) {
         
         final ByteArrayBuffer b = t.getValueBuffer();
 
@@ -937,11 +956,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Glue class for hash code and binding set used when the hash code is for
      * just the join variables rather than the entire binding set.
      */
-    private static class BS implements Comparable<BS> {
+    public static class BS implements Comparable<BS> {
 
-        final private int hashCode;
+        final int hashCode;
 
-        final private IBindingSet bset;
+        final IBindingSet bset;
 
         BS(final int hashCode, final IBindingSet bset) {
             this.hashCode = hashCode;
@@ -969,11 +988,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Glue class for hash code and encoded binding set used when we already
      * have the binding set encoded.
      */
-    private static class BS2 implements Comparable<BS2> {
+    static class BS2 implements Comparable<BS2> {
 
-        final private int hashCode;
+        final int hashCode;
 
-        final private byte[] value;
+        final byte[] value;
 
         BS2(final int hashCode, final byte[] value) {
             this.hashCode = hashCode;
@@ -1023,6 +1042,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final IBuffer<IBindingSet> outputBuffer,//
             final IConstraint[] constraints//
             ) {
+        
+        if (!open.get())
+            throw new IllegalStateException();
+
 
         // Note: We no longer rechunk in this method.
         final Iterator<IBindingSet[]> it;
@@ -1134,7 +1157,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                          * Visit all source solutions having the same hash code.
                          * 
                          * @see <a
-                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/763#comment:19">
+                         *      href="https://jira.blazegraph.com/browse/BLZG-848">
                          *      Stochastic results with Analytic Query Mode)
                          *      </a>
                          * 
@@ -1364,7 +1387,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * 
      * @return The vectored chunk of solutions ordered by hash code.
      */
-    private BS[] vector(final IBindingSet[] leftSolutions,
+    protected BS[] vector(final IBindingSet[] leftSolutions,
             final IVariable<?>[] joinVars,
             final IVariable<?>[] selectVars,
             final boolean ignoreUnboundVariables,
@@ -1437,7 +1460,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Note: the hash key is based on the entire solution (not just the join
      * variables). The values are the full encoded {@link IBindingSet}.
      */
-    private void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
+    protected void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
 
         final HTree joinSet = this.getJoinSet();
 
@@ -1488,6 +1511,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     
     @Override
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
+
+        if (!open.get())
+            throw new IllegalStateException();
 
         try {
 
@@ -1655,6 +1681,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     @Override
     public void outputSolutions(final IBuffer<IBindingSet> out) {
+
+        if (!open.get())
+            throw new IllegalStateException();
 
        try {
 

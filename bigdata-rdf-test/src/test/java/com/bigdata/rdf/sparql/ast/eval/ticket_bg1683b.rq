@@ -1,0 +1,11 @@
+Select distinct * where {
+
+  hint:Query hint:analytic "false" .
+
+  <http://s> <http://p1> ?o1 .
+  
+  OPTIONAL {
+    <http://s> <http://p2> ?o2 .
+    <http://s> <http://p3> ?o3 .
+  }
+}

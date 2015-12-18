@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import info.aduna.iteration.CloseableIteration;
-
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -46,6 +44,7 @@ import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.UpdateExecutionException;
@@ -72,7 +71,6 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -86,6 +84,7 @@ import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.cache.DescribeBindingsCollector;
 import com.bigdata.rdf.sparql.ast.cache.DescribeCacheUpdater;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution.DeferredResolutionResult;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -93,6 +92,7 @@ import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
+import info.aduna.iteration.CloseableIteration;
 
 /**
  * Helper class for evaluating SPARQL queries.
@@ -109,40 +109,6 @@ public class ASTEvalHelper {
     private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
 
     /**
-     * Batch resolve {@link Value}s to {@link IV}s.
-     * 
-     * @param store
-     *            The KB instance.
-     * @param bs
-     *            The binding set (may be empty or <code>null</code>).
-     * 
-     * @return A binding set having resolved {@link IV}s.
-     * 
-     * @throws QueryEvaluationException
-     */
-    static //private Note: Exposed to CBD class. 
-    IBindingSet batchResolveIVs(final AbstractTripleStore store,
-            final BindingSet bs) throws QueryEvaluationException {
-
-        if (bs == null || bs.size() == 0) {
-
-            // Use an empty binding set.
-            return new ListBindingSet();
-            
-        }
-
-        final Object[] tmp = new BigdataValueReplacer(store).replaceValues(
-                null/* dataset */, new BindingSet[] { bs });
-
-        final BindingSet[] a = (BindingSet[]) tmp[1];
-
-        final BindingSet tmp2 = a[0];
-        
-        return toBindingSet(tmp2);
-
-    }
-    
-    /**
      * Evaluate a boolean query.
      * 
      * @param store
@@ -158,8 +124,23 @@ public class ASTEvalHelper {
      */
     static public boolean evaluateBooleanQuery(
             final AbstractTripleStore store,
-            final ASTContainer astContainer, final BindingSet globallyScopedBS)
+            final ASTContainer astContainer,
+            final BindingSet globallyScopedBS,
+            final Dataset dataset)
             throws QueryEvaluationException {
+
+        final DeferredResolutionResult resolved;
+        try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
+            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
+
+        if (resolved.dataset != null) {
+            astContainer.getOriginalAST().setDataset(
+                new DatasetNode(resolved.dataset, false/* update */));
+        }
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -167,8 +148,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -219,8 +199,23 @@ public class ASTEvalHelper {
      * @throws QueryEvaluationException
      */
     static public TupleQueryResult evaluateTupleQuery(
-            final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
+            final AbstractTripleStore store,
+            final ASTContainer astContainer,
+            final QueryBindingSet globallyScopedBS,
+            final Dataset dataset) throws QueryEvaluationException {
+
+        final DeferredResolutionResult resolved;
+        try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
+            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
+
+        if (resolved.dataset != null) {
+            astContainer.getOriginalAST().setDataset(
+                new DatasetNode(resolved.dataset, false/* update */));
+        }
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -228,8 +223,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -307,8 +301,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(globallyScopedBS) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -431,8 +424,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(globallyScopedBS) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
@@ -471,8 +463,23 @@ public class ASTEvalHelper {
      *      DESCRIBE CACHE </a>
      */
     public static GraphQueryResult evaluateGraphQuery(
-            final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
+            final AbstractTripleStore store,
+            final ASTContainer astContainer,
+            final QueryBindingSet globallyScopedBS,
+            final Dataset dataset) throws QueryEvaluationException {
+
+        final DeferredResolutionResult resolved;
+        try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
+            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
+
+        if (resolved.dataset != null) {
+            astContainer.getOriginalAST().setDataset(
+                new DatasetNode(resolved.dataset, false/* update */));
+        }
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -480,8 +487,7 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = 
-              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
@@ -805,21 +811,25 @@ public class ASTEvalHelper {
      * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}.
      * 
      * @param src
-     *            The {@link BindingSet}.
-     *            
-     * @return The {@link IBindingSet}.
+     *            The {@link BindingSet} (optional).
+     * 
+     * @return The {@link IBindingSet}. When the source is null or empty, an
+     *         empty {@link ListBindingSet} is returned.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static IBindingSet toBindingSet(final BindingSet src) {
+    private static IBindingSet[] toBindingSet(final BindingSet src) {
         
-        if (src == null)
-            throw new IllegalArgumentException();
+        if (src == null || src.size() == 0) {
+            
+            return new IBindingSet[] { new ListBindingSet() };
+
+        }
 
         final ListBindingSet bindingSet = new ListBindingSet();
 
         final Iterator<Binding> itr = src.iterator();
 
-        while(itr.hasNext()) {
+        while (itr.hasNext()) {
 
             final Binding binding = itr.next();
 
@@ -833,7 +843,7 @@ public class ASTEvalHelper {
             
         }
         
-        return bindingSet;
+        return new IBindingSet[]{ bindingSet };
 
     }
     
@@ -1050,6 +1060,14 @@ public class ASTEvalHelper {
         if(astContainer == null)
             throw new IllegalArgumentException();
         
+        final DeferredResolutionResult resolved;
+        try {
+        	// @see https://jira.blazegraph.com/browse/BLZG-1176
+            resolved = ASTDeferredIVResolution.resolveUpdate(conn.getTripleStore(), astContainer, bs, dataset);
+        } catch (MalformedQueryException e) {
+            throw new UpdateExecutionException(e.getMessage(), e);
+        }
+
         try {
 
             if (dataset != null) {
@@ -1058,7 +1076,7 @@ public class ASTEvalHelper {
                  * Apply the optional data set override.
                  */
 
-                applyDataSet(conn.getTripleStore(), astContainer, dataset);
+                applyDataSet(conn.getTripleStore(), astContainer, resolved.dataset);
                 
             }
 
@@ -1071,14 +1089,12 @@ public class ASTEvalHelper {
             ctx.setIncludeInferred(includeInferred);
             
             // Batch resolve Values to IVs and convert to bigdata binding set.
-            final IBindingSet[] bindingSets = //mergeBindingSets(astContainer,
-                    new IBindingSet[] {
-                        batchResolveIVs(conn.getTripleStore(), bs)
-                    };
+            final IBindingSet[] bindingSets = toBindingSet(resolved.bindingSet) ;
             
-            // Propogate bindings
+            // Propagate bindings
             ctx.setQueryBindingSet(bs);
             ctx.setBindings(bindingSets);
+            ctx.setDataset(dataset);
 
             /*
              * Convert the query (generates an optimized AST as a side-effect).
@@ -1137,14 +1153,14 @@ public class ASTEvalHelper {
          * Batch resolve RDF Values to IVs and then set on the query model.
          */
 
-        final Object[] tmp = new BigdataValueReplacer(tripleStore)
-                .replaceValues(dataset, null/* bindings */);
+//        final Object[] tmp = new BigdataValueReplacer(tripleStore)
+//                .replaceValues(dataset, null/* bindings */);
 
         /*
          * Set the data set on the original AST.
          */
         
-        final Dataset resolvedDataset = (Dataset) tmp[0];
+//        final Dataset resolvedDataset = (Dataset) tmp[0];
 
         final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
         
@@ -1154,7 +1170,7 @@ public class ASTEvalHelper {
             
                 final IDataSetNode node = ((IDataSetNode) op);
 
-                node.setDataset(new DatasetNode(resolvedDataset, true/* update */));
+                node.setDataset(new DatasetNode(dataset, true/* update */));
                 
             }
             

@@ -1,0 +1,5 @@
+<http://s0> <http://p> "0"^^<http://www.bigdata.com/rdf/datatype#compressedTimestamp> .
+<http://s1> <http://p> "1"^^<http://www.bigdata.com/rdf/datatype#compressedTimestamp> .
+<http://s2> <http://p> "2"^^<http://www.bigdata.com/rdf/datatype#compressedTimestamp> .
+<http://s10> <http://p> "10"^^<http://www.bigdata.com/rdf/datatype#compressedTimestamp> .
+<http://s20> <http://p> "20"^^<http://www.bigdata.com/rdf/datatype#compressedTimestamp> .

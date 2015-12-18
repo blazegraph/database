@@ -303,23 +303,34 @@ public class Banner {
      */
     public interface BuildInfoMeta {
         /** The bigdata release version. */
-        String buildVersion = "buildVersion";
+        static final String buildVersion = "buildVersion";
         /** The source code revision. */
-        String svnRevision = "svnRevision";
+        static final String svnRevision = "svnRevision";
         /** The source code repository URL for the branch. */
-        String svnURL = "svnURL";
+        static final String svnURL = "svnURL";
         /** The timestamp of the build. */
-        String buildTimestamp = "buildTimestamp";
+        static final String buildTimestamp = "buildTimestamp";
         /** The username that performed the build. */
-        String buildUser = "buildUser";
+        static final String buildUser = "buildUser";
         /** The hostname on which the build was performed. */
-        String buildHost = "buildHost";
+        static final String buildHost = "buildHost";
         /** The OS architecture on which the build was performed. */
-        String osArch = "osArch";
+        static final String osArch = "osArch";
         /** The OS name on which the build was performed. */
-        String osName = "osName";
+        static final String osName = "osName";
         /** The OS version on which the build was performed. */
-        String osVersion = "osVersion";
+        static final String osVersion = "osVersion";
+        /** The string representing the git build branch. */
+        static final String gitBranch = "gitBranch"; 
+        /** 
+         * The string representing the git build commit. 
+         * 
+         * This is the output of git  git rev-parse --verify HEAD
+         * 
+         * See BLZG-1688
+         * 
+         */
+        static final String gitCommit = "gitCommit"; 
     }
     
     /**
@@ -418,7 +429,10 @@ public class Banner {
 
         s.append("\nbuildVersion=" + getBuildInfo().get(BuildInfoMeta.buildVersion));
 
-//        s.append("\nsvnRevision =" + getBuildInfo().get("svnRevision"));
+        //BLZG-1688
+        if(getBuildInfo().get(BuildInfoMeta.gitCommit) != null) {
+        	s.append("\ngitCommit=" + getBuildInfo().get(BuildInfoMeta.gitCommit));
+        }
         
         return s.toString();
 

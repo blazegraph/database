@@ -381,13 +381,15 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         final TermNode newContext = (TermNode) node.jjtGetChild(0).jjtAccept(
                 this, null);
 
-        if (!context.tripleStore.isQuads()) {
-           if (newContext!=null) {
-               throw new QuadsOperationInTriplesModeException(
-                   "Use of GRAPH construct in query body is not supported "
-                   + "in triples mode.");
-           }
-        }
+        // @see https://jira.blazegraph.com/browse/BLZG-1176
+        // moved to ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
+//        if (!context.tripleStore.isQuads()) {
+//           if (newContext!=null) {
+//               throw new QuadsOperationInTriplesModeException(
+//                   "Use of GRAPH construct in query body is not supported "
+//                   + "in triples mode.");
+//           }
+//        }
 
         graphPattern.setContextVar(newContext);
         graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);

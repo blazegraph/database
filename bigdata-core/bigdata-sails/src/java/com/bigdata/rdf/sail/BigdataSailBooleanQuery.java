@@ -28,21 +28,6 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     }
 
     @Override
-    public void setDataset(final Dataset dataset) {
-
-        /*
-         * Batch resolve RDF Values to IVs and then set on the query model.
-         */
-
-        final Object[] tmp = new BigdataValueReplacer(getTripleStore())
-                .replaceValues(dataset, null/* bindings */);
-
-        astContainer.getOriginalAST().setDataset(
-                new DatasetNode((Dataset) tmp[0], false/* update */));
-
-    }
-
-    @Override
     public String toString() {
 
         return astContainer.toString();
@@ -91,7 +76,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
 
         final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
                 getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
+                        getBindings()), getDataset());
 
         return queryResult;
     }
