@@ -34,6 +34,11 @@ public class ClassPathUtil {
 
 	private static final Logger log = Logger.getLogger(ClassPathUtil.class);
 
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static private boolean DEBUG = log.isDebugEnabled();
+    
 	public static <T> T classForName(final String preferredClassName, final Class<T> defaultClass,
 			final Class<T> sharedInterface) {
 		
@@ -123,8 +128,8 @@ public class ClassPathUtil {
 
 			// Could not find preferred class.  Will use default instance.  Do NOT log @ WARN.
 			
-			if (log.isInfoEnabled()) {
-				log.info("Not found: " + preferredClassName);
+			if (DEBUG) {
+				log.debug("Not found: " + preferredClassName);
 			}
 			
 			// fall through
@@ -144,8 +149,8 @@ public class ClassPathUtil {
 
 		try {
 
-			if (log.isInfoEnabled()) {
-				log.info("Using defaultClass: " + defaultClass.getCanonicalName());
+			if (DEBUG) {
+				log.debug("Using defaultClass: " + defaultClass.getCanonicalName());
 			}
 
 			// Return an instance of the default class.
