@@ -30,13 +30,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.util.ClassPathUtil;
 
 public class MapgraphServletProxy extends BigdataRDFServlet {
 	
@@ -65,31 +65,48 @@ public class MapgraphServletProxy extends BigdataRDFServlet {
 		
 	}
 	
+	/**
+     * Factory pattern for a servlet that is discovered at runtime. Either the
+     * real servlet or its base class (the proxy servlet) will be returned by
+     * the factory. This is used by the {@link RESTServlet} to discover,
+     * initialize, delegate, and destroy such servlets using a runtime discovery
+     * pattern.
+     * 
+     * @author beebs
+     * @author bryan
+     */
 	public static class MapgraphServletFactory {
 		
-		public static MapgraphServletProxy getInstance() {
+		public MapgraphServletProxy getInstance() {
 			return getInstance(DEFAULT_PROVIDER);
 		}
 		
-		public static MapgraphServletProxy getInstance(final String provider) {
-			
-			try {
-				final Class<?> c = Class.forName(provider);
-				final Constructor<?> cons = c.getConstructor();
-				final Object object = cons.newInstance();
-				final MapgraphServletProxy proxy = (MapgraphServletProxy) object;
-				return proxy;
-			} catch (ClassNotFoundException | NoSuchMethodException
-					| SecurityException | InstantiationException
-					| IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException e) {
-				if (log.isDebugEnabled()) {
-					log.debug(e.toString());
-				}
-				//If we're running without the mapgraph package, just return a proxy.
-				return new MapgraphServletProxy();
-				
-			}
+		public MapgraphServletProxy getInstance(final String provider) {
+
+		    return ClassPathUtil.classForName(//
+		                provider, // preferredClassName,
+		                MapgraphServletProxy.class, // defaultClass,
+		                MapgraphServletProxy.class, // sharedInterface,
+		                getClass().getClassLoader() // classLoader
+		        );
+
+//			try {
+//				final Class<?> c = Class.forName(provider);
+//				final Constructor<?> cons = c.getConstructor();
+//				final Object object = cons.newInstance();
+//				final MapgraphServletProxy proxy = (MapgraphServletProxy) object;
+//				return proxy;
+//			} catch (ClassNotFoundException | NoSuchMethodException
+//					| SecurityException | InstantiationException
+//					| IllegalAccessException | IllegalArgumentException
+//					| InvocationTargetException e) {
+//				if (log.isDebugEnabled()) {
+//					log.debug(e.toString());
+//				}
+//				//If we're running without the mapgraph package, just return a proxy.
+//				return new MapgraphServletProxy();
+//				
+//			}
 
 		}
 	}
