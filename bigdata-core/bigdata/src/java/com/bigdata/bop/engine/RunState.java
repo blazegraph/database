@@ -62,11 +62,28 @@ class RunState {
     static private final Logger log = Logger.getLogger(RunState.class);
 
     /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static private boolean INFO = log.isInfoEnabled();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static private boolean DEBUG = log.isDebugEnabled();
+    
+    /**
+     * True iff the {@link #log} level is TRACE or less.
+     */
+    final static private boolean TRACE = log.isTraceEnabled();
+    
+    /**
      * Inner class provides a 2nd logger used for tabular representations.
      */
     static private class TableLog {
 
         static private final Logger tableLog = Logger.getLogger(TableLog.class);
+
+        final static private boolean INFO = tableLog.isInfoEnabled();
 
     }
 
@@ -694,7 +711,7 @@ class RunState {
 //        }
         innerState.serviceIds.add(controllerId);
         
-        if (TableLog.tableLog.isInfoEnabled()) {
+        if (TableLog.INFO) {
 //            TableLog.tableLog.info("\n\nqueryId=" + queryId + "\n");
             
             TableLog.tableLog.info(getTableHeader());
@@ -703,10 +720,10 @@ class RunState {
                     null/* cause */, null/* stats */));
         }
 
-        if(log.isInfoEnabled())
+        if(INFO)
             log.info("startQ : " + toString());
 
-        if (log.isTraceEnabled())
+        if (TRACE)
             log.trace(msg.toString());
 
     }
@@ -752,16 +769,16 @@ class RunState {
         
         innerState.serviceIds.add(msg.getServiceId());
         
-        if (TableLog.tableLog.isInfoEnabled()) {
+        if (TableLog.INFO) {
             TableLog.tableLog.info(getTableRow("startOp", msg.getServiceId(),
                     msg.getBOpId(), msg.getPartitionId(), msg.getChunkMessageCount(),
                     null/* cause */, null/* stats */));
         }
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("startOp: " + toString() + " : bop=" + msg.getBOpId());
 
-        if (log.isTraceEnabled())
+        if (TRACE)
             log.trace(msg.toString());
 
         return firstTime;
@@ -945,18 +962,18 @@ class RunState {
 //        if (isAllDone && !isOpDone)
 //            throw new RuntimeException("Whoops!: "+this);
         
-        if (TableLog.tableLog.isInfoEnabled()) {
+        if (TableLog.INFO) {
             final int fanOut = msg.getSinkMessagesOut() + msg.getAltSinkMessagesOut();
             TableLog.tableLog.info(getTableRow("haltOp", msg.getServiceId(),
                     msg.getBOpId(), msg.getPartitionId(), fanOut, msg.getCause(),
                     msg.getStats()));
         }
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("haltOp : " + toString() + " : bop=" + msg.getBOpId()
                     + ",opRunState=" + state + ",queryAllDone=" + isAllDone);
 
-        if (log.isTraceEnabled())
+        if (TRACE)
             log.trace(msg.toString());
 
         if (msg.getCause() != null) {
@@ -1044,7 +1061,7 @@ class RunState {
 
                 if (runningCount != null && runningCount.get() != 0) {
 
-                    if (log.isDebugEnabled())
+                    if (DEBUG)
                         log.debug("Operator can be triggered: op=" + op
                                 + ", possible trigger=" + t + " is running.");
 
@@ -1067,7 +1084,7 @@ class RunState {
                 if (availableChunkCount != null
                         && availableChunkCount.get() != 0) {
 
-                    if (log.isDebugEnabled())
+                    if (DEBUG)
                         log.debug("Operator can be triggered: op=" + op
                                 + ", possible trigger=" + t + " has "
                                 + availableChunkCount + " chunks available.");
@@ -1087,7 +1104,7 @@ class RunState {
 					 * itself) requires at-once evaluation and has not yet run.
 					 */
 
-            		if (log.isDebugEnabled())
+            		if (DEBUG)
                         log.debug("Operator can be triggered: op=" + op
                                 + ", possible trigger=" + t
                                 + " awaiting at-once evaluation of predecessor.");
@@ -1111,7 +1128,7 @@ class RunState {
 	                // If null, then has not started lastPass evaluation.
 	                if (doneSet == null) {
 	
-	                    if (log.isDebugEnabled())
+	                    if (DEBUG)
 	                        log.debug("Operator can be triggered: op=" + op
 	                                + ", possible trigger=" + t
 	                                + " has not started last pass evaluation.");
@@ -1123,7 +1140,7 @@ class RunState {
 	                // If non-empty, then has not finished lastPass evaluation.
 	                if (!doneSet.isEmpty()) {
 	
-	                    if (log.isDebugEnabled())
+	                    if (DEBUG)
 	                        log.debug("Operator can be triggered: op=" + op
 	                                + ", possible trigger=" + t
 	                                + " awaiting last pass evaluation for doneSet="
@@ -1170,7 +1187,7 @@ class RunState {
             // If null, then has not started lastPass eval.
             if (doneSet == null) {
 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug("Operator will self-trigger last pass evaluation: op="
                             + op);
 
@@ -1202,7 +1219,7 @@ class RunState {
             // If non-empty, then has not finished lastPass eval.
             if (!doneSet.isEmpty()) {
 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug("Operator will self-trigger last pass evaluation: op="
                             + op
                             + ", awaiting last pass evaluation for doneSet="
@@ -1214,7 +1231,7 @@ class RunState {
             
         }
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Operator can not be triggered: op=" + op);
 
         return RunStateEnum.AllDone;
@@ -1256,7 +1273,7 @@ class RunState {
 		if (didStart) {
             
             // Evaluation has already run (or begun) for this operator.
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Already ran/running: " + bopId);
             
             return false;
@@ -1293,7 +1310,7 @@ class RunState {
 
                 if (runningCount != null && runningCount.get() != 0) {
 
-                    if (log.isDebugEnabled())
+                    if (DEBUG)
                         log.debug("Predecessor running: predecessorId=" + id
                                 + ", predecessorRunningCount=" + runningCount);
 
@@ -1320,7 +1337,7 @@ class RunState {
                      * We are looking at some other predecessor of the specified
                      * operator.
                      */
-                    if (log.isDebugEnabled())
+                    if (DEBUG)
                         log.debug("Predecessor can be triggered: predecessorId="
                                 + id + " has " + availableChunkCount
                                 + " chunks available.");
@@ -1333,7 +1350,7 @@ class RunState {
         }
 
         // Success.
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Ready for 'at-once' evaluation: " + bopId);
 
         return true;
