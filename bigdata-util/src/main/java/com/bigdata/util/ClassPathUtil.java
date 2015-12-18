@@ -43,53 +43,53 @@ public class ClassPathUtil {
 	}
 
 	/**
-	 * Return an instance of the shared interface. If possible, an instance of
-	 * the preferred class will be used. If that class is not found or is does
-	 * not extend the specified interface, then an instance of the default class
-	 * will be used.
-	 * 
-	 * @param preferredClassName
-	 *            The name of the preferred class to use. The class may need to
-	 *            have a zero argument public constructor in order to be
-	 *            instantiated by this this method.
-	 * @param defaultClass
-	 *            The default class to use (optional). When non-
-	 *            <code>null</code>, the default class must implement the shared
-	 *            interface.
-	 * @param sharedInterface
-	 *            An interface that the preferred class must implement if it is
-	 *            to be instantiated.
-	 * @param classLoader
-	 *            The class loader to use.
-	 * 
-	 * @return An instance of the preferred class if it can be found, implements
-	 *         the shared interface, and the security checks permit its
-	 *         instantiation -or- an instance of the default class (if given)
-	 *         and otherwise <code>null</code>.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the preferred class name is <code>null</code>.
-	 * @throws IllegalArgumentException
-	 *             if defaultClass is given and does not implement the shared
-	 *             interface.
-	 * @throws RuntimeException
-	 *             if an attempt to instantiate the default class results in a
-	 *             {@link SecurityException} or {@link IllegalAccessException}.
-	 */
+     * Return an instance of the shared interface. If possible, an instance of
+     * the preferred class will be used. If that class is not found or is does
+     * not extend the specified interface, then an instance of the default class
+     * will be used.
+     * 
+     * @param preferredClassName
+     *            The name of the preferred class to use. The class may need to
+     *            have a zero argument public constructor in order to be
+     *            instantiated by this this method.
+     * @param defaultClass
+     *            The default class to use (optional). When non-
+     *            <code>null</code>, the default class must implement the shared
+     *            interface.
+     * @param sharedClassOrInterface
+     *            A class or interface that the preferred class must implement
+     *            if it is to be instantiated.
+     * @param classLoader
+     *            The class loader to use.
+     * 
+     * @return An instance of the preferred class if it can be found, implements
+     *         the shared interface, and the security checks permit its
+     *         instantiation -or- an instance of the default class (if given)
+     *         and otherwise <code>null</code>.
+     * 
+     * @throws IllegalArgumentException
+     *             if the preferred class name is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if defaultClass is given and does not implement the shared
+     *             interface.
+     * @throws RuntimeException
+     *             if an attempt to instantiate the default class results in a
+     *             {@link SecurityException} or {@link IllegalAccessException}.
+     */
 	@SuppressWarnings("unchecked")
 	public static <T> T classForName(final String preferredClassName, final Class<? extends T> defaultClass,
-			final Class<T> sharedInterface, final ClassLoader classLoader) {
+			final Class<T> sharedClassOrInterface, final ClassLoader classLoader) {
 
 		if (preferredClassName == null)
 			throw new IllegalArgumentException();
 
-		if (sharedInterface == null)
+		if (sharedClassOrInterface == null)
 			throw new IllegalArgumentException();
 		
 		if (classLoader == null)
 			throw new IllegalArgumentException();
 
-		if (defaultClass != null && !sharedInterface.isAssignableFrom(defaultClass)) {
+		if (defaultClass != null && !sharedClassOrInterface.isAssignableFrom(defaultClass)) {
 			// The default class must extend the shared interface.
 			throw new IllegalArgumentException();
 		}
@@ -102,7 +102,7 @@ public class ClassPathUtil {
 			// Use the caller's class loader to find the preferred class.
 			final Class<?> cls = Class.forName(preferredClassName, initialize, classLoader);
 
-			if (sharedInterface.isAssignableFrom(cls)) {
+			if (sharedClassOrInterface.isAssignableFrom(cls)) {
 
 				// Found preferred class.  Is instance of shared interface.
 				if (log.isInfoEnabled()) {
@@ -115,7 +115,7 @@ public class ClassPathUtil {
 			}
 
 			// Class is not instance of shared interface. Can not use.  Will return default class instance.
-			log.warn(cls.getCanonicalName() + " does not extend " + sharedInterface.getCanonicalName());
+			log.warn(cls.getCanonicalName() + " does not extend " + sharedClassOrInterface.getCanonicalName());
 
 			// fall through
 		
