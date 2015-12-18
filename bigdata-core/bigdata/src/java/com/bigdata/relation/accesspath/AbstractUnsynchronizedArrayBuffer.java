@@ -43,6 +43,10 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
 
     private static final Logger log = Logger
             .getLogger(AbstractUnsynchronizedArrayBuffer.class);
+    
+    private static final boolean INFO = log.isInfoEnabled();
+    
+    private static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The capacity of the internal buffer each time it is allocated.
@@ -180,7 +184,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
 
         if (!accept(e)) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("reject: " + e.toString());
 
             return false;
@@ -216,7 +220,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
             
         }
 
-        if(log.isDebugEnabled())
+        if(DEBUG)
             log.debug("accept: " + e);
 
         buffer[size++] = e;
@@ -242,7 +246,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
             
             final boolean dense = size == buffer.length; 
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("size=" + size + ", dense=" + dense);
 
             final E[] a;
@@ -305,7 +309,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
 //        // tell the target buffer to flush itself.
 //        final long nwritten = target.flush();
         
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("wrote " + n + " elements, cumulative total=" + counter);
             
@@ -319,7 +323,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
     
     public void reset() {
         
-        if(log.isInfoEnabled()) {
+        if(INFO) {
             
             log.info("Resetting buffer state and counter.");
             
