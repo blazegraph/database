@@ -2373,7 +2373,14 @@ abstract public class AbstractTripleStore extends
 
         rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount();
 
-        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
+        IIndex blobsIndex = null;
+        try {
+            blobsIndex = getLexiconRelation().getBlobsIndex();
+            rangeCount += blobsIndex.rangeCount();
+        } catch(IllegalStateException ex) {
+            // No blobs index.  fall through
+        }
+//        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
 
         return rangeCount;
 
@@ -2409,8 +2416,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
 
         }
 
@@ -2418,6 +2430,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getLiteralCount() {
 
         long rangeCount = 0L;
@@ -2447,8 +2460,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
         }
  
         return rangeCount;
@@ -2461,6 +2479,7 @@ abstract public class AbstractTripleStore extends
      * Note: Will always return zero (0) if {@value Options#STORE_BLANK_NODES}
      * is <code>false</code>.
      */
+    @Override
     final public long getBNodeCount() {
 
         if (!getLexiconRelation().isStoreBlankNodes())
@@ -2493,8 +2512,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
 
         }
 
