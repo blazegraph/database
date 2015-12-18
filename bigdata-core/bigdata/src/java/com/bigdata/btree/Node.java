@@ -629,7 +629,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         btree.getBtreeCounters().rootsSplit++;
 
-        if (BTree.log.isInfoEnabled() || BigdataStatics.debug) {
+        if (BTree.INFO || BigdataStatics.debug) {
 
             // Note: nnodes and nleaves might not reflect rightSibling yet.
 
@@ -638,7 +638,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                     + ", m=" + btree.getBranchingFactor() + ", nentries="
                     + btree.nentries;
 
-            if (BTree.log.isInfoEnabled())
+            if (BTree.INFO)
                 BTree.log.info(msg);
 
             if (BigdataStatics.debug)
@@ -1296,8 +1296,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final MutableKeyBuffer keys = data.keys;
         final MutableKeyBuffer skeys = sdata.keys;
 
-        if (INFO) {
-            log.info("this=" + this + ", nkeys=" + getKeyCount()
+        if (DEBUG) {
+            log.debug("this=" + this + ", nkeys=" + getKeyCount()
                     + ", splitIndex=" + splitIndex + ", separatorKey="
                     + keyAsString(separatorKey));
             // if(DEBUG) dump(Level.DEBUG,System.err);
@@ -1476,8 +1476,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // children of the same node.
         assert s.getParent() == p;
 
-        if (INFO) {
-            log.info("this=" + this + ", sibling=" + sibling
+        if (DEBUG) {
+            log.debug("this=" + this + ", sibling=" + sibling
                     + ", rightSibling=" + isRightSibling);
             // if(DEBUG) {
             // System.err.println("this"); dump(Level.DEBUG,System.err);
@@ -1681,8 +1681,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // children of the same node.
         assert s.getParent() == p;
 
-        if (INFO) {
-            log.info("this=" + this + ", sibling=" + sibling
+        if (DEBUG) {
+            log.debug("this=" + this + ", sibling=" + sibling
                     + ", rightSibling=" + isRightSibling);
             // if(DEBUG) {
             // System.err.println("this"); dump(Level.DEBUG,System.err);
@@ -2245,8 +2245,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         if (btree.debug)
             assertInvariants();
 
-        if (INFO) {
-            log.info("this=" + this + ", child=" + child);
+        if (DEBUG) {
+            log.debug("this=" + this + ", child=" + child);
             /*
              * Note: dumping [this] or the [child] will throw false exceptions
              * at this point - they are in an intermediate state.
@@ -2381,8 +2381,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 if (btree.debug)
                     lastChild.assertInvariants();
 
-				if (log.isInfoEnabled()) {
-                    log.info("replacing root: root=" + btree.root + ", node="
+				if (DEBUG) {
+                    log.debug("replacing root: root=" + btree.root + ", node="
                             + this + ", lastChild=" + lastChild);
                     // System.err.println("root");
                     // btree.root.dump(Level.DEBUG,System.err);

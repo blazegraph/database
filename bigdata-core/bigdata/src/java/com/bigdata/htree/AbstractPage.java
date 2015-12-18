@@ -44,7 +44,22 @@ import com.bigdata.util.BytesUtil;
 abstract class AbstractPage extends PO implements // IAbstractNode?,
 		IAbstractNodeData {
 
-    private static final Logger log = Logger.getLogger(AbstractPage.class);
+    protected static final Logger log = Logger.getLogger(AbstractPage.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static protected boolean INFO = log.isInfoEnabled();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static protected boolean DEBUG = log.isDebugEnabled();
+
+    /**
+     * True iff the {@link #log} level is TRACE or less.
+     */
+    final static protected boolean TRACE = log.isTraceEnabled();
 
 	@Override
 	public String toShortString() {
@@ -651,8 +666,8 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
         }
 
-        if (log.isInfoEnabled()) {
-            log.info("this=" + toShortString() + ", trigger=" + triggeredByChildId);
+        if (DEBUG) {
+            log.debug("this=" + toShortString() + ", trigger=" + triggeredByChildId);
         }
 
         // cast to mutable implementation class.
@@ -692,7 +707,7 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
             assert parent == null;
 
             // Update the root node on the htree.
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info("Copy-on-write : replaced root node on htree.");
 
             final boolean wasDirty = htree.root.dirty;
