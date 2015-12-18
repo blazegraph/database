@@ -28,13 +28,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.0-master-SNAPSHOT</version>
+    <version>1.6.1-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>lgpl-utils</artifactId>
-  <version>1.6.0-master-SNAPSHOT</version>
+  <version>1.6.1-master-SNAPSHOT</version>
   <name>Blazegraph LGPL Utils</name>
   <packaging>jar</packaging>
 
