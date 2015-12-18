@@ -197,6 +197,7 @@ dependencies.
     <module>../ctc-striterators</module>
     <module>../lgpl-utils</module>
     <module>../dsi-utils</module>
+    <module>../system-utils</module>
     <module>../rdf-properties</module>
     <module>../sparql-grammar</module>
     <module>../bigdata-util</module>
