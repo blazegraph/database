@@ -115,6 +115,8 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
     static final protected Logger log = Logger.getLogger(IAccessPath.class);
     
+    private static final boolean DEBUG = log.isDebugEnabled();
+    
     /** Relation (resolved lazily if not specified to the ctor). */
     private final IRelation<R> relation;
 
@@ -643,7 +645,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
         didInit = true;
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             if (fromKey != null && toKey != null) {
                 
@@ -718,7 +720,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
             
         }
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug(toString());
             
@@ -863,14 +865,14 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
              * The access path has already been proven to be empty.
              */
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("Proven empty by historical range count");
 
             return new EmptyChunkedIterator<R>(keyOrder);
             
         }
         
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("offset=" + offset + ", limit=" + limit + ", capacity="
                     + capacity + ", accessPath=" + this);
         
@@ -881,7 +883,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         
         if(isFullyBoundForKey) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("Predicate is fully bound for the key.");
             
             /*
@@ -986,7 +988,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
             final long rangeCountRemaining = rangeCount(false/* exact */)
                     - offset;
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("offset=" + offset + ", limit=" + limit
                         + ", rangeCountRemaining=" + rangeCountRemaining
                         + ", fullyBufferedReadThreashold="
@@ -999,7 +1001,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
                  * iterator would not visit anything.
                  */
 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug("No elements based on range count.");
                 
                 return new EmptyChunkedIterator<R>(keyOrder);
@@ -1127,7 +1129,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         assert limit < MAX_FULLY_BUFFERED_READ_LIMIT : "limit=" + limit
                 + ", max=" + MAX_FULLY_BUFFERED_READ_LIMIT;
         
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("offset=" + offset + ", limit=" + limit);
 
@@ -1165,7 +1167,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Fully buffered: read=" + nread + ", used=" + nused
                     + ", offset=" + offset + ", limit=" + limit);
@@ -1203,7 +1205,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         if (src == null)
             throw new IllegalArgumentException();
         
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("");
         
         /*
@@ -1307,7 +1309,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
                     nchunks++;
                     nelements += chunk.length;
 
-                    if (log.isDebugEnabled())
+                    if (DEBUG)
                         log.debug("#chunks=" + nchunks + ", chunkSize="
                             + chunk.length + ", nelements=" + nelements);
 
@@ -1394,7 +1396,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
             
         }
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("exact=" + exact + ", filter=" + hasFilter + ", n=" + n
                     + " : " + toString());
@@ -1439,7 +1441,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
         assertInitialized();
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug(this + " : capacity=" + capacity + ", flags=" + flags
                     + ", filter=" + filter);
@@ -1462,7 +1464,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
         assertInitialized();
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug(this.toString());
             

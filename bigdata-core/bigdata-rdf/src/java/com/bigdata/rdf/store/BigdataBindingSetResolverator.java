@@ -286,7 +286,7 @@ public class BigdataBindingSetResolverator
 
             }
 
-            if (SolutionsLog.solutionsLog.isInfoEnabled()) {
+            if (SolutionsLog.INFO) {
 
                 SolutionsLog.log(queryId, null/* bop */,
                         -1/* bopId */, -1/* partitionId */, chunk2);

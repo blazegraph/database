@@ -42,6 +42,10 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
 
     private static final Logger log = Logger
             .getLogger(AbstractUnsynchronizedArrayBuffer.class);
+    
+    private static final boolean INFO = log.isInfoEnabled();
+    
+    private static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.

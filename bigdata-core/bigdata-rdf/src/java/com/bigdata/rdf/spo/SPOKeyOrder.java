@@ -71,6 +71,8 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     
     private static final transient Logger log = Logger.getLogger(SPOKeyOrder.class);
 
+    private static final boolean DEBUG = log.isDebugEnabled();
+
     /**
      * Enables or disables the index locality optimization.
      * 
@@ -809,7 +811,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
         final IV[] ivs = IVUtility.decode(key, offset, keyArity);
         
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
         	log.debug("key: " + Arrays.toString(key));
         	log.debug("keyArity: " + keyArity);
         	log.debug(Arrays.toString(ivs));
