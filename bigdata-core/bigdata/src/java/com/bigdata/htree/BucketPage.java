@@ -120,8 +120,6 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  */
 class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
-    private static final Logger log = Logger.getLogger(BucketPage.class);
-
 	/**
 	 * The data record. {@link MutableBucketData} is used for all mutation
 	 * operations. {@link ReadOnlyLeafData} is used when the {@link BucketPage}
@@ -585,7 +583,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			}
 			if (insIndex < 0) {
 				insIndex = -insIndex - 1;
-			} else if (log.isTraceEnabled()){
+			} else if (TRACE){
 				log.trace("Insert duplicate key");
 			}
 			
