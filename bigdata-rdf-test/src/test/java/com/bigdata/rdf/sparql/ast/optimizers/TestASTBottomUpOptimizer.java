@@ -76,6 +76,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
 
 /**
@@ -153,8 +154,10 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -303,7 +306,7 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -432,8 +435,10 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -623,8 +628,10 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -758,7 +765,7 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -812,7 +819,7 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -866,7 +873,7 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -931,7 +938,7 @@ public class TestASTBottomUpOptimizer extends
             addTerms(values, values.length, false/* readOnly */);
 
         final ASTContainer astContainer = 
-            new Bigdata2ASTSPARQLParser(store).parseQuery2(queryStr, baseURI);
+            new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -989,8 +996,10 @@ public class TestASTBottomUpOptimizer extends
 //        x.getIV().setValue(x);
 //        p.getIV().setValue(p);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -1080,7 +1089,7 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -1146,8 +1155,10 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -1262,7 +1273,7 @@ public class TestASTBottomUpOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);

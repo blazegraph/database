@@ -23,9 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.servlet.Servlet;
@@ -39,6 +47,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
@@ -47,9 +56,12 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.PropertyUtil;
 
@@ -96,6 +108,19 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private RESTServlet m_restServlet;
 
     private static final String namespaceRegex = "[^.]+\\Z";
+    
+    public static final Set<String> PROPERTIES_BLACK_LIST = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+	    		 Journal.Options.BUFFER_MODE,
+	             Journal.Options.FILE,
+	             Journal.Options.INITIAL_EXTENT,
+	             Journal.Options.MAXIMUM_EXTENT,
+	             IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
+	             IndexMetadata.Options.BTREE_BRANCHING_FACTOR,
+	             RelationSchema.CLASS,
+	             AbstractTransactionService.Options.MIN_RELEASE_AGE,
+	             RelationSchema.NAMESPACE,
+	             RelationSchema.CONTAINER)
+             ));
 
     public MultiTenancyServlet() {
 
@@ -127,6 +152,14 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             // CREATE NAMESPACE.
             doCreateNamespace(req, resp);
+
+            return;
+            
+        } else if (req.getRequestURI().endsWith("/prepareProperties")) {
+
+            // Prepare properties.
+
+            doPrepareProperties(req, resp);
 
             return;
             
@@ -218,9 +251,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
         return;
 
     }
-
+    
     /**
-     * Create a new namespace.
+     * Prepare a list of properties for a new namespace.
      * 
      * <pre>
      * Request-URI
@@ -234,7 +267,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
      * @param resp
      * @throws IOException
      */
-    private void doCreateNamespace(final HttpServletRequest req,
+    private void doPrepareProperties(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
         if (!isWritable(getServletContext(), req, resp)) {
@@ -245,6 +278,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
         final BigdataRDFContext context = getBigdataRDFContext();
 
         final IIndexManager indexManager = context.getIndexManager();
+        
+        final long timestamp = getTimestamp(req);
 
         /*
          * 1. Read the request entity, which must be some kind of Properties
@@ -302,6 +337,30 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             // The given Properties.
             given = parser.parse(req.getInputStream());
+            
+            //check properties
+            BigdataSail.checkProperties(given);
+            
+            // The effective namespace for the new KB.
+            final String namespace = given.getProperty(
+                    BigdataSail.Options.NAMESPACE,
+                    BigdataSail.Options.DEFAULT_NAMESPACE);
+            
+            try {
+        	  
+        	  	if (!Pattern.matches(namespaceRegex , namespace)) {
+        	  		    	  		
+        	  		throw new IllegalArgumentException("Namespace should not be empty nor include '.' character");
+        	  		
+        	  	}    	  
+
+    	    } catch (Throwable e) {
+    	
+    	         launderThrowable(e, resp, "namespace=" + namespace);
+    	         
+    	         return;
+    	
+    	    }
 
             /*
              * Get the default Properties.
@@ -319,14 +378,15 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                 defaults = fed.getClient().getProperties();
 
             }
-
+            
             /*
              * Produce the effective properties.
              */
             {
+            	
                 
                 effectiveProperties = PropertyUtil.flatCopy(defaults);
-
+                
                 for (Map.Entry<Object, Object> e : given.entrySet()) {
 
                     final String name = (String) e.getKey();
@@ -341,13 +401,162 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                     }
 
                 }
+                
+                Set<Object> keySet = new HashSet<Object>();
+                
+                keySet.addAll(effectiveProperties.keySet());
+                
+                Iterator<Object> it = keySet.iterator();
+               
+                while(it.hasNext()) {
+            	   
+             	   final String name = (String) it.next();
+
+     				//remove journal related properties
+                   if(PROPERTIES_BLACK_LIST.contains(name)) {
+                   	
+                	   effectiveProperties.remove(name);
+                   	
+                   }
+                   
+                   //replace default namespace with a specified one
+                   
+                   String newName = name.replaceAll("(?<=\\.namespace\\.)([^.]+)(?=\\.)", Matcher.quoteReplacement(namespace));
+                   
+                   if (!newName.equals(name)) {
+
+                	   Object val = effectiveProperties.get(name);
+	               	
+                	   effectiveProperties.remove(name);
+   	               	
+                	   effectiveProperties.put(newName, val);
+
+                   }
+                   
+                               	   
+               }
+
+             }
+             
+     		try {
+    			   
+    	         submitApiTask(
+    	               new AbstractRestApiTask<Void>(req, resp, namespace, timestamp) {
+
+    	                  @Override
+    	                  public boolean isReadOnly() {
+    	                     return true;
+    	                  }
+
+    	                  @Override
+    	                  public Void call() throws Exception {
+
+    	                     sendProperties(req, resp, effectiveProperties);
+
+    	                     return null;
+
+    	                  }
+
+    	               }).get();
+
+    			} catch(Throwable t) {
+    				
+    				launderThrowable(t, resp, "namespace=" + namespace);
+    				
+    			} 
+    		
+        }
+
+    }
+
+    /**
+     * Create a new namespace.
+     * 
+     * <pre>
+     * Request-URI
+     * ...
+     * Content-Type=...
+     * ...
+     * PropertySet
+     * </pre>
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException
+     */
+    private void doCreateNamespace(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+        
+        if (!isWritable(getServletContext(), req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
+        final BigdataRDFContext context = getBigdataRDFContext();
+
+        final IIndexManager indexManager = context.getIndexManager();
+
+        /*
+         * 1. Read the request entity, which must be some kind of Properties
+         * object. The BigdataSail.Options.NAMESPACE property defaults to "kb".
+         * A non-default value SHOULD be specified by the client.
+         * 
+         * 2. Wrap and flatten the base properties for the Journal or
+         * Federation. This provides defaults for properties which were not
+         * explicitly configured for this KB instance.
+         * 
+         * 3. Add the given properties to the flattened defaults to obtain the
+         * effective properties.
+         */
+        final Properties props;
+        {        
+
+            final String contentType = req.getContentType();
+
+            if (log.isInfoEnabled())
+                log.info("Request body: " + contentType);
+
+            final PropertiesFormat format = PropertiesFormat.forMIMEType(contentType);
+
+            if (format == null) {
+
+                buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                        "Content-Type not recognized as Properties: "
+                                + contentType);
+
+                return;
 
             }
 
-        }
+            if (log.isInfoEnabled())
+                log.info("Format=" + format);
+            
+            final PropertiesParserFactory parserFactory = PropertiesParserRegistry
+                    .getInstance().get(format);
+
+            if (parserFactory == null) {
+
+                buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                        "Parser factory not found: Content-Type="
+                                + contentType + ", format=" + format);
+                
+                return;
+
+            }
+
+            /*
+             * There is a request body, so let's try and parse it.
+             */
+
+            final PropertiesParser parser = parserFactory.getParser();
+
+            // The given Properties.
+            props = parser.parse(req.getInputStream());
+
+         }
 
         // The effective namespace for the new KB.
-        final String namespace = effectiveProperties.getProperty(
+        final String namespace = props.getProperty(
                 BigdataSail.Options.NAMESPACE,
                 BigdataSail.Options.DEFAULT_NAMESPACE);
 
@@ -357,7 +566,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     	  		
     	  		submitApiTask(
                     new RestApiCreateKBTask(req, resp, namespace,
-                            effectiveProperties)).get();
+                    		props)).get();
     	  		
     	  	} else {
     	  		

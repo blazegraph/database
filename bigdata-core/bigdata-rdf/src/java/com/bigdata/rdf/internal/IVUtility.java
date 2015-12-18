@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -57,6 +58,7 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.MockedValueIV;
 import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
@@ -721,25 +723,27 @@ public class IVUtility {
             return decodeInlineUnicodeLiteral(key,o);
         }
         case Extension: {
-            /*
-			 * Handle an extension of the intrinsic data types.
-			 * 
-			 * @see BLZG-1507 (Implement support for DTE extension types for
-			 * URIs)
-	 * 
-             * @see BLZG-1595 ( DTEExtension for compressed timestamp)
-	 */
+        /*
+         * Handle an extension of the intrinsic data types.
+         * 
+         * @see BLZG-1507 (Implement support for DTE extension types for URIs)
+         * @see BLZG-1595 (DTEExtension for compressed timestamp)
+         * @see BLZG-611 (MockValue problems in hash join)
+         */
 		switch (dtex) {
-		case IPV4: {
-			final byte[] addr = new byte[5];
-			System.arraycopy(key, o, addr, 0, 5);
-			final IPv4Address ip = new IPv4Address(addr);
-			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
-			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
-		}
+    		case IPV4: {
+    			final byte[] addr = new byte[5];
+    			System.arraycopy(key, o, addr, 0, 5);
+    			final IPv4Address ip = new IPv4Address(addr);
+    			final AbstractLiteralIV iv = new IPv4AddrIV(ip);
+    			return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
+    		}
             case PACKED_LONG: {
                 final AbstractLiteralIV iv = new PackedLongIV<>(LongPacker.unpackLong(key, o));
                 return isExtension ? new LiteralExtensionIV<>(iv, datatype) : iv;
+            }
+            case MOCKED_IV: {
+                return new MockedValueIV(decodeFromOffset(key,o));
             }
             case ARRAY: {
                 // byte(0...255) --> int(1...256) 
@@ -900,23 +904,44 @@ public class IVUtility {
         return iv;
     }
 
+//    /**
+//     * Decode an IV from its string representation as encoded by
+//     * {@link BlobIV#toString()} and {@link AbstractInlineIV#toString()} (this
+//     * is used by the prototype IRIS integration.)
+//     * 
+//     * @param s
+//     *            the string representation
+//     * @return the IV
+//     */
+//    public static final IV fromString(final String s) {
+//        if (s.startsWith("TermIV")) {
+//            return TermId.fromString(s);
+//        } else if (s.startsWith("BlobIV")) {
+//                return BlobIV.fromString(s);
+//        } else {
+//            final String type = s.substring(0, s.indexOf('(')); 
+//            final String val = s.substring(s.indexOf('('), s.length()-1);
+//            return decode(val, type);
+//        }
+//    }
+
     /**
-     * Decode an IV from its string representation as encoded by
-     * {@link BlobIV#toString()} and {@link AbstractInlineIV#toString()} (this
-     * is used by the prototype IRIS integration.)
+     * Decode an IV from its string representation and type, provided in as
+     * ASTRDFLiteral node in AST model.
+     * <p>
+     * Note: This is a very special case method. Normally logic should go
+     * through the ILexiconRelation to resolve inline IVs. This always uses
+     * inline IVs, and thus defeats the ILexiconConfiguration for the namespace.
      * 
-     * @param s
+     * @param val
      *            the string representation
+     * @param type
+     *            value type
      * @return the IV
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1176 (SPARQL QUERY/UPDATE should not use db connection)
      */
-    public static final IV fromString(final String s) {
-        if (s.startsWith("TermIV")) {
-            return TermId.fromString(s);
-        } else if (s.startsWith("BlobIV")) {
-                return BlobIV.fromString(s);
-        } else {
-            final String type = s.substring(0, s.indexOf('(')); 
-            final String val = s.substring(s.indexOf('('), s.length()-1);
+    public static IV decode(final String val, final String type) {
             final DTE dte = Enum.valueOf(DTE.class, type);
             switch (dte) {
             case XSDBoolean: {
@@ -963,22 +988,24 @@ public class IVUtility {
                 final BigDecimal x = new BigDecimal(val);
                 return new XSDDecimalIV<BigdataLiteral>(x);
             }
-                // case XSDUnsignedByte:
-                // keyBuilder.appendUnsigned(t.byteValue());
-                // break;
-                // case XSDUnsignedShort:
-                // keyBuilder.appendUnsigned(t.shortValue());
-                // break;
-                // case XSDUnsignedInt:
-                // keyBuilder.appendUnsigned(t.intValue());
-                // break;
-                // case XSDUnsignedLong:
-                // keyBuilder.appendUnsigned(t.longValue());
-                // break;
+            case XSDString: {
+                return new FullyInlineTypedLiteralIV(val, null, XMLSchema.STRING);
+            }
+            case XSDUnsignedByte: {
+                return new XSDUnsignedByteIV<>((byte) (Byte.valueOf(val) + Byte.MIN_VALUE));
+            }
+            case XSDUnsignedShort: {
+                return new XSDUnsignedShortIV<>((short) (Short.valueOf(val) + Short.MIN_VALUE));
+            }
+            case XSDUnsignedInt: {
+                return new XSDUnsignedIntIV((int) (Integer.valueOf(val) + Integer.MIN_VALUE));
+            }
+            case XSDUnsignedLong: {
+                return new XSDUnsignedLongIV<>(Long.valueOf(val) + Long.MIN_VALUE);
+            }
             default:
                 throw new UnsupportedOperationException("dte=" + dte);
             }
-        }
     }
     
 }
