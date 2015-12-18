@@ -55,6 +55,8 @@ public class SolutionsLog {
      */
     public static final Logger solutionsLog = Logger.getLogger(SolutionsLog.class);
 
+    public static final boolean INFO = solutionsLog.isInfoEnabled();
+    
     /**
      * A single buffer is reused to keep down the heap churn.
      */

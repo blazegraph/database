@@ -92,6 +92,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
     private final static transient Logger log = Logger
             .getLogger(ChunkedRunningQuery.class);
 
+    private final static boolean INFO = log.isInfoEnabled();
+    
     /**
      * Logger for the {@link ChunkTask}.
      */
@@ -620,7 +622,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                      * After removing the maximum amount from a pipelined operator,
                      * the work queue is still not empty.
                      */
-                    if (log.isInfoEnabled())
+                    if (INFO)
                         log.info("Work queue is over capacity: bundle=" + bundle
                                 + ", naccepted=" + naccepted + ", nremaining="
                                 + nremaining + ", maxMessagesPerTask="
@@ -702,7 +704,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 /*
                  * Submit task for execution (asynchronous).
                  */
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Running task: bop=" + bundle.bopId
                             + (pipelined?"":", atOnceReady=" + atOnceReady) + ", bop="
                             + bop.toShortString() + ", messages=" + naccepted
@@ -978,7 +980,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 t.context.getExecutorService().execute(sendTask);
             } catch (RejectedExecutionException ex) {
                 // e.g., service is shutting down.
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Could not send message: " + msg, ex);
             } catch (Throwable ex) {
                 log.error("Could not send message: " + msg + " : " + ex, ex);
@@ -1395,7 +1397,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         @Override
         public void add(final E e) {
             super.add(e);
-            if (SolutionsLog.solutionsLog.isInfoEnabled()) {
+            if (SolutionsLog.INFO) {
                 SolutionsLog
                         .log(queryId, bop, bopId, partitionId, (IBindingSet[]) e);
             }
@@ -1514,7 +1516,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             if(!open)
                 throw new BufferClosedException();
 
-            if (SolutionsLog.solutionsLog.isInfoEnabled()) {
+            if (SolutionsLog.INFO) {
                 SolutionsLog.log(q.getQueryId(), q.getBOp(bopId), bopId,
                         partitionId, (IBindingSet[]) e);
             }
