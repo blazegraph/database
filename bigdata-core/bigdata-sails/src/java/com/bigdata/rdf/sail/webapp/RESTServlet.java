@@ -114,7 +114,7 @@ public class RESTServlet extends BigdataRDFServlet {
                     || provider.equals("") ? ConfigParams.DEFAULT_MAPGRAPH_SERVLET_PROVIDER
                     : provider;
             
-            m_mapgraphServlet = MapgraphServletProxy.MapgraphServletFactory
+            m_mapgraphServlet = new MapgraphServletProxy.MapgraphServletFactory()
                 .getInstance(mapgraphProvider);
         }
 
