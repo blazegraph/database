@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
@@ -142,6 +139,9 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      */
     private static final long serialVersionUID = 1L;
 
+    private static final MapgraphOptimizers mapgraphOptimizers = new MapgraphOptimizers();
+
+    
     public DefaultOptimizerList() {
 
        /**
@@ -736,7 +736,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * operator to obtain range counts for a set of triple patterns
          */
        final IASTOptimizer o = null; // initGPURangeCountOptimizer();
-//     final IASTOptimizer o = resolveMapgraphOptimizers().rangeCountOptimizer;
+//     final IASTOptimizer o = mapgraphOptimizers.rangeCountOptimizer;
        if ( o != null ) {
           add(o);
        } else {
@@ -753,7 +753,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      */
     protected void addFastRangeCountOptimizer() {
 
-        final IASTOptimizer o = resolveMapgraphOptimizers().fastRangeCountOptimizer;
+        final IASTOptimizer o = mapgraphOptimizers.fastRangeCountOptimizer;
         if ( o != null ) {
            add(o);
         } else {
@@ -766,7 +766,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      * Tries to add the {@link IASTOptimizer} for using GPUs.
      */
     protected void addGPUAccelerationOptimizer() {
-        final IASTOptimizer o = resolveMapgraphOptimizers().gpuAccelerationOptimizer;
+        final IASTOptimizer o = mapgraphOptimizers.gpuAccelerationOptimizer;
         if (o != null ) {
            add(o);
         }
@@ -841,23 +841,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         }
         
     }
-    
-    private static final AtomicBoolean checkedForMapgraphRuntime = new AtomicBoolean(false);
-
-    private static final AtomicReference<MapgraphOptimizers> mapgraphOptimizers = new AtomicReference<MapgraphOptimizers>(null);
-
-    private MapgraphOptimizers resolveMapgraphOptimizers() {
-
-        if (checkedForMapgraphRuntime.compareAndSet(false/* expect */, true/* update */)) {
-
-            mapgraphOptimizers.set(new MapgraphOptimizers());
-
-        }
-
-        return mapgraphOptimizers.get();
-
-    }
-    
     
 
 }
