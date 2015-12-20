@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import org.apache.log4j.Logger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
@@ -133,7 +135,7 @@ import com.bigdata.util.ClassPathUtil;
  */
 public class DefaultOptimizerList extends ASTOptimizerList {
 
-    private static final Logger log = Logger.getLogger(DefaultOptimizerList.class);
+//    private static final Logger log = Logger.getLogger(DefaultOptimizerList.class);
 
     /**
      * 
@@ -734,29 +736,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * operator to obtain range counts for a set of triple patterns
          */
        final IASTOptimizer o = null; // initGPURangeCountOptimizer();
-//       final IASTOptimizer o = initGPURangeCountOptimizer();
+//     final IASTOptimizer o = resolveMapgraphOptimizers().rangeCountOptimizer;
        if ( o != null ) {
           add(o);
        } else {
           add(new ASTRangeCountOptimizer());
        }
-
-    }
-
-    /**
-     * Tries to create the GPU-based {@link ASTRangeCountOptimizer}; returns
-     * <code>null</code> if the attempt fails.
-     *
-     * @see https://github.com/SYSTAP/bigdata-gpu/issues/23
-     */
-    protected IASTOptimizer initGPURangeCountOptimizer() {
-
-       return ClassPathUtil.classForName(//
-             "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPURangeCountOptimizer", // preferredClassName,
-             null, // defaultClass,
-             IASTOptimizer.class, // sharedInterface,
-             getClass().getClassLoader() // classLoader
-       );
 
     }
 
@@ -768,29 +753,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      */
     protected void addFastRangeCountOptimizer() {
 
-       final IASTOptimizer o = initGPUFastRangeCountOptimizer();
-       if ( o != null ) {
-          add(o);
-       } else {
-          add(new ASTFastRangeCountOptimizer());
-       }
-
-    }
-
-    /**
-     * Tries to create the GPU-based {@link ASTFastRangeCountOptimizer};
-     * returns <code>null</code> if the attempt fails.
-     *
-     * @see https://github.com/SYSTAP/bigdata-gpu/issues/101
-     */
-    protected IASTOptimizer initGPUFastRangeCountOptimizer() {
-
-       return ClassPathUtil.classForName(//
-             "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUFastRangeCountOptimizer", // preferredClassName,
-             null, // defaultClass,
-             IASTOptimizer.class, // sharedInterface,
-             getClass().getClassLoader() // classLoader
-       );
+        final IASTOptimizer o = resolveMapgraphOptimizers().fastRangeCountOptimizer;
+        if ( o != null ) {
+           add(o);
+        } else {
+           add(new ASTFastRangeCountOptimizer());
+        }
 
     }
 
@@ -798,46 +766,98 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      * Tries to add the {@link IASTOptimizer} for using GPUs.
      */
     protected void addGPUAccelerationOptimizer() {
-
-       final IASTOptimizer o = initGPUAccelerationOptimizer();
-       if (o != null ) {
-          add(o);
-       }
-    }
-
+        final IASTOptimizer o = resolveMapgraphOptimizers().gpuAccelerationOptimizer;
+        if (o != null ) {
+           add(o);
+        }
+    }    
+    
+    
     /**
-     * Tries to create the {@link IASTOptimizer} for using GPUs; returns
-     * <code>null</code> if the attempt fails.
+     * Helper class for one-time static initialization of the mapgraph
+     * optimizers.
+     *
+     * @author bryan
      */
-    protected IASTOptimizer initGPUAccelerationOptimizer() {
+    private static class MapgraphOptimizers {
+        
+        private final IASTOptimizer rangeCountOptimizer;
+        private final IASTOptimizer fastRangeCountOptimizer;
+        private final IASTOptimizer gpuAccelerationOptimizer;
 
-    	return ClassPathUtil.classForName(//
-    			"com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer", // preferredClassName,
-				null, // defaultClass,
-				IASTOptimizer.class, // sharedInterface,
-				getClass().getClassLoader() // classLoader
-		);
-    	
-//       try {
-//          final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer" );
-//
-//          if (IASTOptimizer.class.isAssignableFrom(cls)) {
-//        	  if(log.isInfoEnabled())
-//        		  log.info( "Found Blazegraph-Mapgraph connector: "
-//                       + cls.getCanonicalName() );
-//             return (IASTOptimizer) cls.newInstance();
-//          }
-//          else {
-//        	  // Note: Please do not log @ WARN here. It appears for every non-GPU accelerated query!
-////             log.warn( cls.getCanonicalName()
-////                       + " does not extend "
-////                       + IASTOptimizer.class.getCanonicalName() );
-//             return null;
-//          }
-//       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-//          if(log.isInfoEnabled()) log.info( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
-//          return null;
-//       }
+        /**
+         * Tries to create the GPU-based {@link ASTRangeCountOptimizer}; returns
+         * <code>null</code> if the attempt fails.
+         *
+         * @see https://github.com/SYSTAP/bigdata-gpu/issues/23
+         */
+        protected IASTOptimizer initGPURangeCountOptimizer() {
+
+           return ClassPathUtil.classForName(//
+                 "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPURangeCountOptimizer", // preferredClassName,
+                 null, // defaultClass,
+                 IASTOptimizer.class, // sharedInterface,
+                 getClass().getClassLoader() // classLoader
+           );
+
+        }
+
+        /**
+         * Tries to create the GPU-based {@link ASTFastRangeCountOptimizer};
+         * returns <code>null</code> if the attempt fails.
+         *
+         * @see https://github.com/SYSTAP/bigdata-gpu/issues/101
+         */
+        protected IASTOptimizer initGPUFastRangeCountOptimizer() {
+
+           return ClassPathUtil.classForName(//
+                 "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUFastRangeCountOptimizer", // preferredClassName,
+                 null, // defaultClass,
+                 IASTOptimizer.class, // sharedInterface,
+                 getClass().getClassLoader() // classLoader
+           );
+
+        }
+
+        /**
+         * Tries to create the {@link IASTOptimizer} for using GPUs; returns
+         * <code>null</code> if the attempt fails.
+         */
+        protected IASTOptimizer initGPUAccelerationOptimizer() {
+
+            return ClassPathUtil.classForName(//
+                    "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer", // preferredClassName,
+                    null, // defaultClass,
+                    IASTOptimizer.class, // sharedInterface,
+                    getClass().getClassLoader() // classLoader
+            );
+
+        }
+
+        MapgraphOptimizers() {
+            rangeCountOptimizer = initGPURangeCountOptimizer();
+            fastRangeCountOptimizer = initGPUFastRangeCountOptimizer();
+            gpuAccelerationOptimizer = initGPUAccelerationOptimizer();
+        }
+        
     }
+    
+    private static final AtomicBoolean checkedForMapgraphRuntime = new AtomicBoolean(false);
+
+    private static final AtomicReference<MapgraphOptimizers> mapgraphOptimizers = new AtomicReference<MapgraphOptimizers>(null);
+
+    private MapgraphOptimizers resolveMapgraphOptimizers() {
+
+        if (checkedForMapgraphRuntime.compareAndSet(false/* expect */, true/* update */)) {
+
+            mapgraphOptimizers.set(new MapgraphOptimizers());
+
+        }
+
+        return mapgraphOptimizers.get();
+
+    }
+    
+    
 
 }
