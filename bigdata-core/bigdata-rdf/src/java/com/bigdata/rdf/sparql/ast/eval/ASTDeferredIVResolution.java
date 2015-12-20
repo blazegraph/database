@@ -177,7 +177,7 @@ public class ASTDeferredIVResolution {
      * @throws MalformedQueryException
      */
     public static DeferredResolutionResult resolveQuery(final AbstractTripleStore store, final ASTContainer ast) throws MalformedQueryException {
-        return resolveQuery(store, ast, null, null);
+        return resolveQuery(store, ast, null, null, null /* context unknown */);
     }
     
     /**
@@ -193,8 +193,13 @@ public class ASTDeferredIVResolution {
      * @param dataset 
      * @throws MalformedQueryException
      */
-    public static DeferredResolutionResult resolveQuery(final AbstractTripleStore store, final ASTContainer ast, final BindingSet bs, final Dataset dataset) throws MalformedQueryException {
+    public static DeferredResolutionResult resolveQuery(
+        final AbstractTripleStore store, final ASTContainer ast, 
+        final BindingSet bs, final Dataset dataset, final AST2BOpContext ctxIn) throws MalformedQueryException {
 
+        // whenever a context is provided, use that one, otherwise construct it
+        final AST2BOpContext ctx = ctxIn==null ? new AST2BOpContext(ast, store) : ctxIn;
+        
         final ASTDeferredIVResolution termsResolver = new ASTDeferredIVResolution(store);
 
         // process provided binding set
@@ -257,7 +262,7 @@ public class ASTDeferredIVResolution {
          */
         final ASTSetValueExpressionsOptimizer opt = new ASTSetValueExpressionsOptimizer();
 
-        final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(new AST2BOpContext(ast, store), new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
+        final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(ctx, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
         termsResolver.resolve(store, queryRoot2, dcLists, bs);
         

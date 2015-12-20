@@ -129,10 +129,13 @@ public class ASTEvalHelper {
             final Dataset dataset)
             throws QueryEvaluationException {
 
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
         final DeferredResolutionResult resolved;
         try {
         	// @see https://jira.blazegraph.com/browse/BLZG-1176
-            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
+            resolved = ASTDeferredIVResolution.resolveQuery(
+                store, astContainer, globallyScopedBS, dataset, context);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -142,7 +145,6 @@ public class ASTEvalHelper {
                 new DatasetNode(resolved.dataset, false/* update */));
         }
 
-        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();
@@ -204,10 +206,13 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS,
             final Dataset dataset) throws QueryEvaluationException {
 
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
         final DeferredResolutionResult resolved;
         try {
         	// @see https://jira.blazegraph.com/browse/BLZG-1176
-            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
+            resolved = ASTDeferredIVResolution.resolveQuery(
+                store, astContainer, globallyScopedBS, dataset, context);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -216,8 +221,6 @@ public class ASTEvalHelper {
             astContainer.getOriginalAST().setDataset(
                 new DatasetNode(resolved.dataset, false/* update */));
         }
-
-        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();
@@ -468,10 +471,13 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS,
             final Dataset dataset) throws QueryEvaluationException {
 
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
         final DeferredResolutionResult resolved;
         try {
         	// @see https://jira.blazegraph.com/browse/BLZG-1176
-            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
+            resolved = ASTDeferredIVResolution.resolveQuery
+                (store, astContainer, globallyScopedBS, dataset, context);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -481,7 +487,6 @@ public class ASTEvalHelper {
                 new DatasetNode(resolved.dataset, false/* update */));
         }
 
-        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();

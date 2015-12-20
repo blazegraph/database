@@ -86,7 +86,7 @@ import com.bigdata.util.ClassPathUtil;
  */
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
-   private static final Logger log = Logger.getLogger(AST2BOpContext.class);
+//   private static final Logger log = Logger.getLogger(AST2BOpContext.class);
    
     /**
      * The {@link ASTContainer} and never <code>null</code>.
