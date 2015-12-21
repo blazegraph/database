@@ -28,28 +28,36 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.1-BLZG-1377-SNAPSHOT</version>
+    <version>1.6.1-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>bigdata-statics</artifactId>
-  <version>1.6.1-BLZG-1377-SNAPSHOT</version>
-  <name>Blazegraph Statics</name>
+  <artifactId>blazegraph-war</artifactId>
+  <version>1.6.1-master-SNAPSHOT</version>
+  <name>Blazegraph WAR</name>
   <url>http://maven.apache.org</url>
+  <packaging>war</packaging>
   <build>
-   <plugins>
-    <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.6</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-     </plugin>
+    <plugins>
+      <plugin>
+       <groupId>org.apache.maven.plugins</groupId>
+       <artifactId>maven-war-plugin</artifactId>
+       <version>2.6</version>
+       <configuration>
+        <webXml>../bigdata-war-html/src/main/webapp/WEB-INF/web.xml</webXml>
+	<failOnMissingWebXml>false</failOnMissingWebXml>
+         <overlays>
+           <overlay>
+             <groupId>com.blazegraph</groupId>
+             <artifactId>bigdata-war-html</artifactId>
+	     <includes>
+                <include>WEB-INF/web.xml</include>
+                <include>**/*</include>
+              </includes>
+           </overlay>
+         </overlays>
+       </configuration>
+      </plugin>
     </plugins>
   </build>
 
@@ -64,7 +72,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>Blazegraph Utilities</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph WAR</h1>]]></doctitle>
           <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
@@ -90,46 +98,61 @@ ga('send', 'pageview');
   
   <dependencies>
     <dependency>
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
-    <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>junit-ext</artifactId>
-      <version>${junit-ext.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>system-utils</artifactId>
+      <artifactId>bigdata-war-html</artifactId>
       <version>${project.version}</version>
+      <type>war</type>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-common-util</artifactId>
+      <artifactId>bigdata-core</artifactId>
       <version>${project.version}</version>
-    </dependency>
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit4.version}</version>
-      <scope>test</scope>
-    </dependency>
-     <dependency>
-       <groupId>com.fasterxml.jackson.core</groupId>
-       <artifactId>jackson-core</artifactId>
-       <version>${jackson.version}</version>
+      <exclusions>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-rio-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-sparql-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-store-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-server</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-webapp</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-servlet</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions> 
     </dependency>
     <dependency>
-       <groupId>com.fasterxml.jackson.core</groupId>
-       <artifactId>jackson-annotations</artifactId>
-       <version>${jackson.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>  
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions> 
     </dependency>
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>${jackson.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 
