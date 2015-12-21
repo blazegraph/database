@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.0-master-SNAPSHOT</version>
+    <version>1.6.1-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jar</artifactId>
-  <version>1.6.0-master-SNAPSHOT</version>
+  <version>1.6.1-master-SNAPSHOT</version>
   <name>Blazegraph Executable Jar</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>
