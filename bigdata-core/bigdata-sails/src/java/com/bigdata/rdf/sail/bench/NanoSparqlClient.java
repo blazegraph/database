@@ -244,8 +244,8 @@ public class NanoSparqlClient {
 //			final QueryParser engine = new SPARQLParserFactory().getParser();
 //			
 //			final ParsedQuery q = engine.parseQuery(opts.queryStr, opts.baseURI);
-            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                    opts.tmpKb).parseQuery2(opts.queryStr, opts.baseURI);
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                    .parseQuery2(opts.queryStr, opts.baseURI);
 
             final QueryType queryType = opts.queryType = astContainer
                     .getOriginalAST().getQueryType();

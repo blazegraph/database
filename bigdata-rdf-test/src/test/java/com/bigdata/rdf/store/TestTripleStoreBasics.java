@@ -102,6 +102,9 @@ public class TestTripleStoreBasics extends TestCase2 {
          */
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
+        // the DataLoader utility.
+        suite.addTestSuite(TestDataLoader.class);
+        
 		/**
 		 * Test suite for configuration of the BLOBS index support.
 		 * 

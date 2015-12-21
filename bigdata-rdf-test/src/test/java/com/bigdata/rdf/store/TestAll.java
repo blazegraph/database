@@ -29,16 +29,12 @@ package com.bigdata.rdf.store;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestCase2;
 import junit.framework.TestSuite;
-
-import org.apache.log4j.Logger;
 
 /**
  * Runs tests for each {@link ITripleStore} implementation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 

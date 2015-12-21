@@ -271,6 +271,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          }
          if(testMode == TestMode.triplesPlusTruthMaintenance) {
             suite.addTestSuite(Test_Ticket_1207.class); // BLZG-1207 (GETSTMTS with includeInferred)
+            
+            // BLZG-697 Manage truth maintenance in SPARQL UPDATE
+            suite.addTestSuite(TestSparqlUpdateSuppressTruthMaintenance.class); 
          }
          suite.addTestSuite(Test_REST_ServiceDescription.class);
          suite.addTestSuite(Test_REST_DELETE_BY_ACCESS_PATH.class);
@@ -296,7 +299,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(Test_Ticket_605.class);
 
          suite.addTestSuite(TestService794.class);
-
+         
          if (testMode == TestMode.sids) {
             // Tests that require sids mode.
             suite.addTestSuite(TestRDROperations.class);

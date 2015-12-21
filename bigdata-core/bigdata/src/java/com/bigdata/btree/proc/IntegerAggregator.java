@@ -35,7 +35,6 @@ import com.bigdata.service.Split;
  * as a {@link Long} integer (to help prevent overflow).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class IntegerAggregator implements IResultHandler<Integer, Long> {
 
@@ -44,13 +43,15 @@ public class IntegerAggregator implements IResultHandler<Integer, Long> {
     public IntegerAggregator() {
         
     }
-    
-    public void aggregate(Integer result, Split split) {
+
+    @Override
+    public void aggregate(final Integer result, final Split split) {
 
         counter.addAndGet(result.intValue());
 
     }
 
+    @Override
     public Long getResult() {
 
         return counter.get();

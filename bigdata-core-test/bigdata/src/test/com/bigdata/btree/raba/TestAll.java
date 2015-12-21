@@ -67,6 +67,9 @@ public class TestAll extends TestCase {
         // test key search routines on the key buffer implementations.
         suite.addTestSuite(TestKeyBufferSearch.class);
 
+        // test suite for a read-only view onto a backing raba.
+        suite.addTestSuite(TestSubRangeRaba.class);
+        
         // compressed data implementations.
         suite.addTest(com.bigdata.btree.raba.codec.TestAll.suite());
 

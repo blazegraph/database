@@ -65,6 +65,7 @@ public class InMemChangeLog implements IChangeLog {
     /**
      * See {@link IChangeLog#changeEvent(IChangeRecord)}.
      */
+    @Override
     public synchronized void changeEvent(final IChangeRecord record) {
         
         if (log.isInfoEnabled()) 

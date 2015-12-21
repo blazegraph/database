@@ -97,6 +97,58 @@ public interface IWriteCacheServiceCounters {
     String NBUFFER_EVICTED_TO_CHANNEL = "nbufferEvictToChannel";
 
     /**
+     * The cumulative number of nanoseconds latency when writing into the write
+     * cache.
+     * 
+     * @see BLZG-1589 (new latency-oriented counters)
+     */
+    String ELAPSED_BUFFER_EVICTED_TO_CHANNEL_NANOS = "elapsedBufferEvictToChannelNanos";
+
+    /**
+     * The average latency (nanoseconds) to evict a write cache buffer onto the
+     * backing channel, which is {@link #NBUFFER_EVICTED_TO_CHANNEL} /
+     * {@link #ELAPSED_BUFFER_EVICTED_TO_CHANNEL_NANOS}.
+     * 
+     * @see BLZG-1589 (new latency-oriented counters)
+     */
+    String AVERAGE_BUFFER_EVICTED_TO_CHANNEL_NANOS = "averageBufferEvictToChannelNanos";
+
+    /**
+     * The cumulative number of records written onto the backing channel. This
+     * may be used to track the number of induced write operators per second.
+     * However, note that the RWStore will pad out writes to their slot size in
+     * order to offer the underlying file system and disk controller an
+     * opportunity to meld together multiple writes into a single IO. This is
+     * particularly effective in combination with the small slots optimization.
+     * 
+     * @see BLZG-1589 (new latency-oriented counters)
+     */
+    String NRECORDS_EVICTED_TO_CHANNEL = "nrecordsEvictedToChannel";
+
+    /**
+     * The average latency per record written onto the backing channel, which is
+     * {@link #NRECORDS_EVICTED_TO_CHANNEL} /
+     * {@link #ELAPSED_BUFFER_EVICTED_TO_CHANNEL_NANOS}
+     * <p>
+     * Note: records are evicted a buffer at a time. Therefore we use the same
+     * divisor here as we do for the
+     * {@link #AVERAGE_BUFFER_EVICTED_TO_CHANNEL_NANOS}.
+     * <p>
+     * This number is fairly misleading as writes are normally transferred to
+     * the disk write queue without blocking. Latency only begins to appear when
+     * the disk write channel is full.
+     * 
+     * @see BLZG-1589 (new latency-oriented counters)
+     */
+    String AVERAGE_RECORD_EVICTED_TO_CHANNEL_NANOS = "averageRecordEvictedToChannelNanos";
+
+    /**
+     * A variant of {@value #AVERAGE_RECORD_EVICTED_TO_CHANNEL_NANOS} that is expressed
+     * directly in terms of random write IO / second.
+     */
+    String AVERAGE_RANDOM_WRITES_PER_SECOND = "averageRandomWritesToChannelPerSecond";
+    
+    /**
      * The #of {@link WriteCache} buffers that have been compacted.
      */
     String NCOMPACT = "ncompact";
@@ -105,6 +157,22 @@ public interface IWriteCacheServiceCounters {
      * The #of record-level writes made onto the {@link WriteCacheService}.
      */
     String NCACHE_WRITES = "ncacheWrites";
+
+    /**
+     * The cumulative number of nanoseconds latency when writing into the write
+     * cache.
+     * 
+     * See BLZG-1589 (new latency-oriented counters)
+     */
+    String ELAPSED_CACHE_WRITES_NANOS = "elapsedCacheWriteNanos";
+
+    /**
+     * The average latency (nanoseconds) to write a record onto the write cache,
+     * which is {@link #NCACHE_WRITES} / {@link #ELAPSED_CACHE_WRITES_NANOS}.
+     * 
+     * See BLZG-1589 (new latency-oriented counters)
+     */
+    String AVERAGE_CACHE_WRITE_NANOS = "averageCacheWriteNanos";
 
     /**
      * The requests to clear an address from the cache.
@@ -125,7 +193,7 @@ public interface IWriteCacheServiceCounters {
      * The #of megabytes per second written onto the backing channel.
      */
     String MB_PER_SEC = "mbPerSec";
-
+    
     /*
      * ReadCache counters.
      */

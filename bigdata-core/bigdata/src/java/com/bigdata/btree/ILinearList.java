@@ -43,7 +43,6 @@ package com.bigdata.btree;
  * B+Tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ILinearList {
 

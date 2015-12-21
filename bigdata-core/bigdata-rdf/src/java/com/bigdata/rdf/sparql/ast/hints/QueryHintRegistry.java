@@ -118,6 +118,8 @@ public class QueryHintRegistry {
         add(new RemoteAPHint());
         add(new AccessPathSampleLimitHint());
         add(new AccessPathScanAndFilterHint());
+        add(new NumTasksPerThreadHint());
+        add(new MinDatapointsPerTaskHint());
         
         // DESCRIBE
         add(new DescribeModeHint());
@@ -176,6 +178,16 @@ public class QueryHintRegistry {
          * type == StatementEnum.History, which are normally hidden from view). 
          */
         add(new HistoryHint());
+        
+        /*
+         * Selectively enable/disbale usage of pipelined hash joins.
+         */
+        add(new PipelinedHashJoinHint());
+        
+        /*
+         * Disable default graph distinct filter
+         */
+        add(new DefaultGraphDistinctFilterHint());
         
     }
 

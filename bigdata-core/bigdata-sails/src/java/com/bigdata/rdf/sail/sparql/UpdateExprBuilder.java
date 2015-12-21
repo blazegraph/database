@@ -55,15 +55,18 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
 import com.bigdata.rdf.sail.sparql.ast.ASTCreate;
+import com.bigdata.rdf.sail.sparql.ast.ASTCreateEntailments;
 import com.bigdata.rdf.sail.sparql.ast.ASTDeleteClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTDeleteData;
 import com.bigdata.rdf.sail.sparql.ast.ASTDeleteWhere;
+import com.bigdata.rdf.sail.sparql.ast.ASTDisableEntailments;
 import com.bigdata.rdf.sail.sparql.ast.ASTDrop;
+import com.bigdata.rdf.sail.sparql.ast.ASTDropEntailments;
+import com.bigdata.rdf.sail.sparql.ast.ASTEnableEntailments;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphOrDefault;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphRefAll;
@@ -83,10 +86,14 @@ import com.bigdata.rdf.sparql.ast.AddGraph;
 import com.bigdata.rdf.sparql.ast.ClearGraph;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
+import com.bigdata.rdf.sparql.ast.CreateEntailments;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
 import com.bigdata.rdf.sparql.ast.DeleteData;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
+import com.bigdata.rdf.sparql.ast.DisableEntailments;
+import com.bigdata.rdf.sparql.ast.DropEntailments;
 import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.EnableEntailments;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.InsertData;
@@ -95,7 +102,6 @@ import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
-import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -288,35 +294,6 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         if (node.isSilent())
             op.setSilent(true);
 
-        final RDFParserOptions options = new RDFParserOptions(
-                context.tripleStore.getProperties());
-
-        if (node.verifyData != null) {
-
-            options.setVerifyData(node.verifyData);
-
-        }
-
-        if (node.stopAtFirstError != null) {
-
-            options.setStopAtFirstError(node.stopAtFirstError);
-
-        }
-
-        if (node.preserveBNodeIDs != null) {
-
-            options.setPreserveBNodeIDs(node.preserveBNodeIDs);
-
-        }
-
-        if (node.datatypeHandling != null) {
-
-            options.setDatatypeHandling(node.datatypeHandling);
-
-        }
-
-        op.setRDFParserOptions(options);
-        
         if (node.jjtGetNumChildren() > 1) {
 
             final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(1)
@@ -633,12 +610,14 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             final ASTIRI withNode = node.getWithClause();
             
             if (withNode != null) {
-                
-                if (!context.tripleStore.isQuads()) {
-                    throw new QuadsOperationInTriplesModeException(
-                         "Using named graph referenced through WITH clause " +
-                         "is not supported in triples mode.");
-                }
+
+                // @see https://jira.blazegraph.com/browse/BLZG-1176
+                // moved to com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
+//                if (!context.tripleStore.isQuads()) {
+//                    throw new QuadsOperationInTriplesModeException(
+//                         "Using named graph referenced through WITH clause " +
+//                         "is not supported in triples mode.");
+//                }
                 
                 with = (ConstantNode) withNode.jjtAccept(this, data);
 
@@ -778,15 +757,17 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         /**
          * Reject real quads in triple mode
          */
-        if (!context.tripleStore.isQuads()) {
-           for (Statement stmt : stmts) {
-              if (stmt!=null && stmt.getContext()!=null) {
-                 throw new QuadsOperationInTriplesModeException(
-                    "Quads in SPARQL update data block are not supported " +
-                    "in triples mode.");
-              }
-           }
-        }
+        // @see https://jira.blazegraph.com/browse/BLZG-1176
+        // moved to com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
+//        if (!context.tripleStore.isQuads()) {
+//           for (Statement stmt : stmts) {
+//              if (stmt!=null && stmt.getContext()!=null) {
+//                 throw new QuadsOperationInTriplesModeException(
+//                    "Quads in SPARQL update data block are not supported " +
+//                    "in triples mode.");
+//              }
+//           }
+//        }
 
          if (!allowBlankNodes) {
    
@@ -1094,5 +1075,29 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         return c;
 
     }
-
+    
+	@Override
+	public DropEntailments visit(ASTDropEntailments node, Object data)
+			throws VisitorException {
+		return new DropEntailments();
+	}
+	
+	@Override
+	public CreateEntailments visit(ASTCreateEntailments node, Object data)
+			throws VisitorException {
+		return new CreateEntailments();
+	}
+	
+	@Override
+	public EnableEntailments visit(ASTEnableEntailments node, Object data)
+			throws VisitorException {
+		return new EnableEntailments();
+	}
+	
+	@Override
+	public DisableEntailments visit(ASTDisableEntailments node, Object data)
+			throws VisitorException {
+		return new DisableEntailments();
+	}
+	
 }

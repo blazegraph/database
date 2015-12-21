@@ -92,6 +92,9 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -262,8 +265,11 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
              * the triple/sids/quads mode distinction and even other
              * configuration properties for the KB instance.
              */
-            astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(
-                    queryStr, baseURI);
+			astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
+			// Force the QueryEngine to exist for this db.
+            QueryEngineFactory.getInstance().getQueryController((IBTreeManager) store.getIndexManager());
+//            ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
 //            queryPlan = AST2BOpUtility.convert(context = new AST2BOpContext(
 //                    astContainer, store));
@@ -302,7 +308,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
 
                 final TupleQueryResult queryResult = ASTEvalHelper
                         .evaluateTupleQuery(store, astContainer,
-                                new QueryBindingSet());
+                                new QueryBindingSet(), null /* dataset */);
 
 //                final TupleQueryResult queryResult = ASTEvalHelper
 //                        .evaluateTupleQuery(store, queryPlan,
@@ -319,7 +325,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
                 final Set<Statement> expectedResult = readExpectedGraphQueryResult();
 
                 final GraphQueryResult gqr = ASTEvalHelper.evaluateGraphQuery(
-                        store, astContainer, new QueryBindingSet());
+                        store, astContainer, new QueryBindingSet(), null /* dataset */);
                 
 //                final GraphQueryResult gqr = ASTEvalHelper.evaluateGraphQuery(
 //                        store, //
@@ -341,7 +347,7 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
             case ASK: {
 
                 final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
-                        store, astContainer, new QueryBindingSet());
+                        store, astContainer, new QueryBindingSet(), null /* dataset */);
 
 //                final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
 //                        store, queryPlan, new QueryBindingSet(),
@@ -640,8 +646,10 @@ abstract public class AbstractDataDrivenSPARQLTestCase extends
             final String baseURI = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#"
                     + queryFileURL;
 
-            astContainer = new Bigdata2ASTSPARQLParser(store).parseUpdate2(
-                    queryStr, baseURI);
+            Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser();
+            astContainer = parser.parseUpdate2(queryStr, baseURI);
+            ASTDeferredIVResolution.resolveUpdate(store, astContainer);
+
 
         }
 

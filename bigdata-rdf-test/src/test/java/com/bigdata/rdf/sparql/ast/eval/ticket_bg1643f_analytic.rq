@@ -1,0 +1,12 @@
+SELECT ?entity ?p ?o
+WHERE {
+  hint:Query hint:analytic "true" .
+  
+  VALUES ?entity { <http://s1> }
+  ?entity ?p ?o .
+  FILTER NOT EXISTS {
+    VALUES ( ?entity ?p ?o ) {
+      ( <http://s1> <http://o> "a"^^<http://my.datatype> )
+    }
+  }
+}

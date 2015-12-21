@@ -712,13 +712,13 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             final byte[] val = tupleSer.serializeVal(data[i].v);
 
             // insert first
-            ndx.insert(key, val, false/* delete */, timestamp, ndx
+            ndx.insert(key, val, false/* delete */, false/*putIfAbsent*/, timestamp, ndx
                     .getWriteTuple());
 
             if (delete) {
 
                 // then convert to a delete marker.
-                ndx.insert(key, null/* val */, true/* delete */, timestamp, ndx
+                ndx.insert(key, null/* val */, true/* delete */, false/*putIfAbsent*/, timestamp, ndx
                         .getWriteTuple());
                 
                 ndeleted++;

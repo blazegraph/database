@@ -62,6 +62,7 @@ import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.BatchPutIfAbsent.BatchPutIfAbsentConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -158,7 +159,6 @@ import cutthecrap.utils.striterators.IFilter;
  *       against which the parallelized operation must be mapped.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ClientIndexView implements IScaleOutClientIndex {
 
@@ -462,7 +462,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         return tupleSer;
 
     }
-    
+
+    @Override
     public boolean contains(Object key) {
 
         key = getTupleSerializer().serializeKey(key);
@@ -471,7 +472,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
     
-    public boolean contains(byte[] key) {
+    @Override
+    public boolean contains(final byte[] key) {
         
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -489,6 +491,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
     
+    @Override
     public Object insert(Object key,Object val) {
         
         final ITupleSerializer tupleSer = getTupleSerializer();
@@ -504,7 +507,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
     
-    public byte[] insert(byte[] key, byte[] value) {
+    @Override
+    public byte[] insert(final byte[] key, final byte[] value) {
 
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -523,6 +527,27 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
+    @Override
+    public byte[] putIfAbsent(final byte[] key, final byte[] value) {
+
+        if (batchOnly)
+            log.error(NON_BATCH_API,new RuntimeException());
+        else
+            if(WARN) log.warn(NON_BATCH_API);
+
+        final byte[][] keys = new byte[][] { key };
+        final byte[][] vals = new byte[][] { value };
+        
+        final IResultHandler resultHandler = new IdentityHandler();
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
+                BatchPutIfAbsentConstructor.RETURN_OLD_VALUES, resultHandler);
+
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
+
+    }
+
+    @Override
     public Object lookup(Object key) {
         
         key = getTupleSerializer().serializeKey(key);
@@ -534,7 +559,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
 
-    public byte[] lookup(byte[] key) {
+    @Override
+    public byte[] lookup(final byte[] key) {
 
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -552,6 +578,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
+    @Override
     public Object remove(Object key) {
         
         key = getTupleSerializer().serializeKey(key);
@@ -563,6 +590,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
     
+    @Override
     public byte[] remove(final byte[] key) {
 
         if (batchOnly)
@@ -586,6 +614,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * partitions.
      */
 
+    @Override
     public long rangeCount() {
         
         return rangeCount(null, null);
@@ -599,6 +628,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/470">
      *      Optimize range counts on cluster </a>
      */
+    @Override
     public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final LongAggregator handler = new LongAggregator();
@@ -616,6 +646,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * The exact range count is obtained by mapping a key-range scan over the
      * index partitions. The operation is parallelized.
      */
+    @Override
     final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final LongAggregator handler = new LongAggregator();
@@ -634,6 +665,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * mapping a key-range scan over the index partitions. The operation is
      * parallelized.
      */
+    @Override
     final public long rangeCountExactWithDeleted(final byte[] fromKey,
             final byte[] toKey) {
 
@@ -648,6 +680,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
     
+    @Override
     final public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);
@@ -659,6 +692,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * {@link ResultSet}s to cover all index partitions spanned by the key
      * range.
      */
+    @Override
     public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
         
         return rangeIterator(fromKey, toKey, capacity,
@@ -680,6 +714,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      *       until the caller uses first(), last(), seek(), hasNext(), or
      *       hasPrior().
      */
+    @Override
     public ITupleIterator rangeIterator(final byte[] fromKey,
             final byte[] toKey, int capacity, final int flags,
             final IFilter filter) {
@@ -856,7 +891,6 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      * @param <E>
      */
     private static class UnchunkedTupleIterator<E> implements ITupleIterator<E> {
@@ -876,6 +910,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         }
         
         //@Override
+        @Override
         public boolean hasNext() {
 
             while (!exhausted
@@ -901,7 +936,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
-        //@Override
+        @Override
         public ITuple<E> next() {
 
             if (!hasNext())
@@ -911,7 +946,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             
         }
 
-        //@Override
+        @Override
         public void remove() {
 
             throw new UnsupportedOperationException();
@@ -925,6 +960,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
          *       lot of work on the remote data services in which case the
          *       client GC might not be timely.
          */
+        @Override
         protected void finalize() throws Exception {
             
             src.close();
@@ -1007,6 +1043,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             try {
@@ -1111,6 +1148,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
             }
             
+            @Override
             public Void call() throws Exception {
 
                 try {
@@ -1179,7 +1217,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/454">
      *      Global Row Store Read on Cluster uses Tx </a>
      */
-    public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
+    @Override
+    public <T> T submit(final byte[] key, final ISimpleIndexProcedure<T> proc) {
 
         if (false && readConsistent && proc.isReadOnly()
                 && TimestampUtility.isReadCommittedOrUnisolated(getTimestamp())) {
@@ -1238,8 +1277,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @param proc
      * @return
      */
-    private Object submit(final long ts, final byte[] key,
-            final ISimpleIndexProcedure proc) {
+    private <T> T submit(final long ts, final byte[] key,
+            final ISimpleIndexProcedure<T> proc) {
 
         // Find the index partition spanning that key.
         final PartitionLocator locator = fed.getMetadataIndex(name, ts).find(
@@ -1258,7 +1297,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             }
 
             // required to get the result back from the procedure.
-            final IResultHandler<?, ?> resultHandler = new IdentityHandler();
+            final IResultHandler<T, T> resultHandler = new IdentityHandler<T>();
 
             final SimpleDataServiceProcedureTask task = new SimpleDataServiceProcedureTask(
                     this, key, ts, new Split(locator, 0, 0), proc, resultHandler);
@@ -1267,7 +1306,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             getThreadPool().submit(task).get(taskTimeout, TimeUnit.MILLISECONDS);
 
             // the singleton result.
-            final Object result = resultHandler.getResult();
+            final T result = resultHandler.getResult();
 
             return result;
 
@@ -1279,6 +1318,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
     
+    @Override
     @SuppressWarnings("unchecked")
     public Iterator<PartitionLocator> locatorScan(final long ts,
             final byte[] fromKey, final byte[] toKey, final boolean reverseScan) {
@@ -1298,6 +1338,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * When the task is not parallelizable the tasks will be submitted to the
      * corresponding index partitions at a time and in key order.
      */
+    @Override
     public void submit(final byte[] fromKey, final byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler resultHandler) {
 
@@ -1455,6 +1496,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @return The aggregated result of applying the procedure to the relevant
      *         index partitions.
      */
+    @Override
     public void submit(final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
             final AbstractKeyArrayIndexProcedureConstructor ctor,
@@ -1892,6 +1934,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
+    @Override
     public LinkedList<Split> splitKeys(long ts, int fromIndex, int toIndex,
             byte[][] keys) {
 
@@ -1899,6 +1942,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
 
+    @Override
     public LinkedList<Split> splitKeys(long ts, int fromIndex, int toIndex,
             KVO[] a) {
 
@@ -2167,6 +2211,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 //        
 //    }
     
+    @Override
     public IDataService getDataService(final PartitionLocator pmd) {
 
         return fed.getDataService(pmd.getDataServiceUUID());
@@ -2178,12 +2223,14 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * index would include all "live" resources in the corresponding
      * {@link MetadataIndex}.
      */
+    @Override
     public IResourceMetadata[] getResourceMetadata() {
         
         throw new UnsupportedOperationException();
         
     }
 
+    @Override
     public void staleLocator(final long ts, final PartitionLocator locator,
             final StaleLocatorException cause) {
 
@@ -2207,6 +2254,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
+    @Override
     public <T extends IKeyArrayIndexProcedure, O, R, A> IRunnableBuffer<KVO<O>[]> newWriteBuffer(
             final IResultHandler<R, A> resultHandler,
             final IDuplicateRemover<O> duplicateRemover,
@@ -2263,6 +2311,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * Return a new {@link CounterSet} backed by the {@link ScaleOutIndexCounters}
      * for this scale-out index.
      */
+    @Override
     public CounterSet getCounters() {
 
         return getFederation().getIndexCounters(name).getCounters();

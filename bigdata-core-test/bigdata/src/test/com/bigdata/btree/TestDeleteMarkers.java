@@ -97,7 +97,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         /*
          * insert a null value under the key.
          */
-        btree.insert(k1, null, false/* delete */, timestamp, null/* tuple */);
+        btree.insert(k1, null, false/* delete */, false/*putIfAbsent*/, timestamp, null/* tuple */);
 
         assertTrue(btree.contains( k1 ));
 
@@ -118,7 +118,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         /*
          * insert a non-null value under that key.
          */
-        btree.insert(k1, v1, false/* delete */, timestamp, null/* tuple */);
+        btree.insert(k1, v1, false/* delete */, false/*putIfAbsent*/, timestamp, null/* tuple */);
         
         assertTrue(btree.contains( k1 ));
 
@@ -141,7 +141,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         /*
          * insert a delete marker under that key.
          */
-        btree.insert(k1, null, true/* delete */, timestamp, null/* tuple */);
+        btree.insert(k1, null, true/* delete */, false/*putIfAbsent*/, timestamp, null/* tuple */);
 
         assertFalse(btree.contains(k1));
 

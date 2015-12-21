@@ -39,7 +39,6 @@ import com.bigdata.btree.filter.TupleFilter;
  * @see IRangeQuery
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ITupleIterator<E> extends Iterator<ITuple<E>> {
 
@@ -59,6 +58,7 @@ public interface ITupleIterator<E> extends Iterator<ITuple<E>> {
      * @throws NoSuchElementException
      *             if there is no next entry.
      */
+	@Override
     public ITuple<E> next();
         
 }

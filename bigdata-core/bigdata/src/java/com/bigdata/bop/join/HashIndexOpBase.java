@@ -34,6 +34,7 @@ import java.util.concurrent.FutureTask;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.ILocatableResourceAnnotations;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.IVariable;
@@ -62,7 +63,7 @@ abstract public class HashIndexOpBase extends PipelineOp implements ISingleThrea
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends HashJoinAnnotations, JoinAnnotations,
-            NamedSetAnnotations {
+            NamedSetAnnotations, ILocatableResourceAnnotations {
 
         /**
          * A mandatory attribute specifying the {@link IHashJoinUtilityFactory} 
@@ -161,6 +162,8 @@ abstract public class HashIndexOpBase extends PipelineOp implements ISingleThrea
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
+        getRequiredProperty(Annotations.RELATION_NAME);
+        
         for (IVariable<?> var : joinVars) {
 
             if (var == null)

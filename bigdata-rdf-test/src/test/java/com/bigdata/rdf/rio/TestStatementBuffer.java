@@ -76,20 +76,53 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         super(name);
     }
 
-    public void test_ctor() {
+    public void test_ctor01() {
         
-        final int capacity = 27;
+    	final int capacity = 27;
+    	
+    	final int queueCapacity = 0;
         
         final AbstractTripleStore store = getStore();
         
         try {
 
 			final StatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
-					store, capacity);
+					store, capacity, queueCapacity);
 
             assertEquals(store, buffer.getDatabase());
 //            assertTrue(buffer.distinct);
-            assertEquals(capacity, buffer.capacity);
+            assertEquals(capacity, buffer.getCapacity());
+            assertEquals(capacity * store.getSPOKeyArity() + 5, buffer.values.length);
+            assertEquals(capacity, buffer.stmts.length);
+            assertEquals(5, buffer.numURIs);
+            assertEquals(0, buffer.numLiterals);
+            assertEquals(0, buffer.numBNodes);
+            assertEquals(0, buffer.numStmts);
+
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
+
+    }
+
+    public void test_ctor02() {
+        
+    	final int capacity = 27;
+    	
+    	final int queueCapacity = 10;
+        
+        final AbstractTripleStore store = getStore();
+        
+        try {
+
+			final StatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
+					store, capacity, queueCapacity);
+
+            assertEquals(store, buffer.getDatabase());
+//            assertTrue(buffer.distinct);
+            assertEquals(capacity, buffer.getCapacity());
             assertEquals(capacity * store.getSPOKeyArity() + 5, buffer.values.length);
             assertEquals(capacity, buffer.stmts.length);
             assertEquals(5, buffer.numURIs);

@@ -39,8 +39,12 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 
 /**
  * Perform open-world value comparison operations per the SPARQL spec (the LT
@@ -220,14 +224,54 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		
     	}
     	
+    	/**
+    	 * Handle LiteralExtensionIVs that support comparison with built-in datatypes.
+         * These types are handled by conversion into a built-in datatype, which can be checked
+         * by Sesame's QueryEvaluationUtil.
+    	 */
+    	Literal l1 = null;
+        Literal l2 = null;
+    	if (left instanceof LiteralExtensionIV || right instanceof LiteralExtensionIV) { 
+    	    
+    	    /**
+    	     * We caught the case where both left and right are LiteralExtensionIVs
+    	     * earlier, so we can be sure that exactly one of the is a LiteralExtensionIVs.
+    	     */
+    	    boolean leftIsLiteralExtensionIV = left instanceof LiteralExtensionIV;
+    	    
+    	    @SuppressWarnings("rawtypes")
+            final AbstractLiteralIV delegate = 
+                leftIsLiteralExtensionIV ?
+                ((LiteralExtensionIV) left).getDelegate():
+                ((LiteralExtensionIV) right).getDelegate();
+                    
+    	    if (delegate !=null) {
+    	        
+    	        Literal delegateAsBuiltInLiteral = null;
+    	        if (delegate instanceof PackedLongIV) {
+    	            
+    	            @SuppressWarnings("rawtypes")
+                    final PackedLongIV iv = (PackedLongIV)delegate;
+    	            delegateAsBuiltInLiteral = new XSDIntegerIV<>(iv.integerValue());
+
+    	        } // else: add other cases here in future
+
+    	        // set left-hand or right-hand side expression
+                if (leftIsLiteralExtensionIV) {
+                    l1 = delegateAsBuiltInLiteral; // may remain null
+                } else {
+                    l2 = delegateAsBuiltInLiteral; // may remanin null
+                }    	        
+    	    }
+    	}
+
 		/*
 		 * Now that the IVs implement the right openrdf interfaces,
 		 * we should be able to mix and match inline with non-inline,
 		 * using either the IV directly or its materialized value.
 		 */
-		final Literal l1 = asLiteral(left);
-		
-		final Literal l2 = asLiteral(right);
+		l1 = l1==null ? asLiteral(left) : l1;
+		l2 = l2==null ? asLiteral(right) : l2;
 		
         if (log.isDebugEnabled()) {
             log.debug(l1);

@@ -52,7 +52,7 @@ public class TestIVBindingSetEncoder extends AbstractBindingSetEncoderTestCase {
         super.setUp();
         
         // The encoder under test.
-        encoder = new IVBindingSetEncoder(false/* filter */);
+        encoder = new IVBindingSetEncoder(valueFactory, false/* filter */);
         
         // The decoder under test (same object as the encoder).
         decoder = (IVBindingSetEncoder) encoder;

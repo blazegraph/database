@@ -27,9 +27,9 @@ import java.util.UUID;
 
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**

@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,6 +37,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 
 /**
  * A SPARQL Update operation.
@@ -93,15 +96,24 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
          * The {@link Scope} (required for operations which have this concept).
          */
         String SCOPE = "scope";
+        
+        /**
+         * Reference to ASTDatasetClause list for operations deferred until evaluation stage
+         * 
+         * @see https://jira.blazegraph.com/browse/BLZG-1176
+         */
+        String DATASET_CLAUSES = "datasetClauses";
  
     }
-    
+
     /**
      * 
      */
     public Update(final UpdateType updateType) {
 
         setProperty(Annotations.UPDATE_TYPE, updateType);
+
+        setProperty(Annotations.DATASET_CLAUSES, Collections.emptyList());
 
     }
 
@@ -188,13 +200,44 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
     }
     
     @Override
-    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
-       return new HashSet<IVariable<?>>();
+    public Set<IVariable<?>> getRequiredBound(final StaticAnalysis sa) {
+       
+    	return new LinkedHashSet<IVariable<?>>();
+    	
     }
 
     @Override
-    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
-       return new HashSet<IVariable<?>>();
+    public Set<IVariable<?>> getDesiredBound(final StaticAnalysis sa) {
+
+        return new LinkedHashSet<IVariable<?>>();
+
+    }
+
+    /**
+	 * Return the {@link ASTDatasetClause} list for operations deferred until
+	 * evaluation stage.
+	 *
+	 * @see Annotations#DATASET_CLAUSES
+	 * @see https://jira.blazegraph.com/browse/BLZG-1176
+     */
+    public void setDatasetClauses(final List<ASTDatasetClause> uc) {
+
+        setProperty(Annotations.DATASET_CLAUSES, uc);
+
+    }
+
+    /**
+	 * Return the {@link ASTDatasetClause} list for operations deferred until
+	 * evaluation stage.
+	 * 
+	 * @see Annotations#DATASET_CLAUSES
+	 * @see https://jira.blazegraph.com/browse/BLZG-1176
+	 */
+    @SuppressWarnings("unchecked")
+    public List<ASTDatasetClause> getDatasetClauses() {
+
+        return (List<ASTDatasetClause>) getProperty(Annotations.DATASET_CLAUSES);
+
     }
     
 }

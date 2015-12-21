@@ -32,6 +32,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
@@ -111,16 +114,22 @@ public class JustIndexWriteProc
      *         {@link Long}.
      */
     @Override
-    public Long apply(final IIndex ndx) {
+    public Long applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
         long nwritten = 0;
         
-        final int n = getKeyCount();
+        final int n = keys.size();
         
         for (int i = 0; i < n; i++) {
 
-            final byte[] key = getKey( i );
+            final byte[] key = keys.get( i );
             
+			/*
+			 * Note: We can not decide nwritten using putIfAbsent() since the
+			 * index is storing nulls.
+			 * 
+			 * See BLZG-1539.
+			 */
             if (!ndx.contains(key)) {
 
                 ndx.insert(key, null/* no value */);
@@ -134,5 +143,15 @@ public class JustIndexWriteProc
         return Long.valueOf(nwritten);
         
     }
+
+    /**
+     * Uses {@link LongAggregator} to combine the mutation counts.
+     */
+	@Override
+	protected IResultHandler<Long, Long> newAggregator() {
+
+		return new LongAggregator();
+
+	}
     
 }

@@ -667,8 +667,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
                   .getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
 
-            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                  tripleStore).parseQuery2(queryString, baseURI);
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                  .parseQuery2(queryString, baseURI);
 
             queryType = astContainer.getOriginalAST().getQueryType();
          }

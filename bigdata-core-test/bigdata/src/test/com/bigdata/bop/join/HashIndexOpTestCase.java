@@ -181,7 +181,8 @@ abstract public class HashIndexOpTestCase extends TestCase2 {
                 new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                 new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(IPredicate.Annotations.RELATION_NAME, "kb")
         );
 
         final SolutionSetHashJoinOp op2 = newSolutionSetHashJoinOp(
@@ -274,7 +275,8 @@ abstract public class HashIndexOpTestCase extends TestCase2 {
                 new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional),//
                 new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(IPredicate.Annotations.RELATION_NAME, "kb")
         );
 
         final SolutionSetHashJoinOp op2 = newSolutionSetHashJoinOp(
@@ -422,7 +424,8 @@ abstract public class HashIndexOpTestCase extends TestCase2 {
                 new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_SOURCE_REF, namedSolutionSetSource)//
+                new NV(HashIndexOp.Annotations.NAMED_SET_SOURCE_REF, namedSolutionSetSource),//
+                new NV(IPredicate.Annotations.RELATION_NAME, "kb")
         );
 
         // Add operator to validate the hash index build.

@@ -1,0 +1,9 @@
+SELECT * WHERE {
+  ?s <http://p1> ?o1
+  {
+    SELECT * WHERE {
+      ?s <http://p2> ?o2 .
+      ?s <http://p3> ?o3 .
+    }
+  }
+}

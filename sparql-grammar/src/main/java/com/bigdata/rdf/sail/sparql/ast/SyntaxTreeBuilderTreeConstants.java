@@ -138,19 +138,23 @@ public interface SyntaxTreeBuilderTreeConstants
   public int JJTUNPARSEDQUADDATABLOCK = 132;
   public int JJTQUADSNOTTRIPLES = 133;
   public int JJTLOAD = 134;
-  public int JJTCLEAR = 135;
-  public int JJTDROP = 136;
-  public int JJTADD = 137;
-  public int JJTMOVE = 138;
-  public int JJTCOPY = 139;
-  public int JJTCREATE = 140;
-  public int JJTINSERTDATA = 141;
-  public int JJTDELETEDATA = 142;
-  public int JJTDELETEWHERE = 143;
-  public int JJTDELETECLAUSE = 144;
-  public int JJTINSERTCLAUSE = 145;
-  public int JJTMODIFY = 146;
-  public int JJTTREFPATTERN = 147;
+  public int JJTDROPENTAILMENTS = 135;
+  public int JJTCREATEENTAILMENTS = 136;
+  public int JJTENABLEENTAILMENTS = 137;
+  public int JJTDISABLEENTAILMENTS = 138;
+  public int JJTCLEAR = 139;
+  public int JJTDROP = 140;
+  public int JJTADD = 141;
+  public int JJTMOVE = 142;
+  public int JJTCOPY = 143;
+  public int JJTCREATE = 144;
+  public int JJTINSERTDATA = 145;
+  public int JJTDELETEDATA = 146;
+  public int JJTDELETEWHERE = 147;
+  public int JJTDELETECLAUSE = 148;
+  public int JJTINSERTCLAUSE = 149;
+  public int JJTMODIFY = 150;
+  public int JJTTREFPATTERN = 151;
 
 
   public String[] jjtNodeName = {
@@ -289,6 +293,10 @@ public interface SyntaxTreeBuilderTreeConstants
     "UnparsedQuadDataBlock",
     "QuadsNotTriples",
     "Load",
+    "DropEntailments",
+    "CreateEntailments",
+    "EnableEntailments",
+    "DisableEntailments",
     "Clear",
     "Drop",
     "Add",
@@ -304,4 +312,4 @@ public interface SyntaxTreeBuilderTreeConstants
     "TRefPattern",
   };
 }
-/* JavaCC - OriginalChecksum=a23c685c9d0b177363263b8d51515da5 (do not edit this line) */
+/* JavaCC - OriginalChecksum=6c4b34a09246f77648980ce382afc6be (do not edit this line) */

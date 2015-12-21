@@ -40,9 +40,9 @@ import com.bigdata.btree.view.FusedView;
 public interface ILocalBTreeView extends IIndex {
 
     /**
-     * The #of {@link AbstractBTree}s sources for the view. This will be ONE
-     * (1) if the view is a {@link BTree}.
-     */
+	 * The #of {@link AbstractBTree}s sources for the view. This will be ONE (1)
+	 * if the view is a {@link BTree}. 
+	 */
     public int getSourceCount();
 
     /**

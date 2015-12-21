@@ -32,12 +32,15 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
+import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
@@ -225,11 +228,11 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     		
     		// ?left > ?right
     		if (left instanceof VarNode) {
-    			addLowerBound((VarNode) left, right, ranges);
+    			addLowerBoundIfConstant((VarNode) left, right, ranges);
     		}
     		
     		if (right instanceof VarNode) {
-    			addUpperBound((VarNode) right, left, ranges);
+    			addUpperBoundIfConstant((VarNode) right, left, ranges);
     		}
     		
     	} else if (uri.equals(FunctionRegistry.LT) || uri.equals(FunctionRegistry.LE)) {
@@ -239,20 +242,31 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     		
     		// ?left < ?right
     		if (left instanceof VarNode) {
-    			addUpperBound((VarNode) left, right, ranges);
+    			addUpperBoundIfConstant((VarNode) left, right, ranges);
     		}
     		
     		if (right instanceof VarNode) {
-    			addLowerBound((VarNode) right, left, ranges);
+    			addLowerBoundIfConstant((VarNode) right, left, ranges);
     		}
     		
     	}
     	
     }
     
-    private void addUpperBound(final VarNode var, final ValueExpressionNode ve, 
+    @SuppressWarnings("unchecked")
+    private void addUpperBoundIfConstant(final VarNode var, final ValueExpressionNode ve, 
     		final Map<VarNode, RangeNode> ranges) {
-    	
+
+        /**
+         * If the node is not a constant, adding it as a range restriction won't
+         * help us: com.bigdata.rdf.internal.constraints.RangeBOp.isToBound(),
+         * which is called when deciding whether to apply a range scane, will
+         * simply ignore non-constant range nodes.
+         */
+        if (!(ve instanceof ConstantNode)) {
+            return; 
+        }
+        
     	RangeNode range = ranges.get(var);
     	if (range == null) {
     		range = new RangeNode(var);
@@ -263,16 +277,41 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     	if (to == null) {
     		to = (ValueExpressionNode) ve.clone();
     	} else {
-    		to = FunctionNode.MIN(to, ve);
+    	    
+    	    try {
+                ConstantNode cOld = (ConstantNode)to;
+                ConstantNode cNew = (ConstantNode)ve;
+                
+        	    if (CompareBOp.compare(
+        	            cNew.getValueExpression().get(), cOld.getValueExpression().get(), CompareOp.LT)) {
+                    to = (ValueExpressionNode) ve.clone(); // override
+        	    }
+    	    } catch (Exception e) {
+    	        // ignore: this may be some non materialized stuff or the like, in which
+    	        // case we just can't do better here, so let's stick with the old value
+    	    }
     	}
     	
-    	range.setTo(to);
+    	if (to!=null)
+    	    range.setTo(to);
     	
     }
     
-    private void addLowerBound(final VarNode var, final ValueExpressionNode ve, 
+    @SuppressWarnings("unchecked")
+    private void addLowerBoundIfConstant(final VarNode var, final ValueExpressionNode ve, 
     		final Map<VarNode, RangeNode> ranges) {
     	
+        /**
+         * If the node is not a constant, adding it as a range restriction won't
+         * help us: com.bigdata.rdf.internal.constraints.RangeBOp.isFromBound(),
+         * which is called when deciding whether to apply a range scan, will
+         * simply ignore non-constant range nodes. See BLZG-1635.
+         */
+
+        if (!(ve instanceof ConstantNode)) {
+            return;
+        }
+
     	RangeNode range = ranges.get(var);
     	if (range == null) {
     		range = new RangeNode(var);
@@ -283,10 +322,23 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     	if (from == null) {
     		from = (ValueExpressionNode) ve.clone();
     	} else {
-    		from = FunctionNode.MAX(from, ve);
+    	    
+            try {
+                ConstantNode cOld = (ConstantNode)ve;
+                ConstantNode cNew = (ConstantNode)ve;
+                
+                if (CompareBOp.compare(
+                        cNew.getValueExpression().get(), cOld.getValueExpression().get(), CompareOp.GT)) {
+                    from = (ValueExpressionNode) ve.clone(); // override
+                }
+            } catch (Exception e) {
+                // ignore: this may be some non materialized stuff or the like, in which
+                // case we just can't do better here, so let's stick with the old value
+            }
     	}
     	
-    	range.setFrom(from);
+    	if (from!=null)
+    	    range.setFrom(from);
     	
     }
     

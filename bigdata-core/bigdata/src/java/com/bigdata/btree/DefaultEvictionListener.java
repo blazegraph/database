@@ -51,16 +51,35 @@ public class DefaultEvictionListener implements
          * neither synchronization nor atomic counters are used to track that
          * information.
          */
-
+        
         if (--node.referenceCount > 0) {
             
             return;
-
             
         }
-
-        final AbstractBTree btree = node.btree;
         
+//        final AbstractBTree btree = node.btree;
+//
+//        final BTreeCounters counters = btree.getBtreeCounters();
+//
+//        counters.queueEvict.incrementAndGet();
+//        
+//        if (--node.referenceCount > 0) {
+//            
+//            return;
+//            
+//        }
+//
+//        counters.queueEvictNoRef.incrementAndGet();
+
+        doEviction(node);
+        
+    }
+    
+    private void doEviction(final AbstractNode<?> node) {
+        
+        final AbstractBTree btree = node.btree;
+
         if (btree.error != null) {
             /**
              * This occurs if an error was detected against a mutable view of
@@ -98,6 +117,8 @@ public class DefaultEvictionListener implements
 				// // this causes transient nodes to be coded on eviction.
 				// if (node.dirty) {
 
+//		        counters.queueEvictDirty.incrementAndGet();
+		        
 				if (node.isLeaf()) {
 
 					/*
@@ -128,7 +149,7 @@ public class DefaultEvictionListener implements
 				if (btree.store != null) {
 
 					// object is persistent (has assigned addr).
-					assert ref.identity != PO.NULL;
+					assert node.identity != PO.NULL;
 
 				}
 

@@ -93,7 +93,7 @@ public class AtomicRowRead extends AbstractAtomicRowReadOrWrite {
      *         regardless of whether or not they were selected.
      */
     @Override
-    public TPS apply(final IIndex ndx) {
+	public TPS apply(final IIndex ndx) {
     
         return atomicRead(ndx, schema, primaryKey, fromTime, toTime,
                 0L/* writeTime */, filter);

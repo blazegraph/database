@@ -9,7 +9,7 @@ if [ -z "$JAVA_OPTS" ] ; then
 fi
 
 if [ -z "$JAVA_HOME" ] ; then
-	JAVA=${JAVA_HOME}/bin/java
+	JAVA="${JAVA_HOME}/bin/java"
 else
 	JAVA=`which java`
 fi

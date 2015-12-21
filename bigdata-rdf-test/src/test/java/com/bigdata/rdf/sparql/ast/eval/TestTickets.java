@@ -27,7 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
@@ -1337,5 +1344,558 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_bg1463d.srx"// resultFileURL
           ).runTest();   
     }
+
+    /**
+     * Ticket 1627: minus fails when preceded by property path.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627a() throws Exception {
+       new TestHelper(
+             "ticket_bg1627a",// testURI,
+             "ticket_bg1627a.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1627b: minus fails when preceded by property path.
+     * Variant of the query where MINUS is indeed eliminated.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627b() throws Exception {
+       new TestHelper(
+             "ticket_bg1627b",// testURI,
+             "ticket_bg1627b.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1627c: minus fails when preceded by property path
+     * - variant of 1627a with different style of property path.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627c() throws Exception {
+       new TestHelper(
+             "ticket_bg1627c",// testURI,
+             "ticket_bg1627c.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1627d: minus fails when preceded by property path
+     * - variant of 1627d with different style of property path.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1627d() throws Exception {
+       new TestHelper(
+             "ticket_bg1627d",// testURI,
+             "ticket_bg1627d.rq",// queryFileURL
+             "ticket_bg1627.trig",// dataFileURL
+             "ticket_bg1627d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1498: Query hint optimizer:None ignored for property
+     * path queries. This is related to ticket 1627, caused
+     * by appending property path decompositions at the end. It
+     * has been fixed along the lines with the previous one.
+     * 
+     * @throws Exception
+     */
+    @SuppressWarnings("unchecked")
+    public void test_ticket_1498() throws Exception {
+       final ASTContainer container = new TestHelper(
+             "ticket_bg1498",// testURI,
+             "ticket_bg1498.rq",// queryFileURL
+             "ticket_bg1498.trig",// dataFileURL
+             "ticket_bg1498.srx"// resultFileURL
+          ).runTest();   
+       
+       /**
+        * We assert that, in the optimized AST and given the input
+        * 
+        * SELECT (count(*) as ?c)
+        * WHERE {
+        *   hint:Query hint:optimizer "None" .
+        *   ?s <http://p1>/<http://p2> "A" . 
+        *   ?s rdf:type <http://T> . 
+        * }
+        * 
+        * the triples pattern ?s rdf:type <http://T> is still at
+        * the last position, i.e. the optimizer hint is considered.
+        */
+       final GraphPatternGroup<IGroupMemberNode> whereClause = 
+           container.getOptimizedAST().getWhereClause();
+       final BOp lastInGroup = whereClause.get(whereClause.arity()-1);
+       
+       final StatementPatternNode sp = (StatementPatternNode)lastInGroup;
+       final VarNode subj = (VarNode)sp.get(0);
+       final ConstantNode pred = (ConstantNode)sp.get(1);
+       final ConstantNode obj = (ConstantNode)sp.get(2);
+       
+       // the statement pattern node is the only node (?s, <const>, <const>),
+       // so the checks below are sufficient to verify our claim
+       assertTrue(subj.getValueExpression().getName().equals("s"));
+       assertTrue(pred.isConstant());
+       assertTrue(obj.isConstant());
+    }
+    
+    /**
+     * Ticket 1648: proper handling of join constraints in merge join.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1648a() throws Exception {
+       new TestHelper(
+             "ticket_bg1648a",// testURI,
+             "ticket_bg1648a.rq",// queryFileURL
+             "ticket_bg1648.trig",// dataFileURL
+             "ticket_bg1648.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1648: proper handling of join constraints in merge join.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1648b() throws Exception {
+       new TestHelper(
+             "ticket_bg1648b",// testURI,
+             "ticket_bg1648b.rq",// queryFileURL
+             "ticket_bg1648.trig",// dataFileURL
+             "ticket_bg1648.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /*
+     * Ticket 1524: MINUS being ignored.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1542a() throws Exception {
+       new TestHelper(
+             "ticket_bg1542a",// testURI,
+             "ticket_bg1542a.rq",// queryFileURL
+             "ticket_bg1542.trig",// dataFileURL
+             "ticket_bg1542a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1524: MINUS being ignored. Analogous test
+     * case for OPTIONAL case.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1542b() throws Exception {
+       new TestHelper(
+             "ticket_bg1542b",// testURI,
+             "ticket_bg1542b.rq",// queryFileURL
+             "ticket_bg1542.trig",// dataFileURL
+             "ticket_bg1542b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611a_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611a_analytic",// testURI,
+             "ticket_bg611a_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611a_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611a_nonanalytic",// testURI,
+             "ticket_bg611a_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611b_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611b_nonanalytic",// testURI,
+             "ticket_bg611b_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611b_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611b_analytic",// testURI,
+             "ticket_bg611b_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611c_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611c_nonanalytic",// testURI,
+             "ticket_bg611c_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611c_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611c_analytic",// testURI,
+             "ticket_bg611c_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611d_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611d_nonanalytic",// testURI,
+             "ticket_bg611d_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611d_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611d_analytic",// testURI,
+             "ticket_bg611d_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611e_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611e_nonanalytic",// testURI,
+             "ticket_bg611e_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611e.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611e_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611e_analytic",// testURI,
+             "ticket_bg611e_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611e.srx"// resultFileURL
+          ).runTest();   
+    }
+
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * with literal in object position (analytic version). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643a_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643a_analytic",// testURI,
+             "ticket_bg1643a_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service,
+     * with literal in object position (non-analytic equivalent). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643a_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643a_nonanalytic",// testURI,
+           "ticket_bg1643a_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643a.srx"// resultFileURL
+          ).runTest();   
+    }
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * with URI in object position (analytic version). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643b_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643b_analytic",// testURI,
+             "ticket_bg1643b_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service,
+     * with URI in object position (non-analytic equivalent). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643b_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643b_nonanalytic",// testURI,
+           "ticket_bg1643b_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode). Version with MINUS. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643c_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643c_analytic",// testURI,
+             "ticket_bg1643c_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with MINUS. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643c_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643c_nonanalytic",// testURI,
+           "ticket_bg1643c_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643c.srx"// resultFileURL
+          ).runTest();   
+    }    
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode). Version with URI where FILTER removes element. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643d_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643d_analytic",// testURI,
+             "ticket_bg1643d_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent).  Version with URI where FILTER removes element. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643d_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643d_nonanalytic",// testURI,
+           "ticket_bg1643d_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643d.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode).  Version with literal where FILTER removes element. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643e_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643e_analytic",// testURI,
+             "ticket_bg1643e_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643e.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with literal where FILTER removes element.  Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643e_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643e_nonanalytic",// testURI,
+           "ticket_bg1643e_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643e.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode).Version with literal where FILTER does not apply
+     * because of datatype in literal. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643f_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643f_analytic",// testURI,
+             "ticket_bg1643f_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643f.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with literal where FILTER does not apply
+     * because of datatype in literal.  Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643f_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643f_nonanalytic",// testURI,
+           "ticket_bg1643f_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643f.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode).Version with literal where FILTER applies
+     * because of datatype in literal. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643g_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643g_analytic",// testURI,
+             "ticket_bg1643g_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643g.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with literal where FILTER applies
+     * because of datatype in literal.  Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643g_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643g_nonanalytic",// testURI,
+           "ticket_bg1643g_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643g.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+   /**
+    * BLZG-1683: Required property relationName for HTreeDistinctBindingSetsOp
+    * (analytic version).
+    */
+   public void test_ticket_1683a() throws Exception {
+      new TestHelper(
+          "ticket_bg1683a",// testURI,
+          "ticket_bg1683a.rq",// queryFileURL
+          "ticket_bg1683.trig",// dataFileURL
+          "ticket_bg1683.srx"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+    * BLZG-1683: Required property relationName for HTreeDistinctBindingSetsOp
+    * (non-analytic version).
+    */
+   public void test_ticket_1683b() throws Exception {
+      new TestHelper(
+          "ticket_bg1683b",// testURI,
+          "ticket_bg1683b.rq",// queryFileURL
+          "ticket_bg1683.trig",// dataFileURL
+          "ticket_bg1683.srx"// resultFileURL
+         ).runTest();   
+   }
 
 }

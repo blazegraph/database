@@ -2,10 +2,13 @@ Blazegraph Debian Deployer
 -----------------
 
 ```
+apt-get update #Update to the latest
+cd blazegraph-ha-deb
 mvn package
 dpkg --install target/blazegraph-deb-1.6.0-master-SNAPSHOT.deb
-service blazegraph start
+apt-get install -f -y #force install of dependencies without prompting for updates
 ```
+
 
 This will start a Blazegraph instance running on port 9999 on localhost host.
 

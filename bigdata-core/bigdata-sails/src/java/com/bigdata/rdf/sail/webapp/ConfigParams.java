@@ -186,15 +186,21 @@ public interface ConfigParams {
             .getName();
     
     /**
-     * A class the implements the {@link BlueprintsServletProxy}.
+     * A class that implements the {@link BlueprintsServletProxy}.
      * 
      * @see <a href="https://jira.blazegraph.com/browse/BLZG-1295"> Refactor Blueprints </a>
      * 
      */
-    
     final String BLUEPRINTS_SERVLET_PROVIDER = "blueprintsServletProvider";
     
     final static String DEFAULT_BLUEPRINTS_SERVLET_PROVIDER = BlueprintsServletProxy.getDefaultProvider();
+
+    /**
+     * A class that implements the {@link MapgraphServletProxy}.
+     */
+    final String MAPGRAPH_SERVLET_PROVIDER = "mapgraphServletProvider";
+    
+    final static String DEFAULT_MAPGRAPH_SERVLET_PROVIDER = MapgraphServletProxy.getDefaultProvider();
 
     /**
      * List of the services this instance is allowed to call out to.

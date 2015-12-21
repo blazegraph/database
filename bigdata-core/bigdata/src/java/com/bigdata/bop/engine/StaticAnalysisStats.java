@@ -32,6 +32,9 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.openrdf.model.Value;
+
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 
 /**
@@ -43,23 +46,27 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  */
 public class StaticAnalysisStats implements Serializable {
 
-
    private static final long serialVersionUID = 3092439315838261120L;
 
    /**
-    * Parser statistics.
+    * Batch resolve values to IVs stats.
     */
-   private StaticAnalysisStat parserStat;
+   private final StaticAnalysisStat resolveValuesStat;
    
    /**
     * Parser statistics.
     */
-   private StaticAnalysisStat optimizerLoopStat;
+   private final StaticAnalysisStat parserStat;
+   
+   /**
+    * Optimizer statistics.
+    */
+   private final StaticAnalysisStat optimizerLoopStat;
    
    /**
     * Range count statistics.
     */
-   private StaticAnalysisStat rangeCountStat;
+   private final StaticAnalysisStat rangeCountStat;
 
    /**
     * Map for the statistics of the individual (non-loop).
@@ -77,6 +84,7 @@ public class StaticAnalysisStats implements Serializable {
       this.optimizerStats = new LinkedHashMap<String, StaticAnalysisStat>();
      
       parserStat = new StaticAnalysisStat("ParseTime"); 
+      resolveValuesStat = new StaticAnalysisStat("ResolveValues"); 
       rangeCountStat = new StaticAnalysisStat("RangeCount"); 
       optimizerLoopStat = new StaticAnalysisStat("Optimizers");
       
@@ -88,14 +96,24 @@ public class StaticAnalysisStats implements Serializable {
     * 
     * @param elapsed the elapsed time for the parsing phase.
     */
-   public void registerParserCall(final Long elapsedNanoSec) {
+   public void registerParserCall(final ASTContainer astContainer) {
       
-      if (parserStat==null) {
-         parserStat = new StaticAnalysisStat("ParseTime");
-      }
+		{
+			final Long elapsedNanoSec = astContainer.getQueryParseTime();
+			if (elapsedNanoSec != null) {
+				parserStat.incrementNrCalls();
+				parserStat.addElapsed(elapsedNanoSec);
+			}
+		}
 
-      parserStat.incrementNrCalls();
-      parserStat.addElapsed(elapsedNanoSec);
+		{
+			final Long elapsedNanoSec = astContainer.getResolveValuesTime();
+			if (elapsedNanoSec != null) {
+				resolveValuesStat.incrementNrCalls();
+				resolveValuesStat.addElapsed(elapsedNanoSec);
+			}
+		}
+
    }
    
    /**
@@ -139,9 +157,13 @@ public class StaticAnalysisStats implements Serializable {
        final StringBuilder sb = new StringBuilder();
        sb.append("#StaticAnalysisStats: ");
        if (parserStat!=null) {
-          sb.append(parserStat);
-          sb.append(" ");
-       }
+           sb.append(parserStat);
+           sb.append(" ");
+        }
+       if (resolveValuesStat!=null) {
+           sb.append(resolveValuesStat);
+           sb.append(" ");
+        }
        if (optimizerLoopStat!=null) {
           sb.append(optimizerLoopStat);
           sb.append(" ");
@@ -160,7 +182,14 @@ public class StaticAnalysisStats implements Serializable {
    public StaticAnalysisStat getParserStat() {
       return parserStat;
    }
-   
+
+   /**
+    * @return stat object associated with batch resolution of RDF {@link Value}s to IVs.
+    */
+   public StaticAnalysisStat getResolveValuesStat() {
+      return resolveValuesStat;
+   }
+
    /**
     * @return stats object associated with the optimizer loop class
     */

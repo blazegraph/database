@@ -68,6 +68,7 @@ public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery,
      * <p>
      * Interesting performance counters and other statistics about the index.
      */
+    @Override
     public CounterSet getCounters();
     
     /**
@@ -81,7 +82,7 @@ public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery,
      * 
      * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
      */
-    public Object submit(byte[] key, ISimpleIndexProcedure proc);
+    public <T> T submit(byte[] key, ISimpleIndexProcedure<T> proc);
     
     /**
      * The procedure will be transparently applied against each index partition
@@ -132,6 +133,16 @@ public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery,
      * @param resultHandler
      *            When defined, results from each procedure application will be
      *            reported to this object.
+     * 
+     * TODO In order to allow parallelization within a shard, we need to modify
+     * this method signature to pass in an {@link IResultHandler} constructor
+     * object. That might be something which could be pushed down onto the ctor
+     * argument. It would be used in scale-out to create a DS local result handler
+     * so we can locally aggregate when parallelizing against each shard and then
+     * return that aggregated result to the client which would extract the aggregate
+     * result across the shards from the client's result handler. See BLZG-1537.
+     *            
+	 * @see BLZG-1537 (Schedule more IOs when loading data)
      */
     public void submit(int fromIndex, int toIndex, byte[][] keys,
             byte[][] vals, AbstractKeyArrayIndexProcedureConstructor ctor,

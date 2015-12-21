@@ -33,41 +33,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.rdf.internal.ILexiconConfiguration;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Object provides context required in various stages of parsing queries or
  * updates.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @openrdf
  */
 public class BigdataASTContext {
-
-    protected final AbstractTripleStore tripleStore;
-
-    protected final LexiconRelation lexicon;
-
-    /**
-     * The namespace of the {@link #lexicon}.
-     */
-    protected final String lex;
-
-    protected final ILexiconConfiguration<BigdataValue> conf;
 
     protected final BigdataValueFactory valueFactory;
 
@@ -77,8 +62,6 @@ public class BigdataASTContext {
      * everything which was parsed plus certain well-known items such as
      * {@link RDF#FIRST}, {@link RDF#REST}, and {@link RDF#NIL} which are only
      * used when handling syntactic sugar constructions.
-     * 
-     * @see BatchRDFValueResolver
      */
     protected final Map<Value,BigdataValue> vocab;
     
@@ -87,19 +70,18 @@ public class BigdataASTContext {
      */
     private int constantVarID = 1;
 
-    public BigdataASTContext(final AbstractTripleStore tripleStore) {
+	/**
+	 * 
+	 * @param values
+	 *            A map from the distinct RDF {@link Value} objects in the QUERY
+	 *            or UPDATE request to the corresponding {@link BigdataValue}
+	 *            objects that will be used to process the request.
+	 */
+    public BigdataASTContext(final Map<Value, BigdataValue> values) {
 
-        this.tripleStore = tripleStore;
-
-        this.valueFactory = tripleStore.getValueFactory();
-
-        this.lexicon = tripleStore.getLexiconRelation();
-
-        this.lex = lexicon.getNamespace();
-
-        this.conf = lexicon.getLexiconConfiguration();
+    	this.valueFactory = BigdataValueFactoryImpl.getInstance("");
         
-        this.vocab = new LinkedHashMap<Value, BigdataValue>();
+    	this.vocab = values;
 
     }
 

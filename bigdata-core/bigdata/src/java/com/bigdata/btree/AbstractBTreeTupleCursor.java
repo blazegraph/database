@@ -52,7 +52,6 @@ import com.bigdata.util.BytesUtil;
  * provisioned to visit deleted tuples.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extends Leaf, E>
         implements ITupleCursor2<E> {
@@ -91,26 +90,30 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     /** true iff the cursor was provisioned to visit deleted tuples. */
     final protected boolean visitDeleted;
 
+    @Override
     final public I getIndex() {
 
         return btree;
 
     }
 
-    /** From the ctor. */
+    /** {@inheritDoc}<p>From the ctor. */
+    @Override
     final public byte[] getFromKey() {
         
         return fromKey;
         
     }
 
-    /** From the ctor. */
+    /** {@inheritDoc}<p>From the ctor. */
+    @Override
     final public byte[] getToKey() {
         
         return toKey;
         
     }
     
+    @Override
     final public boolean isDeletedTupleVisitor() {
         
         return visitDeleted;
@@ -128,6 +131,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 //     */
 //    private AbstractCursorPosition<L,E> tempPosition;
     
+    @Override
     final public boolean isCursorPositionDefined() {
 
         return currentPosition != null;
@@ -237,6 +241,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
 
+    @Override
     public String toString() {
         
         return "Cursor{fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
@@ -617,6 +622,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
     }
 
+    @Override
     public byte[] currentKey() {
         
         if(!isCursorPositionDefined()) {
@@ -633,6 +639,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
     
+    @Override
     public ITuple<E> tuple() {
         
         if(!isCursorPositionDefined()) {
@@ -654,6 +661,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
     
+    @Override
     public ITuple<E> first() {
 
 //        // clear references since no longer valid.
@@ -681,6 +689,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
     
+    @Override
     public ITuple<E> last() {
         
 //        // clear references since no longer valid.
@@ -708,6 +717,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
 
+    @Override
     final public ITuple<E> seek(Object key) {
 
         if (key == null)
@@ -718,6 +728,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
     
+    @Override
     public ITuple<E> seek(final byte[] key) {
 
         if (key == null)
@@ -800,10 +811,13 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 //    }
     
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: This is lighter weight than {@link #hasNext()} and {@link #next()}
      * since it does not need to scan to verify that the next position exists
      * before visiting that tuple.
      */
+    @Override
     public ITuple<E> nextTuple() {
         
         if(!isCursorPositionDefined()) {
@@ -833,6 +847,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
     
+    @Override
     public ITuple<E> next() {
 
         final ITuple<E> t;
@@ -869,6 +884,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
 
+    @Override
     public boolean hasNext() {
         
 //        // the next position is already known.
@@ -936,10 +952,13 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: This is lighter weight than {@link #hasNext()} and {@link #next()}
      * since it does not need to scan to verify that the prior position exists
      * before visiting that tuple.
      */
+    @Override
     public ITuple<E> priorTuple() {
         
         if(!isCursorPositionDefined()) {
@@ -966,6 +985,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
 
+    @Override
     public ITuple<E> prior() {
 
         final ITuple<E> t;
@@ -1001,6 +1021,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
     }
     
+    @Override
     public boolean hasPrior() {
     
 //        // the prior position is already known.
@@ -1075,6 +1096,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      * done inside of an implementation that extends the {@link FusedView}
      * cursor implementation, at which point this notice can be removed.
      */
+    @Override
     public void remove() {
 
         if (btree.isReadOnly())
@@ -1123,7 +1145,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         if (btree.getIndexMetadata().getDeleteMarkers()) {
 
             // set the delete marker.
-            btree.insert(key, null/* val */, true/* delete */,
+            btree.insert(key, null/* val */, true/* delete */, false/*putIfAbstent*/,
                     btree.getRevisionTimestamp(), tuple);
             
         } else {

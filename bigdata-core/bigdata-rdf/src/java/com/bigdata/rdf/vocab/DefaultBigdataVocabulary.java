@@ -31,10 +31,13 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 
 /**
- * Extendeded vocabulary to include some new declarations. 
+ * Extended vocabulary to include some new declarations. 
  * Note: Do not modify this class.  Create an entirely new vocabulary and edit
  * {@link AbstractTripleStore.Options#DEFAULT_VOCABULARY_CLASS}.
  * 
+ * NOTE: Default is a terrible name for this class.  The core vocabulary
+ * will naturally evolve over time.  This version of this class was the default
+ * vocabulary for journals created prior to 11/6/2015.  -MP
  */
 public class DefaultBigdataVocabulary extends RDFSVocabulary {
 

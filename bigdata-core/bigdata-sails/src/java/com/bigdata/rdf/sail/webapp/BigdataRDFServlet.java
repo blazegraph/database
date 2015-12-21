@@ -206,7 +206,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	 * @see <a href="http://trac.blazegraph.com/ticket/1075" > LaunderThrowable
 	 *      should never throw an exception </a>
 	 */
-    protected static void launderThrowable(final Throwable t,
+    public static void launderThrowable(final Throwable t,
             final HttpServletResponse resp, final String queryStr) {
         final boolean isQuery = queryStr != null && queryStr.length() > 0;
         try {
@@ -549,7 +549,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    static protected void sendGraph(final HttpServletRequest req,
+    static public void sendGraph(final HttpServletRequest req,
             final HttpServletResponse resp, final Graph g) throws IOException {
         /*
          * CONNEG for the MIME type.

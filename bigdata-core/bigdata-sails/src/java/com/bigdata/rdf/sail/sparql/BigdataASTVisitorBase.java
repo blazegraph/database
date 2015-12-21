@@ -45,7 +45,6 @@ import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTNumericLiteral;
 import com.bigdata.rdf.sail.sparql.ast.ASTQName;
 import com.bigdata.rdf.sail.sparql.ast.ASTRDFLiteral;
-import com.bigdata.rdf.sail.sparql.ast.ASTRDFValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTString;
 import com.bigdata.rdf.sail.sparql.ast.ASTTrue;
 import com.bigdata.rdf.sail.sparql.ast.ASTVar;
@@ -71,14 +70,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
 
     }
 
-    /**
-     * Return <code>true</code> iff the KB is in an RDR enabled mode.
-     */
-    protected boolean getStatementIdentifiers() {
-       
-       return context.tripleStore.getStatementIdentifiers();
-       
-    }
     
     /**
      * Return the depth of the node in the parse tree. The depth is ZERO (0) if
@@ -141,12 +132,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
 
     private static final transient String ws = "                                                                                                                                                                                                                  ";
 
-    /**
-     * Note: The {@link BatchRDFValueResolver} is responsible for annotating the
-     * {@link ASTRDFValue}s in the parse tree with {@link BigdataValue}s whose
-     * {@link IV}s have been resolved against the database. That processor MUST
-     * run before we build the bigdata AST from the jjtree AST nodes.
-     */
     @SuppressWarnings("unchecked")
     private IV<BigdataValue, ?> makeIV(final BigdataValue value)
             throws VisitorException {

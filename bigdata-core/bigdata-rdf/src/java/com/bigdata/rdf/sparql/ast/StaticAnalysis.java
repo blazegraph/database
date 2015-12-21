@@ -2488,6 +2488,29 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             for (IValueExpressionNode exprNode : projection) {
 
+                if (isAggregateExpressionNode(exprNode)) {
+                    return true;
+                }
+
+            }
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Checks if given expression node is or contains any aggregates
+     * <br><br>
+     * After refactoring of SPARQL parser (https://jira.blazegraph.com/browse/BLZG-1176),
+     * AggregationNode needs to be checked recuresively, as its value expression is not completely parsed, but could be an aggregate, that should result in failing checks while preparing queries.
+     * For example, following test is failing without this check: com.bigdata.rdf.sail.sparql.BigdataSPARQL2ASTParserTest.test_agg10() 
+     * 
+     * @param exprNode - expression node to be checked
+     */
+    private static boolean isAggregateExpressionNode(IValueExpressionNode exprNode) {
+        
                 final IValueExpression<?> expr = exprNode.getValueExpression();
 
                 if (expr == null) {
@@ -2496,6 +2519,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                      * The value expression is not cached....
                      */
                     
+                    if (exprNode instanceof AssignmentNode) {
+                        return isAggregateExpressionNode(((AssignmentNode) exprNode).getValueExpressionNode());
+                    }
+
                     if (exprNode instanceof FunctionNode) {
 
                         /*
@@ -2523,13 +2550,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                     return true;
 
                 }
-
-            }
-
-        }
-
-        return false;
-
+                return false;
     }
 
     /**

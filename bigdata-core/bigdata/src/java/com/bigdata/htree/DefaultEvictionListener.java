@@ -26,8 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.EvictionError;
 import com.bigdata.btree.IEvictionListener;
 import com.bigdata.btree.PO;
@@ -42,7 +40,7 @@ import com.bigdata.cache.IHardReferenceQueue;
 public class DefaultEvictionListener implements
         IEvictionListener {
 
-	private static final Logger log = Logger.getLogger(DefaultEvictionListener.class);
+//	private static final Logger log = Logger.getLogger(DefaultEvictionListener.class);
 
 	@Override
     public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
@@ -58,16 +56,35 @@ public class DefaultEvictionListener implements
          * neither synchronization nor atomic counters are used to track that
          * information.
          */
-
+        
         if (--node.referenceCount > 0) {
-            
+
             return;
 
-            
         }
 
-        final AbstractHTree htree = node.htree;
+//        final AbstractHTree htree = node.htree;
+//
+//        final BTreeCounters counters = htree.getBtreeCounters();
+//
+//        counters.queueEvict.incrementAndGet();
+//        
+//        if (--node.referenceCount > 0) {
+//            
+//            return;
+//            
+//        }
+//
+//        counters.queueEvictNoRef.incrementAndGet();
 
+        doEviction(node);
+
+	}
+	
+	private void doEviction(final AbstractPage node) {
+        
+        final AbstractHTree htree = node.htree;
+        
         if (htree.error != null) {
             /**
              * This occurs if an error was detected against a mutable view of
@@ -105,9 +122,11 @@ public class DefaultEvictionListener implements
 //            // this causes transient nodes to be coded on eviction.
 //            if (node.dirty) {
 
-			if (log.isDebugEnabled())
-				log.debug("Evicting: " + (node.isLeaf() ? "leaf" : "node")
-						+ " : " + node.toShortString());
+//            counters.queueEvictDirty.incrementAndGet();
+            
+//			if (log.isDebugEnabled())
+//				log.debug("Evicting: " + (node.isLeaf() ? "leaf" : "node")
+//						+ " : " + node.toShortString());
         	
             if (node.isLeaf()) {
 
@@ -139,7 +158,7 @@ public class DefaultEvictionListener implements
             if (htree.store != null) {
              
                 // object is persistent (has assigned addr).
-                assert ref.getIdentity() != PO.NULL;
+                assert node.getIdentity() != PO.NULL;
                 
             }
             

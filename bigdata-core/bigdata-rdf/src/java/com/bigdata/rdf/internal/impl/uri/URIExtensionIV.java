@@ -24,7 +24,6 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * {@link Vocabulary} and the <code>localName</code> is directly inline.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @param <V>
  */
 public class URIExtensionIV<V extends BigdataURI> 
@@ -55,6 +54,7 @@ public class URIExtensionIV<V extends BigdataURI>
      * delegateIV, then it will be done separately for those objects when they
      * are inserted into the termsCache.
      */
+    @Override
     public IV<V, Object> clone(final boolean clearCache) {
 
         final URIExtensionIV<V> tmp = new URIExtensionIV<V>(delegateIV,
@@ -102,6 +102,7 @@ public class URIExtensionIV<V extends BigdataURI>
      * to go to the index to get the value (it just needs access to the lexicon's
      * vocabulary).
      */
+    @Override
     public boolean needsMaterialization() {
     	return delegateIV.needsMaterialization() 
     	            || namespaceIV.needsMaterialization();
@@ -111,6 +112,7 @@ public class URIExtensionIV<V extends BigdataURI>
         return delegateIV;
     }
     
+    @Override
     public Object getInlineValue() { // TODO TEST
         return new URIImpl(stringValue());
     }
@@ -130,6 +132,7 @@ public class URIExtensionIV<V extends BigdataURI>
         return namespaceIV.hashCode() ^ delegateIV.hashCode();
     }
 
+    @Override
     public boolean equals(final Object o) {
         if (this == o)
             return true;
@@ -140,10 +143,18 @@ public class URIExtensionIV<V extends BigdataURI>
         return false;
     }
     
+    /*
+     * See BLZG-1591. Note that namespaceIV is not being materialized
+     * separately. This fix does not change that.  It instead it uses
+     * the cached value directly.
+     */
+    @Override
     public String toString() {
-        return this.namespaceIV.toString() + ":" + this.delegateIV.toString();
+//        return this.namespaceIV.toString() + ":" + this.delegateIV.toString();
+        return getValue().stringValue();
     }
     
+    @Override
     @SuppressWarnings("rawtypes")
     public int _compareTo(final IV o) {
 
@@ -160,6 +171,7 @@ public class URIExtensionIV<V extends BigdataURI>
      * Return the length of the namespace IV plus the length of the localName
      * IV.
      */
+    @Override
     public int byteLength() {
 
         return 1/* flags */+ namespaceIV.byteLength() + delegateIV.byteLength();
@@ -172,7 +184,8 @@ public class URIExtensionIV<V extends BigdataURI>
 	 * <p>
 	 * {@inheritDoc}
 	 */
-	@SuppressWarnings( { "unchecked", "rawtypes" })
+    @Override
+	@SuppressWarnings( "unchecked" )
 	public V asValue(final LexiconRelation lex) {
 
 		V v = getValueCache();
