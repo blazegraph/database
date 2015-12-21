@@ -1,9 +1,9 @@
-#Add the blazgraph group
-addgroup --system --quiet blzg
 #Add the blazegraph user with the home directory
-adduser --system --home /usr/local/blazegraph --quiet blzg
+/usr/bin/getent group blzg || /usr/sbin/groupadd -r blzg >& /dev/null
+/usr/bin/getent passwd blzg || /usr/sbin/useradd -r -g blzg -d /usr/local/blazegraph -s /sbin/nologin blzg >& /dev/null
+
 #Enable TCP_TW_REUSE
 echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 #Set VM swappiness to 0
 echo "vm.swappiness = 0" >> /etc/sysctl.d/10-vm.swappiness.conf
-sysctl -p
+sysctl -p || true >& /dev/null

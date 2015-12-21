@@ -62,10 +62,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <version>2.1.4</version>
           <extensions>true</extensions>
           <configuration>
-          <license>GPL v2 (c) 2005, SWWDC</license>
+          <license>GPL v2</license>
           <distribution>Blazegraph</distribution>
-          <group>Application/Collectors</group>
-          <icon>src/rpm/resources/icon.gif</icon>
+          <group>High Performance Graph Database</group>
           <packager>SYSTAP, LLC</packager>
           <prefix>${rpm.installDir}</prefix>
           <changelogFile>src/changelog</changelogFile>
@@ -75,7 +74,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </defineStatements>
 -->
           <mappings>
-<!--
             <mapping>
               <directory>${rpm.installDir}/lib</directory>
               <filemode>440</filemode>
@@ -87,7 +85,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </source>
               </sources>
             </mapping>
--->
             <mapping>
               <directory>${rpm.installDir}/war</directory>
               <filemode>440</filemode>
@@ -100,6 +97,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </source>
               </sources>
             </mapping>
+<!--
             <mapping>
               <directory>${rpm.installDir}/lib</directory>
               <filemode>750</filemode>
@@ -107,10 +105,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <groupname>${rpm.group}</groupname>
               <dependency>
                 <includes>
-                  <include>**/*.jar</include>
                 </includes>
               </dependency>
             </mapping>
+-->
             <mapping>
               <directory>${rpm.installDir}/bin</directory>
               <filemode>750</filemode>
@@ -125,7 +123,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             <mapping>
               <directory>${rpm.installDir}/conf</directory>
               <configuration>true</configuration>
-              <filemode>640</filemode>
+              <filemode>750</filemode>
               <username>${rpm.user}</username>
               <groupname>${rpm.group}</groupname>
               <sources>
@@ -141,35 +139,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <source>
                   <location>${project.build.directory}/classes/jetty.xml</location>
                 </source>
-                <!-- soft link the configuration /etc/blazegraph -->
-                <softlinkSource>
-                  <location>${rpm.installDir}/conf</location>
-                  <destination>/etc/blazegraph</destination>
-                </softlinkSource>
               </sources>
             </mapping>
             <mapping>
-              <directory>/etc/init.d</directory>
+              <directory>${rpm.installDir}/data</directory>
               <filemode>750</filemode>
               <username>${rpm.user}</username>
               <groupname>${rpm.group}</groupname>
-              <sources>
-                <source>
-                  <location>src/rpm/init.d/${app.name}</location>
-                </source>
-              </sources>
-            </mapping>
-            <mapping>
-              <directory>/etc/logrotate.d</directory>
-              <filemode>750</filemode>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-              <sources>
-                <source>
-                  <location>src/rpm/logrotate.d/${app.name}</location>
-                </source>
-              </sources>
-            </mapping>
+	    </mapping>
             <mapping>
               <directory>/var/log/${app.name}</directory>
               <filemode>750</filemode>
@@ -177,16 +154,16 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <groupname>${rpm.group}</groupname>
             </mapping>
             <mapping>
+              <directory>/usr/local</directory>
               <sources>
                 <softlinkSource>
                   <location>${rpm.installDir}</location>
-                  <destination>/usr/local/blazegraph</destination>
+                  <destination>${app.name}</destination>
                 </softlinkSource>
               </sources>
             </mapping>
           </mappings>
           <preinstallScriptlet>
-            <script>echo "Installing now"</script>
             <scriptFile>src/rpm/scripts/preinst</scriptFile>
             <fileEncoding>utf-8</fileEncoding>
           </preinstallScriptlet>
@@ -194,6 +171,17 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             <scriptFile>src/rpm/scripts/postinst</scriptFile>
             <fileEncoding>utf-8</fileEncoding>
           </postinstallScriptlet>
+          <postremoveScriptlet>
+            <scriptFile>src/rpm/scripts/postremove</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </postremoveScriptlet>
+          <provides>
+             <provide>blazegraph</provide>
+	  </provides>
+          <requires>
+		<require>/usr/sbin/useradd</require>
+		<require>/usr/bin/getent</require>
+	  </requires>
         </configuration>
        </plugin>
       </plugins>
