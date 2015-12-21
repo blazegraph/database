@@ -1,6 +1,13 @@
-#!/bin/sh
+#!/bin/sh -x
 #
 # /etc/init.d/blazegraph -- startup script for Blazegraph
+#
+# chkconfig: 2345 65 25
+# description:  Blazegraph High Performance Graph Database
+#
+# processname: blazegraph
+# config: /etc/blazegraph/blazegraph
+# pid:  /var/run/blazegraph.pid
 #
 # Modified from the tomcat7 script
 # Written by Miquel van Smoorenburg <miquels@cistron.nl>.
@@ -22,13 +29,14 @@
 # Description:       Start the Blazegraph High Performance Database.
 ### END INIT INFO
 
-set -e
+# source function library
+. /etc/rc.d/init.d/functions
+
+# pull in sysconfig settings
+[ -f /etc/sysconfig/blazegraph ] && . /etc/sysconfig/blazegraph
+
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
-NAME=blazegraph
-DESC="Blazegraph High Performance Database"
-DEFAULT=/etc/${NAME}/$NAME
-JVM_TMP=/tmp/blazegraph-$NAME-tmp
 
 if [ `id -u` -ne 0 ]; then
 	echo "You need root privileges to run this script"
@@ -41,10 +49,25 @@ if [ -r /etc/default/locale ]; then
 	export LANG
 fi
 
-. /lib/lsb/init-functions
 
-if [ -r /etc/default/rcS ]; then
-	. /etc/default/rcS
+NAME="$(basename $0)"
+
+NAME=blazegraph
+DESC="Blazegraph High Performance Database"
+DEFAULT=/etc/${NAME}/$NAME
+JVM_TMP=/tmp/blazegraph-$NAME-tmp
+
+unset ISBOOT
+if [ "${NAME:0:1}" = "S" -o "${NAME:0:1}" = "K" ]; then
+    NAME="${NAME:3}"
+    ISBOOT="1"
+fi
+
+# For SELinux we need to use 'runuser' not 'su'
+if [ -x "/sbin/runuser" ]; then
+    SU="/sbin/runuser -s /bin/sh"
+else
+    SU="/bin/su -s /bin/sh"
 fi
 
 
@@ -75,7 +98,7 @@ OPENJDKS=""
 find_openjdks
 # The first existing directory is used for JAVA_HOME (if JAVA_HOME is not
 # defined in $DEFAULT)
-JDK_DIRS="/usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-7-oracle"
+JDK_DIRS="/usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-7-oracle /usr"
 
 # Look for the right JVM to use
 for jdir in $JDK_DIRS; do
@@ -85,7 +108,7 @@ for jdir in $JDK_DIRS; do
 done
 export JAVA_HOME
 
-# Directory where the Tomcat 6 binary distribution resides
+# Directory where the Blazegraph distribution resides
 if [ -z "$BLZG_HOME" ] ; then
 	BLZG_HOME=/usr/local/$NAME
 fi
@@ -115,7 +138,7 @@ if [ -f "$DEFAULT" ]; then
 fi
 
 if [ ! -f "$BLZG_HOME/bin/blazegraph.sh" ]; then
-	log_failure_msg "$NAME is not installed"
+	echo "$NAME is not installed"
 	exit 1
 fi
 
@@ -153,9 +176,12 @@ blazegraph_sh() {
 		AUTHBIND_COMMAND="/usr/bin/authbind --deep /bin/bash -c "
 	fi
 
+#		source \"$DEFAULT\"; \
+
 	# Define the command to run Tomcat's blazegraph.sh as a daemon
 	# set -a tells sh to export assigned variables to spawned shells.
-	BLZGCMD_SH="set -a; JAVA_HOME=\"$JAVA_HOME\"; source \"$DEFAULT\"; \
+	BLZGCMD_SH="set -a; JAVA_HOME=\"$JAVA_HOME\"; \
+		source \"$DEFAULT\"; \
 		BLZG_HOME=\"$BLZG_HOME\"; \
 		BLZG_BASE=\"$BLZG_BASE\"; \
 		JAVA_OPTS=\"$JAVA_OPTS\"; \
@@ -166,6 +192,8 @@ blazegraph_sh() {
 		cd \"$BLZG_BASE\"; \
 		\"$BLZG_SH\" $@"
 
+	echo "$BLZGCMD" 
+
 	if [ "$AUTHBIND" = "yes" -a "$1" = "start" ]; then
 		BLZGCMD_SH="'$BLZGCMD_SH'"
 	fi
@@ -174,9 +202,10 @@ blazegraph_sh() {
 	set +e
 	touch "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
 	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
-	start-stop-daemon --start -b -u "$BLZG_USER" -g "$BLZG_GROUP" \
-		-c "$BLZG_USER" -d "$BLZG_TMPDIR" -p "$BLZG_PID" \
-		-x /bin/bash -- -c "$AUTHBIND_COMMAND $BLZGCMD_SH"
+	#start-stop-daemon --start -b -u "$BLZG_USER" -g "$BLZG_GROUP" \
+	#	-c "$BLZG_USER" -d "$BLZG_TMPDIR" -p "$BLZG_PID" \
+	#	-x /bin/bash -- -c "$AUTHBIND_COMMAND $BLZGCMD_SH"
+	$SU - $BLZG_USER -c "$BLZGCMD_SH start"
 	status="$?"
 	set +a -e
 	return $status
@@ -185,19 +214,19 @@ blazegraph_sh() {
 case "$1" in
   start)
 	if [ -z "$JAVA_HOME" ]; then
-		log_failure_msg "no JDK or JRE found - please set JAVA_HOME"
+		echo "no JDK or JRE found - please set JAVA_HOME"
 		exit 1
 	fi
 
 	if [ ! -d "$BLZG_BASE/conf" ]; then
-		log_failure_msg "invalid BLZG_BASE: $BLZG_BASE"
+		echo "invalid BLZG_BASE: $BLZG_BASE"
 		exit 1
 	fi
 
-	log_daemon_msg "Starting $DESC" "$NAME"
-	if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
-		--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
-		>/dev/null; then
+	echo "Starting $DESC" "$NAME"
+	#if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
+	#	--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
+	#	>/dev/null; then
 
 		# Regenerate POLICY_CACHE file
 	#	umask 022
@@ -210,30 +239,16 @@ case "$1" in
 		# Remove / recreate JVM_TMP directory
 		rm -rf "$JVM_TMP"
 		mkdir -p "$JVM_TMP" || {
-			log_failure_msg "could not create JVM temporary directory"
+			echo "could not create JVM temporary directory"
 			exit 1
 		}
 		chown $BLZG_USER "$JVM_TMP"
 
-		blazegraph_sh start $SECURITY
+		blazegraph_sh start 
 		sleep 5
-        	if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
-			--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
-			>/dev/null; then
-			if [ -f "$BLZG_PID" ]; then
-				rm -f "$BLZG_PID"
-			fi
-			log_end_msg 1
-		else
-			log_end_msg 0
-		fi
-	else
-	        log_progress_msg "(already running)"
-		log_end_msg 0
-	fi
 	;;
   stop)
-	log_daemon_msg "Stopping $DESC" "$NAME"
+	echo "Stopping $DESC" "$NAME"
 
 	set +e
 	if [ -f "$BLZG_PID" ]; then 
@@ -241,18 +256,18 @@ case "$1" in
 			--user "$BLZG_USER" \
 			--retry=TERM/20/KILL/5 >/dev/null
 		if [ $? -eq 1 ]; then
-			log_progress_msg "$DESC is not running but pid file exists, cleaning up"
+			echo "$DESC is not running but pid file exists, cleaning up"
 		elif [ $? -eq 3 ]; then
 			PID="`cat $BLZG_PID`"
-			log_failure_msg "Failed to stop $NAME (pid $PID)"
+			echo "Failed to stop $NAME (pid $PID)"
 			exit 1
 		fi
 		rm -f "$BLZG_PID"
 		rm -rf "$JVM_TMP"
 	else
-		log_progress_msg "(not running)"
+		echo "(not running)"
 	fi
-	log_end_msg 0
+	echo 0
 	set -e
 	;;
    status)
@@ -263,14 +278,14 @@ case "$1" in
 	if [ "$?" = "0" ]; then
 
 		if [ -f "$BLZG_PID" ]; then
-		    log_success_msg "$DESC is not running, but pid file exists."
+		    echo "$DESC is not running, but pid file exists."
 			exit 1
 		else
-		    log_success_msg "$DESC is not running."
+		    echo "$DESC is not running."
 			exit 3
 		fi
 	else
-		log_success_msg "$DESC is running with pid `cat $BLZG_PID`"
+		echo "$DESC is running with pid `cat $BLZG_PID`"
 	fi
 	set -e
         ;;
@@ -289,7 +304,7 @@ case "$1" in
 	fi
         ;;
   *)
-	log_success_msg "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
+	echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
 	exit 1
 	;;
 esac

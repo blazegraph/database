@@ -4,6 +4,10 @@ Blazegraph RPM Deployer
 This must be run on a platform with the rpm tools installed.
 
 ```
+yum -y install rpm-build
+```
+
+```
 mvn package
 
 service blazegraph start
