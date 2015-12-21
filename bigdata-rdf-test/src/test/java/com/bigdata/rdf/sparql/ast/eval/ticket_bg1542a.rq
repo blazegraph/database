@@ -1,0 +1,9 @@
+select ?s 
+where {
+   ?s <http://p1> ?o1 .
+   MINUS {
+     select ?s (COUNT(?o1) AS ?count_stmt) where {
+       ?s <http://p2> ?o1 .
+     } GROUP BY ?s HAVING (?count_stmt >= 1)
+   } 
+}

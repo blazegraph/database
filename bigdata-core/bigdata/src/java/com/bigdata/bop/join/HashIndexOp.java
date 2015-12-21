@@ -111,7 +111,7 @@ public class HashIndexOp extends HashIndexOpBase {
         
     }
     
-    private static class ChunkTask extends ChunkTaskBase {
+    protected static class ChunkTask extends ChunkTaskBase {
 
         public ChunkTask(final HashIndexOp op,
                 final BOpContext<IBindingSet> context) {

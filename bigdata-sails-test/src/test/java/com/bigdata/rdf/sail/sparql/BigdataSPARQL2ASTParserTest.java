@@ -372,7 +372,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
 
         if (useBigdataParser) {
 
-            new Bigdata2ASTSPARQLParser(tripleStore).parseOperation(query,
+            new Bigdata2ASTSPARQLParser().parseOperation(query,
                     baseURI);
             
         } else {

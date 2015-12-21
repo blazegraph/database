@@ -1,0 +1,14 @@
+@prefix : <http://bigdata.com/> .
+
+:c1 {
+  :john :loves :mary .
+}
+:c2 {
+  :mary :loves :paul .
+}
+:c4 {
+  :paul :loves :sam .
+} 
+:c5 {
+  :paul :loves :sam .
+} 

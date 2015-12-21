@@ -1,0 +1,7 @@
+prefix : <http://bigdata.com/> 
+
+SELECT ?s ?p ?o
+WHERE {
+    hint:Query hint:defaultGraphDistinctFilter "false" .
+    ?s ?p ?o
+}

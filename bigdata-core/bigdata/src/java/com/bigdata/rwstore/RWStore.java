@@ -373,8 +373,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          */
         String SMALL_SLOT_TYPE = RWStore.class.getName() + ".smallSlotType";
 
-        // String DEFAULT_SMALL_SLOT_TYPE = "1024"; // standard default
-        String DEFAULT_SMALL_SLOT_TYPE = "0"; // initial default to no special processing
+        /**
+         * Enable the small slot optimization by default.
+         * 
+         * @see BLZG-1596 (Enable small slot optimization by default)
+         */
+         String DEFAULT_SMALL_SLOT_TYPE = "1024"; // standard default
+//        String DEFAULT_SMALL_SLOT_TYPE = "0"; // initial default to no special processing
 
         /**
          * The #of free bits required to be free in a "small slot" allocator before
@@ -562,7 +567,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     // private final ArrayList<BlobAllocator> m_freeBlobs;
 
     /** lists of blocks requiring commitment. */
-    private final ArrayList<FixedAllocator> m_commitList;
+    // private final ArrayList<FixedAllocator> m_commitList;
+    FixedAllocator m_commitHead;
+    FixedAllocator m_commitTail;
 
 //  private WriteBlock m_writes;
     
@@ -951,8 +958,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         this.storeCounters.set(new StoreCounters(10/* batchSize */));
         
         final IRootBlockView m_rb = fileMetadata.rootBlock;
-
-        m_commitList = new ArrayList<FixedAllocator>();
 
         m_allocs = new ArrayList<FixedAllocator>();
         
@@ -1909,7 +1914,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         final ArrayList<FixedAllocator> list = m_freeFixed[block];
         for (int i = 0; i < list.size(); i++) {
             FixedAllocator f = list.get(i);
-            if (!m_commitList.contains(f)) {
+            if (!isOnCommitList(f)) {
                 list.remove(i);
                 return f;
             }
@@ -2617,8 +2622,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             }
             final long pa = alloc.getPhysicalAddress(addrOffset);
             
-            if (log.isTraceEnabled())
-                log.trace("Freeing allocation at " + addr + ", physical address: " + pa);
+            // In a tight loop, this log level test shows up as a hotspot
+//            if (log.isTraceEnabled())
+//                log.trace("Freeing allocation at " + addr + ", physical address: " + pa);
             alloc.free(addr, sze, overrideSession);
             // must clear after free in case is a blobHdr that requires reading!
             // the allocation lock protects against a concurrent re-allocation
@@ -2648,8 +2654,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             if (alloc.isAllocated(addrOffset))
                 throw new IllegalStateException("Reallocation problem with WriteCache");
 
-            if (alloc.isUnlocked() && !m_commitList.contains(alloc)) {
-                m_commitList.add(alloc);
+            if (alloc.isUnlocked()) {
+                addToCommit(alloc);
             }
             
             m_recentAlloc = true;
@@ -2745,7 +2751,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     if (allocator.checkBlock0()) {
                     	if (log.isInfoEnabled())
                     		log.info("Adding new shadowed allocator, index: " + allocator.getIndex() + ", diskAddr: " + allocator.getDiskAddr());
-                    	m_commitList.add(allocator);
+                    	addToCommit(allocator);
                     }
 
                 } else {
@@ -2795,7 +2801,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     	}
 
                         if (allocator.checkBlock0()) {
-                        	m_commitList.add(allocator);
+                        	addToCommit(allocator);
                         }
                     } else {
                         // Verify free list only has allocators with free bits
@@ -2821,8 +2827,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 	throw new IllegalStateException("Free Allocator unable to allocate address: " + allocator.getSummaryStats());
                 }
 
-                if (allocator.isUnlocked() && !m_commitList.contains(allocator)) {
-                    m_commitList.add(allocator);
+                if (allocator.isUnlocked()) {
+                	addToCommit(allocator);
                 }
 
                 m_recentAlloc = true;
@@ -2905,8 +2911,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      		}
     	}
     	
-    	if (candidate != null && log.isDebugEnabled()) {
-    		log.debug("Found candidate small slot allocator");
+    	if (candidate != null) {
+    		candidate.m_smallSlotHighWaste = true;
+    		if (log.isDebugEnabled()) {
+    			log.debug("Found candidate small slot allocator");
+    		}
     	}
     	
     	return candidate;   	
@@ -3191,7 +3200,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 // FIXME: we should be able to clear the dirty list, but this currently causes
                 //  problems in HA.
                 // If the allocators are torn down correctly, we should be good to clear the commitList
-                 m_commitList.clear();
+                 clearCommitList();
                 
                 // Flag no allocations since last commit
                 m_recentAlloc = false;
@@ -3535,11 +3544,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             // assert m_deferredFreeOut.getBytesWritten() == 0;
 
             // save allocation headers
-            final Iterator<FixedAllocator> iter = m_commitList.iterator();
+            FixedAllocator fa = m_commitHead;
             
-            while (iter.hasNext()) {
+            while (fa != null) {
                 
-                final FixedAllocator allocator = iter.next();
+                final FixedAllocator allocator = fa;
                 
                 // the bit in metabits for the old allocator version.
                 final int old = allocator.getDiskAddr();
@@ -3568,6 +3577,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     throw new RuntimeException(e);
                     
                 }
+                
+                fa = fa.m_nextCommit;
             }
             // DO NOT clear the commit list until the writes have been flushed
             // m_commitList.clear();
@@ -3653,17 +3664,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             
         }
         
-        for (FixedAllocator fa : m_commitList) {
-
-            fa.postCommit();
-            
+        {
+        	FixedAllocator fa = m_commitHead;
+	        while (fa != null) {
+	
+	            fa.postCommit();
+	            
+	            fa = fa.m_nextCommit;
+	            
+	        }
         }
 
         if (m_storageStats != null) {
         	m_storageStats.commit();
         }
 
-        m_commitList.clear();
+        clearCommitList();
 
     }
 
@@ -3787,7 +3803,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
         // add the maximum number of new metaBits storage that may be
         //  needed to save the current committed objects
-        final int commitInts = ((32 + m_commitList.size()) / 32);
+        final int commitInts = ((32 + commitListSize()) / 32);
         final int allocBlocks = (cDefaultMetaBitsSize - 1 + commitInts)/(cDefaultMetaBitsSize-1);
         ints += cDefaultMetaBitsSize * allocBlocks;
         
@@ -4396,6 +4412,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         str.append("\nChecking regions.....");
         
         // Now check all allocators to confirm that each file region maps to only one allocator
+        final Lock lock = m_allocationLock.readLock();
+        lock.lock();
         try {
 	        final HashMap<Integer, FixedAllocator> map = new HashMap<Integer, FixedAllocator>();
 	        for (FixedAllocator fa : m_allocs) {
@@ -4404,6 +4422,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	        str.append("okay\n");
         } catch (IllegalStateException is) {
         	str.append(is.getMessage() + "\n");
+        } finally {
+        	lock.unlock();
         }
         
     }
@@ -4726,15 +4746,47 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //  }
 
     void addToCommit(final FixedAllocator allocator) {
-        if (!m_commitList.contains(allocator)) {
-            m_commitList.add(allocator);
+    	if (allocator.m_prevCommit == null && m_commitHead != allocator) { // not on list
+    		allocator.m_prevCommit = m_commitTail;
+    		if (allocator.m_prevCommit != null) {
+    			allocator.m_prevCommit.m_nextCommit = allocator;
+    			m_commitTail = allocator;
+    		} else {
+    			m_commitHead = m_commitTail = allocator;
+    		}   		
         }
     }
 
-
-    void removeFromCommit(final Allocator allocator) {
-        m_commitList.remove(allocator);
+    final boolean isOnCommitList(final FixedAllocator allocator) {
+    	return allocator.m_prevCommit != null || allocator == m_commitHead;
     }
+    
+    final void clearCommitList() {
+    	FixedAllocator cur = m_commitHead;
+    	while (cur != null) {
+    		final FixedAllocator t = cur;
+    		cur = t.m_nextCommit;
+    		
+    		t.m_prevCommit = t.m_nextCommit = null;
+    	}
+    	
+    	m_commitHead = m_commitTail = null;
+    }
+    
+    final int commitListSize() {
+    	int count = 0;
+    	FixedAllocator cur = m_commitHead;
+    	while (cur != null) {
+    		count++;
+    		cur = cur.m_nextCommit;
+    	}
+    	
+    	return count;
+    }
+    
+//    void removeFromCommit(final Allocator allocator) {
+//        m_commitList.remove(allocator);
+//    }
 
     public Allocator getAllocator(final int i) {
         return (Allocator) m_allocs.get(i);
@@ -5003,6 +5055,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             
             addr <<= 32;
             addr += outlen;
+            
+            // Ensure added to blob allocation stats: BLZG-1646
+            if (outlen > this.m_maxFixedAlloc && m_storageStats != null) {
+            	m_storageStats.allocateBlob(outlen);
+            }
             
             m_deferredFreeOut.reset();
             return addr;            

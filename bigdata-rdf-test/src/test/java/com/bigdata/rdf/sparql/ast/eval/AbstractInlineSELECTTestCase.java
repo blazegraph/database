@@ -156,8 +156,8 @@ public abstract class AbstractInlineSELECTTestCase extends AbstractDataAndSPARQL
         
         private TupleQueryResult executeSelect(String sparql) throws QueryEvaluationException, MalformedQueryException {
         	String prefixes = sparqlPrefixes();
-            astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(prefixes+sparql, FILL_IN_URI);
-        	return ASTEvalHelper.evaluateTupleQuery(store, astContainer, new QueryBindingSet());
+            astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(prefixes+sparql, FILL_IN_URI);
+        	return ASTEvalHelper.evaluateTupleQuery(store, astContainer, new QueryBindingSet(), null /* dataset */);
         }
         
         /**

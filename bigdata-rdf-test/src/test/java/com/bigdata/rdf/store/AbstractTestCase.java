@@ -857,7 +857,8 @@ abstract public class AbstractTestCase
 
                 final IResultHandler<?, ?> resultHandler = new IResultHandler<ResultBitBuffer, Long>() {
 
-                    public void aggregate(ResultBitBuffer result, Split split) {
+                	@Override
+                    public void aggregate(final ResultBitBuffer result, final Split split) {
 
                         // #of elements in this split.
                         final int n = result.getResultCount();
@@ -901,6 +902,7 @@ abstract public class AbstractTestCase
                     /**
                      * The #of statements found.
                      */
+                	@Override
                     public Long getResult() {
 
                         return nfound.get();

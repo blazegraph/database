@@ -1,3 +1,26 @@
+/*
+
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.bfs;
 
 import java.io.Externalizable;
@@ -18,6 +41,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.io.DataOutputBuffer;
@@ -30,9 +54,8 @@ import com.bigdata.util.BytesUtil;
  * Atomic append of a single block to a file version.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
+public class AtomicBlockAppendProc implements ISimpleIndexProcedure<Object>,
         Externalizable {
 
     private static final long serialVersionUID = 1441331704737671258L;
@@ -58,6 +81,7 @@ public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
     private int len;
     private byte[] b;
     
+    @Override
     public final boolean isReadOnly() {
         
         return false;
@@ -116,8 +140,9 @@ public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
      * 
      * @return <code>true</code> iff the block was overwritten.
      */
-    public Object apply(IIndex ndx) {
-
+    @Override
+    public Object apply(final IIndex ndx) {
+    
         // tunnel through to the backing journal.
         final AbstractJournal journal = (AbstractJournal)((AbstractBTree)ndx).getStore();
         
@@ -525,7 +550,8 @@ public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
 
     }
 
-    public void readExternal(ObjectInput in) throws IOException,
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         id = in.readUTF();
@@ -542,7 +568,8 @@ public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
 
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeUTF(id);
 

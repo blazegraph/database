@@ -30,13 +30,15 @@ import com.bigdata.service.Split;
 
 /**
  * An interface for handling results obtained when an {@link IIndexProcedure} is
- * applied to either a unitary index or to partitions of a scale-out index.
+ * parallelized across either a local index or partitions of a scale-out index.
  * 
  * @param <R>
  *            The type of the result from applying the procedure to a single
- *            {@link Split} of data.
+ *            key-range (or {@link Split}} of data.
  * @param <A>
  *            The type of the aggregated result.
+ * 
+ * @see BLZG-1537 (Schedule more IOs when loading data)
  * 
  * @todo drop {@link #getResult()} from the signature? The handler
  *       implementation can expose a custom method when an aggregated return is
@@ -44,7 +46,6 @@ import com.bigdata.service.Split;
  *       results as they are obtained without any sense of aggregation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IResultHandler<R extends Object, A extends Object> {
     

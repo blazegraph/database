@@ -1,0 +1,7 @@
+SELECT * WHERE {
+  ?s <http://p1> ?o1
+  OPTIONAL {
+    ?s <http://p2> ?o2 .
+    ?s <http://p3> ?o3 .
+  }
+} LIMIT 100 # effectively all

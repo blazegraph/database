@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="s0"/>
+    <variable name="s1"/>
+    <variable name="s2"/>
+    <variable name="s10"/>
+    <variable name="s20"/>
+    <variable name="s0pluss1"/>
+    <variable name="s20minuss10"/>
+  </head>
+  <results>
+    <result>
+      <binding name="s0">
+        <literal datatype="http://www.bigdata.com/rdf/datatype#compressedTimestamp">0</literal>
+      </binding>
+      <binding name="s1">
+        <literal datatype="http://www.bigdata.com/rdf/datatype#compressedTimestamp">1</literal>
+      </binding>
+      <binding name="s2">
+        <literal datatype="http://www.bigdata.com/rdf/datatype#compressedTimestamp">2</literal>
+      </binding>
+      <binding name="s10">
+        <literal datatype="http://www.bigdata.com/rdf/datatype#compressedTimestamp">10</literal>
+      </binding>
+      <binding name="s20">
+        <literal datatype="http://www.bigdata.com/rdf/datatype#compressedTimestamp">20</literal>
+      </binding>
+      <binding name="s0pluss1">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">1</literal>
+      </binding>
+      <binding name="s20minuss10">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">10</literal>
+      </binding>
+    </result>
+  </results>
+</sparql>

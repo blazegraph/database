@@ -405,8 +405,8 @@ public class TripleStoreUtility {
 
         try {
 
-            final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(
-                    tmp, 100000/* capacity */);
+			final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(tmp, 100000/* capacity */,
+					10/* queueCapacity */);
 
             final IV NULL = null;
 

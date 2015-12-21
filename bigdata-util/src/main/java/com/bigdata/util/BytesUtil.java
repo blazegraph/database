@@ -1666,5 +1666,22 @@ public class BytesUtil {
         return a;
 
     }
+    
+
+    /**
+     * Converts a byte array into a binary string. Useful for debugging.
+     * 
+     * @param zOrderByteArray
+     * @return
+     */
+    public static String byteArrToBinaryStr(byte[] zOrderByteArray) {
+       
+       final StringBuffer buf = new StringBuffer();
+       for (int i=0; i<zOrderByteArray.length*8; i++) {
+          buf.append(BytesUtil.getBit(zOrderByteArray, i) ? "1" : "0");
+       }
+       
+       return buf.toString();
+    }
 
 }

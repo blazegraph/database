@@ -128,23 +128,29 @@ public class RemoteSparqlBuilderFactory {
             throw new IllegalArgumentException();
 
         /*
-         * When true, there is only one binding set to be vectored and it is
+         * When 'SPARQLVersion.SPARQL_10', there is only one binding set to be vectored and it is
          * empty. We DO NOT use the BINDINGS clause for this case in order to be
          * compatible with services which do and do not support BINDINGS.
          */
 
-        if(!serviceOptions.isSparql11()) {
+        if(serviceOptions.getSPARQLVersion().equals(SPARQLVersion.SPARQL_10)) {
             
             return new RemoteSparql10QueryBuilder(serviceNode);
 
         }
-        
+                
         final boolean singleEmptyBindingSet = (bindingSets.length == 0)
                 || (bindingSets.length == 1 && bindingSets[0].size() == 0);
         
         if (!singleEmptyBindingSet && hasCorrelatedBlankNodeBindings(bindingSets)) {
 
             return new RemoteSparql10QueryBuilder(serviceNode);
+
+        }
+        
+        if(serviceOptions.getSPARQLVersion().equals(SPARQLVersion.SPARQL_11_DRAFT_BINDINGS)) {
+            
+            return new RemoteSparql11DraftQueryBuilder(serviceNode);
 
         }
 

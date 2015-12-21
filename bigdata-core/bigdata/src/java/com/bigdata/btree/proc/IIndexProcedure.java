@@ -113,5 +113,5 @@ public interface IIndexProcedure<T> extends IReadOnly, Serializable {
      *         across a network interface.
      */
     public T apply(IIndex ndx);
-
+	
 }

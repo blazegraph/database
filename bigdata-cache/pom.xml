@@ -29,12 +29,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.0-master-SNAPSHOT</version>
+    <version>1.6.1-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-cache</artifactId>
-  <version>1.6.0-master-SNAPSHOT</version>
+  <version>1.6.1-master-SNAPSHOT</version>
   <name>Blazegraph Cache</name>
   <packaging>jar</packaging>
 
@@ -112,9 +112,24 @@ ga('send', 'pageview');
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-util</artifactId>
+      <artifactId>bigdata-common-util</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>system-utils</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-statics</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!--dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${project.version}</version>
+    </dependency-->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-util</artifactId>

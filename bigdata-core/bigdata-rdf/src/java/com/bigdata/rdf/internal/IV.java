@@ -122,7 +122,18 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * {@link IV} using {@link #getInlineValue()}.
      */
     DTE getDTE();
-
+    
+    /**
+     * IFF {@link #getDTE()} returns {@link DTE#Extension} then this method will
+     * report the {@link DTEExtension} value that specifies the intrinsic
+     * datatype for this IV.
+     * 
+     * @see BLZG-1507 (Implement support for DTE extension types for URIs)
+     * 
+     * @see BLZG-1595 ( DTEExtension for compressed timestamp)
+     */
+    DTEExtension getDTEX();
+    
 	/**
 	 * <code>true</code> iff the {@link IV} represents a <em>null</em>
 	 * {@link IV} reference. <code>null</code> {@link IV}s are somewhat special.

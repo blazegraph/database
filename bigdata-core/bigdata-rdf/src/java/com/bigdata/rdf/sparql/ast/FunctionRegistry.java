@@ -77,7 +77,9 @@ import com.bigdata.rdf.internal.constraints.SubstrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UUIDBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
+import com.bigdata.rdf.internal.constraints.XsdLongBOp;
 import com.bigdata.rdf.internal.constraints.XsdStrBOp;
+import com.bigdata.rdf.internal.constraints.XsdUnsignedLongBOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
@@ -243,6 +245,8 @@ public class FunctionRegistry {
     public static final URI XSD_INT = XMLSchema.INTEGER;
     public static final URI XSD_STR = XMLSchema.STRING;
     public static final URI XSD_DATE = XMLSchema.DATE;
+    public static final URI XSD_LONG = XMLSchema.LONG;
+    public static final URI XSD_UNSIGNED_LONG = XMLSchema.UNSIGNED_LONG;
 
     static {
         add(AVERAGE, new AggregateFactory() {
@@ -897,6 +901,34 @@ public class FunctionRegistry {
 	    add(XSD_FLT, new CastFactory(XMLSchema.FLOAT.toString()));
 
 	    add(XSD_INT, new CastFactory(XMLSchema.INTEGER.toString()));
+
+        add(XSD_LONG, new Factory() {
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class);
+
+//              final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
+
+                return new XsdLongBOp(ve, globals);
+
+            }
+        });
+
+        add(XSD_UNSIGNED_LONG, new Factory() {
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class);
+
+//              final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
+
+                return new XsdUnsignedLongBOp(ve, globals);
+
+            }
+        });
 
 	    /*
 	     * Changed the xsd:string cast operator to use XsdStrBOp instead of the

@@ -40,7 +40,6 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
-import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
@@ -717,5 +716,35 @@ public interface QueryHints {
 
    boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
          System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "false"));
+   
+   /**
+    * Prefer pipelined hash join over its normal, non-pipelined variant.
+    * If set to true, this parameter can still be overridden by query hint.
+    * If set to false, the pipelined hash join will only be used in
+    * some exceptional cases (i.e., for LIMIT queries in which pipelining 
+    * brings a clear benefit). 
+    */
+   String PIPELINED_HASH_JOIN = "pipelinedHashJoin";
+
+   boolean DEFAULT_PIPELINED_HASH_JOIN = Boolean.valueOf(System.getProperty(
+           QueryHints.class.getName() + "." + PIPELINED_HASH_JOIN, "false"));
+   
+   /**
+    * By default, a DISTINCT filter is applied when evaluating access paths
+    * against the default graph, for correctness reasons. The hint (or the 
+    * respective system property) can be used to disabled the distinct filter,
+    * in order to accelerate default graph queries. This can be done whenever
+    * it is known that NO triple occurs in more than one named graph. 
+    * 
+    * BE CAREFUL: if this condition does not hold and the filter is disabled, 
+    * wrong query results (caused by duplicates) will be the consequence.
+    * 
+    * Note that this hint only takes effect in quads mode.
+    */
+   String DEFAULT_GRAPH_DISTINCT_FILTER = "defaultGraphDistinctFilter";
+
+   boolean DEFAULT_DEFAULT_GRAPH_DISTINCT_FILTER = 
+       Boolean.valueOf(System.getProperty(
+           QueryHints.class.getName() + "." + DEFAULT_GRAPH_DISTINCT_FILTER, "true"));
 
 }

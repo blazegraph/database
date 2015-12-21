@@ -340,9 +340,10 @@ TOKEN [IGNORE_CASE] :   // Bigdata extension specific tokens
 |   <IGNORE: "IGNORE">
 |   <NORMALIZE: "NORMALIZE">
 // Managing Truth Maintenance
-//|   <ENABLE: "enable">
-//|   <DISABLE: "disable">
-//|   <ENTAILMENTS>
+|   <DROP_ENTAILMENTS: "drop entailments">
+|   <CREATE_ENTAILMENTS: "create entailments">
+|   <ENABLE_ENTAILMENTS: "enable entailments">
+|   <DISABLE_ENTAILMENTS: "disable entailments">
 }
 
 TOKEN [IGNORE_CASE] :   // SPARQL 1.1 Update-specific tokens
@@ -1927,6 +1928,10 @@ void Update() #void :
 |   Move()
 |   Copy()
 |   Create()
+|   DropEntailments()
+|   CreateEntailments()
+|   EnableEntailments()
+|   DisableEntailments()
 |   LOOKAHEAD(2) InsertData()
 |   LOOKAHEAD(2) DeleteData() 
 |   LOOKAHEAD(2) DeleteWhere()
@@ -1946,6 +1951,30 @@ void Load() :
     )*
     IRIref()
     [ <INTO> GraphRef() ]
+}
+
+void DropEntailments() :
+{}
+{
+    <DROP_ENTAILMENTS>
+}
+
+void CreateEntailments() :
+{}
+{
+    <CREATE_ENTAILMENTS>
+}
+
+void EnableEntailments() :
+{}
+{
+    <ENABLE_ENTAILMENTS>
+}
+
+void DisableEntailments() :
+{}
+{
+    <DISABLE_ENTAILMENTS>
 }
 
 void Clear() :
@@ -2069,4 +2098,3 @@ void TRefPattern() :
 {
   <TREF_OPEN> VarOrTermOrTRefP() VarOrIRIrefOrIsA() VarOrTermOrTRefP() <TREF_CLOSE>
 } 
-

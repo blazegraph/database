@@ -34,8 +34,6 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 
-import javax.xml.datatype.DatatypeConfigurationException;
-import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.BNode;
@@ -48,16 +46,13 @@ import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
-import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.util.concurrent.CanonicalFactory;
-import com.bigdata.util.InnerCause;
 
 /**
  * An implementation using {@link BigdataValue}s and {@link BigdataStatement}s.
@@ -80,11 +75,36 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 	@Override
 	public String getNamespace() {
 		
-		return namespace;
+	    if (namespace != null) {
+	        
+	        return namespace;
+	        
+	    } else {
+	        
+	        throw new RuntimeException("Headless value factory should not be asked for its namespace");
+	        
+	    }
 		
 	}
 	
     /**
+     * WARNING: Use {@link #getInstance(String)} NOT this constructor.
+     * <p>
+     * WARNING: This constructor provides 'headless' (not associated with any
+     * namespace) instance of the {@link BigdataValueFactory}, which is used for
+     * query/update parsing. It SHOULD NOT be used in code working with
+     * triple-store.
+     * 
+     * @see BLZG-1678 (remove "headless" BigdataValueFactory impl class)
+     * @see BLZG-1176 (SPARQL Query/Update parser should not use db connection)
+     */
+    public BigdataValueFactoryImpl() {
+
+        this(null);
+
+    }
+
+	/**
      * WARNING: Use {@link #getInstance(String)} NOT this constructor.
      */
     private BigdataValueFactoryImpl(final String namespace) {
@@ -489,6 +509,13 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     @Override
     public BigdataLiteralImpl createLiteral(final String label, URI datatype) {
 
+        return createLiteral(label, datatype, null);
+    }
+
+    @Override
+    public BigdataLiteralImpl createLiteral(String label, URI datatype, String language) {
+        
+
         /*
          * Note: The datatype parameter may be null per the Sesame API.
          * 
@@ -496,14 +523,14 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
          */
         if (datatype != null && !(datatype instanceof BigdataURIImpl)) {
 
-        	datatype = createURI(datatype.stringValue());
-        	
+            datatype = createURI(datatype.stringValue());
+            
         }
 
-        return new BigdataLiteralImpl(this, label, null,
+        return new BigdataLiteralImpl(this, label, language,
                 (BigdataURIImpl) datatype);
-
     }
+
 
     @Override
     public BigdataURIImpl createURI(final String uriString) {

@@ -36,7 +36,6 @@ import com.bigdata.rdf.model.BigdataURI;
  * {@link StatementBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class PresortRioLoader extends BasicRioLoader implements RDFHandler
 {
@@ -46,6 +45,15 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      * the RDF parser (the value is supplied by the ctor). 
      */
     final protected IStatementBuffer<?> buffer;
+
+	/**
+	 * When true, the <i>buffer</i> will be flushed when the end of the input is
+	 * reached.
+	 * 
+	 * @see BLZG-1562 (DataLoader.Options.FLUSH does not defer flush of
+	 *      StatementBuffer)
+	 */
+    private final boolean flush;
 
     /**
      * The value that will be used for the graph/context co-ordinate when
@@ -61,26 +69,49 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      *            the database.
      */
     public PresortRioLoader(final IStatementBuffer<?> buffer) {
+		
+    	this(buffer, true/* flush */);
+		
+    }
+    
+    /**
+	 * 
+	 * @param buffer
+	 *            The buffer onto which the parsed statements will be written.
+	 * @param flush
+	 *            When true, the <i>buffer</i> will be flushed when the end of
+	 *            the input is reached.
+	 *            
+	 * @see BLZG-1562 (DataLoader.Options.FLUSH does not defer flush of
+	 *      StatementBuffer)
+	 */
+    public PresortRioLoader(final IStatementBuffer<?> buffer, final boolean flush) {
 
         super(buffer.getDatabase().getValueFactory());
 
         this.buffer = buffer;
         
+        this.flush = flush;
+        
     }
 
     /**
-     * bulk insert the buffered data into the store.
-     */
+	 * {@inheritDoc}
+	 * <p>
+	 * bulk insert the buffered data into the store iff <code>flush:=true</code>
+	 */
+    @Override
     protected void success() {
 
-        if (buffer != null) {
-            
+		if (buffer != null && flush) {
+
             buffer.flush();
             
         }
 
     }
 
+    @Override
     protected void error(final Exception ex) {
         
         if(buffer != null) {
@@ -94,6 +125,7 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
         
     }
     
+    @Override
     public RDFHandler newRDFHandler() {
         
         defaultGraphURI = null != defaultGraph && buffer.getDatabase().isQuads()
@@ -105,6 +137,7 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
         
     }
 
+    @Override
     public void handleStatement(final Statement stmt) {
 
         if (log.isDebugEnabled()) {
@@ -139,20 +172,24 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
         
     }
 
+    @Override
     public void endRDF() throws RDFHandlerException {
         
         // @todo why not invoke buffer#force()?
         
     }
 
+    @Override
     public void handleComment(String arg0) throws RDFHandlerException {
         
     }
 
+    @Override
     public void handleNamespace(String arg0, String arg1) throws RDFHandlerException {
         
     }
 
+    @Override
     public void startRDF() throws RDFHandlerException {
         
     }

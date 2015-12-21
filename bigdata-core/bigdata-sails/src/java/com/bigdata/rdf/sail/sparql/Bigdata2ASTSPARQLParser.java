@@ -30,12 +30,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.ParsedOperation;
@@ -46,6 +48,7 @@ import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.query.parser.sparql.SPARQLParser;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
@@ -57,20 +60,14 @@ import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
-import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Overridden version of the openrdf {@link SPARQLParser} class which extracts
@@ -91,12 +88,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     static private final URI queryIdHint = new URIImpl(QueryHints.NAMESPACE
             + QueryHints.QUERYID);
 
-    private final BigdataASTContext context;
-
-    public Bigdata2ASTSPARQLParser(final AbstractTripleStore tripleStore) {
-        
-        this.context = new BigdataASTContext(tripleStore);
-        
+    public Bigdata2ASTSPARQLParser() {
+      
     }
 
     /**
@@ -173,7 +166,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ASTContainer parseUpdate2(final String updateStr,
             final String baseURI) throws MalformedQueryException {
 
-        long startTime = System.nanoTime();
+    	final long startTime = System.nanoTime();
 
         if (log.isInfoEnabled())
             log.info(updateStr);
@@ -204,7 +197,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
             // Class builds bigdata Update operators from SPARQL UPDATE ops.
             final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(
-                    context);
+                    new BigdataASTContext(new LinkedHashMap<Value, BigdataValue>()));
 
             // The sequence of UPDATE operations to be processed.
             final List<ASTUpdateContainer> updateOperations = updateSequence
@@ -240,7 +233,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  
                         if (sharedPrefixDeclarations != null) {
                         
-                            for (ASTPrefixDecl prefixDecl : sharedPrefixDeclarations) {
+                            for (final ASTPrefixDecl prefixDecl : sharedPrefixDeclarations) {
                             
                                 uc.jjtAppendChild(prefixDecl);
                                 
@@ -270,8 +263,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 BlankNodeVarProcessor.process(uc);
 
                 /*
-                 * Batch resolve ASTRDFValue to BigdataValues with their
-                 * associated IVs.
+                 * Prepare deferred batch IV resolution of ASTRDFValue to BigdataValues.
+                 * @see https://jira.blazegraph.com/browse/BLZG-1176
                  * 
                  * Note: IV resolution must proceed separately (or be
                  * re-attempted) for each UPDATE operation in a sequence since
@@ -283,17 +276,9 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  * 
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
                  */
-                new BatchRDFValueResolver(context, true/* readOnly */)
+                new ASTDeferredIVResolutionInitializer()
                         .process(uc);
 
-                /*
-                 * Handle dataset declaration. It only appears for DELETE/INSERT
-                 * (aka ASTModify). It is attached to each DeleteInsertNode for
-                 * which it is given.
-                 */
-                final DatasetNode dataSetNode = new DatasetDeclProcessor(
-                        context).process(uc);
-                
                 final ASTUpdate updateNode = uc.getUpdate();
 
                 if (updateNode != null) {
@@ -303,19 +288,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                      */
                     final Update updateOp = (Update) updateNode.jjtAccept(
                             updateExprBuilder, null/* data */);
-
-                    if (dataSetNode != null) {
-
-                        /*
-                         * Attach the data set (if present)
-                         * 
-                         * Note: The data set can only be attached to a
-                         * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
-                         */
-
-                        ((IDataSetNode) updateOp).setDataset(dataSetNode);
-
-                    }
+                    
+                    updateOp.setDatasetClauses(updateNode.getDatasetClauseList());
 
                     updateRoot.addChild(updateOp);
 
@@ -324,13 +298,14 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             } // foreach
 
             astContainer.setQueryParseTime(System.nanoTime() - startTime);
+            
             return astContainer;
             
-        } catch (ParseException e) {
+        } catch (final ParseException e) {
             throw new MalformedQueryException(e.getMessage(), e);
-        } catch (TokenMgrError e) {
+        } catch (final TokenMgrError e) {
             throw new MalformedQueryException(e.getMessage(), e);
-        } catch (VisitorException e) {
+        } catch (final VisitorException e) {
             throw new MalformedQueryException(e.getMessage(), e);
         }
 
@@ -351,7 +326,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ASTContainer parseQuery2(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
-        long startTime = System.nanoTime();
+        final long startTime = System.nanoTime();
         
         if(log.isInfoEnabled())
             log.info(queryStr);
@@ -371,15 +346,17 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             BlankNodeVarProcessor.process(qc);
 
             /*
-             * Batch resolve ASTRDFValue to BigdataValues with their associated
-             * IVs.
+             * Prepare deferred batch IV resolution of ASTRDFValue to BigdataValues.
+             * @see https://jira.blazegraph.com/browse/BLZG-1176
              */
-            new BatchRDFValueResolver(context, true/* readOnly */).process(qc);
+            final ASTDeferredIVResolutionInitializer resolver = new ASTDeferredIVResolutionInitializer();
+            
+            resolver.process(qc);
 
             /*
              * Build the bigdata AST from the parse tree.
              */
-            final QueryRoot queryRoot = buildQueryModel(qc, context);
+            final QueryRoot queryRoot = buildQueryModel(qc, resolver.getValues());
 
             final ASTContainer ast = new ASTContainer(queryRoot);
             
@@ -404,61 +381,25 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              */
             queryRoot.setPrefixDecls(prefixes);
             
-            /*
-             * Handle dataset declaration
-             * 
-             * Note: Filters can be attached in order to impose ACLs on the
-             * query. This has to be done at the application layer at this
-             * point, but it might be possible to extend the grammar for this.
-             * The SPARQL end point would have to be protected from external
-             * access if this were done. Perhaps the better way to do this is to
-             * have the NanoSparqlServer impose the ACL filters. There also
-             * needs to be an authenticated identity to make this work and that
-             * could be done via an integration within the NanoSparqlServer web
-             * application container.
-             * 
-             * Note: This handles VIRTUAL GRAPH resolution.
-             */
-            final DatasetNode dataSetNode = new DatasetDeclProcessor(context)
-                    .process(qc);
-
-            if (dataSetNode != null) {
-
-                queryRoot.setDataset(dataSetNode);
-
-            }
-            
-            /*
-             * I think here we could set the value expressions and do last-
-             * minute validation.
-             */
-            final ASTSetValueExpressionsOptimizer opt = 
-            		new ASTSetValueExpressionsOptimizer();
-            
-            final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
-            
-            final QueryRoot queryRoot2 = (QueryRoot)
-          	    opt.optimize(context2, 
-           		     new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
-            
-            BigdataExprBuilder.verifyAggregate(queryRoot2);
+            VerifyAggregates.verifyAggregate(queryRoot);
 
             ast.setQueryParseTime(System.nanoTime() - startTime);
+            
             return ast;
 
-        } catch (IllegalArgumentException e) {
+        } catch (final IllegalArgumentException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);
             
-        } catch (VisitorException e) {
+        } catch (final VisitorException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);
             
-        } catch (ParseException e) {
+        } catch (final ParseException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);
             
-        } catch (TokenMgrError e) {
+        } catch (final TokenMgrError e) {
             
             throw new MalformedQueryException(e.getMessage(), e);
             
@@ -472,6 +413,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * 
      * @param qc
      *            The root of the parse tree.
+     * @param values
+     *            Previously cached RDF values
      * @param context
      *            The context used to interpret that parse tree.
      * 
@@ -481,15 +424,15 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @throws MalformedQueryException
      */
     private QueryRoot buildQueryModel(final ASTQueryContainer qc,
-            final BigdataASTContext context) throws MalformedQueryException {
+            final Map<Value, BigdataValue> values) throws MalformedQueryException {
 
-        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(context);
+        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(new BigdataASTContext(values));
 
         try {
 
             return (QueryRoot) qc.jjtAccept(exprBuilder, null);
 
-        } catch (VisitorException e) {
+        } catch (final VisitorException e) {
 
             throw new MalformedQueryException(e.getMessage(), e);
 
@@ -544,7 +487,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 try {
                     // Parse (validates that this is a UUID).
                     UUID.fromString(queryIdStr);
-                } catch (IllegalArgumentException ex) {
+                } catch (final IllegalArgumentException ex) {
                     throw new MalformedQueryException("Not a valid UUID: "
                             + queryIdStr);
                 }

@@ -331,13 +331,76 @@ function getNamespaceProperties(namespace, download) {
    });
 }
 
+function getPreparedProperties(elem) {
+
+	   var url = RO_URL_PREFIX + 'namespace/prepareProperties';
+	      var params = {};
+	      
+	      params.name = $('#new-namespace-name').val().trim();
+	      params.textIndex = $('#new-namespace-textIndex').is(':checked');
+	      params.isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked');
+	      
+	      var mode = $('#new-namespace-mode').val();
+	      if(mode == 'triples') {
+	         params.quads = false;
+	         params.rdr = false;
+	      } else if(mode == 'rdr') {
+	         params.quads = false;
+	         params.rdr = true;
+	      } else { // quads
+	         params.quads = true;
+	         params.rdr = false;
+	      }
+	      
+	      if($('#new-namespace-inference').is(':checked')) {
+	         // Enable inference related options.
+	         params.axioms = 'com.bigdata.rdf.axioms.OwlAxioms';
+	         params.truthMaintenance = true;
+	         params.justify = true;
+	      } else {
+	         // Disable inference related options.
+	         params.axioms = 'com.bigdata.rdf.axioms.NoAxioms';
+	         params.truthMaintenance = false;
+	         params.justify = false;
+	      }
+
+	      var data = elem.html();//'<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
+	      for(var key in NAMESPACE_PARAMS) {
+//	         data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
+	    	  data += NAMESPACE_PARAMS[key] + '=' + params[key] + '\n';
+	      }
+//	      data += '</properties>';
+	      
+	   var settings = {
+	    	     type: 'POST',
+	    	     data: data,
+	    	     contentType: 'text/plain',
+//	    	     contentType: 'application/xml',
+	    	     async: false,
+	    	     success: function(data) { 
+		   			  elem.html('');
+					  $.each(data.getElementsByTagName('entry'), function(i, entry) {
+					    	  elem.append(entry.getAttribute('key') + '=' + entry.textContent + '\n');
+					      });
+	   			 },
+	    	     error: function(jqXHR, textStatus, errorThrown) {
+						  elem.html('');
+						  alert(jqXHR.responseText);
+					  }
+	    	   	};
+	  $.ajax(url, settings);
+}
+
 function cloneNamespace(namespace) {
    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/properties';
    $.get(url, function(data) {
       // collect params from namespace to be cloned
       var params = {};
+      var elem = $('#properties-text-area');
+      elem.html('');
       $.each(data.getElementsByTagName('entry'), function(i, entry) {
          params[entry.getAttribute('key')] = entry.textContent.trim();
+         elem.append(entry.getAttribute('key') + '=' + entry.textContent + '\n');
       });
 
       // set up new namespace form with collected params
@@ -358,6 +421,7 @@ function cloneNamespace(namespace) {
       $('#new-namespace-inference').prop('checked', params[NAMESPACE_PARAMS.axioms] == 'com.bigdata.rdf.axioms.OwlAxioms');
       $('#new-namespace-textIndex').prop('checked', params[NAMESPACE_PARAMS.textIndex] == 'true');
       $('#new-namespace-isolatableIndices').prop('checked', params[NAMESPACE_PARAMS.isolatableIndices] == 'true');
+	  changeNamespaceMode();
 
       $('#new-namespace-name').focus();
    });
@@ -405,7 +469,7 @@ function changeNamespaceMode() {
 }
 
 // Create a new namespace.
-function createNamespace(e) {
+/*function createNamespace(e) {
    e.preventDefault();
    if(!validateNamespaceOptions()) {
       return;
@@ -455,6 +519,20 @@ function createNamespace(e) {
       error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
    };
    $.ajax(RW_URL_PREFIX + 'namespace', settings);
+}*/
+
+//Create a new namespace.
+function createNamespace(elem) {
+var data = elem.val();
+
+var settings = {
+   type: 'POST',
+   data: data,
+   contentType: 'text/plain',
+   success: function() { $('#new-namespace-name').val(''); getNamespaces(); },
+   error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
+};
+$.ajax(RW_URL_PREFIX + 'namespace', settings);
 }
 
 function getDefaultNamespace() {
@@ -1858,6 +1936,33 @@ function loadQueryHistory() {
    }
 }
 
+function deselect(e) {
+	  $('.pop').slideFadeToggle(function() {
+	    e.removeClass('selected');
+	  });    
+	}
+
+	$(function() {
+	  $('#contact').on('click', function() {
+	    if($(this).hasClass('selected')) {
+	      deselect($(this));               
+	    } else {
+	      $(this).addClass('selected');
+	      $('.pop').slideFadeToggle();
+	    }
+	    return false;
+	  });
+
+	  $('.close').on('click', function() {
+	    deselect($('#contact'));
+	    return false;
+	  });
+	});
+
+	$.fn.slideFadeToggle = function(easing, callback) {
+	  return this.animate({ opacity: 'toggle', height: 'toggle' }, 'fast', easing, callback);
+	};
+
 
 /* Startup functions */
 
@@ -1887,8 +1992,35 @@ function setupHandlers() {
 
    $('#new-namespace-mode').change(changeNamespaceMode);
    $('#new-namespace-isolatableIndices').change(changeNamespaceMode);
-   $('#namespace-create').submit(createNamespace);
-
+   $('#namespace-create').submit(function(e){
+	    e.preventDefault();
+		var hiddenSection = $('.popup-container');
+		hiddenSection.click(function(event){
+			if(event.target.className.indexOf("popup-container") !== -1){
+				hiddenSection.fadeOut();
+			}
+		});
+		getPreparedProperties($('#properties-text-area'));
+		if ($('#properties-text-area').html()) {
+			hiddenSection.fadeIn()
+			    // unhide section.hidden
+			    .css({ 'display':'block' })
+			    // set to full screen
+			    .css({ width: '100%', height: '100%', top: '0', left: '0' })
+			    // greyed out background
+			    .css({ 'background-color': 'rgba(0,0,0,0.5)' })
+			    .appendTo('body');
+				
+			
+			    $('#cancel-namespace').click(function(){ 
+			    		hiddenSection.fadeOut(); 
+			    	});
+			    $('#create-namespace').focus().click(function(){ 
+			    		$(hiddenSection).fadeOut(); 
+			    		createNamespace($('#properties-text-area'));
+			    	});
+		}
+    });
    $('#update-type').change(function() { setUpdateSettings(this.value); });
    $('#rdf-type').change(function() { setUpdateMode('rdf'); });
    $('#update-file').change(handleFileInput);
@@ -1920,7 +2052,6 @@ function setupHandlers() {
    $('#current-page').keyup(handlePageSelector);
    $('#show-datatypes').click(showDatatypes);
    $('#show-languages').click(showLanguages);
-
    $('#explore-form').submit(exploreSubmit);
 
    // handle browser history buttons and initial display of first tab

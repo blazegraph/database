@@ -125,6 +125,12 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
     /** A "mockIV". */
     protected TermId<BigdataValue> mockIV3;
     
+    /** A "mockIV". */
+    protected TermId<BigdataValue> mockIVCarryingUri;
+    
+    /** A "mockIV". */
+    protected TermId<BigdataValue> mockIVCarryingBNode;
+    
     /** An inline IV whose {@link IVCache} is set. */
     protected XSDIntegerIV<BigdataLiteral> inlineIV;
 
@@ -165,6 +171,13 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
         mockIV3 = (TermId) TermId.mockIV(VTE.LITERAL);
         mockIV3.setValue((BigdataValue) valueFactory.createLiteral("green"));
+        
+        mockIVCarryingUri = (TermId) TermId.mockIV(VTE.URI);
+        mockIVCarryingUri.setValue((BigdataValue) valueFactory.createURI("http://green.as.uri"));
+
+        mockIVCarryingBNode = (TermId) TermId.mockIV(VTE.BNODE);
+        mockIVCarryingBNode.setValue((BigdataValue) valueFactory.createBNode("_:green_as_bnode"));
+
 
         inlineIV = new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(100));
         inlineIV.setValue((BigdataLiteral) valueFactory.createLiteral("100",
@@ -899,9 +912,6 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
      */
     public void test_solutionWithOneMockIV() {
 
-        if(!BigdataStatics.runKnownBadTests)
-            return;
-        
         final IBindingSet expected = new ListBindingSet();
 
         expected.set(Var.var("y"), new Constant<IV<?, ?>>(termId));
@@ -916,9 +926,6 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
      * Unit test with all mock IVs.
      */
     public void test_solutionWithAllMockIVs() {
-
-        if(!BigdataStatics.runKnownBadTests)
-            return;
 
         final IBindingSet expected = new ListBindingSet();
 
@@ -935,9 +942,6 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
      */
     public void test_solutionWithMockIVAndOthersToo() {
 
-        if(!BigdataStatics.runKnownBadTests)
-            return;
-
         final IBindingSet expected = new ListBindingSet();
 
         expected.set(Var.var("a"), new Constant<IV<?, ?>>(termId));
@@ -946,6 +950,8 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         expected.set(Var.var("x"), new Constant<IV<?, ?>>(mockIV2));
         expected.set(Var.var("b"), new Constant<IV<?, ?>>(termId2));
         expected.set(Var.var("z"), new Constant<IV<?, ?>>(mockIV3));
+        expected.set(Var.var("d"), new Constant<IV<?, ?>>(mockIVCarryingUri));
+        expected.set(Var.var("e"), new Constant<IV<?, ?>>(mockIVCarryingBNode));
 
         doEncodeDecodeTest(expected);
 

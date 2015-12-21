@@ -28,10 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.proc;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.IKeyBuilder;
-
 /**
  * Base class has some utility methods.
  * 
@@ -52,23 +48,23 @@ abstract public class AbstractIndexProcedure<T> implements IIndexProcedure<T> {
     */
    private static final long serialVersionUID = 1L;
 
-   /**
-     * Return the thread-local key builder configured for the {@link IIndex}
-     * 
-     * @param ndx
-     *            The index.
-     * 
-     * @return The {@link IKeyBuilder}.
-     * 
-     * @see IndexMetadata#getKeyBuilder()
-     */
-    protected IKeyBuilder getKeyBuilder(final IIndex ndx) {
-
-        return ndx.getIndexMetadata().getKeyBuilder();
-        
-//        return ((AbstractJournal) ((AbstractBTree) ndx).getStore())
-//                .getKeyBuilder();
-
-    }
+//   /**
+//     * Return the thread-local key builder configured for the {@link IIndex}
+//     * 
+//     * @param ndx
+//     *            The index.
+//     * 
+//     * @return The {@link IKeyBuilder}.
+//     * 
+//     * @see IndexMetadata#getKeyBuilder()
+//     */
+//    protected IKeyBuilder getKeyBuilder(final IIndex ndx) {
+//
+//        return ndx.getIndexMetadata().getKeyBuilder();
+//        
+////        return ((AbstractJournal) ((AbstractBTree) ndx).getStore())
+////                .getKeyBuilder();
+//
+//    }
 
 }

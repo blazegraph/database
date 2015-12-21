@@ -34,6 +34,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
@@ -138,15 +141,15 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure<Long>
      *         {@link Integer}.
      */
     @Override
-    public Long apply(final IIndex ndx) {
+    public Long applyOnce(final IIndex ndx, final IRaba keys, final IRaba vals) {
 
         long updateCount = 0;
 
-        final int n = getKeyCount();
+        final int n = keys.size();
 
         for (int i = 0; i < n; i++) {
 
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);
             assert key != null;
             assert key.length > 0;
 
@@ -156,7 +159,7 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure<Long>
              * package, the RDF specific full text indices still use the value.
              * Therefore it now MAY be null and these asserts have been removed.
              */
-            final byte[] val = getValue(i);
+            final byte[] val = vals.get(i);
 //            assert val != null;
 //            assert val.length > 0;
 
@@ -167,13 +170,33 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure<Long>
              * Note: This is an optimization which avoids mutation of the btree
              * when there would be no change in the data.
              */
-            final boolean write = overwrite || !ndx.contains(key);
-            
-            if (write && ndx.insert(key, val) != null) {
-                
-                updateCount++;
-                
+            if(overwrite) {
+
+            	// overwrite.
+            	if (ndx.insert(key, val) != null) {
+
+					updateCount++;
+
+				}
+            	
+            } else {
+            	
+            	// conditional mutation.
+				if (ndx.putIfAbsent(key, val) != null) {
+
+                    updateCount++;
+
+            	}
+            	
             }
+
+//            final boolean write = overwrite || !ndx.contains(key);
+//            
+//            if (write && ndx.insert(key, val) != null) {
+//                
+//                updateCount++;
+//                
+//            }
 
         }
 
@@ -205,5 +228,15 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure<Long>
         out.writeBoolean(overwrite);
         
     }
+
+	/**
+	 * Uses {@link LongAggregator} to combine the mutation counts.
+	 */
+	@Override
+	protected IResultHandler<Long, Long> newAggregator() {
+
+		return new LongAggregator();
+		
+	}
     
 }

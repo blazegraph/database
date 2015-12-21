@@ -138,6 +138,10 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTUnparsedQuadDataBlock node, Object data) throws VisitorException;
   public Object visit(ASTQuadsNotTriples node, Object data) throws VisitorException;
   public Object visit(ASTLoad node, Object data) throws VisitorException;
+  public Object visit(ASTDropEntailments node, Object data) throws VisitorException;
+  public Object visit(ASTCreateEntailments node, Object data) throws VisitorException;
+  public Object visit(ASTEnableEntailments node, Object data) throws VisitorException;
+  public Object visit(ASTDisableEntailments node, Object data) throws VisitorException;
   public Object visit(ASTClear node, Object data) throws VisitorException;
   public Object visit(ASTDrop node, Object data) throws VisitorException;
   public Object visit(ASTAdd node, Object data) throws VisitorException;
@@ -152,4 +156,4 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTModify node, Object data) throws VisitorException;
   public Object visit(ASTTRefPattern node, Object data) throws VisitorException;
 }
-/* JavaCC - OriginalChecksum=9af0ea5c75d03ecc7cb9d9ff3679a436 (do not edit this line) */
+/* JavaCC - OriginalChecksum=19fc096cf194b0de425ec428b659eb82 (do not edit this line) */

@@ -26,11 +26,12 @@ package com.bigdata.service;
 import com.bigdata.mdi.IPartitionMetadata;
 
 /**
- * Describes a "split" of keys for a batch operation that are spanned by the
- * same index partition.
+ * Describes a "split" of keys for a batch operation. This is used in scale-out
+ * where the operation is parallelized across multiple index partitions. It is
+ * also used within a single index partition when an operation that has a lot of
+ * keys in its keys[] is parallelized over sub-key-ranges of that keys[].
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Split {
 
@@ -73,7 +74,7 @@ public class Split {
      * 
      * @param pmd
      *            The metadata for the index partition within which the keys in
-     *            this split lie.
+     *            this split lie (optional and used only in scale-out).
      * @param fromIndex
      *            The index of the first key that will enter that index
      *            partition (inclusive lower bound).
@@ -104,15 +105,42 @@ public class Split {
     }
 
     /**
-     * Hash code is based on the {@link IPartitionMetadata} hash code.
-     */
+	 * Hash code is based on the {@link IPartitionMetadata} hash code if given
+	 * (if is always present for scale-out client requests) and otherwise
+	 * {@link #fromIndex} (for example, when parallelizing operations within a
+	 * single index per BLGZ-1537).
+	 * <p>
+	 * Note: The historical hash code was just based on the
+	 * {@link IPartitionMetadata} and would thrown out an NPE if there was no
+	 * {@link IPartitionMetadata}. This was changed as part of BLZG-1537 to
+	 * support cases where the {@link IPartitionMetadata} was not given (for
+	 * index local parallelism).
+	 * 
+	 * @see BLZG-1537 (Schedule more IOs when loading data)
+	 */
+    @Override
     public int hashCode() {
 
-        return pmd.hashCode();
+		if (pmd != null)
+			return pmd.hashCode();
+
+		return fromIndex;
 
     }
 
-    public boolean equals(Split o) {
+    @Override
+	public boolean equals(final Object o) {
+		
+		if (o == this)
+			return true;
+		
+		if (o instanceof Split)
+			return equals((Split) o);
+	
+		return false;
+	}
+
+	public boolean equals(final Split o) {
 
         if (fromIndex != o.fromIndex)
             return false;

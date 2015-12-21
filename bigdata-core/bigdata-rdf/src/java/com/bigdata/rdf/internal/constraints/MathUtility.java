@@ -14,6 +14,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XPathMathFunctions;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NumericBOp.NumericOp;
+import com.bigdata.rdf.internal.impl.extensions.CompressedTimestampExtension;
 import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
@@ -26,7 +27,14 @@ public class MathUtility implements IMathOpHandler {
     	for (Literal lit : args) {
     		final URI dt = lit.getDatatype();
 
-    		if (dt == null || !XMLDatatypeUtil.isNumericDatatype(dt))
+    		if (dt == null)
+    		    return false;
+    		
+    		boolean isNumeric = false;
+    		isNumeric |= XMLDatatypeUtil.isNumericDatatype(dt);
+    		isNumeric |= dt.equals(CompressedTimestampExtension.COMPRESSED_TIMESTAMP);
+    		
+    		if (!isNumeric)
     			return false;
     	}
     	return true;

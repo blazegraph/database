@@ -41,7 +41,6 @@ package com.bigdata.btree;
  *       application keys to unsigned byte[] keys.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IAutoboxBTree {
 

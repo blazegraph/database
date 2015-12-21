@@ -807,6 +807,122 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
         }
         
     }
+    
+    /**
+     * 
+     * Prepare configuration properties for a new KB instance.
+     * 
+     * @param namespace
+     *            The namespace of the KB instance.
+     * @param properties
+     *            The configuration properties for that KB instance.
+     *            
+     * @return The effective configuration properties for that named data set.
+     * 
+     * @throws Exception
+     */
+    public Properties getPreparedProperties(final String namespace,
+            final Properties properties) throws Exception {
+    	return getPreparedProperties(namespace, properties, UUID.randomUUID());
+    }
+    
+    public Properties getPreparedProperties(final String namespace,
+            final Properties properties, final UUID uuid) throws Exception {
+
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        if (properties == null)
+            throw new IllegalArgumentException();
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
+        // Set the namespace property.
+        final Properties tmp = PropertyUtil.flatCopy(properties);
+        tmp.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
+        
+        final String sparqlEndpointURL = baseServiceURL + "/namespace/prepareProperties";
+        
+        /*
+         * Note: This operation does not currently permit embedding into a
+         * read/write tx.
+         */
+        final ConnectOptions opts = newConnectOptions(baseServiceURL
+                + "/namespace/prepareProperties", uuid, null/* tx */);
+    
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            final PropertiesFormat format = PropertiesFormat.XML;
+            
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            
+            final PropertiesWriter writer = PropertiesWriterRegistry
+                    .getInstance().get(format).getWriter(baos);
+
+            writer.write(tmp);
+            
+            final byte[] data = baos.toByteArray();
+            
+            final ByteArrayEntity entity = new ByteArrayEntity(data);
+
+            entity.setContentType(format.getDefaultMIMEType());
+
+            opts.entity = entity;
+        
+        }
+
+        boolean consumeNeeded = true;
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+            final String contentType = response.getContentType();
+
+            if (contentType == null)
+                throw new RuntimeException("Not found: Content-Type");
+
+            final MiniMime mimeType = new MiniMime(contentType);
+
+            final PropertiesFormat format = PropertiesFormat
+                    .forMIMEType(mimeType.getMimeType());
+
+            if (format == null)
+                throw new IOException(
+                        "Could not identify format for service response: serviceURI="
+                                + sparqlEndpointURL + ", contentType="
+                                + contentType + " : response="
+                                + response.getResponseBody());
+
+            final PropertiesParserFactory factory = PropertiesParserRegistry
+                    .getInstance().get(format);
+
+            if (factory == null)
+                throw new RuntimeException(
+                        "ParserFactory not found: Content-Type=" + contentType
+                                + ", format=" + format);
+
+            final PropertiesParser parser = factory.getParser();
+
+            final Properties preparedProperties = parser.parse(response.getInputStream());
+
+            consumeNeeded = false;
+            
+            return preparedProperties;
+            
+        } catch (Exception e) {
+            consumeNeeded = !InnerCause.isInnerCause(e,
+                    HttpException.class);
+        	throw e;
+        	
+        } finally {
+        	if (response != null)
+        		response.abort();
+
+        }
+        
+    }
 
     /**
      * Destroy a KB instance.

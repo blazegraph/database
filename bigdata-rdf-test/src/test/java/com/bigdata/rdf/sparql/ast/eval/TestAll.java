@@ -173,6 +173,10 @@ public class TestAll extends TestCase {
         // Test suite with explicitly enabled hash joins.
         suite.addTestSuite(TestHashJoin.class);
 
+        // Test suite for pipelined hash join
+        suite.addTestSuite(TestPipelinedHashJoin.class);
+        
+        
         /*
          * Tests corresponding to various trouble tickets.
          */
@@ -191,6 +195,8 @@ public class TestAll extends TestCase {
 
         // test suite for a sub-select with an empty PROJECTION.
         suite.addTestSuite(TestTicket946.class);
+        
+        suite.addTestSuite(TestCompressedTimestampExtensionSPARQL.class);
 
         // SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern}
         // @see #1037 (fast-range-count optimizer)

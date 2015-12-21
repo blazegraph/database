@@ -33,7 +33,6 @@ package com.bigdata.btree;
  * @todo add error codes; localize.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Errors {
 
@@ -44,5 +43,7 @@ public class Errors {
     public static final transient String ERR_KEYS_NULL = "keys is null";
 
     public static final transient String ERR_VALS_NULL = "values is null";
+
+    public static final transient String ERR_VALS_NOT_NULL = "values must be null";
 
 }
