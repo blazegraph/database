@@ -128,25 +128,26 @@
              <New id="Contexts" class="org.eclipse.jetty.server.handler.ContextHandlerCollection">
                    <Call name="addHandler">
                       <Arg>
-                        <!-- This is the redirect from root to /blazegraph -->
                         <New id="moved" class="org.eclipse.jetty.server.handler.MovedContextHandler">
-              <Set name="contextPath">/</Set>
-              <Set name="newContextURL">/blazegraph</Set>
-              <Set name="permanent">true</Set>
-              <Set name="discardPathInfo">false</Set>
-              <Set name="discardQuery">false</Set>
+                        <!-- This is the redirect from root to /blazegraph -->
+                           <Set name="contextPath">/</Set>
+                           <Set name="newContextURL">/blazegraph</Set>
+                           <Set name="permanent">true</Set>
+                           <Set name="discardPathInfo">false</Set>
+                           <Set name="discardQuery">false</Set>
                         </New>
                     </Arg>
                   </Call>
-                   <Call name="addHandler">
+                  <Call name="addHandler">
                       <Arg>
-                        <!-- This is the redirect from root to /blazegraph from /bigdata -->
                         <New id="moved" class="org.eclipse.jetty.server.handler.MovedContextHandler">
-              <Set name="contextPath">/bigdata</Set>
-              <Set name="newContextURL">/blazegraph</Set>
-              <Set name="permanent">true</Set>
-              <Set name="discardPathInfo">false</Set>
-              <Set name="discardQuery">false</Set>
+                        <!-- This is the redirect from /bigdata to /blazegraph -->
+                        <!-- Note that this does not work for POST data based the semantics of the 301 response -->
+                           <Set name="contextPath">/bigdata</Set>
+                           <Set name="newContextURL">/blazegraph</Set>
+                           <Set name="permanent">true</Set>
+                           <Set name="discardPathInfo">false</Set>
+                           <Set name="discardQuery">false</Set>
                         </New>
                     </Arg>
                   </Call>
@@ -154,8 +155,7 @@
                     <Arg>
                         <!-- This is the bigdata web application. -->
                         <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
-			 <!-- <Set name="war"><SystemProperty name="jetty.home" default="."/>/src/main/webapp/</Set> -->
-			 <Set name="war"><SystemProperty name="jetty.home" default="."/></Set>
+			             <Set name="war"><SystemProperty name="jetty.home" default="."/></Set>
                          <Set name="contextPath">/blazegraph</Set>
                          <Set name="descriptor">WEB-INF/web.xml</Set>
                          <Set name="parentLoaderPriority">true</Set>
