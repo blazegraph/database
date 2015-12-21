@@ -76,7 +76,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <mappings>
             <mapping>
               <directory>${rpm.installDir}/lib</directory>
-              <filemode>440</filemode>
+              <filemode>750</filemode>
               <username>${rpm.user}</username>
               <groupname>${rpm.group}</groupname>
               <sources>
@@ -87,7 +87,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             </mapping>
             <mapping>
               <directory>${rpm.installDir}/war</directory>
-              <filemode>440</filemode>
+              <filemode>750</filemode>
               <recurseDirectories>true</recurseDirectories>
               <username>${rpm.user}</username>
               <groupname>${rpm.group}</groupname>
