@@ -1,3 +1,4 @@
+service blazegraph stop
 chkconfig blazegraph off
 rm -f /etc/init.d/blazegraph
 rm -f /etc/logrotate.d/blazegraph
