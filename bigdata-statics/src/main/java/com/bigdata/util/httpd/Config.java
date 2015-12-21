@@ -33,5 +33,17 @@ package com.bigdata.util.httpd;
 public final class Config {
 	
 	public static final int BLAZEGRAPH_HTTP_PORT = 9999;
+	
+    //See BLZG-1375 Update for /blazegraph path	
+    public static final String BLAZEGRAPH_PATH = "blazegraph";
+    
+    //See BLZG-1375.  Adding for legacy migration purposes.
+    @Deprecated
+    public static final String BIGDATA_PATH = "bigdata";
+    
+    public static final String DEFAULT_HOST = "localhost";
+    
+	public static final String DEFAULT_ENDPOINT = "http://" + DEFAULT_HOST
+			+ ":" + BLAZEGRAPH_HTTP_PORT + "/" + BLAZEGRAPH_PATH;
 
 }
