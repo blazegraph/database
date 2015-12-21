@@ -210,6 +210,7 @@ dependencies.
     <module>../bigdata-core/</module>
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
+    <module>../blazegraph-war</module>
     <module>../bigdata-blueprints</module>
     <module>../bigdata-jar</module>
     <module>../bigdata-runtime</module>
