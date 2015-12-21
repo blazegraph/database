@@ -1,1 +1,5 @@
+ln -s /usr/local/blazegraph/bin/blazegraph.init.d /etc/init.d/blazegraph
+ln -s /usr/local/blazegraph/conf/blazegraph.logrotate.d /etc/logrotate.d/blazegraph
+ln -s /usr/local/blazegraph/conf/ /etc/blazegraph
+chmod 700 /etc/blazegraph/blazegraph
 chkconfig blazegraph on
