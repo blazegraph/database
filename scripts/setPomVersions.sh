@@ -3,7 +3,7 @@
 BASE_DIR=`dirname $0`
 
 PARENT_POM="${BASE_DIR}"/../blazegraph-parent/pom.xml
-CURRENT_VERSION=1.6.0
+CURRENT_VERSION=1.6.1
 BRANCH=`git rev-parse --abbrev-ref HEAD`
 SNAPSHOT="SNAPSHOT"
 
