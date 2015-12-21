@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.0-master-SNAPSHOT</version>
+    <version>1.6.1-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-sails-test</artifactId>
-    <version>1.6.0-master-SNAPSHOT</version>
+    <version>1.6.1-master-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Sail Tests</name>
     <description>Blazegraph(TM) Maven Build</description>
@@ -408,6 +408,21 @@ dependencies.
     <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-util</artifactId>
+       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-common-util</artifactId>
+       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>system-utils</artifactId>
+       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-statics</artifactId>
        <version>${project.version}</version>
     </dependency>
     <dependency>
