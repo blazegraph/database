@@ -1,0 +1,6 @@
+ln -s /usr/local/blazegraph/bin/blazegraph.init.d /etc/init.d/blazegraph
+ln -s /usr/local/blazegraph/conf/blazegraph.logrotate.d /etc/logrotate.d/blazegraph
+ln -s /usr/local/blazegraph/conf/ /etc/blazegraph
+#Update the journal file location
+sed -i -e 's/com\.bigdata\.journal\.AbstractJournal\.file=.*/com.bigdata.journal.AbstractJournal.file=\/usr\/local\/blazegraph\/data\/blazegraph\.jnl/' /usr/local/blazegraph/conf/RWStore.properties
+chkconfig blazegraph on
