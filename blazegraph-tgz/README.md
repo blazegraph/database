@@ -26,10 +26,19 @@ The general layout is:
 
 ```
 bin/   #Scripts and other utilities
-conf   #Configuration files for Journal properties, logging, and startup
-data   #data directory.  The journal properties must be configured to use this.
-lib    #Java libraries
-log    #Log file.  The default is blazegraph.out
-pid    #pid file
-war    #web application sources for the Blazegraph Workbench
+conf/   #Configuration files for Journal properties, logging, and startup
+data/   #data directory.  The journal properties must be configured to use this.
+lib/    #Java libraries
+log/    #Log file.  The default is blazegraph.out
+pid/    #pid file
+war/    #web application sources for the Blazegraph Workbench
 ```
+
+## Configuring the init.d script ##
+
+TODO
+
+
+### Configuring to run as a non-root user ###
+
+TODO
