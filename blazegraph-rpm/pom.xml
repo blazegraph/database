@@ -42,12 +42,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
      <rpm.user>blzg</rpm.user>
      <rpm.group>blzg</rpm.group>
      <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
+     <rpm.release>SNAPSHOT</rpm.release>
      <app.name>blazegraph</app.name>
   </properties>
 
   <build>
     <extensions>
-      <!-- Add support for the "deb" packaging -->
       <extension>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>rpm-maven-plugin</artifactId>
@@ -68,11 +68,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <packager>SYSTAP, LLC</packager>
           <prefix>${rpm.installDir}</prefix>
           <changelogFile>src/changelog</changelogFile>
-<!--
-          <defineStatements>
-            <defineStatement>_unpackaged_files_terminate_build 0</defineStatement>
-          </defineStatements>
--->
           <mappings>
             <mapping>
               <directory>${rpm.installDir}/lib</directory>

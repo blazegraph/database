@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh
 #
 # /etc/init.d/blazegraph -- startup script for Blazegraph
 #
@@ -16,6 +16,7 @@
 # Modified for Tomcat6 by Thierry Carrez <thierry.carrez@ubuntu.com>.
 # Modified for Tomcat7 by Ernesto Hernandez-Novich <emhn@itverx.com.ve>.
 # Additional improvements by Jason Brittain <jason.brittain@mulesoft.com>.
+# Modified for Blazegraph by Brad Bebee <beebs@systap.com>
 #
 ### BEGIN INIT INFO
 # Provides:          blazegraph
@@ -187,6 +188,7 @@ running_pid() {
 
 	if [ ! -f "${BLZG_PID}" ] ; then
 		return 0;
+                exit 0
 	fi
 
 	PID=`cat ${BLZG_PID}`
@@ -247,23 +249,17 @@ case "$1" in
 	else
 		echo "(not running)"
 	fi
-	echo 0
 	set -e
 	;;
    status)
 	set +e
 
-	echo "Running pid " `running_pid`
-
-	if [ `running_pid` -eq 0 ]; then
-
-		if [ -f "$BLZG_PID" ]; then
-		    echo "$DESC is not running, but pid file exists."
-		    exit 1
-		else
-		    echo "$DESC is not running."
-		    exit 3
-		fi
+	if [ -f "${BLZG_PID}" ] &&  [ `running_pid` -eq 0 ]; then
+	    echo "$DESC is not running, but pid file exists."
+	    exit 3
+	elif [ ! -f "$BLZG_PID" ]; then
+	    echo "$DESC is not running."
+	    exit 1
 	else
 		echo "$DESC is running with pid `cat $BLZG_PID`"
 	fi
@@ -276,15 +272,8 @@ case "$1" in
 	fi
 	$0 start
 	;;
-  try-restart)
-        if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
-		--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
-		>/dev/null; then
-		$0 start
-	fi
-        ;;
   *)
-	echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
+	echo "Usage: $0 {start|stop|restart|force-reload|status}"
 	exit 1
 	;;
 esac
