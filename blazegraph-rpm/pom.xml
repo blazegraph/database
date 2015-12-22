@@ -32,35 +32,153 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>blazegraph-tgz</artifactId>
+  <artifactId>blazegraph-rpm</artifactId>
   <version>1.6.1-master-SNAPSHOT</version>
-  <name>Blazegraph Tarball Package</name>
+  <name>Blazegraph RPM Package</name>
   <url>https://www.blazegraph.com/</url>
-  <packaging>pom</packaging>
+  <packaging>rpm</packaging>
 
   <properties>
-     <tgz.user>blzg</tgz.user>
-     <tgz.group>blzg</tgz.group>
-     <tgz.installDir>/usr/local/blazegraph-${project.version}</tgz.installDir>
-     <tgz.release>SNAPSHOT</tgz.release>
+     <rpm.user>blzg</rpm.user>
+     <rpm.group>blzg</rpm.group>
+     <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
+     <rpm.release>SNAPSHOT</rpm.release>
      <app.name>blazegraph</app.name>
   </properties>
 
   <build>
     <extensions>
+      <extension>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>rpm-maven-plugin</artifactId>
+          <version>2.1.4</version>
+      </extension>
     </extensions>
     <pluginManagement>
       <plugins>
         <plugin>
-	   <artifactId>maven-assembly-plugin</artifactId>
-	   <version>2.5.3</version>
-	   <configuration>
-	      <descriptors>
-	         <descriptor>src/main/assembly/blazegraph.xml</descriptor>
-	      </descriptors>
-	      <tarLongFileMode>posix</tarLongFileMode>
-	   </configuration>
-	</plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>rpm-maven-plugin</artifactId>
+          <version>2.1.4</version>
+          <extensions>true</extensions>
+          <configuration>
+          <license>GPL v2</license>
+          <distribution>Blazegraph</distribution>
+          <group>High Performance Graph Database</group>
+          <packager>SYSTAP, LLC</packager>
+          <prefix>${rpm.installDir}</prefix>
+          <changelogFile>src/changelog</changelogFile>
+          <mappings>
+            <mapping>
+              <directory>${rpm.installDir}/lib</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>${project.build.directory}/dependency</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>${rpm.installDir}/war</directory>
+              <filemode>750</filemode>
+              <recurseDirectories>true</recurseDirectories>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>${project.build.directory}/classes/war</location>
+                </source>
+              </sources>
+            </mapping>
+<!--
+            <mapping>
+              <directory>${rpm.installDir}/lib</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <dependency>
+                <includes>
+                </includes>
+              </dependency>
+            </mapping>
+-->
+            <mapping>
+              <directory>${rpm.installDir}/bin</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>src/rpm/bin</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>${rpm.installDir}/conf</directory>
+              <configuration>true</configuration>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>src/rpm/conf</location>
+                </source>
+                <source>
+                  <location>${project.build.directory}/classes/RWStore.properties</location>
+                </source>
+                <source>
+                  <location>${project.build.directory}/classes/war/WEB-INF/classes/log4j.properties</location>
+                </source>
+                <source>
+                  <location>${project.build.directory}/classes/jetty.xml</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>${rpm.installDir}/data</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+	    </mapping>
+            <mapping>
+              <directory>/var/log/${app.name}</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+            </mapping>
+            <mapping>
+              <directory>/usr/local</directory>
+              <sources>
+                <softlinkSource>
+                  <location>${rpm.installDir}</location>
+                  <destination>${app.name}</destination>
+                </softlinkSource>
+              </sources>
+            </mapping>
+          </mappings>
+          <preinstallScriptlet>
+            <scriptFile>src/rpm/scripts/preinst</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </preinstallScriptlet>
+          <postinstallScriptlet>
+            <scriptFile>src/rpm/scripts/postinst</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </postinstallScriptlet>
+          <postremoveScriptlet>
+            <scriptFile>src/rpm/scripts/postremove</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </postremoveScriptlet>
+          <provides>
+             <provide>blazegraph</provide>
+	  </provides>
+          <requires>
+		<require>/usr/sbin/useradd</require>
+		<require>/usr/bin/getent</require>
+	  </requires>
+        </configuration>
+       </plugin>
       </plugins>
      </pluginManagement>
     <plugins>
@@ -124,22 +242,22 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>compile</phase>
                <configuration>
                  <target>
- 		                <unzip dest="target/classes/war">
+ 		   <unzip dest="target/classes/war">
                         <patternset>
                            <include name="**/*"/>
                         </patternset>
-        		        <fileset dir="target/classes/">
-            			   <include name="bigdata.war" />
-        		        </fileset>    
+        		<fileset dir="target/classes/">
+            			<include name="bigdata.war" />
+        		</fileset>    
     		   </unzip>
 		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
  		   <unzip dest="target/classes/jar">
                         <patternset>
                            <include name="jetty.xml"/>
                         </patternset>
-        		        <fileset dir="target/classes/">
-            			    <include name="bigdata.jar" />
-        		        </fileset>    
+        		<fileset dir="target/classes/">
+            			<include name="bigdata.jar" />
+        		</fileset>    
     		   </unzip>
 		   <copy file="target/classes/jar/jetty.xml" todir="target/classes" />
                  </target>
@@ -156,7 +274,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
-          <stylesheetfile>${basedir}/src/tgz/javadoc/stylesheet.css</stylesheetfile>
+          <stylesheetfile>${basedir}/src/rpm/javadoc/stylesheet.css</stylesheetfile>
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
