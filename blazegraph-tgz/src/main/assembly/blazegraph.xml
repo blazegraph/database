@@ -51,7 +51,7 @@
 		<includes>
                    <include>**/*</include>
                 </includes>
- 	        <fileMode>640</fileMode>
+ 	        <fileMode>750</fileMode>
       		<directoryMode>750</directoryMode>
                 <directory>src/tgz/bin</directory>
 	     </fileSet>
@@ -75,6 +75,15 @@
 	     </fileSet>
 	     <fileSet>
 		<outputDirectory>log</outputDirectory>
+                <!-- Just create empty directories here -->
+		<excludes>
+                   <exclude>**/*</exclude>
+                </excludes>
+ 	        <fileMode>640</fileMode>
+      		<directoryMode>750</directoryMode>
+	     </fileSet>
+	     <fileSet>
+		<outputDirectory>pid</outputDirectory>
                 <!-- Just create empty directories here -->
 		<excludes>
                    <exclude>**/*</exclude>
