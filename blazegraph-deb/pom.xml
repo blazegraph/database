@@ -35,7 +35,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>blazegraph-deb</artifactId>
   <version>1.6.1-master-SNAPSHOT</version>
   <name>Blazegraph Debian Package</name>
-  <url>http://maven.apache.org</url>
+  <url>https://www.blazegraph.com/</url>
   <packaging>deb</packaging>
 
   <properties>
