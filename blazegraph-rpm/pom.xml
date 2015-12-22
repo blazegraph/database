@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-artifacts</artifactId>
-    <version>1.6.1-BLZG-1377-SNAPSHOT</version>
+    <version>1.6.1-master-SNAPSHOT</version>
     <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-rpm</artifactId>
-  <version>1.6.1-BLZG-1377-SNAPSHOT</version>
+  <version>1.6.1-master-SNAPSHOT</version>
   <name>Blazegraph RPM Package</name>
   <url>https://www.blazegraph.com/</url>
   <packaging>rpm</packaging>
