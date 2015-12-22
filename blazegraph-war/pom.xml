@@ -27,13 +27,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
-    <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.1-BLZG-1377-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <artifactId>blazegraph-artifacts</artifactId>
+    <version>1.6.1-master-SNAPSHOT</version>
+    <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-war</artifactId>
-  <version>1.6.1-BLZG-1377-SNAPSHOT</version>
+  <version>1.6.1-master-SNAPSHOT</version>
   <name>Blazegraph WAR</name>
   <url>http://maven.apache.org</url>
   <packaging>war</packaging>
