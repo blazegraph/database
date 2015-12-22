@@ -124,22 +124,22 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>compile</phase>
                <configuration>
                  <target>
- 		   <unzip dest="target/classes/war">
+ 		                <unzip dest="target/classes/war">
                         <patternset>
                            <include name="**/*"/>
                         </patternset>
-        		<fileset dir="target/classes/">
-            			<include name="bigdata.war" />
-        		</fileset>    
+        		        <fileset dir="target/classes/">
+            			   <include name="bigdata.war" />
+        		        </fileset>    
     		   </unzip>
 		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
  		   <unzip dest="target/classes/jar">
                         <patternset>
                            <include name="jetty.xml"/>
                         </patternset>
-        		<fileset dir="target/classes/">
-            			<include name="bigdata.jar" />
-        		</fileset>    
+        		        <fileset dir="target/classes/">
+            			    <include name="bigdata.jar" />
+        		        </fileset>    
     		   </unzip>
 		   <copy file="target/classes/jar/jetty.xml" todir="target/classes" />
                  </target>
