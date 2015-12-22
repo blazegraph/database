@@ -135,11 +135,11 @@ function useLBS(state) {
       state = this.checked;
    }
    if(state) {
-      RW_URL_PREFIX = '/bigdata/LBS/leader/';
-      RO_URL_PREFIX = '/bigdata/LBS/read/';
+      RW_URL_PREFIX = 'LBS/leader/';
+      RO_URL_PREFIX = 'LBS/read/';
    } else {
-      RW_URL_PREFIX = '/bigdata/';
-      RO_URL_PREFIX = '/bigdata/';
+      RW_URL_PREFIX = '';
+      RO_URL_PREFIX = '';
    }
    $('.use-lbs').prop('checked', state);
 }
