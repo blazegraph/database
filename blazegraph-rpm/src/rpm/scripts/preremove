@@ -1,0 +1,2 @@
+service blazegraph stop
+chkconfig blazegraph off
