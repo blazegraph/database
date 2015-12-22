@@ -32,10 +32,6 @@
 # source function library
 . /etc/rc.d/init.d/functions
 
-# pull in sysconfig settings
-[ -f /etc/sysconfig/blazegraph ] && . /etc/sysconfig/blazegraph
-
-
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 if [ `id -u` -ne 0 ]; then
@@ -98,7 +94,7 @@ OPENJDKS=""
 find_openjdks
 # The first existing directory is used for JAVA_HOME (if JAVA_HOME is not
 # defined in $DEFAULT)
-JDK_DIRS="/usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-7-oracle /usr"
+JDK_DIRS="/usr /usr/lib/jvm/java-7-oracle usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun"
 
 # Look for the right JVM to use
 for jdir in $JDK_DIRS; do
@@ -142,15 +138,8 @@ if [ ! -f "$BLZG_HOME/bin/blazegraph.sh" ]; then
 	exit 1
 fi
 
-#POLICY_CACHE="$BLZG_BASE/work/catalina.policy"
-
 if [ -z "$BLZG_TMPDIR" ]; then
 	BLZG_TMPDIR="$JVM_TMP"
-fi
-
-# Set the JSP compiler if set in the blazegraph.default file
-if [ -n "$JSP_COMPILER" ]; then
-	JAVA_OPTS="$JAVA_OPTS -Dbuild.compiler=\"$JSP_COMPILER\""
 fi
 
 SECURITY=""
@@ -171,13 +160,6 @@ blazegraph_sh() {
 	# Escape any double quotes in the value of JAVA_OPTS
 	JAVA_OPTS="$(echo $JAVA_OPTS | sed 's/\"/\\\"/g')"
 
-	AUTHBIND_COMMAND=""
-	if [ "$AUTHBIND" = "yes" -a "$1" = "start" ]; then
-		AUTHBIND_COMMAND="/usr/bin/authbind --deep /bin/bash -c "
-	fi
-
-#		source \"$DEFAULT\"; \
-
 	# Define the command to run Tomcat's blazegraph.sh as a daemon
 	# set -a tells sh to export assigned variables to spawned shells.
 	BLZGCMD_SH="set -a; JAVA_HOME=\"$JAVA_HOME\"; \
@@ -192,23 +174,30 @@ blazegraph_sh() {
 		cd \"$BLZG_BASE\"; \
 		\"$BLZG_SH\" $@"
 
-	echo "$BLZGCMD" 
-
-	if [ "$AUTHBIND" = "yes" -a "$1" = "start" ]; then
-		BLZGCMD_SH="'$BLZGCMD_SH'"
-	fi
-
-	# Run the blazegraph.sh script as a daemon
 	set +e
 	touch "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
 	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
-	#start-stop-daemon --start -b -u "$BLZG_USER" -g "$BLZG_GROUP" \
-	#	-c "$BLZG_USER" -d "$BLZG_TMPDIR" -p "$BLZG_PID" \
-	#	-x /bin/bash -- -c "$AUTHBIND_COMMAND $BLZGCMD_SH"
 	$SU - $BLZG_USER -c "$BLZGCMD_SH start"
 	status="$?"
 	set +a -e
 	return $status
+}
+
+running_pid() {
+
+	if [ ! -f "${BLZG_PID}" ] ; then
+		return 0;
+	fi
+
+	PID=`cat ${BLZG_PID}`
+
+	let HAS_PID=`ps -eo pid | grep $PID | wc -l`
+
+	echo ${HAS_PID}
+
+	return ${HAS_PID} 
+	#1 if running, 0 if not
+
 }
 
 case "$1" in
@@ -224,46 +213,37 @@ case "$1" in
 	fi
 
 	echo "Starting $DESC" "$NAME"
-	#if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
-	#	--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
-	#	>/dev/null; then
+	# Remove / recreate JVM_TMP directory
+	rm -rf "$JVM_TMP"
+	mkdir -p "$JVM_TMP" || {
+		echo "could not create JVM temporary directory"
+		exit 1
+	}
+	chown $BLZG_USER "$JVM_TMP"
+	blazegraph_sh start 
 
-		# Regenerate POLICY_CACHE file
-	#	umask 022
-	#	echo "// AUTO-GENERATED FILE from /etc/blazegraph/policy.d/" \
-	#		> "$POLICY_CACHE"
-	#	echo ""  >> "$POLICY_CACHE"
-	#	cat $BLZG_BASE/conf/policy.d/*.policy \
-	#		>> "$POLICY_CACHE"
-
-		# Remove / recreate JVM_TMP directory
-		rm -rf "$JVM_TMP"
-		mkdir -p "$JVM_TMP" || {
-			echo "could not create JVM temporary directory"
-			exit 1
-		}
-		chown $BLZG_USER "$JVM_TMP"
-
-		blazegraph_sh start 
-		sleep 5
+	sleep 5
 	;;
   stop)
 	echo "Stopping $DESC" "$NAME"
 
 	set +e
 	if [ -f "$BLZG_PID" ]; then 
-		start-stop-daemon --stop --pidfile "$BLZG_PID" \
-			--user "$BLZG_USER" \
-			--retry=TERM/20/KILL/5 >/dev/null
-		if [ $? -eq 1 ]; then
-			echo "$DESC is not running but pid file exists, cleaning up"
-		elif [ $? -eq 3 ]; then
-			PID="`cat $BLZG_PID`"
-			echo "Failed to stop $NAME (pid $PID)"
-			exit 1
+
+		PID=`cat "${BLZG_PID}"`	
+	
+		if [ `running_pid` -eq 1 ] ; then
+
+			kill -9 $PID
+			if [ `running_pid` -eq 0 ] ; then
+				rm -f "${BLZG_PID}"
+				rm -rf "$JVM_TMP"
+				echo "Stopped $NAME (pid ${PID})"
+			else
+				echo "Failed to stop $NAME (pid ${PID})"
+			fi
 		fi
-		rm -f "$BLZG_PID"
-		rm -rf "$JVM_TMP"
+
 	else
 		echo "(not running)"
 	fi
@@ -272,17 +252,17 @@ case "$1" in
 	;;
    status)
 	set +e
-	start-stop-daemon --test --start --pidfile "$BLZG_PID" \
-		--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
-		>/dev/null 2>&1
-	if [ "$?" = "0" ]; then
+
+	echo "Running pid " `running_pid`
+
+	if [ `running_pid` -eq 0 ]; then
 
 		if [ -f "$BLZG_PID" ]; then
 		    echo "$DESC is not running, but pid file exists."
-			exit 1
+		    exit 1
 		else
 		    echo "$DESC is not running."
-			exit 3
+		    exit 3
 		fi
 	else
 		echo "$DESC is running with pid `cat $BLZG_PID`"

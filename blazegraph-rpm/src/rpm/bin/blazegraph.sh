@@ -59,7 +59,6 @@ cmd="java ${JAVA_OPTS} \
 case "$1" in
   start)
 
-      echo "Running: $cmd"
       # Note: This redirects console logger output to dev/null!
       # This is only valid if all logger output is explicitly
       # directed into a file, which it is not when using the
