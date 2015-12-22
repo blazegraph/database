@@ -60,7 +60,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <version>1.3</version>
           <!-- Customize deb package  -->
             <configuration>
-              <deb>${project.build.directory}/${artifactId}-${project.version}.deb</deb>
+              <deb>${project.build.directory}/${project.artifactId}-${project.version}.deb</deb>
               <dataSet>
                 <!-- dependencies go in /usr/local/blazegraph-[version]/lib -->
                 <data>
