@@ -27,13 +27,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
-    <artifactId>blazegraph-parent</artifactId>
-    <version>1.6.1-master-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <artifactId>blazegraph-artifacts</artifactId>
+    <version>1.6.1-BLZG-1377-SNAPSHOT</version>
+    <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-rpm</artifactId>
-  <version>1.6.1-master-SNAPSHOT</version>
+  <version>1.6.1-BLZG-1377-SNAPSHOT</version>
   <name>Blazegraph RPM Package</name>
   <url>https://www.blazegraph.com/</url>
   <packaging>rpm</packaging>
@@ -202,16 +202,16 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <type>war</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target/classes/</outputDirectory>
-                  <destFileName>bigdata.war</destFileName>
+                  <destFileName></destFileName>
                 </artifactItem>
                 <artifactItem>
                   <groupId>com.blazegraph</groupId>
-                  <artifactId>bigdata-jar</artifactId>
+                  <artifactId>blazegraph-jar</artifactId>
                   <version>${project.version}</version>
                   <type>jar</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target/classes/</outputDirectory>
-                  <destFileName>bigdata.jar</destFileName>
+                  <destFileName>blazegraph.jar</destFileName>
                 </artifactItem>
               </artifactItems>
             </configuration>
@@ -247,7 +247,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                            <include name="**/*"/>
                         </patternset>
         		<fileset dir="target/classes/">
-            			<include name="bigdata.war" />
+            			<include name="" />
         		</fileset>    
     		   </unzip>
 		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
@@ -256,7 +256,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                            <include name="jetty.xml"/>
                         </patternset>
         		<fileset dir="target/classes/">
-            			<include name="bigdata.jar" />
+            			<include name="blazegraph.jar" />
         		</fileset>    
     		   </unzip>
 		   <copy file="target/classes/jar/jetty.xml" todir="target/classes" />

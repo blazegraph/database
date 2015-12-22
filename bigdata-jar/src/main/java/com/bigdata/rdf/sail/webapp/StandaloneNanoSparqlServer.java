@@ -31,6 +31,7 @@ import org.eclipse.jetty.server.Server;
 import com.bigdata.Banner;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.util.httpd.Config;
 
 /**
  * Utility class provides a simple SPARQL end point with a REST API.  
@@ -155,7 +156,8 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         awaitServerStart(server);
 
         System.out.println("\n\nWelcome to Blazegraph(tm) by SYSTAP.\n");
-        System.out.println("\nGo to http://localhost:" + port + "/bigdata/ to get started.");
+        //BLZG-1377 Included for legacy support.
+        System.out.println("Go to http://localhost:9999/bigdata/ to get started.");
         
         // Wait for the service to terminate.
         server.join();

@@ -87,7 +87,7 @@
    <servlet-name>REST API</servlet-name>
    <display-name>REST API</display-name>
    <description>The REST API, including a SPARQL end point, as described at
-   https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer
+   https://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer
    </description>
    <servlet-class>com.bigdata.rdf.sail.webapp.RESTServlet</servlet-class>
    <load-on-startup>0</load-on-startup>
