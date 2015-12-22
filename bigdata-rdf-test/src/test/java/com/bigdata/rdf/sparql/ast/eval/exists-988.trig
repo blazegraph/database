@@ -1,0 +1,10 @@
+@prefix eg: <http://www.bigdata.com/> .
+
+eg:g {
+ eg:a eg:p eg:a, eg:b, eg:c, eg:d, eg:e, eg:f .
+    eg:b eg:p eg:a, eg:b, eg:c, eg:d, eg:e, eg:f .
+   eg:c eg:p eg:a, eg:b, eg:c, eg:d, eg:e, eg:f .
+    eg:d eg:p eg:a, eg:b, eg:c, eg:d, eg:e, eg:f .
+    eg:e eg:p eg:a, eg:b, eg:c, eg:d, eg:e, eg:f .
+   eg:f eg:p eg:a, eg:b, eg:c, eg:d, eg:e, eg:f . 
+}

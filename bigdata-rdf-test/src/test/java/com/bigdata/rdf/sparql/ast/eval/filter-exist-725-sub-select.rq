@@ -1,0 +1,13 @@
+PREFIX : <http://example/> 
+
+select *
+where {
+{
+   SELECT ( COUNT(?narrow) as ?countNarrow ) ?scheme
+   WHERE
+   { ?narrow :inScheme ?scheme .
+     FILTER EXISTS { ?narrow :broader ?b }
+   }
+   GROUP BY ?scheme
+}
+}

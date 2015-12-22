@@ -1,0 +1,6 @@
+SELECT (count(*) as ?c)
+WHERE {
+  hint:Query hint:optimizer "None" .
+  ?s <http://p1>/<http://p2> "A" . 
+  ?s rdf:type <http://T> . 
+}

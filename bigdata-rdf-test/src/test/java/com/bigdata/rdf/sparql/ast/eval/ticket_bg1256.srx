@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="o"/>
+    <variable name="d"/>
+  </head>
+  <results>
+    <result>
+      <binding name="o">
+         <literal>foo</literal>
+      </binding>
+      <binding name="d">
+         <uri>http://example.org/a</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="o">
+         <literal>foo</literal>
+      </binding>
+      <binding name="d">
+         <uri>http://example.org/b</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="o">
+         <literal>foo</literal>
+      </binding>
+      <binding name="d">
+         <uri>http://example.org/c</uri>
+      </binding>
+    </result>
+  </results>
+</sparql>

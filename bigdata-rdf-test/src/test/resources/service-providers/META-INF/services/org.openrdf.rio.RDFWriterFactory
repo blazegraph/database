@@ -1,0 +1,2 @@
+com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory
+com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterForConstructFactory

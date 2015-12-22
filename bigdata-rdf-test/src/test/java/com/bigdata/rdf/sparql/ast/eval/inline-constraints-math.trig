@@ -1,0 +1,12 @@
+@prefix : <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+: {
+:a rdf:type :X .
+:a :age 25 .
+:b rdf:type :X .
+:b :age 45 .
+:c rdf:type :X .
+:c :age 35 .
+:d :age 30 .
+}

@@ -1,0 +1,312 @@
+x. Support distributed link sets so that we can efficiently parallize
+   link set scans across multiple segments and leverage bigtable row
+   scans to scan link sets in parallel. Link set jump tables need to
+   identify the head/tail/count of each segment in the database in
+   which there are members for that link set.  A distributed link set
+   partitions the link set into a link set generic objects (one per
+   segment), each of which maintains the link set members for that
+   segment.  A two level iterator can scan the top-level link set and
+   assign the nexted link sets to workers in a thread pool.  With 20
+   workers, you can scan 20 segments in parallel.  When workers become
+   free they are assigned to the next nexted link set.  All of this
+   should be more or less transparent.  Some declarative options can
+   be placed on the top-level link set indicating the degree of
+   scatter that is desired and a data distribution policy.  Iterators
+   of the top level link set will transparently traverse the nexted
+   link sets.  If the iterator is written to perform an operation in
+   place then we do not even need to send objects or data back to the
+   client that requested the iterator.
+
+x. Support schema constraints on link sets and generic objects in GOM.
+
+@todo Clustered indices.  A clustered index is where the rows are
+organized on disk according to some key found in or computed for each
+row.  Clustered indices provides maximum read rates when scanning data
+in key order and they can be used to effectively pre-fetch rows when a
+known key range is being scanned.  Unfortunately clustered indices are
+at odds with object identifiers (OIDs).  I can see only two ways to
+reconcile these things: (1) If object lookup proceeds by indirection
+using an object index, then the object index can be updated each time
+the clustered index page on which the object is found is changed.
+With this approach clustered index nodes will need to track the oid
+for each key-value so that an object can be resolved either by its oid
+or by its key - this seems on the face to be pretty messy.; (2) the
+other option is to generalize OIDs to permit variable length byte[]s
+as the general case.  This could be done at the API using an IOId
+interface.  All persistent objects would implement IOId.  When the OID
+was "direct" it would be a 64-bit integer and go through one set of
+lookup mechanisms.  When the object was allocated using a clustered
+index, the OID would be the key (a byte[]) together with the index
+identifier and the index would know how to compare its keys.  This
+would have an impact throughout the generic object design since we
+could no longer rely on the assumption that an OID was a 64-bit
+integer.  However, it would make it possible to cluster objects disk
+within a dynamic structure (e.g., a btree, rtree, etc.).
+
+Thinking this through further, I am beginning to really like the idea
+that object identity may be defined by data fields -or- by an system
+defined identifier.  OIDs show up in several aspects of the system,
+and they would all have to be modified to handle either 64-bit OIDs or
+byte[] OIDs interpreted by an index structure.
+
+  propertyIds -- assumes long oids. Uses a persistent map from unicode
+  name to long integer.  Clearly the map itself is ammenable to an
+  index structure, but the index might be structured as
+  (partition.)schema.property rather than by a universal btree.
+  Property Ids are used multiple times in a generic data record,
+  yielding a great opportunity for compression using a bit coding
+  algorithm with the shortest codes assigned to the most common ids.
+
+  listenerIds -- assumes long oids.  listener ids are used for link
+  sets indices and also formulas.  there is no reason that I can see
+  to permit listeners to be allocated within clustered indices.  for
+  example, why would you perform an ordered scan of listeners?  There
+  is probably some redundency in listener ids in generic data records,
+  again creating an opportunity for compression.
+
+  --- IOI --
+
+  thin() : IOI - the returned IOI will not hold a hard/soft reference
+  to the object described by that identifier.  (IOIs are often created
+  from objects, in which case they typically hold a hard reference to
+  that object.)
+
+  toString() : String - convert to external form
+
+  new IOI(OM,String) - convert from external form
+
+  isId() : boolean - true iff OID is  generated (64-bit long).
+  isKey() : boolean - true iff OID is application defined.
+  getId() : long throws IllegalStateException;
+  getIndex() : <index> throws IllegalStateException;
+  getKey() : Object throws IllegalStateException;
+
+  ---- org.CognitiveWeb.generic.core ----
+
+  AbstractBTree (and concrete implementations)
+  long _nativeBTreeId
+
+  Generic, PropertyClass::
+
+      Only very minor changes.  The transient listener and property
+      change maps on the generic object use long keys, but they are
+      already scheduled to be re-implemented using a weak hash map
+      with IPropertyClass keys.
+
+  m_transientLinkSetChangeListeners : Map -> IOI (or PropertyClass) keys in map
+  m_transientPropertyChangeListeners : Map (ditto)
+
+  GenericData:: See IGenericData.
+  
+  IBlob, IBlobValue, BlobValue:: These wrap the OID of the Blob.
+
+  Is there a reason to arrange blobs in order in disk?  Blobs are made
+  out of chunks and those chunks should be clustered, and even
+  ordered, on disk, but the expectation is that blobs are used for
+  rather larger data items.  A counter example might be the multiple
+  versions of the content of a web page stored together with their
+  metadata where the pages are indexed by URL and one or more temporal
+  dimensions (lastModified, harvestTime, etc.)
+
+  long m_oid; -> IOI oid;
+  long getOID() -> getOID() : IOI
+
+  ILinkValue, LinkValue::
+
+  Note: Link sets may span clustered and unclustered objects, so
+  priorId could be a 64-bit long while nextId was a {index,key} tuple.
+
+  Note: LinkValue is serialized as part of the generic data record.
+  Since it contains OIDs, all LinkValue need to participate in the
+  bitcoding algorithm to compress object references.  LinkValue
+  currently defines serialization, but that should probably be removed
+  (or versioned to a serializer that throws an exception) to make sure
+  that OIDs are being compressed properly!
+
+  long getTargetId(); -> getTargetId() : IOI
+  long getPriorId(); ditto
+  long getNextId(); ditto
+
+  IPropertyClassExt::
+
+  long getPropertyId() -> ???
+
+       This method is widely used.  It dates back to a time when
+       properties were not modeled as generic objects, hence there was
+       some ambiguity about the propertyId.  Currently the propertyId
+       is just the OID.  If we restrict PropertyClass to always use a
+       64-bit long OID, then this method could stay as is and that
+       would (drammatically) reduce the impact on the generic-native
+       API.
+
+       If we modify property class to be allocated within (or allow
+       allocation within) a clustered index, then all bets are off and
+       this needs to become getOID():IOI.
+
+       I vote to defer this change for now.
+
+  IReference:: extended by IBlobValue and ILinkValue.
+
+  long getOID() -> getOID() : IOI.
+
+  LinkSet:: No API changes, some implementation change (traversing
+  prior and next link set members).
+
+  LinkSetIterator::
+
+  long m_nextId -> m_nextId : IOI
+  long m_lastVisited -> ?Generic or ?IOI
+  
+  LinkSetIndex::
+
+  transient IGeneric m_owner -> drop field.
+  long m_ownerId -> m_owner:IOI
+
+      There is a pattern here for caching a reference to the generic
+      object that is the owned, link class or property class while
+      only serializing its OID.  This could be modified to use a
+      "thick" IOI wrapping the referenced object and serialized using
+      a simplistic approach (since there are only four OIDs to be
+      serialized (owner, linkClass, propertyClass, btree)).
+
+  getFooId() -> getFooOID(), where foo is Owner, Btree, etc.  Or
+  perhaps just drop those method forms completely.
+
+  ILinkSetIndex:: Refactor to provide common abstraction for clustered
+  index, link set, and link set index for ordered traversal and (for
+  clustered index and link set) for set semantics (membership tests,
+  etc.)
+
+  ---- org.CognitiveWeb.generic.core.data ----
+
+  IGenericData:: Lots of changes - it presumes 'long oid' everywhere.
+  The serialization logic does not not currently factor out OIds from
+  longs for compression.  Once that change is made, it should be
+  possible to refactor further to support compression (bitcoding) for
+  both 64-bit OIDs and keys.  It is possible that there are
+  opportunities for leading or trailing edge compression in keys.
+
+  ---- org.CognitiveWeb.generic.core.ndx ----
+
+  CompositeKey, ICompositeKey::  Uses long oid to break ties.
+
+     Note: A clustered index itself can not permit ties (or, rather,
+     must apply destructive merge rules on commits resulting in ties).
+     Therefore composite keys are not used for clustered indices.
+     
+     A link set index is a secondary index structure.  Like a link
+     set, it is possible that it may span objects having both 64-bit
+     long OIDs and those allocated within one (or more) clustered
+     indices.  Breaking ties remains a requirement when the index
+     supports duplicates and the composite key would need to be
+     generalized (or specialized) into handling either 64-bit OIDs and
+     {index,key} OIDs.
+
+  long getObjectIdentity() -> getOID():IOI? 
+
+     This was given a distinct name since it introduces a clash if the
+     composite key is also a persistent object (between the OID of the
+     composite key and the OID of the object having that key value).
+     This was a problem with Objectivity since keys were persistence
+     capable objects, but it should not be a problem with any backend
+     that supports keys inline within btree nodes.
+  
+  CompositeKeyComparator:: Compares composite keys and therefore must
+  be updated to remove the assumption of long OID.
+
+  FlyOId:: -> IOI implementation.
+
+  ResolvingComparator
+
+  ---- org.CognitiveWeb.generic.core.om ----
+
+  BaseObject::
+
+  transient long _oid;
+  init( ObjectManager om, long oid )
+  long getOID(); -> IOI getOID();
+  int hashCode() -> delegate to getOID().hashCode();
+                    configure on index w/ comparator.
+  identity():String -> IOI:toString()
+  fetch(long oid) -> fetch(IOI oid)
+
+  IPersistentStore::
+
+  fetch(long oid) -> fetch(IOI oid)
+  delete(long oid) -> delete(IOI oid)
+  getBTree(long oid) -> ???
+
+  ObjectManager::
+
+  getPropertyName(long oid) -> Ok (convert property name to obj).
+  getPropertyClass(long oid) -> Ok (convert property name to obj).
+
+  getObject(String identity) -> IOI#fromString( String ); ??
+                                IOI#toString();
+
+  Lazy removal of objects : assumes long OID.
+
+  fetch(long oid) -> fetch(IOI)
+
+  ObjectNotFoundException::
+
+  long m_oid -> IOI m_oid;
+
+  ---- org.CognitiveWeb.generic.om.blob ----
+
+  Blob
+  long headId, tailId;
+
+  Segment
+  long blobId, priorId, nextId;
+
+  ---- org.CognitiveWeb.generic.core.cache ----
+
+  This needs to be refactored into an outer abstraction for IOI and
+  inner implementations for (a) an object cache based on 64-bit longs;
+  and (b) an object cache per-cluster index based on key values. For
+  the latter it could either use a lookup strategy appropriate to that
+  index type, e.g., a btree, or it could use a hash map.  Index nodes
+  should have some caching options, but that is at another level.
+
+  ---- org.CognitiveWeb.generic.core.util ----
+
+  GenericResolver: assumes resolving Long to object. Modify to resolve
+  IOI to object.
+
+  ---- org.CognitiveWeb.extser ----
+
+  DataOutput
+  void writePackedOId();
+
+  DataInput
+  long readPackedOId();
+
+  ILinkSet (head,tail) and ILinkValue (prior,next,target) - assume
+  long oids.
+
+     Assuming that the clustered index can be viewed as an ordered
+     link set, the prior / next members would not be used for that
+     index as the btree would supply forward and reverse object
+     visitation in key order.  Likewise, the target would not be used
+     since the clustered index would be the target and it can be
+     identifed from the btree node in which the object is found.
+     Therefore ILinkValue is NOT stored for references to prior/next
+     objects in a clustered index.
+  
+     However, ILinkValue would still be used for links into objects in
+     a clustered index.  Those OIDs would then be byte[]s.
+
+     There is also an issue with maintaining referential integrity
+     under object deletion or (possibly computed) key change for an
+     object.  This is currently handled for integer OIDs and would
+     have to be handled for clustered indices as well.
+
+  Object cache -- assumes long oids.  There would have to be a 2nd
+  object cache data structure based on a btree.
+
+  Supporting multiple clustered indices means that the key is actually
+  a combination of the index identifier (a 64-bit OID) and the byte[].
+  This means that we need an object cache per clustered index.
+   
+  

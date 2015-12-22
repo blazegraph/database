@@ -1,0 +1,10 @@
+prefix : <http://bigdata.com/> 
+
+SELECT  ?g ?x ?y
+FROM NAMED :c1
+FROM NAMED :c2
+WHERE {
+ GRAPH ?g {
+   ?x :loves ?y .
+   }
+}

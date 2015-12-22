@@ -1,0 +1,130 @@
+<html>
+<head>
+<title>bigdata&#174;</title>
+</head>
+<body>
+<!-- $Id $ -->
+<p>
+
+bigdata&#174; is a scale-out data and computing fabric designed for commodity
+hardware. Scale-out is achieved using key-range partitioned B+Trees and
+distributed computing.  The architecture supports both
+embedded and scale-out database applications.  Unisolated transactions
+are supported and provide for extremely high read-write concurrency
+when used as a sparse row store.  In addition, both read-committed,
+read-only, and fully isolated read-write transactions are supported
+using Multi-Version Concurrency Control (MVCC).
+
+</p>
+
+<h2>Services</h2>
+
+<p>
+
+The bigdata architecture is broken down into several services: <dl>
+
+<dt>data service</dt><dd>The data service provides an API for reading
+and writing on index partitions</dd>
+
+<dt>metadata service</dt><dd>The metadata services manages and locates
+index paritions</dd>
+
+<dt>transaction service</dt><dd>The transaction service coordinates
+transaction start and commits and provides the integration point for
+both unisolated and isolated transactions.</dd>
+
+<dt>map/reduce service</dt><dd>The map/reduce service provides an API
+for decomposing a problem across the distributed database.</dd>
+
+</dl>
+
+The current release supports distributed services using JINI but there
+has been interest expressed in supporting other distributed
+application architectures as well, including <a
+href="http://www.osgi.org/">OSGi</a> and <a
+href="http://en.wikipedia.org/wiki/Service_component_architecture">Service
+Component Archicture</a> (SCA).
+
+</p>
+
+<p>
+
+Note: Readers familar with Google's research publications or with the
+Apache Hadoop effort will recognize some similarities and some
+differences.  For example, both Google and Hadoop both use a
+distributed file system for failover.  While bigdata may be deployed
+in a similar manner using a third party distributed file system, it
+also offers a store-level media replication strategy for addressing
+failover.
+
+</p>
+
+<h2>Packages</h2>
+
+<p>
+
+<dl>
+
+<dt>{@link com.bigdata.cache}</dt><dd>A set of utility classes for
+creating weak reference object caches.</dd>
+
+<dt>{@link com.bigdata.io}</dt><dd>A set of utility classes I/O.</dd>
+
+<dt>{@link com.bigdata.util}</dt><dd>A set of utility classes.</dd>
+
+<dt>{@link com.bigdata.rawstore}</dt><dd>A set of interfaces and
+utility classes defining the low-level protocol for operations on a
+persistence store.  Operations at this level are expressed in terms of
+byte[] records and an "address" combining both the <code>offset</code>
+at which the a record was written and the <code>length</code> of the
+record.</dd>
+
+<dt>{@link com.bigdata.btree}</dt><dd>This package provides both a
+implementation of both a mutable B+Tree and a read-only B+Tree.  The
+mutable {@link com.bigdata.btree.BTree} supports variable length
+byte[] keys, a copy-on-write strategy for nodes and leaves which is
+used to support transactional isolation, and remains balanced under
+both insert and delete operations.  a B+Tree may be exported into a
+read-only {@link com.bigdata.btree.IndexSegment} using an efficient
+bulk index build utility.</dd>
+
+<dt>{@link com.bigdata.isolation}</dt><dd>This package provides
+specialized B+Tree classes designed to support transactional
+isolation. This builds on the features of the base B+Tree package,
+which already supports copy-on-write semantics, and on the Journal
+package, which already supports a policy in which valid data are never
+overwritten. The primary contribution of this package is a set of
+extensions and wrapper classes that manage {@link
+com.bigdata.isolation.IValue} objects wrapping application data
+values. Each {@link com.bigdata.isolation.IValue} encapsulates a
+version counter, which is used to detect write-write conflicts, and a
+deleted flag, which is used to mark keys that have been deleted until
+a full compacting merge can be performed.</dd>
+
+<dt>{@link com.bigdata.sparse}<dt><dd>This package provides a sparse
+row store data model similar to Google's bigtable or the HBase
+component in the Apache Hadoop project.  A sparse row store is a data
+model in which the B+Tree keys are formed as:
+<code>
+[schemaName][primaryKey][columnName][timestamp]
+</code>
+</dd>
+
+<dt>{@link com.bigdata.journal}</dt><dd>This package provides a fast
+append-only persistence store.  The journal is designed to minimize
+disk head movement and maximize the opportunity for sequential IO.
+Typically, multiple indices are mapped onto the same journal in order
+to minimize the #of distinct disk files and disk seeks on a server
+platform.</dd>
+
+<dt>{@link com.bigdata.service}</dt><dd>This package realizes the
+services for a distributed scale-out database.  The basic components
+of the scale-out architecture are the {@link
+com.bigdata.service.IDataService} and {@link com.bigdata.service.IMetadataService}.</dd>
+
+</dl>
+
+</p>
+
+</body>
+</html>

@@ -1,0 +1,5 @@
+<http://example.com/g1>
+{
+   <eg:a> <eg:p> 1 .
+   <eg:a> <eg:ap> 2 .
+}

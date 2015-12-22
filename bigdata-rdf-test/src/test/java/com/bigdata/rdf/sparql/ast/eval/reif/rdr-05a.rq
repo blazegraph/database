@@ -1,0 +1,11 @@
+prefix :       <http://example.com/> 
+prefix dc:        <http://purl.org/dc/terms/> 
+
+select ?s ?o ?c  where {
+  ?s :bought ?o .
+  ?stmt rdf:type rdf:Statement .
+  ?stmt rdf:subject ?s .
+  ?stmt rdf:predicate :bought .
+  ?stmt rdf:object ?o .
+  ?stmt dc:created ?c .
+}

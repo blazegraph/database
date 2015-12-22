@@ -1,0 +1,10 @@
+SELECT ?ar
+WHERE {
+    ?ar a <os:class/AnalysisResults>.
+    FILTER NOT EXISTS {
+        ?ar <os:prop/analysis/refEntity> <os:elem/loc/Artis>.
+    }.
+    FILTER NOT EXISTS {
+        ?ar <os:prop/analysis/refEntity> <os:elem/loc/Kriterion>.
+    }.
+}

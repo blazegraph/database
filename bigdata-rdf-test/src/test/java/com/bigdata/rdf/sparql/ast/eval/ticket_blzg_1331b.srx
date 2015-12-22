@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='s'/>
+        <variable name='p'/>
+        <variable name='o'/>
+        <variable name='tmp'/>
+        <variable name='tmp2'/>
+    </head>
+    <results>
+      <result>
+        <binding name='s'><uri>http://s</uri></binding>
+        <binding name='p'><uri>http://p</uri></binding>
+        <binding name='o'><literal>val</literal></binding>
+        <binding name='tmp'><literal>val</literal></binding>
+        <binding name='tmp2'><literal datatype="http://www.w3.org/2001/XMLSchema#boolean">false</literal></binding>
+      </result>
+    </results>
+</sparql>

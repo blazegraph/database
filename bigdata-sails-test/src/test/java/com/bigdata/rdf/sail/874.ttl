@@ -1,0 +1,4 @@
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+<http://qr1hi/user/12345> <http://arvados.org/schema/api_token> <token:ckedd> .
+<http://qr1hi/user/12345> <http://arvados.org/schema/user_is_admin> "true"^^xsd:boolean .
+<http://arvados.org/schema/modified_at> <http://rdf#type> <http://rdfs#Property> .

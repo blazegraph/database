@@ -1,0 +1,6 @@
+SELECT ?uri_d WHERE {
+  SELECT ?type ?uri_d WHERE {
+    VALUES ?type { <http://type1> }
+    GRAPH <http://graph1> { ?uri_d <http://p> ?type . }
+  }
+}

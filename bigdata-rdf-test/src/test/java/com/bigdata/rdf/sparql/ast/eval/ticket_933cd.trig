@@ -1,0 +1,4 @@
+<http://graph> {
+  <http://s> <http:/is3> "3" .
+  <http://s> <http:/is4> "4" .
+}

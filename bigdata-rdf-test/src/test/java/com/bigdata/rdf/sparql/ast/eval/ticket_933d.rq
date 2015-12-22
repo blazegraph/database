@@ -1,0 +1,7 @@
+SELECT * WHERE
+{
+  OPTIONAL {
+    <http://s> <http:/is3> ?x .
+  }
+  <http://s> <http:/is4> ?x .
+}

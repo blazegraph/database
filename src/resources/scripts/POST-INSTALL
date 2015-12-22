@@ -1,0 +1,43 @@
+Note: This presumes that you have successfully installed bigdata using
+the 'ant install' target.
+
+In order to manage the bigdata run state you need to modify crontab
+so that it will automatically execute:
+
+@BIN_DIR@/bigdata
+
+once per minute, reading the desired run state from:
+
+@STATE_FILE@
+
+You can destructively overwrite the @INSTALL_USER@ crontab on the
+localhost using:
+
+crontab @BIN_DIR@/crontab.user
+
+YOU MUST DO THIS FOR EACH HOST IN THE CLUSTER WHICH WILL RUN A BIGDATA
+SERVICE.
+
+Next, edit @STATE_FILE@ and change the bigdata run state to 'start'.
+If everything was configured correctly, the bigdata services will
+soon start on all hosts in the cluster.
+
+You can watch the progress using:
+
+@BIN_DIR@/listServices.sh com.bigdata.service.jini.util.ListServices.repeatCount=0
+
+You can look for errors using.
+
+tail -f @STATE_LOG@ @ERROR_LOG@
+
+You will typically see errors initially as some services can not start.
+For example, if jini or zookeeper can not be discovered.  However, those
+errors should go away once these services are running.
+
+A good practice is to debug your configuration by running 'bigdata start'
+directly from the appropriate user account on the individual machines,
+especially those which will run jini, zookeeper, the bigdata transaction
+service, the bigdata load balancer service, and the bigdata metadata
+service.  Once you know that the basic services on those machines can
+be started, you can change the run state for the entire federation and
+the rest of your services should also come online.

@@ -1,0 +1,28 @@
+SELECT DISTINCT ?_var1 (COUNT(DISTINCT ?_var2) AS ?_var3)
+FROM <http://www.rdfabout.com/rdf/usgov/congress>
+FROM <http://www.rdfabout.com/rdf/schema/Committees>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/people>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/109/bills>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/109/house>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/109/senate>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/110/bills>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/110/house>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/110/senate>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/111/bills>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/111/house>
+FROM <http://www.rdfabout.com/rdf/usgov/congress/111/senate>
+ WHERE {
+	?_var4 <http://www.rdfabout.com/rdf/schema/usbill/vote> ?_var2. 
+	?_var5 <http://www.rdfabout.com/rdf/schema/usbill/hadAction> ?_var4. 
+	?_var5 <http://www.rdfabout.com/rdf/schema/usbill/congress> ?_var1. 
+	?_var2 <http://www.rdfabout.com/rdf/schema/vote/hasOption> ?_var6. 
+	?_var2 <http://www.rdfabout.com/rdf/schema/vote/heldBy> ?_var7. 
+	?_var7 <http://www.w3.org/2000/01/rdf-schema#label> "The United States Senate". 
+	?_var2 <http://www.rdfabout.com/rdf/schema/vote/threshold> ?_var8. 
+	?_var2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.rdfabout.com/rdf/schema/vote/Vote>
+	FILTER (bound(?_var6))
+	FILTER ((?_var8 in("3/5", "2/3")))
+}
+GROUP BY ?_var1
+ORDER BY DESC(?_var3)
+LIMIT 500

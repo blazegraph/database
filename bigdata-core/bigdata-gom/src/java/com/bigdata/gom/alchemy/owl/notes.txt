@@ -1,0 +1,39 @@
+When processing an OWL ontology file we note the following:
+
+		IGPO classClass = m_om.getGPO(OWL.CLASS);
+		System.out.println("ClassClass: " + classClass.pp());
+		System.out.println("RDFS.SUBCLASSOF: " + RDFS.SUBCLASSOF);
+		
+		Iterator<IGPO> owlClasses = classClass.getLinksIn(RDF.TYPE).iterator();
+
+The classes that do not have a value for RDF.SUBCLASSOF are the base classes.
+
+To determine the class properties we need to retrieve the ObjectProperty(s) and DatatypeProperty(s)
+
+The ObjectProperty expects the rdfs:domain to reference an Class object.
+
+A DatatypeProperty requires the rdfs:domain to reference a datatype such as XMLSchema#string.
+
+
+ <owl:FunctionalProperty rdf:ID="ename">
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:range rdf:resource="#Name"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="depBdate">
+    <rdfs:domain rdf:resource="#Dependent"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+
+Therefore we can process the properties of a class with
+
+class.getLinksIn(RDFS.DOMAIN);
+
+Iterating the solution and checking for OWL.DATATYPEPROPERTY vs OWL.OBJECTPROPERTY
+will determine the attributes and associations for a class.
+
+A real issue again is whether we can cache the LinkSets.  I don't really see how
+this can work. I guess it may be possible to cache LinkSets at the skin level.
+
+Alternatively, 

@@ -1,0 +1,5 @@
+SELECT * WHERE {
+  BIND(2 AS ?s2)
+  BIND(1 AS ?s)
+  FILTER(!bound(?s))
+} 

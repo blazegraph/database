@@ -1,0 +1,8 @@
+# Who bought Sybase and where did we get that fact?
+
+prefix :          <http://example.com/>
+prefix dc:        <http://purl.org/dc/terms/>
+
+SELECT ?src ?who {
+   <<?who :bought :sybase>> dc:source ?src
+}

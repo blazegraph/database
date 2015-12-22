@@ -1,0 +1,9 @@
+# Search query.
+PREFIX bds: <http://www.bigdata.com/rdf/search#>
+
+SELECT ?subj ?label 
+WHERE {
+      ?label bds:search "mi*" .
+      ?label bds:relevance ?cosine .
+      ?subj ?p ?label .
+}

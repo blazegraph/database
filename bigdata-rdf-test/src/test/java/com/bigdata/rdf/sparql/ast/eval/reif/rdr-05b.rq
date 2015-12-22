@@ -1,0 +1,6 @@
+prefix :       <http://example.com/> 
+prefix dc:        <http://purl.org/dc/terms/> 
+
+select ?s ?o ?c  where {
+  <<?s :bought ?o>> dc:created ?c .
+}

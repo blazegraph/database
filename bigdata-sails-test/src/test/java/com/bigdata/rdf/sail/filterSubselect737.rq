@@ -1,0 +1,4 @@
+SELECT *
+{  { SELECT * { ?s ?p ?o } LIMIT 1 }
+   FILTER ( ?s = <eg:a> )
+}

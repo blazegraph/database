@@ -1,0 +1,14 @@
+@prefix rdf:        <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix bd:       <http://bigdata.com/RDF#> .
+@prefix dc:         <http://purl.org/dc/terms/> .
+@prefix foo:         <http://www.foo.org/> .
+
+foo:x rdf:type foo:A .
+<<foo:x rdf:type foo:A>> dc:creator "bryan" .
+
+foo:y rdf:type foo:B .
+<<foo:y rdf:type foo:B>> dc:creator "bryan" ;
+     dc:creator "mike" .
+
+foo:z rdf:type foo:C .
+<<foo:z rdf:type foo:C>> dc:creator "mike" .

@@ -1,0 +1,12 @@
+SELECT * WHERE {
+  ?s ?p ?o
+  {
+    SELECT * WHERE {
+      ?s ?p ?o
+      BIND(<http://p> AS ?p)
+      {
+        SELECT * WHERE { BIND(<http://z> AS ?z) }
+      }
+    }
+  }
+} VALUES ?p { <http://p> }

@@ -1,0 +1,11 @@
+SELECT *
+WHERE {
+ hint:Query hint:analytic "true" .
+ { 
+    SELECT $Y 
+    {
+     BIND ( "y" as $Y )
+    }
+  }
+  BIND ( "y" as $Y ) .
+}

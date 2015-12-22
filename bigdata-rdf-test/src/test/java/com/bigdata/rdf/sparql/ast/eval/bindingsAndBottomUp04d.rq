@@ -1,0 +1,9 @@
+SELECT * WHERE {
+  FILTER(!bound(?x))
+  {
+    VALUES ?x2 { 2 }
+    {
+      VALUES ?x { 1 }
+    }
+  }
+}

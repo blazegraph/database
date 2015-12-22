@@ -1,0 +1,7 @@
+SELECT *
+{ BIND (1 as ?x)
+  { SELECT * { 
+      VALUES ?z { "abc" "def" }
+    }
+  }
+}

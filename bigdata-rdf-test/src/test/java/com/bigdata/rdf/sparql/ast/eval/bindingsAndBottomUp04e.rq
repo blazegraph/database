@@ -1,0 +1,9 @@
+SELECT * WHERE {
+   FILTER(!bound(?x) || !bound(?y))
+   {
+     BIND(1 AS ?x)
+     {
+       BIND(2 AS ?y)
+     }
+   }
+} 

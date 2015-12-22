@@ -1,0 +1,9 @@
+<eg:g> {
+  <eg:p> <eg:special> <eg:q> .
+  <eg:a> <eg:p> <eg:c> .
+  <eg:b> <eg:p> <eg:d>
+           .
+  <eg:a> <eg:q> "c" .
+  <eg:b> <eg:q> "d" .
+  <eg:c> skos:prefLabel "c"
+}

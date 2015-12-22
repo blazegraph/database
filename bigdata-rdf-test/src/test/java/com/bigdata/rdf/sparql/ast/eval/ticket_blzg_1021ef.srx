@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='a'/>
+        <variable name='b'/>
+    </head>
+    <results>
+        <result>
+            <binding name='a'><uri>http://s</uri></binding>
+            <binding name='b'><uri>http://s</uri></binding>
+        </result>
+    </results>
+</sparql>

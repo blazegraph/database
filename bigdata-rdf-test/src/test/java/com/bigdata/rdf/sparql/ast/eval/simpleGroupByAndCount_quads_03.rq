@@ -1,0 +1,2 @@
+SELECT  (COUNT(*) as ?count) ?s
+WHERE { GRAPH <http://www.bigdata.com/mygraph> { ?s ?p ?o } } GROUP BY ?s

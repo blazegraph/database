@@ -1,0 +1,3 @@
+select (count(distinct ?s) as ?count) {
+   ?s ?p "abcedefg" .
+}

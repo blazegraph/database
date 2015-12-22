@@ -1,0 +1,20 @@
+# LUBM Q2.
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+#SELECT ?x ?y ?z
+SELECT (COUNT(*) as ?count)
+WHERE{
+
+  # Control all RTO parameters for repeatable behavior.
+  hint:Group hint:optimizer "Runtime".
+  hint:Group hint:RTO-sampleType "DENSE".
+  hint:Group hint:RTO-limit "100".
+  hint:Group hint:RTO-nedges "1".
+
+  ?x a ub:GraduateStudent .
+  ?y a ub:University .
+  ?z a ub:Department .
+  ?x ub:memberOf ?z .
+  ?z ub:subOrganizationOf ?y .
+  ?x ub:undergraduateDegreeFrom ?y
+}

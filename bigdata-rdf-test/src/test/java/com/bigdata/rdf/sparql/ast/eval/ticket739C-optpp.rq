@@ -1,0 +1,14 @@
+
+
+SELECT ?X
+WHERE {
+BIND ( <eg:o> as ?Z )
+{ 
+?X <eg:part>  ?part .
+?part ?predicate ?Z .
+}
+UNION 
+{
+?X ?predicate ?Z .
+}
+}

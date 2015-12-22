@@ -1,0 +1,91 @@
+<!-- $Id$ -->
+<!--                                                        -->
+<!-- do "ant bundle-jar" in the parent directory first.     -->
+<!--                                                        -->
+<project name="CI" basedir=".">
+
+	<property file="build.properties" />
+
+	<path id="runtime.classpath">
+		<!-- The bigdata dependencies (for the nano-server). -->
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<target name="clean"
+	    description="Cleans everything in [build.dir] (including source and loaded data)">
+		<delete dir="${build.dir}" />
+	</target>
+
+	<target name="prepare">
+		<!-- create directories. -->
+		<mkdir dir="${build.dir}" />
+		<copy toDir="${build.dir}/bin">
+			<!-- copy logging and journal configuration file. -->
+			<fileset file="${ci.dir}/*.properties" />
+		</copy>
+		<available file="${govtrack.zip}" property="govtrack.zip.present"/>
+	</target>
+
+	<target name="prepare-data" depends="prepare" unless="${govtrack.zip.present}">
+	   <echo>Must fetch data from ${govtrack.url}</echo>
+	   <get src="${govtrack.url}" dest="${govtrack.zip}" verbose="on"/>
+	   <unzip src="${govtrack.zip}" dest="${govtrack.dir}"/>
+	</target>
+
+	<target name="run-load" depends="prepare-data"
+		    description="Load a data set.">
+		<!-- delete file if it exists so we load into a new journal. -->
+		<delete file="${ci.journalFile}" />
+		<java classname="com.bigdata.rdf.store.DataLoader"
+                           fork="true" failonerror="true">
+			<arg line="-namespace ${ci.namespace} ${ci.journalPropertyFile} ${govtrack.dir}/govtrack/trig ${govtrack.dir}/govtrack/additions" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${ci.journalFile}
+				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
+				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
+				" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="dump-journal" depends="prepare"
+		    description="Dump interesting facts about the loaded data.">
+		<java classname="com.bigdata.journal.DumpJournal"
+                           fork="true" failonerror="true">
+			<arg line="-pages ${ci.journalFile}"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="start-sparql-server" depends="prepare"
+		    description="Start a small http server fronting for a bigdata database instance.">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" 
+		           fork="true" failonerror="true">
+			<arg line="${ci.nanoServerPort} ${ci.namespace} ${ci.journalPropertyFile}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${ci.journalFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="run-queries" depends="prepare"
+		    description="Run queries against an existing SPARQL endpoint.">
+		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlClient"
+                           fork="true" failonerror="true">
+			<arg line="-analytic true -dbMode quads -repeat 3 -f queries http://localhost:${ci.nanoServerPort}/sparql ${ci.journalFile}"/>
+			<jvmarg line="-Dlog4j.configuration=file:log4j.properties"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+		
+</project>

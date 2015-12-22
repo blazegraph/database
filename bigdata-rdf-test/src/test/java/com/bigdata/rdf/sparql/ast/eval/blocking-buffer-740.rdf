@@ -1,0 +1,920 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+	xmlns:owl="http://www.w3.org/2002/07/owl#"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:sys="http://example.com/a0"
+	xmlns:base="http://example.com/a1"
+	xmlns:sysd="http://example.com/a2"
+	xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+	xmlns:syapse="http://example.com/a3"
+	xmlns:based="http://example.com/a4"
+	xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+	xmlns:s="http://example.com/a5"
+	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+	xmlns:sd="http://www.w3.org/ns/sparql-service-description#"
+	xmlns:c2="http://example.com/a6"
+	xmlns:c2d="http://example.com/a7"
+	xmlns:bigdata="http://www.bigdata.com/rdf#">
+
+<rdf:Description rdf:about="http://example.com/a8">
+	<rdfs:subClassOf rdf:resource="http://example.com/a9"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a10">
+	<rdfs:subClassOf rdf:resource="http://example.com/a9"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a11">
+	<rdfs:subClassOf rdf:resource="http://example.com/a9"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a9">
+	<rdfs:subClassOf rdf:resource="http://example.com/a12"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a13">
+	<rdfs:subClassOf rdf:resource="http://example.com/a12"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a14">
+	<rdfs:subClassOf rdf:resource="http://example.com/a12"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a15">
+	<rdfs:subClassOf rdf:resource="http://example.com/a12"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a16">
+	<rdfs:subClassOf rdf:resource="http://example.com/a12"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a17">
+	<rdfs:subClassOf rdf:resource="http://example.com/a12"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a18">
+	<rdfs:subClassOf rdf:resource="http://example.com/a12"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a19">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a20">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a21">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a22">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a23">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a24">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a25">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a26">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a27">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a28">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a29">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a30">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a31">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a32">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a33">
+	<rdf:type rdf:resource="http://example.com/a14"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a34">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a36">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a37">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a38">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a39">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a40">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a41">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a42">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a43">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a44">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a45">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a46">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a47">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a48">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a49">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a50">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a51">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a52">
+	<rdf:type rdf:resource="http://example.com/a35"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a53">
+	<rdf:type rdf:resource="http://example.com/a8"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a54">
+	<rdf:type rdf:resource="http://example.com/a8"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a55">
+	<rdf:type rdf:resource="http://example.com/a8"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a56">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a57">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a58">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a59">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a60">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a61">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a63">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a64">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a65">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a66">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a67">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a68">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a69">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a70">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a71">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a72">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a73">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a74">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a75">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a76">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a77">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a78">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a79">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a80">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a81">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a82">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a83">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a84">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a85">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a86">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a87">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a88">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a89">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a90">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a91">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a92">
+	<rdf:type rdf:resource="http://example.com/a18"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a19">
+	<syapse:part rdf:nodeID="t71749"/>
+	<syapse:part rdf:nodeID="t71759"/>
+	<syapse:part rdf:nodeID="t71649"/>
+	<syapse:part rdf:nodeID="t71664"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a53">
+	<syapse:part rdf:nodeID="t71676"/>
+	<syapse:part rdf:nodeID="t72698"/>
+	<syapse:part rdf:nodeID="t72705"/>
+	<syapse:part rdf:nodeID="t72749"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a20">
+	<sys:uniqueId>FS-10</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a53">
+	<syapse:part rdf:nodeID="t72801"/>
+	<syapse:part rdf:nodeID="t72811"/>
+	<syapse:part rdf:nodeID="t72843"/>
+	<syapse:part rdf:nodeID="t72878"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a22">
+	<sys:uniqueId>FS-12</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a53">
+	<syapse:part rdf:nodeID="t71645"/>
+	<syapse:part rdf:nodeID="t71653"/>
+	<syapse:part rdf:nodeID="t71670"/>
+	<syapse:part rdf:nodeID="t71672"/>
+	<syapse:part rdf:nodeID="t72897"/>
+	<syapse:part rdf:nodeID="t71673"/>
+	<syapse:part rdf:nodeID="t71674"/>
+	<syapse:part rdf:nodeID="t71675"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a21">
+	<sys:uniqueId>FS-11</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a54">
+	<syapse:part rdf:nodeID="t71651"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a23">
+	<sys:uniqueId>FS-13</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a54">
+	<syapse:part rdf:nodeID="t71655"/>
+	<syapse:part rdf:nodeID="t71659"/>
+	<syapse:part rdf:nodeID="t71661"/>
+	<syapse:part rdf:nodeID="t71662"/>
+	<syapse:part rdf:nodeID="t72720"/>
+	<syapse:part rdf:nodeID="t72813"/>
+	<syapse:part rdf:nodeID="t72888"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a29">
+	<sys:uniqueId>FS-0</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a30">
+	<sys:uniqueId>FS-1</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a54">
+	<syapse:part rdf:nodeID="t72786"/>
+	<syapse:part rdf:nodeID="t72796"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a31">
+	<sys:uniqueId>FS-2</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a26">
+	<sys:uniqueId>FS-3</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a28">
+	<sys:uniqueId>FS-5</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a27">
+	<sys:uniqueId>FS-4</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a61">
+	<syapse:part rdf:nodeID="t71667"/>
+	<syapse:part rdf:nodeID="t71685"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a55">
+	<syapse:part rdf:nodeID="t71646"/>
+	<syapse:part rdf:nodeID="t71648"/>
+	<syapse:part rdf:nodeID="t71656"/>
+	<syapse:part rdf:nodeID="t72709"/>
+	<syapse:part rdf:nodeID="t72734"/>
+	<syapse:part rdf:nodeID="t72760"/>
+	<syapse:part rdf:nodeID="t72841"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a66">
+	<sys:uniqueId>TS-12</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a55">
+	<syapse:part rdf:nodeID="t71644"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a67">
+	<sys:uniqueId>TS-13</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a24">
+	<sys:uniqueId>FS-6</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<syapse:part rdf:nodeID="t71650"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a63">
+	<sys:uniqueId>TS-5</sys:uniqueId>
+	<syapse:part rdf:nodeID="t71647"/>
+	<syapse:part rdf:nodeID="t71665"/>
+	<syapse:part rdf:nodeID="t71668"/>
+	<syapse:part rdf:nodeID="t72716"/>
+	<syapse:part rdf:nodeID="t72833"/>
+	<syapse:part rdf:nodeID="t72852"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<syapse:part rdf:nodeID="t71666"/>
+	<syapse:part rdf:nodeID="t71669"/>
+	<syapse:part rdf:nodeID="t71691"/>
+	<syapse:part rdf:nodeID="t71702"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a79">
+	<sys:uniqueId>TS-14</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<syapse:part rdf:nodeID="t71671"/>
+	<syapse:part rdf:nodeID="t71680"/>
+	<syapse:part rdf:nodeID="t71683"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a25">
+	<sys:uniqueId>FS-7</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<syapse:part rdf:nodeID="t71652"/>
+	<syapse:part rdf:nodeID="t71654"/>
+	<syapse:part rdf:nodeID="t71657"/>
+	<syapse:part rdf:nodeID="t71658"/>
+	<syapse:part rdf:nodeID="t71660"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a33">
+	<sys:uniqueId>FS-9</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<syapse:part rdf:nodeID="t71707"/>
+	<syapse:part rdf:nodeID="t71739"/>
+	<syapse:part rdf:nodeID="t71747"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a81">
+	<sys:uniqueId>TS-16</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a80">
+	<sys:uniqueId>TS-15</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<syapse:part rdf:nodeID="t71757"/>
+	<syapse:part rdf:nodeID="t71760"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a32">
+	<sys:uniqueId>FS-8</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a89">
+	<sys:uniqueId>TS-17</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a90">
+	<sys:uniqueId>TS-18</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a64">
+	<sys:uniqueId>TS-4</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a65">
+	<sys:uniqueId>TS-2</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a84">
+	<sys:uniqueId>TS-19</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a58">
+	<sys:uniqueId>TS-0</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a85">
+	<sys:uniqueId>TS-20</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a86">
+	<sys:uniqueId>TS-21</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a59">
+	<sys:uniqueId>TS-3</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a60">
+	<sys:uniqueId>TS-1</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a56">
+	<sys:uniqueId>TS-25</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a74">
+	<sys:uniqueId>TS-22</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a75">
+	<sys:uniqueId>TS-23</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a57">
+	<sys:uniqueId>TS-26</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a76">
+	<sys:uniqueId>TS-27</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a92">
+	<sys:uniqueId>TS-6</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a91">
+	<sys:uniqueId>TS-24</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a78">
+	<sys:uniqueId>TS-29</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a77">
+	<sys:uniqueId>TS-28</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a82">
+	<sys:uniqueId>TS-30</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a83">
+	<sys:uniqueId>TS-31</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a71">
+	<sys:uniqueId>TS-32</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a72">
+	<sys:uniqueId>TS-33</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a73">
+	<sys:uniqueId>TS-34</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a87">
+	<sys:uniqueId>TS-7</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a88">
+	<sys:uniqueId>TS-8</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a68">
+	<sys:uniqueId>TS-9</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a69">
+	<sys:uniqueId>TS-10</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a70">
+	<sys:uniqueId>TS-11</sys:uniqueId>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a62">
+	<base:hasSubject rdf:resource="http://example.com/a34"/>
+</rdf:Description>
+
+<rdf:Description rdf:nodeID="t71709">
+	<base:hasSubject rdf:resource="http://example.com/a36"/>
+</rdf:Description>
+
+<rdf:Description rdf:nodeID="t71663">
+	<base:hasSubject rdf:resource="http://example.com/a36"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a93">
+	<base:hasSubject rdf:resource="http://example.com/a41"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a63">
+	<base:hasSubject rdf:resource="http://example.com/a41"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a64">
+	<base:hasSubject rdf:resource="http://example.com/a41"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a65">
+	<base:hasSubject rdf:resource="http://example.com/a41"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a58">
+	<base:hasSubject rdf:resource="http://example.com/a41"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a94">
+	<base:hasSubject rdf:resource="http://example.com/a42"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a24">
+	<base:hasSubject rdf:resource="http://example.com/a42"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a89">
+	<base:hasSubject rdf:resource="http://example.com/a42"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a90">
+	<base:hasSubject rdf:resource="http://example.com/a42"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a94">
+	<base:hasSubject rdf:resource="http://example.com/a43"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a22">
+	<base:hasSubject rdf:resource="http://example.com/a43"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a78">
+	<base:hasSubject rdf:resource="http://example.com/a43"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a82">
+	<base:hasSubject rdf:resource="http://example.com/a43"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a94">
+	<base:hasSubject rdf:resource="http://example.com/a44"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a31">
+	<base:hasSubject rdf:resource="http://example.com/a44"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a88">
+	<base:hasSubject rdf:resource="http://example.com/a44"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a68">
+	<base:hasSubject rdf:resource="http://example.com/a44"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a94">
+	<base:hasSubject rdf:resource="http://example.com/a51"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a30">
+	<base:hasSubject rdf:resource="http://example.com/a51"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a73">
+	<base:hasSubject rdf:resource="http://example.com/a51"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a87">
+	<base:hasSubject rdf:resource="http://example.com/a51"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a95">
+	<base:hasSubject rdf:resource="http://example.com/a52"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a33">
+	<base:hasSubject rdf:resource="http://example.com/a52"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a75">
+	<base:hasSubject rdf:resource="http://example.com/a52"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a91">
+	<base:hasSubject rdf:resource="http://example.com/a52"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a95">
+	<base:hasSubject rdf:resource="http://example.com/a45"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a32">
+	<base:hasSubject rdf:resource="http://example.com/a45"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a86">
+	<base:hasSubject rdf:resource="http://example.com/a45"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a74">
+	<base:hasSubject rdf:resource="http://example.com/a45"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a95">
+	<base:hasSubject rdf:resource="http://example.com/a46"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a21">
+	<base:hasSubject rdf:resource="http://example.com/a46"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a76">
+	<base:hasSubject rdf:resource="http://example.com/a46"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a77">
+	<base:hasSubject rdf:resource="http://example.com/a46"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a95">
+	<base:hasSubject rdf:resource="http://example.com/a47"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a28">
+	<base:hasSubject rdf:resource="http://example.com/a47"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a80">
+	<base:hasSubject rdf:resource="http://example.com/a47"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a81">
+	<base:hasSubject rdf:resource="http://example.com/a47"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a95">
+	<base:hasSubject rdf:resource="http://example.com/a38"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a27">
+	<base:hasSubject rdf:resource="http://example.com/a38"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a67">
+	<base:hasSubject rdf:resource="http://example.com/a38"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a79">
+	<base:hasSubject rdf:resource="http://example.com/a38"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a96">
+	<base:hasSubject rdf:resource="http://example.com/a39"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a20">
+	<base:hasSubject rdf:resource="http://example.com/a39"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a56">
+	<base:hasSubject rdf:resource="http://example.com/a39"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a57">
+	<base:hasSubject rdf:resource="http://example.com/a39"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a96">
+	<base:hasSubject rdf:resource="http://example.com/a40"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a25">
+	<base:hasSubject rdf:resource="http://example.com/a40"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a84">
+	<base:hasSubject rdf:resource="http://example.com/a40"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a85">
+	<base:hasSubject rdf:resource="http://example.com/a40"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a96">
+	<base:hasSubject rdf:resource="http://example.com/a48"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a26">
+	<base:hasSubject rdf:resource="http://example.com/a48"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a69">
+	<base:hasSubject rdf:resource="http://example.com/a48"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a70">
+	<base:hasSubject rdf:resource="http://example.com/a48"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a66">
+	<base:hasSubject rdf:resource="http://example.com/a48"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a96">
+	<base:hasSubject rdf:resource="http://example.com/a49"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a29">
+	<base:hasSubject rdf:resource="http://example.com/a49"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a71">
+	<base:hasSubject rdf:resource="http://example.com/a49"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a72">
+	<base:hasSubject rdf:resource="http://example.com/a49"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a96">
+	<base:hasSubject rdf:resource="http://example.com/a50"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a23">
+	<base:hasSubject rdf:resource="http://example.com/a50"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a83">
+	<base:hasSubject rdf:resource="http://example.com/a50"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://example.com/a92">
+	<base:hasSubject rdf:resource="http://example.com/a50"/>
+</rdf:Description>
+
+</rdf:RDF>

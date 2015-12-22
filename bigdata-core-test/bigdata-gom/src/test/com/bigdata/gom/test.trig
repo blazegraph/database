@@ -1,0 +1,12 @@
+:dataset {
+ Ê :Mike rdf:type foaf:Person .
+ Ê :Bryan rdf:type foaf:Person .
+ Ê :Martyn rdf:type foaf:Person .
+ Ê :Mike rdfs:label "Mike" .
+ Ê :Bryan rdfs:label "Bryan" .
+ Ê :Martyn rdfs:label "Martyn" .
+ Ê :Mike foaf:knows :Bryan .
+ Ê :Martyn foaf:knows :Bryan .
+ Ê :Bryan foaf:knows :Mike .
+ Ê :Bryan foaf:knows :Martyn .
+}

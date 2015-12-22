@@ -1,0 +1,38 @@
+// General-purpose policy file that can be used for all
+// Bigdata services when run in a configuration that does
+// not employ distributed security (JSSE, Kerberos)
+
+grant codebase "file:${appHome}/lib/*" {
+    permission java.security.AllPermission "", "";
+};
+
+// JMX Permissions - Allows remote JMX clients (jconsole, msconsole)
+// to connect to the JVM.
+grant principal javax.management.remote.JMXPrincipal "monitorRole" {
+    permission java.security.AllPermission;
+};
+grant principal javax.management.remote.JMXPrincipal "controlRole" {
+    permission java.security.AllPermission;
+};
+
+
+/* ******** Granted to all codebases for convenience ******* */
+grant {
+    // So proxies can connect back to the server
+    permission java.net.SocketPermission "*:1024-", "connect";
+
+    // Needed by proxies that wish to do logging
+    permission java.util.PropertyPermission 
+                                "log4j.configuration", "read";
+    permission java.util.PropertyPermission 
+                        "log4j.primary.configuration", "read";
+    permission java.util.PropertyPermission
+                                     "bigdata.logDir", "read";
+
+    permission java.io.FilePermission 
+                             "${log4j.configuration}", "read";
+    permission java.io.FilePermission 
+                     "${log4j.primary.configuration}", "read";
+    permission java.io.FilePermission
+                          "${bigdata.logDir}/*", "read,write";
+};

@@ -1,0 +1,116 @@
+Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a major release of Blazegraph™.  The official release is made into the Sourceforge Git repository.  Releases after 1.4.0 will no longer be made into SVN. 
+
+Blazegraph Features (http://www.blazegraph.com/blazegraph#FeatureMatrix)
+
+1.5.2 has significant performance improvements for query optimization and new features.  See https://blog.blazegraph.com/?p=905.
+
+In this release, join group evaluation strategy compliant with the official http://www.w3.org/TR/sparql11-query SPARQL W3C semantics. As a consequence, for some query patterns, the behavior of Blazegraph changed and if you’re upgrading your Blazegraph installation it might make sense to review your queries for such patterns, in order to avoid regressions.  See https://blog.blazegraph.com/?p=928 for more details.
+
+Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
+
+Starting points:
+
+	Blazegraph Wiki:  https://wiki.blazegraph.com/
+	Blazegraph Blog:  https://blog.blazegraph.com/
+	Blazegraph JIRA:  https://jira.blazegraph.com/
+	Blazegraph Support:  http://www.blazegraph.com/support/
+	Public Code Samples:  https://github.com/SYSTAP/blazegraph-samples
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BIGDATA_RELEASE_1_5_2 --single-branch git://git.code.sf.net/p/bigdata/git BIGDATA_RELEASE_1_5_2
+
+Change log:
+
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_RELEASE_1_5_2
+
+** Bug
+    * [BLZG-800] - select ?g { Graph ?g {} } incorrect
+    * [BLZG-843] - Wildcard projection was not rewritten.
+    * [BLZG-1001] - optional eval order
+    * [BLZG-1018] - poor filter placement
+    * [BLZG-1021] - optimizer = None and FILTER EXISTS
+    * [BLZG-1132] - Exception while computing closure
+    * [BLZG-1155] - hasStatements can overestimate and ignores includeInferred (REST API)
+    * [BLZG-1166] - Converge deployers and documentation on a well-known port (REST API)
+    * [BLZG-1178] - Bad Address: length requested greater than allocated slot (RWStore, GROUP COMMIT, HA-only)
+    * [BLZG-1193] - Integrate filters into the ALP service
+    * [BLZG-1194] - Allow some inline IVs into the text index (IPv4)
+    * [BLZG-1209] - Resource... contexts not encoded/decoded according to openrdf semantics (REST API)
+    * [BLZG-1214] - BigdataGraphFactory Connect
+    * [BLZG-1217] - BigdataGraphFactory.create not working
+    * [BLZG-1221] - BigdataSailRemoteRepository uses non-daemon thread pool
+    * [BLZG-1222] - Query fails with ArrayIndexOutOfBoundsException
+    * [BLZG-1235] - BOpUtility.postOrderIteratorWithAnnotations() is has wrong visitation order.
+    * [BLZG-1237] - DumpJournal fails on non-BTree/HTree classes
+    * [BLZG-1243] - bigdata-client does not invoke ServiceProviderHook.forceLoad()
+    * [BLZG-1281] - FILTER FILTER != not working
+    * [BLZG-1284] - optional / filter ! bound interaction malfunction
+    * [BLZG-1293] - Bigdata-gas TestCC test is failing.
+    * [BLZG-1296] - named subquery and VALUES expression
+    * [BLZG-1299] - duplicates in VALUES get replicated
+    * [BLZG-1315] - ASTJoinOrderOptimizerByType refactoring
+    * [BLZG-1327] - Computation of maybe and definitely incoming bindings in subqueries
+    * [BLZG-1331] - Duplicate LET expression leading to NotMaterializedException
+    * [BLZG-1339] - Semantics of Sesame’s Operation.setBinding() and Operation.getBindings()
+    * [BLZG-1341] - performance of dumping single graph
+    * [BLZG-1346] - DistinctTermScanOp is not retrieving all data
+    * [BLZG-1358] - SERVICE node placement issues
+    * [BLZG-1362] - Rest API Refactor Appears to have broken BlueprintsServlet
+    * [BLZG-1363] - Join reordering problems
+    * [BLZG-1374] - BigdataGraphConfiguration should allow caller to specify SPARQL endpoint
+    * [BLZG-1380] - Filter Not Exists RC1 Broken
+    * [BLZG-1383] - InlineIV dependent on Java compiler and system encoding settings?
+    * [BLZG-1386] - NPE in FunctionNode<init>
+    * [BLZG-1390] - .swp file in built jar
+    * [BLZG-1391] - test files in jar build
+
+
+** Improvement
+    * [BLZG-1316] - Embedded Graph Clients Query Listing and Cancellation
+    * [BLZG-1322] - Bigdata RDF parsers should be independent from connections
+    * [BLZG-1351] - Collect additional statistics for EXPLAIN
+    * [BLZG-1379] - Join reordering strictly according to W3C semantics
+
+** New Feature
+    * [BLZG-556] - Optimization for GRAPH uri {} and GRAPH ?foo {}
+    * [BLZG-1101] - Feature request: pre-heat the journal on startup
+    * [BLZG-1131] - Enhanced FILTER optimizer
+    * [BLZG-1170] - Extend ESTCARD method for exact range counts (REST API)
+    * [BLZG-1205] - Online backup for Journal.
+    * [BLZG-1211] - Inline URIs should work more like inline values
+    * [BLZG-1219] - CREATE DATA SET does not report Location header
+    * [BLZG-1261] - createRepository() does not set the namespace on the Properties
+
+** Task
+    * [BLZG-30] - External Solr Search
+    * [BLZG-34] - Bug in JiniCoreServicesConfiguration.getServiceRegistrars() (infinite wait)
+    * [BLZG-195] - BlazeGraph release 1.5.2
+    * [BLZG-199] - Refactor RemoteRepository / RemoteRepositoryManager
+    * [BLZG-200] - 1.5.2 benchmarks
+    * [BLZG-207] - RemoteRepository does not CANCEL a SPARQL UPDATE if there is a client error.
+    * [BLZG-1295] - Refactor Blueprints Servlet into the bigdata-blueprints package
+    * [BLZG-1350] - Performance counter depth does not allow "0"
+    * [BLZG-1361] - Update 1.5.2 Release for New Blazegraph Logo
+    * [BLZG-1392] - Assess impact of the indexCache timeout.
+
+** Sub-task
+    * [BLZG-41] - Configurable whitelist of SERVICE URLs
+    * [BLZG-42] - Per query memory limit for analytic query mode.
+    * [BLZG-43] - Add System property to enable analytic query mode.
+    * [BLZG-48] - Query fails to project subquery variables
+    * [BLZG-50] - Queries with multiple VALUES clauses
+    * [BLZG-876] - BIND not executed before SERVICE call.
+    * [BLZG-1256] - Service call with values clauses create a cross product
+    * [BLZG-1274] - bigdata-client requires maven dependency for "properties" registry
+    * [BLZG-1275] - bigdata-gas testCC failure.
+    * [BLZG-1294] - Failed abort should not permit writes
+    * [BLZG-1348] - Create a branch with a possible workaround for write/delete after abort in data race
+    * [BLZG-1371] - Remove BigdataSailHelper Class
+

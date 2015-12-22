@@ -1,0 +1,9 @@
+SELECT * WITH {
+   SELECT ?s
+   WHERE
+   {  
+     bind (?obj as ?obj2) 
+     ?s <http://p> ?obj2 . 
+   } BINDINGS ?obj { ( <http://o> ) } 
+} AS %sub
+WHERE {  include %sub }

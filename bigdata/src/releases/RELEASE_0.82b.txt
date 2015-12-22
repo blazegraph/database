@@ -1,0 +1,75 @@
+This is a bigdata (R) snapshot release.  This release is capable of loading 1B
+triples in under one hour on a 15 node cluster and has been used to load up to
+13B triples on the same cluster.  JDK 1.6 is required.
+
+See [1] for instructions on installing bigdata(R), [2] for the javadoc and [3]
+and [4] for news, questions, and the latest developments.  For more information
+about SYSTAP, LLC and bigdata, see [5].
+
+Please note that we recommend checking out the code from SVN using the tag for
+this release.  The code will build automatically under eclipse.  You can also
+build the code using the ant script.  The cluster installer requires the use of
+the ant script.  You can checkout this release from the following URL:
+
+	https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/RELEASE_0.82b
+
+This tag corresponds to revision 2604.
+
+New features:
+
+- Full transaction support in the SAIL.
+
+- Installer for the Sesame workbench server.
+
+- SPARQL query hints in the SAIL.
+
+- Native execution of UNION queries. (And better overall coverage for native rule
+  execution in general.)
+  
+- Significant performance gains in SPARQL query execution as measured against the
+  LUBM and BSBM benchmarks.  Using a commodity server, the LUBM U50 queries run
+  in ~6 seconds using a branching factor of 64 and the RW store and BSBM query 
+  performance is ~ 2300 query mixes per hour (QMpH) for 100M triples with 4
+  concurrent clients and the LIRS cache).
+
+- A new "WORM" persistence store implementation supporting concurrent IO (DiskWORM). 
+  The WORMStrategy is a binary compatible replacement for the DiskOnlyStrategy
+  which the potential for concurrent IOs.  People interested in a preview may
+  enable this implementation on either new or existing persistence stores by
+  changing the com.bigdata.journal.BufferMode to DiskWORM.
+
+- A new "RW" persistence store implementation with limited history retention
+  supporting concurrent IO, secure checksummed data, and a storage model that
+  may significantly reduce storage requirements in particular for skewed data.
+
+The roadmap for the next release includes:
+
+- Refactor of the dynamic sharding mechanism for higher performance;
+
+- High availability for the journal;
+
+- Query optimizations.
+
+Our next milestone will include both high availability and a greatly simplified
+deployment, configure, and administration process for the clustered database.
+Later this year we will be introducing support for RDF spatial and analytic query
+workloads.
+
+For more information, please see the following links:
+
+[1] http://bigdata.wiki.sourceforge.net/GettingStarted
+[2] http://www.bigdata.com/bigdata/docs/api/
+[3] http://sourceforge.net/projects/bigdata/
+[4] http://www.bigdata.com/blog 
+[5] http://www.systap.com/bigdata.htm
+
+About bigdata: 
+
+Bigdata® is a horizontally-scaled, general purpose storage and computing fabric
+for ordered data (B+Trees), designed to operate on either a single server or a
+cluster of commodity hardware. Bigdata® uses dynamically partitioned key-range
+shards in order to remove any realistic scaling limits - in principle, bigdata®
+may be deployed on 10s, 100s, or even thousands of machines and new capacity may
+be added incrementally without requiring the full reload of all data. The bigdata®
+RDF database supports RDFS and OWL Lite reasoning, high-level query (SPARQL),
+and datum level provenance. 

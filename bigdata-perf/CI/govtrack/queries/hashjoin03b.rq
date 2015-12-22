@@ -1,0 +1,11 @@
+# Default graph hash join with native DISTINCT SPO filter.
+# Originally a 400s query.  Now that the DISTINCT SPO filter uses the best
+# key order based on the natural order of the index against which the hash
+# join is running this has become a 40s query.  10x faster.
+
+SELECT (COUNT(*) as ?count)
+WHERE {
+  ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k, 300ms for AP scan.
+  ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M, 17623ms for AP scan.
+  hint:Prior hint:hashJoin "true" . # use a hash join.
+}

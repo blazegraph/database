@@ -1,0 +1,8 @@
+SELECT ?s WHERE { 
+  
+  ?s <http://q1> ?o1 
+  OPTIONAL {
+    ?s <http://q2> ?o2 . 
+    ?s <http://q2> ?o3 . 
+  }
+} LIMIT 10000

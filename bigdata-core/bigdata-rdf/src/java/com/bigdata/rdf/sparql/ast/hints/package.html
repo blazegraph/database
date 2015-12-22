@@ -1,0 +1,20 @@
+<html>
+<head>
+<title>Query Hints</title>
+</head>
+<body>
+<p>
+Query hints are specified at the SPARQL layer using magic predicates.  A few
+special query hints are interpreted by the parser itself (currently only the
+QueryID).  Most query hints are handled by the {@link ASTQueryHintOptimizer}.
+</p>
+<p>
+Query hints wind up being handled in several different ways.  Some of them
+cause query wide attributes to be set on the AST2BOpContext.  Other query hints
+are transferred into ASTBase annotations and then subsequently intepreted either
+by other IASTOptimizers or by AST2BOpUtility.  Finally, some query hints are
+set on the "queryHints" property of the ASTBase nodes.  Those query hints are
+then transferred onto PipelineOps as they are generated.
+</p>
+</body>
+</html>

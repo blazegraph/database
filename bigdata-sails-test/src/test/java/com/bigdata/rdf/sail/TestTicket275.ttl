@@ -1,0 +1,8 @@
+@prefix  rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<os:elem/lookup/major/Piet+%26+sint> a <os:class/Lookup> ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Piet & sint" ;
+	<os:prop/lookup/text> "Piet & sint" ;
+	<os:prop/lookup/majorType> "major" ;
+	<os:prop/lookup/minorType> "minor" .

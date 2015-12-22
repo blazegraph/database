@@ -1,0 +1,27 @@
+<html>
+<head>
+<title>B+-Tree Fused Views</title>
+</head>
+<body>
+
+<!-- $Id$ -->
+
+<p>
+This package provides support for a view of a <em>local</em> B+-Tree comprised
+of one or more source B+-Tree instances.  The first component of the view is
+always a mutable {@link com.bigdata.btree.BTree} used to absorb writes for the
+view (read-only views use a read-only instance of that BTree).  The sources in
+the view are ordered.  Reads read against the sources in order, stopping on the
+first source for which their is a hit for a tuple.  Writes are always directed
+to the first source in the view.
+</p>
+
+<p>
+Fused views are the basic building block for index partitions.  Each index
+partition consists of a mutable B+-Tree on the live journal and zero or more
+{@link com.bigdata.btree.IndexSegment}s having historical data for the same
+view.
+</p>
+
+</body>
+</html>

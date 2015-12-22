@@ -1,0 +1,16 @@
+# See #796 (Filter assigned to sub-query by query generator is dropped from evaluation)
+#
+select distinct ?s 
+where
+{
+        ?s ?p ?o.
+        {
+                SELECT ?ps WHERE
+                { 
+                        hint:SubQuery hint:runOnce true.
+                        ?ps a <http://www.example.org/schema/Person> .
+                }
+                limit 1
+        }
+        filter (str(?s) = str(?ps))
+}

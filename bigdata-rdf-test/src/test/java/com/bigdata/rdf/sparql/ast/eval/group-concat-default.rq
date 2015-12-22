@@ -1,0 +1,6 @@
+PREFIX : <http://example.org/>
+SELECT ?s (GROUP_CONCAT(?o ; separator=";") AS ?phrase) 
+{
+  ?s :p ?o .
+}
+GROUP BY ?s

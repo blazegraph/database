@@ -1,0 +1,11 @@
+PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+SELECT * {
+  SERVICE gas:service {
+    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.BFS" .
+    gas:program gas:in </:source> . # starting point
+    gas:program gas:target </:target> . # target vertices
+    gas:program gas:out ?v . # bound to the visited vertices.
+    gas:program gas:out1 ?depth . # bound to the depth of the visited vertices.
+    gas:program gas:out2 ?pred . # bound to the predecessor.
+  }
+} order by ?depth

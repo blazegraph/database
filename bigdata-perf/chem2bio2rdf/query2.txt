@@ -1,0 +1,12 @@
+PREFIX c2b2r_chembl: <http://chem2bio2rdf.org/chembl/resource/>
+PREFIX drugbank: <http://chem2bio2rdf.org/drugbank/resource/>
+
+SELECT ?p ?o
+
+WHERE { 
+
+GRAPH <http://linkedlifedata.com/resource/drugbank> {
+<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> ?p ?o .
+}
+
+}

@@ -1,0 +1,3 @@
+<http://example.org/graph> {
+   <http://example.org/s> <http://example.org/p> "n-literal-longer-than-ten-characters" .
+}

@@ -1,0 +1,33 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix bd: <http://www.bigdata.com/rdf#> .
+@prefix : <:> .
+
+# first path, length = 2
+:source :edge :a .
+:a :edge :b .
+:b :edge :target .
+
+# second path, length = 2
+:source :edge :c .
+:c :edge :d .
+:d :edge :target .
+
+# third path, length = 3
+:source :edge :e .
+:e :edge :f .
+:f :edge :g .
+:g :edge :target .
+
+# third path, length = 4
+:source :edge :h .
+:h :edge :i .
+:i :edge :j .
+:j :edge :k .
+:k :edge :target .
+
+# extraneous
+:target :edge :extraneous .
+
+# cycle
+:b :edge :cycle .
+:cycle :edge :a .

@@ -1,0 +1,7 @@
+SELECT ?p {
+
+   { SELECT DISTINCT ?p WHERE { ?s ?p ?o . } } .
+   
+   <http://bigdata.com#s1> ?p ?o .
+   
+}

@@ -1,0 +1,1316 @@
+
+(object Petal
+    version    	46
+    _written   	"Rose 7.7.0204.3001"
+    charSet    	0)
+
+(object Class_Category "junit"
+    is_unit    	TRUE
+    is_loaded  	TRUE
+    quid       	"416EAE30003E"
+    exportControl 	"Public"
+    logical_models 	(list unit_reference_list
+	(object Class_Category "framework"
+	    quid       	"416EAE41007E"
+	    documentation 	"Overview of the JUnit framework."
+	    exportControl 	"Public"
+	    logical_models 	(list unit_reference_list
+		(object Parameterized_Class "Adaptor"
+		    quid       	"416EAF1103B2"
+		    documentation 	
+|The Adaptor is used to run a public method with zero arguments whose name begins with "test".
+		    
+		    superclasses 	(list inheritance_relationship_list
+			(object Inheritance_Relationship
+			    quid       	"416EAFF90366"
+			    supplier   	"Logical View::junit::framework::TestCase"
+			    quidu      	"416EAE520386"))
+		    parameters 	(list Parameters
+			(object Parameter "name"
+			    quid       	"416EAFAB02D7"
+			    type       	"String")))
+		(object Class "Assert"
+		    quid       	"416EB17201F5"
+		    documentation 	"Provides a variety of convenience methods for making assertions during tests.  If an assertion fails, then various information concerning that failure is collated within the TestResult.")
+		(object Class "Test"
+		    quid       	"416EAE4E00D7"
+		    documentation 	
+|From the JavaDoc:
+|
+|A Test can be run and collect its results. 
+		    
+		    stereotype 	"Interface"
+		    operations 	(list Operations
+			(object Operation "run"
+			    quid       	"416EAE91023C"
+			    parameters 	(list Parameters
+				(object Parameter "result"
+				    quid       	"416EAE9D0329"
+				    type       	"TestResult"
+				    quidu      	"416EAE6600B3"))
+			    result     	"void"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0)))
+		(object Class "TestCase"
+		    quid       	"416EAE520386"
+		    documentation 	
+|From the JavaDoc:
+|
+|A test case defines the fixture to run multiple tests.
+|
+|To define a test case
+|1) implement a subclass of TestCase
+|2) define instance variables that store the state of the fixture
+|3) initialize the fixture state by overriding setUp
+|4) clean-up after a test by overriding tearDown.
+|
+|Each test runs in its own fixture so there can be no side effects among test runs.
+|
+		    
+		    superclasses 	(list inheritance_relationship_list
+			(object Inheritance_Relationship
+			    quid       	"416EB17B0339"
+			    supplier   	"Logical View::junit::framework::Assert"
+			    quidu      	"416EB17201F5"))
+		    realized_interfaces 	(list realize_rel_list
+			(object Realize_Relationship
+			    quid       	"416EAE7D0175"
+			    supplier   	"Logical View::junit::framework::Test"
+			    quidu      	"416EAE4E00D7"))
+		    operations 	(list Operations
+			(object Operation "runTest"
+			    quid       	"416EAEB6020D"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0)
+			(object Operation "setUp"
+			    quid       	"416EAEBE024A"
+			    documentation 	"Sets up fixtures for the test.  Fixtures are communicated to a test using instance variables."
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0)
+			(object Operation "tearDown"
+			    quid       	"416EAEC502A5"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0))
+		    abstract   	TRUE)
+		(object Class "TestResult"
+		    quid       	"416EAE6600B3"
+		    documentation 	
+|From the Javadoc:
+|
+|A TestResult collects the results of executing a test case.  It is an instance of the Collecting Parameter pattern. The test framework distinguishes between failures and errors. A failure is anticipated and checked for with assertions.
+		    )
+		(object Class "TestSuite"
+		    quid       	"416EAE580059"
+		    documentation 	
+|From the JavaDoc:
+|
+|A TestSuite is a Composite of Tests. It runs a collection of test cases.
+		    
+		    realized_interfaces 	(list realize_rel_list
+			(object Realize_Relationship
+			    quid       	"416EAE800219"
+			    supplier   	"Logical View::junit::framework::Test"
+			    quidu      	"416EAE4E00D7"))
+		    operations 	(list Operations
+			(object Operation "TestSuite"
+			    quid       	"4177BBD202F0"
+			    documentation 	"This is the designated constructor for TestSuite.  All of the other constructors invoke this one.  The constructor examines the testClass using Java reflection and identifies any test methods.  For each public test method it creates a new instance of the testClass, which is then visitable using tests() to obtain an Enumeration."
+			    parameters 	(list Parameters
+				(object Parameter "testClass"
+				    quid       	"41790B270152"
+				    type       	"Class"))
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0)
+			(object Operation "addTestSuite"
+			    quid       	"41790B0200C3"
+			    documentation 	"This method wraps the testClass in a new TestSuite and adds the resulting TestSuite to the set of tests collected by this TestSuite."
+			    parameters 	(list Parameters
+				(object Parameter "testClass"
+				    quid       	"41790B060169"
+				    type       	"Class"))
+			    result     	"void"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0)
+			(object Operation "tests"
+			    quid       	"41790B8B0319"
+			    result     	"Enumeration"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0
+			    quidu      	"41790B9B0195")))
+		(object Class "TestCase2"
+		    quid       	"41794F54018B"
+		    superclasses 	(list inheritance_relationship_list
+			(object Inheritance_Relationship
+			    quid       	"41794F5E01AD"
+			    supplier   	"Logical View::junit::framework::TestCase"
+			    quidu      	"416EAE520386"))
+		    operations 	(list Operations
+			(object Operation "fail"
+			    quid       	"41794FE300B4"
+			    parameters 	(list Parameters
+				(object Parameter "message"
+				    quid       	"41794FFF00DC"
+				    type       	"String")
+				(object Parameter "initCause"
+				    quid       	"41794FFF012C"
+				    type       	"Throwable"))
+			    result     	"void"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0)
+			(object Operation "getTestInputStream"
+			    quid       	"4179500802B6"
+			    documentation 	"Returns an InputStream that will read from a test resource located along the CLASSPATH."
+			    parameters 	(list Parameters
+				(object Parameter "resourceName"
+				    quid       	"4179502D027D"
+				    type       	"String"))
+			    result     	"InputStream"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0
+			    quidu      	"4179504002C1")
+			(object Operation "getTestResource"
+			    quid       	"4179507002C0"
+			    documentation 	"Returns a String containing the contents of a test resource located along the CLASSPATH.  The resource is read with the specified character set encoding."
+			    parameters 	(list Parameters
+				(object Parameter "resourceName"
+				    quid       	"4179507D026E"
+				    type       	"String")
+				(object Parameter "encoding"
+				    quid       	"4179507D02BE"
+				    type       	"String"))
+			    result     	"String"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0)
+			(object Operation "getProperties"
+			    quid       	"41795086025D"
+			    documentation 	"Returns a property set hierarchy. "
+			    result     	"Properties"
+			    concurrency 	"Sequential"
+			    opExportControl 	"Public"
+			    uid        	0
+			    quidu      	"416EBC180336"))
+		    class_attributes 	(list class_attribute_list
+			(object ClassAttribute "logger"
+			    quid       	"41794F9A0195"
+			    type       	"Logger"
+			    quidu      	"41794FCB0132"
+			    exportControl 	"Protected")))
+		(object Association "tests"
+		    quid       	"416EAF5800E3"
+		    roles      	(list role_list
+			(object Role "$UNNAMED$0"
+			    quid       	"416EAF59026B"
+			    supplier   	"Logical View::junit::framework::Test"
+			    quidu      	"416EAE4E00D7"
+			    is_navigable 	TRUE)
+			(object Role "$UNNAMED$1"
+			    quid       	"416EAF590275"
+			    supplier   	"Logical View::junit::framework::TestSuite"
+			    quidu      	"416EAE580059"
+			    is_aggregate 	TRUE))))
+	    logical_presentations 	(list unit_reference_list
+		(object ClassDiagram "Main"
+		    quid       	"416EAE4902BA"
+		    title      	"Main"
+		    zoom       	100
+		    max_height 	28350
+		    max_width  	21600
+		    origin_x   	25
+		    origin_y   	0
+		    items      	(list diagram_item_list
+			(object ClassView "Class" "Logical View::junit::framework::TestCase" @1
+			    ShowCompartmentStereotypes 	TRUE
+			    IncludeAttribute 	TRUE
+			    IncludeOperation 	TRUE
+			    ShowOperationSignature 	TRUE
+			    location   	(352, 816)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	TRUE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@1
+				location   	(208, 685)
+				fill_color 	13434879
+				nlines     	1
+				max_width  	288
+				justify    	0
+				label      	"TestCase")
+			    icon_style 	"Icon"
+			    line_color 	3342489
+			    fill_color 	13434879
+			    quidu      	"416EAE520386"
+			    compartment 	(object Compartment
+				Parent_View 	@1
+				location   	(208, 743)
+				font       	(object Font
+				    size       	10
+				    face       	"Arial"
+				    bold       	FALSE
+				    italics    	TRUE
+				    underline  	FALSE
+				    strike     	FALSE
+				    color      	0
+				    default_color 	TRUE)
+				icon_style 	"Icon"
+				fill_color 	16777215
+				anchor     	2
+				nlines     	4
+				max_width  	250)
+			    width      	306
+			    height     	286
+			    annotation 	8
+			    autoResize 	TRUE)
+			(object ClassView "ParameterizedClass" "Logical View::junit::framework::Adaptor" @2
+			    ShowCompartmentStereotypes 	TRUE
+			    IncludeAttribute 	TRUE
+			    IncludeOperation 	TRUE
+			    location   	(336, 1232)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@2
+				location   	(231, 1203)
+				fill_color 	13434879
+				nlines     	1
+				max_width  	210
+				justify    	0
+				label      	"Adaptor")
+			    icon_style 	"Icon"
+			    line_color 	3342489
+			    fill_color 	13434879
+			    quidu      	"416EAF1103B2"
+			    width      	228
+			    height     	152
+			    annotation 	8
+			    autoResize 	TRUE)
+			(object ClassView "Class" "Logical View::junit::framework::Assert" @3
+			    ShowCompartmentStereotypes 	TRUE
+			    IncludeAttribute 	TRUE
+			    IncludeOperation 	TRUE
+			    location   	(336, 320)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@3
+				location   	(240, 271)
+				fill_color 	13434879
+				nlines     	1
+				max_width  	192
+				justify    	0
+				label      	"Assert")
+			    icon_style 	"Icon"
+			    line_color 	3342489
+			    fill_color 	13434879
+			    quidu      	"416EB17201F5"
+			    width      	210
+			    height     	120
+			    annotation 	8
+			    autoResize 	TRUE)
+			(object InheritView "" @4
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    quidu      	"416EAFF90366"
+			    client     	@2
+			    supplier   	@1
+			    line_style 	3
+			    origin_attachment 	(331, 1155)
+			    terminal_attachment 	(331, 959))
+			(object ClassView "Class" "Logical View::junit::framework::Test" @5
+			    ShowCompartmentStereotypes 	TRUE
+			    IncludeAttribute 	TRUE
+			    IncludeOperation 	TRUE
+			    ShowOperationSignature 	TRUE
+			    location   	(800, 288)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@5
+				location   	(799, 396)
+				anchor_loc 	1
+				nlines     	2
+				max_width  	1703
+				justify    	0
+				label      	"Test")
+			    icon       	"Interface"
+			    icon_style 	"Icon"
+			    line_color 	3342489
+			    fill_color 	13434879
+			    quidu      	"416EAE4E00D7"
+			    compartment 	(object Compartment
+				Parent_View 	@5
+				location   	(479, 435)
+				font       	(object Font
+				    size       	10
+				    face       	"Arial"
+				    bold       	FALSE
+				    italics    	FALSE
+				    underline  	FALSE
+				    strike     	FALSE
+				    color      	0
+				    default_color 	TRUE)
+				icon_style 	"Icon"
+				anchor     	2
+				nlines     	2
+				max_width  	638
+				justify    	0)
+			    width      	58
+			    height     	58
+			    annotation 	8
+			    autoResize 	TRUE)
+			(object RealizeView "" @6
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    quidu      	"416EAE7D0175"
+			    client     	@1
+			    supplier   	@5
+			    line_style 	0)
+			(object ClassView "Class" "Logical View::junit::framework::TestSuite" @7
+			    ShowCompartmentStereotypes 	TRUE
+			    IncludeAttribute 	TRUE
+			    IncludeOperation 	TRUE
+			    ShowOperationSignature 	TRUE
+			    location   	(1136, 816)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@7
+				location   	(705, 685)
+				fill_color 	13434879
+				nlines     	1
+				max_width  	862
+				justify    	0
+				label      	"TestSuite")
+			    icon_style 	"Icon"
+			    line_color 	3342489
+			    fill_color 	13434879
+			    quidu      	"416EAE580059"
+			    compartment 	(object Compartment
+				Parent_View 	@7
+				location   	(705, 743)
+				font       	(object Font
+				    size       	10
+				    face       	"Arial"
+				    bold       	FALSE
+				    italics    	FALSE
+				    underline  	FALSE
+				    strike     	FALSE
+				    color      	0
+				    default_color 	TRUE)
+				icon_style 	"Icon"
+				fill_color 	16777215
+				anchor     	2
+				nlines     	4
+				max_width  	740)
+			    width      	880
+			    height     	286
+			    annotation 	8
+			    autoResize 	TRUE)
+			(object RealizeView "" @8
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    quidu      	"416EAE800219"
+			    client     	@7
+			    supplier   	@5
+			    line_style 	0)
+			(object AssociationViewNew "tests" @9
+			    location   	(1627, 270)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object SegLabel @10
+				Parent_View 	@9
+				location   	(1627, 211)
+				font       	(object Font
+				    size       	10
+				    face       	"Arial"
+				    bold       	FALSE
+				    italics    	TRUE
+				    underline  	FALSE
+				    strike     	FALSE
+				    color      	0
+				    default_color 	TRUE)
+				anchor     	1
+				anchor_loc 	1
+				nlines     	1
+				max_width  	104
+				justify    	0
+				label      	"tests"
+				pctDist    	0.500000
+				height     	60
+				orientation 	0)
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    quidu      	"416EAF5800E3"
+			    roleview_list 	(list RoleViews
+				(object RoleView "$UNNAMED$0" @11
+				    Parent_View 	@9
+				    location   	(475, -658)
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"416EAF59026B"
+				    client     	@9
+				    supplier   	@5
+				    line_style 	3
+				    origin_attachment 	(1627, 270)
+				    terminal_attachment 	(826, 270))
+				(object RoleView "$UNNAMED$1" @12
+				    Parent_View 	@9
+				    location   	(475, -658)
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"416EAF590275"
+				    client     	@9
+				    supplier   	@7
+				    vertices   	(list Points
+					(1627, 270)
+					(1726, 270)
+					(1726, 822)
+					(1576, 822))
+				    line_style 	3
+				    origin_attachment 	(1627, 270)
+				    terminal_attachment 	(1576, 822))))
+			(object InheritView "" @13
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    quidu      	"416EB17B0339"
+			    client     	@1
+			    supplier   	@3
+			    line_style 	3
+			    origin_attachment 	(328, 673)
+			    terminal_attachment 	(328, 380))
+			(object NoteView @14
+			    location   	(336, 112)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@14
+				location   	(83, 53)
+				fill_color 	13434879
+				nlines     	2
+				max_width  	471
+				label      	"The JUnit framework.")
+			    line_color 	3342489
+			    fill_color 	13434879
+			    width      	531
+			    height     	131)
+			(object NoteView @15
+			    location   	(848, 1200)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@15
+				location   	(629, 1097)
+				fill_color 	13434879
+				nlines     	4
+				max_width  	403
+				label      	"Implement your tests in a TestCase since this is the only class that extends Assert.")
+			    line_color 	3342489
+			    fill_color 	13434879
+			    width      	463
+			    height     	219)
+			(object NoteView @16
+			    location   	(1680, 1152)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@16
+				location   	(1251, 1014)
+				fill_color 	13434879
+				nlines     	5
+				max_width  	822
+				label      	"Tests are collected by a TestSuite.  When you add a Class to a TestSuite, it is automatically wrapped up in a contained TestSuite by the addTestSuite( Class testClass ) method.")
+			    line_color 	3342489
+			    fill_color 	13434879
+			    width      	882
+			    height     	288)
+			(object AttachView "" @17
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    client     	@16
+			    supplier   	@7
+			    line_style 	0)
+			(object AttachView "" @18
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    client     	@15
+			    supplier   	@1
+			    line_style 	0)))
+		(object ClassDiagram "Extensions"
+		    quid       	"41794F3E03C4"
+		    title      	"Extensions"
+		    zoom       	100
+		    max_height 	28350
+		    max_width  	21600
+		    origin_x   	0
+		    origin_y   	0
+		    items      	(list diagram_item_list
+			(object ClassView "Class" "Logical View::junit::framework::TestCase" @19
+			    ShowCompartmentStereotypes 	TRUE
+			    IncludeAttribute 	TRUE
+			    IncludeOperation 	TRUE
+			    location   	(992, 432)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	TRUE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@19
+				location   	(846, 301)
+				fill_color 	13434879
+				nlines     	1
+				max_width  	292
+				justify    	0
+				label      	"TestCase")
+			    icon_style 	"Icon"
+			    line_color 	3342489
+			    fill_color 	13434879
+			    quidu      	"416EAE520386"
+			    compartment 	(object Compartment
+				Parent_View 	@19
+				location   	(846, 359)
+				font       	(object Font
+				    size       	10
+				    face       	"Arial"
+				    bold       	FALSE
+				    italics    	FALSE
+				    underline  	FALSE
+				    strike     	FALSE
+				    color      	0
+				    default_color 	TRUE)
+				icon_style 	"Icon"
+				fill_color 	13434879
+				anchor     	2
+				nlines     	4
+				max_width  	253)
+			    width      	310
+			    height     	286
+			    annotation 	8
+			    autoResize 	TRUE)
+			(object ClassView "Class" "Logical View::junit::framework::TestCase2" @20
+			    ShowCompartmentStereotypes 	TRUE
+			    IncludeAttribute 	TRUE
+			    IncludeOperation 	TRUE
+			    ShowOperationSignature 	TRUE
+			    location   	(928, 944)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@20
+				location   	(186, 763)
+				fill_color 	13434879
+				nlines     	1
+				max_width  	1484
+				justify    	0
+				label      	"TestCase2")
+			    icon_style 	"Icon"
+			    line_color 	3342489
+			    fill_color 	13434879
+			    quidu      	"41794F54018B"
+			    compartment 	(object Compartment
+				Parent_View 	@20
+				location   	(186, 821)
+				font       	(object Font
+				    size       	10
+				    face       	"Arial"
+				    bold       	FALSE
+				    italics    	FALSE
+				    underline  	FALSE
+				    strike     	FALSE
+				    color      	0
+				    default_color 	TRUE)
+				icon_style 	"Icon"
+				fill_color 	13434879
+				anchor     	2
+				nlines     	6
+				max_width  	1271)
+			    width      	1502
+			    height     	386
+			    annotation 	8
+			    autoResize 	TRUE)
+			(object InheritView "" @21
+			    stereotype 	TRUE
+			    line_color 	3342489
+			    quidu      	"41794F5E01AD"
+			    client     	@20
+			    supplier   	@19
+			    line_style 	3
+			    origin_attachment 	(991, 751)
+			    terminal_attachment 	(991, 575))
+			(object NoteView @22
+			    location   	(416, 112)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    label      	(object ItemLabel
+				Parent_View 	@22
+				location   	(84, 53)
+				fill_color 	13434879
+				nlines     	2
+				max_width  	628
+				label      	"Some extension methods.")
+			    line_color 	3342489
+			    fill_color 	13434879
+			    width      	688
+			    height     	131)))))
+	(object Class_Category "extensions"
+	    quid       	"417909FE0079"
+	    exportControl 	"Public"
+	    logical_models 	(list unit_reference_list
+		(object Class_Category "proxy"
+		    quid       	"41794A2C0381"
+		    exportControl 	"Public"
+		    logical_models 	(list unit_reference_list
+			(object Class "IProxyTest"
+			    quid       	"4177BD1003A1"
+			    stereotype 	"Interface"
+			    superclasses 	(list inheritance_relationship_list
+				(object Inheritance_Relationship
+				    quid       	"41790A7E0037"
+				    supplier   	"Logical View::junit::framework::Test"
+				    quidu      	"416EAE4E00D7"))
+			    operations 	(list Operations
+				(object Operation "setDelegate"
+				    quid       	"4177BD1A0085"
+				    parameters 	(list Parameters
+					(object Parameter "delegate"
+					    quid       	"4177BD2D033F"
+					    type       	"Test"
+					    quidu      	"416EAE4E00D7"))
+				    result     	"void"
+				    concurrency 	"Sequential"
+				    opExportControl 	"Public"
+				    uid        	0)
+				(object Operation "getDelegate"
+				    quid       	"4177BD2D032B"
+				    result     	"Test"
+				    concurrency 	"Sequential"
+				    opExportControl 	"Public"
+				    uid        	0
+				    quidu      	"416EAE4E00D7")))
+			(object Class "ProxyTestSuite"
+			    quid       	"416FBEC400C8"
+			    documentation 	"The rootTestCase identifies the TestCase that is being proxied.  This reference is set on the m_rootTestCase instance variable on TMGraphTestCaseProxy and identifies the delegate for the abstract methods that are being proxied."
+			    superclasses 	(list inheritance_relationship_list
+				(object Inheritance_Relationship
+				    quid       	"416FBF7C01D1"
+				    supplier   	"Logical View::junit::framework::TestSuite"
+				    quidu      	"416EAE580059"))
+			    operations 	(list Operations
+				(object Operation "ProxyTestSuite"
+				    quid       	"416FBFA2008C"
+				    documentation 	"This extends the behavior of the designated constructor in the TestSuite class to set the delegate on each instantiated Test that implements the IProxyTest interface."
+				    parameters 	(list Parameters
+					(object Parameter "delegate"
+					    quid       	"41790AEA030D"
+					    type       	"Test"
+					    quidu      	"416EAE4E00D7")
+					(object Parameter "testClass Class"
+					    quid       	"41790B200301"))
+				    concurrency 	"Sequential"
+				    opExportControl 	"Public"
+				    uid        	0)
+				(object Operation "addTestSuite"
+				    quid       	"416FBFC401FD"
+				    documentation 	"This overrides the implementation in the base class and wraps the testClass in a new ProxyTestSuite instance (instead of a new TestSuite, which is the behavior of the base class).  This has the effort of causing the delegate to be recursively inherited and applied to all contained Tests that implement the IProxyTest interface."
+				    parameters 	(list Parameters
+					(object Parameter "testClass"
+					    quid       	"41790BBB0065"
+					    type       	"Class"))
+				    concurrency 	"Sequential"
+				    opExportControl 	"Public"
+				    uid        	0))))
+		    logical_presentations 	(list unit_reference_list
+			(object ClassDiagram "Proxy and Delegation pattern."
+			    quid       	"41790A17030A"
+			    title      	"Proxy and Delegation pattern."
+			    zoom       	100
+			    max_height 	28350
+			    max_width  	21600
+			    origin_x   	0
+			    origin_y   	0
+			    items      	(list diagram_item_list
+				(object ClassView "Class" "Logical View::junit::extensions::proxy::IProxyTest" @23
+				    ShowCompartmentStereotypes 	TRUE
+				    IncludeAttribute 	TRUE
+				    IncludeOperation 	TRUE
+				    ShowOperationSignature 	TRUE
+				    location   	(768, 1072)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@23
+					location   	(767, 1180)
+					anchor_loc 	1
+					nlines     	1
+					max_width  	861
+					justify    	0
+					label      	"IProxyTest")
+				    icon       	"Interface"
+				    icon_style 	"Icon"
+				    line_color 	3342489
+				    fill_color 	13434879
+				    quidu      	"4177BD1003A1"
+				    compartment 	(object Compartment
+					Parent_View 	@23
+					location   	(394, 1219)
+					font       	(object Font
+					    size       	10
+					    face       	"Arial"
+					    bold       	FALSE
+					    italics    	FALSE
+					    underline  	FALSE
+					    strike     	FALSE
+					    color      	0
+					    default_color 	TRUE)
+					icon_style 	"Icon"
+					anchor     	2
+					nlines     	3
+					max_width  	744
+					justify    	0)
+				    width      	58
+				    height     	58
+				    annotation 	8
+				    autoResize 	TRUE)
+				(object NoteView @24
+				    location   	(1120, 1824)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@24
+					location   	(92, 1418)
+					fill_color 	13434879
+					nlines     	16
+					max_width  	2021
+					label      	
+|The use of the proxy and delegation pattern with JUnit is appropriate when you want to factor apart a test suite for some API and you have multiple implementations of that API with the consequence that implementation specific fixtures must be established for testing.  Under these conditions you have a multiple inheritance problem since the API test suite needs to extend the implementation specific test cases, but the API test suites must be independent of the specific implementations.
+|
+|The JUnit framework makes stateless invocations of tests.  In order to solve the multiple inheritence problem, you need to be able to provide one item of state to each of the tests in the API test suite -- a delegate Test.  Normally the delegate Test will expose some abstract behavior and the implementation specific TestCase will provide a concrete implementation of that behavior.  The tests in the API test suite will implement the IProxyTest interface so that they can gain access to that delegate.  The implementation specific test case extends TestCase.
+|
+|The use of the proxy and delegation pattern makes it easy to repeat a test suite for different configurations as well.  The delegate TestCase typically implements a method that reads Properties that are used to establish the configuration.
+					)
+				    line_color 	3342489
+				    fill_color 	13434879
+				    width      	2081
+				    height     	825)
+				(object ClassView "Class" "Logical View::junit::framework::Assert" @25
+				    ShowCompartmentStereotypes 	TRUE
+				    IncludeAttribute 	TRUE
+				    IncludeOperation 	TRUE
+				    location   	(320, 304)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@25
+					location   	(176, 230)
+					fill_color 	13434879
+					nlines     	1
+					max_width  	288
+					justify    	0
+					label      	"Assert")
+				    icon_style 	"Icon"
+				    line_color 	3342489
+				    fill_color 	13434879
+				    quidu      	"416EB17201F5"
+				    width      	306
+				    height     	172
+				    annotation 	8
+				    autoResize 	TRUE)
+				(object ClassView "Class" "Logical View::junit::framework::TestCase" @26
+				    ShowCompartmentStereotypes 	TRUE
+				    IncludeAttribute 	TRUE
+				    IncludeOperation 	TRUE
+				    location   	(320, 768)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	TRUE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@26
+					location   	(174, 614)
+					fill_color 	13434879
+					nlines     	1
+					max_width  	292
+					justify    	0
+					label      	"TestCase")
+				    icon_style 	"Icon"
+				    line_color 	3342489
+				    fill_color 	13434879
+				    quidu      	"416EAE520386"
+				    compartment 	(object Compartment
+					Parent_View 	@26
+					location   	(174, 722)
+					font       	(object Font
+					    size       	10
+					    face       	"Arial"
+					    bold       	FALSE
+					    italics    	FALSE
+					    underline  	FALSE
+					    strike     	FALSE
+					    color      	0
+					    default_color 	TRUE)
+					icon_style 	"Icon"
+					fill_color 	13434879
+					anchor     	2
+					nlines     	4
+					max_width  	253)
+				    width      	310
+				    height     	332
+				    annotation 	8
+				    autoResize 	TRUE)
+				(object InheritView "" @27
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"416EB17B0339"
+				    client     	@26
+				    supplier   	@25
+				    line_style 	3
+				    origin_attachment 	(320, 602)
+				    terminal_attachment 	(320, 390))
+				(object ClassView "Class" "Logical View::junit::framework::TestSuite" @28
+				    ShowCompartmentStereotypes 	TRUE
+				    IncludeAttribute 	TRUE
+				    IncludeOperation 	TRUE
+				    ShowOperationSignature 	TRUE
+				    location   	(1520, 608)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@28
+					location   	(1089, 454)
+					fill_color 	13434879
+					nlines     	1
+					max_width  	862
+					justify    	0
+					label      	"TestSuite")
+				    icon_style 	"Icon"
+				    line_color 	3342489
+				    fill_color 	13434879
+				    quidu      	"416EAE580059"
+				    compartment 	(object Compartment
+					Parent_View 	@28
+					location   	(1089, 562)
+					font       	(object Font
+					    size       	10
+					    face       	"Arial"
+					    bold       	FALSE
+					    italics    	FALSE
+					    underline  	FALSE
+					    strike     	FALSE
+					    color      	0
+					    default_color 	TRUE)
+					icon_style 	"Icon"
+					fill_color 	13434879
+					anchor     	2
+					nlines     	4
+					max_width  	740)
+				    width      	880
+				    height     	332
+				    annotation 	8
+				    autoResize 	TRUE)
+				(object ClassView "Class" "Logical View::junit::framework::Test" @29
+				    ShowCompartmentStereotypes 	TRUE
+				    IncludeAttribute 	TRUE
+				    IncludeOperation 	TRUE
+				    location   	(768, 304)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@29
+					location   	(767, 412)
+					anchor_loc 	1
+					nlines     	2
+					max_width  	307
+					justify    	0
+					label      	"Test")
+				    icon       	"Interface"
+				    icon_style 	"Icon"
+				    line_color 	3342489
+				    fill_color 	13434879
+				    quidu      	"416EAE4E00D7"
+				    compartment 	(object Compartment
+					Parent_View 	@29
+					location   	(695, 501)
+					font       	(object Font
+					    size       	10
+					    face       	"Arial"
+					    bold       	FALSE
+					    italics    	FALSE
+					    underline  	FALSE
+					    strike     	FALSE
+					    color      	0
+					    default_color 	TRUE)
+					icon_style 	"Icon"
+					anchor     	2
+					nlines     	2
+					max_width  	141
+					justify    	0)
+				    width      	58
+				    height     	58
+				    annotation 	8
+				    autoResize 	TRUE)
+				(object RealizeView "" @30
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"416EAE7D0175"
+				    client     	@26
+				    supplier   	@29
+				    line_style 	0)
+				(object AssociationViewNew "tests" @31
+				    location   	(1239, 282)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object SegLabel @32
+					Parent_View 	@31
+					location   	(1239, 223)
+					font       	(object Font
+					    size       	10
+					    face       	"Arial"
+					    bold       	FALSE
+					    italics    	TRUE
+					    underline  	FALSE
+					    strike     	FALSE
+					    color      	0
+					    default_color 	TRUE)
+					anchor     	1
+					anchor_loc 	1
+					nlines     	1
+					max_width  	450
+					justify    	0
+					label      	"tests"
+					pctDist    	0.500000
+					height     	60
+					orientation 	0)
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"416EAF5800E3"
+				    roleview_list 	(list RoleViews
+					(object RoleView "$UNNAMED$1" @33
+					    Parent_View 	@31
+					    location   	(23, 74)
+					    font       	(object Font
+						size       	10
+						face       	"Arial"
+						bold       	FALSE
+						italics    	FALSE
+						underline  	FALSE
+						strike     	FALSE
+						color      	0
+						default_color 	TRUE)
+					    label      	(object SegLabel @34
+						Parent_View 	@33
+						location   	(1566, 352)
+						font       	(object Font
+						    size       	10
+						    face       	"Arial"
+						    bold       	FALSE
+						    italics    	FALSE
+						    underline  	FALSE
+						    strike     	FALSE
+						    color      	0
+						    default_color 	TRUE)
+						hidden     	TRUE
+						anchor     	1
+						anchor_loc 	1
+						nlines     	1
+						max_width  	450
+						justify    	0
+						label      	""
+						pctDist    	0.800000
+						height     	42
+						orientation 	0)
+					    stereotype 	TRUE
+					    line_color 	3342489
+					    quidu      	"416EAF590275"
+					    client     	@31
+					    supplier   	@28
+					    vertices   	(list Points
+						(1239, 282)
+						(1524, 282)
+						(1524, 442))
+					    line_style 	3
+					    origin_attachment 	(1239, 282)
+					    terminal_attachment 	(1524, 442))
+					(object RoleView "$UNNAMED$0" @35
+					    Parent_View 	@31
+					    location   	(23, 74)
+					    font       	(object Font
+						size       	10
+						face       	"Arial"
+						bold       	FALSE
+						italics    	FALSE
+						underline  	FALSE
+						strike     	FALSE
+						color      	0
+						default_color 	TRUE)
+					    label      	(object SegLabel @36
+						Parent_View 	@35
+						location   	(883, 241)
+						font       	(object Font
+						    size       	10
+						    face       	"Arial"
+						    bold       	FALSE
+						    italics    	FALSE
+						    underline  	FALSE
+						    strike     	FALSE
+						    color      	0
+						    default_color 	TRUE)
+						hidden     	TRUE
+						anchor     	1
+						anchor_loc 	1
+						nlines     	1
+						max_width  	450
+						justify    	0
+						label      	""
+						pctDist    	0.800000
+						height     	42
+						orientation 	1)
+					    stereotype 	TRUE
+					    line_color 	3342489
+					    quidu      	"416EAF59026B"
+					    client     	@31
+					    supplier   	@29
+					    line_style 	3
+					    origin_attachment 	(1239, 282)
+					    terminal_attachment 	(794, 282))))
+				(object RealizeView "" @37
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"416EAE800219"
+				    client     	@28
+				    supplier   	@29
+				    line_style 	0)
+				(object InheritView "" @38
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"41790A7E0037"
+				    client     	@23
+				    supplier   	@29
+				    line_style 	3
+				    origin_attachment 	(771, 1043)
+				    terminal_attachment 	(771, 436))
+				(object ClassView "Class" "Logical View::junit::extensions::proxy::ProxyTestSuite" @39
+				    ShowCompartmentStereotypes 	TRUE
+				    IncludeAttribute 	TRUE
+				    IncludeOperation 	TRUE
+				    ShowOperationSignature 	TRUE
+				    location   	(1552, 1056)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@39
+					location   	(1002, 950)
+					fill_color 	13434879
+					nlines     	1
+					max_width  	1100
+					justify    	0
+					label      	"ProxyTestSuite")
+				    icon_style 	"Icon"
+				    line_color 	3342489
+				    fill_color 	13434879
+				    quidu      	"416FBEC400C8"
+				    compartment 	(object Compartment
+					Parent_View 	@39
+					location   	(1002, 1008)
+					font       	(object Font
+					    size       	10
+					    face       	"Arial"
+					    bold       	FALSE
+					    italics    	FALSE
+					    underline  	FALSE
+					    strike     	FALSE
+					    color      	0
+					    default_color 	TRUE)
+					icon_style 	"Icon"
+					fill_color 	13434879
+					anchor     	2
+					nlines     	3
+					max_width  	943)
+				    width      	1118
+				    height     	236
+				    annotation 	8
+				    autoResize 	TRUE)
+				(object InheritView "" @40
+				    stereotype 	TRUE
+				    line_color 	3342489
+				    quidu      	"416FBF7C01D1"
+				    client     	@39
+				    supplier   	@28
+				    line_style 	3
+				    origin_attachment 	(1496, 937)
+				    terminal_attachment 	(1496, 773))
+				(object NoteView @41
+				    location   	(480, 96)
+				    font       	(object Font
+					size       	10
+					face       	"Arial"
+					bold       	FALSE
+					italics    	FALSE
+					underline  	FALSE
+					strike     	FALSE
+					color      	0
+					default_color 	TRUE)
+				    label      	(object ItemLabel
+					Parent_View 	@41
+					location   	(80, 37)
+					fill_color 	13434879
+					nlines     	2
+					max_width  	764
+					label      	"Proxy and delegation pattern.")
+				    line_color 	3342489
+				    fill_color 	13434879
+				    width      	824
+				    height     	131))))))
+	    logical_presentations 	(list unit_reference_list)))
+    logical_presentations 	(list unit_reference_list))

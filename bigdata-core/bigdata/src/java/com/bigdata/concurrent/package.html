@@ -1,0 +1,143 @@
+<html>
+<head>
+<title>Concurrent.</title>
+</head>
+<body>
+
+<p>
+
+This package supports concurrency control using exclusive locks on resources.  The
+use case for bigdata is during operations on unisolated named indices on a single
+journal.  (Note that index partitions which are just modeled as named indices).
+Exclusive locks are required for the unisolated indices since the B+Tree implementation
+is NOT thread-safe for concurrent writers.  The concurrency control package provides a
+"sufficiently" serialized schedule.  Operations that require access to the same unisolated
+index are serialized while operations that require access to non-overlapping sets of
+unisolated indices may run in parallel (depending on the #of available worker tasks).
+
+</p>
+
+<p>
+
+bigdata offers two broad classes of operations: unisolated and isolated (transactional).  The 
+unisolated API of the data service ensures that operations use only a single named index
+(or index partition) at a time.  Coordination of distributed locks is not required making
+this the unisolated API suiteable for scale-out "row stores".  Deadlock cycles are not
+possible for unisolated tasks since they are required to pre-declare their locks.
+
+</p>
+
+<p>
+
+A transaction may issue multiple requests against the data service API, and each request
+MAY touch a different named index (or index partition).  However, due to the underlying
+MVCC (multi-version concurrency control) scheme, a transaction never waits to read data
+and proceeds without locking until it is "done" with its active phase.  When the "commit"
+is requested the transaction MUST obtain an exclusive lock on each index (partition) that
+it needs to (a) validate; and (b) make its writes durable.  This puts us in the envyable
+position of being able to <strong>pre-declare</strong> the set of exclusive locks required
+by the transaction commit.  In this situation we avoid deadlocks by the simple expediency
+of sorting the lock requests into a total order by the resource (the index name).
+
+</p>
+
+<h4>Deadlock detection</h4>
+
+<p>
+
+Note: While {@link com.bigdata.concurrent.TxDag} provides the ability
+to detect deadlocks, in the special case where locks are pre-declared,
+simply sorting the lock requests made by each task is sufficient to
+guarentee that deadlocks can not arise.  Thus, in practice deadlock
+detection is NOT used by bigdata.
+
+</p>
+
+<p>
+
+In general, concurrent schedules may result in deadlock. Deadlocks
+must be identified and deadlocks must be resolved -- typically by
+aborting or restarting one or more processes. 2PL defines a <em>growth
+phase</em> in which locks are acquired and a <em>shrinking phase</em>
+in which locks are released. The <em>locked point</em> is defined as
+the moment after a transaction acquires its last lock and may be
+identified retrospectively when a transaction begins to release
+locks. A common strategy is for a thread to acquire locks
+incrementally and then to release all locks at once when processing
+completes (whether in success or failure). A thread
+<strong>must</strong> eventually release its locks. 2PL is often used
+in a database context in which resources coorrespond to persistent
+records. However the technique may be applied to coordinating
+concurrent access to arbitrary resources, including those not
+associated with a persistence scheme. Other classes of concurrency
+control techniques include timestamping (including multi-version
+concurrency control or MVCC) and optimistic concurrency
+control. Concurrency control can be broken down into read-write
+synchronization conflicts and write-write synchronization conflicts,
+and different concurrency control techniques can be applied to each
+part of the problem. Concurrency control can also be defined in terms
+of datatype specific operations with semantics other than read or
+write -- this approach is used by some interesting optimistic
+concurrency control designs.
+
+</p>
+
+<p>
+
+<em>WAITS_FOR</em> is a binary relation whose source and target are
+threads. The source is said to &quot;WAIT FOR&quot; the target.  The
+relation is written either <code>source WAITS_FOR target</code> or
+<code>WAITS_FOR( source, target )</code>. A <em>deadlock</em> is
+defined as a cycle in the WAITS_FOR graph. The WAITS_FOR relationships
+are maintained in a directed acyclic graph managed by the
+<em>TxDag</em> class. The TxDag class supports atomic changes to the
+WAITS_FOR graph and multiple edges may be added (or removed) at
+once. When adding multiple edges, either all edges are added and no
+cycle results or no edges are added and a deadlock is reported.
+
+</p>
+
+<p>
+
+When a thread <code>t</code> must wait for a lock on a resource
+<code>r</code>, <code>WAITS_FOR( t, g )</code> is asserted for each
+thread <code>g</code> that is a member of the granted group for
+<code>r</code>. If adding those edges would create a cycle then an
+<em>DeadlockException</em> is thrown and the state of the WAITS_FOR
+graph is not modified.
+
+</p>
+
+<p>
+
+When a thread <code>t</code> releases a lock on a resource
+<code>r</code>, the <code>t</code> is removed from the granted group
+for that resource and <code>WAITS_FOR( t, p )</code> is retracted,
+where <code>p</code> is a thread in the pending request queue for
+<code>r</code>. Next the pending lock requests for that resource are
+scanned using a fair schedule (which may be modified by a priority
+escalation scheme). Pending lock requests which are now consistent
+with the granted group are let in one at a time and the WAITS_FOR
+graph is updated: (a) to retract <code>WAITS_FOR( t, g )</code>, where
+<code>g</code> is a thread in the granted group for <code>r</code>;
+and (b) to assert <code>WAIT_FOR( p, t )</code>, where <code>p</code>
+is a thread in the pending request queue and <code>t</code> is the
+thread whose lock request is being granted.
+
+</p>
+
+<p>
+
+A special case exists when a thread is known to be running, e.g., when
+a thread completes its processing (whether in success or
+failure). Since a running thread is guarenteed not to be waiting on
+any resource there will be no edges in the WAITS_FOR graph whose
+<i>source</i> is the running thread. In this situation, an
+optimization is used to update the WAITS_FOR graph. The application
+signals this situation by specifying <code>waiting == false</code> to
+the TxDag#removeEdges( Object tx, boolean waiting) method.
+
+</p>
+
+</body>
+</html>

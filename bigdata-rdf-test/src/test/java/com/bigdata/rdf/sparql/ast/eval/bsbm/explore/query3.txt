@@ -1,0 +1,28 @@
+# BSBM Explore Query 3: Find products having some specific features and not having one feature.
+#
+# Use Case Motivation: After looking at information about some products, the consumer has a more specific idea what we wants. Therefore, he asks for products matching either one set of features or another set.
+#
+#    Uses negation
+#    Uses Order BY and LIMIT
+
+PREFIX bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?product ?label
+WHERE {
+    ?product rdfs:label ?label .
+    ?product a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType4> .
+        ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature94> .
+        ?product bsbm:productPropertyNumeric1 ?p1 .
+        FILTER ( ?p1 > 338 )
+        ?product bsbm:productPropertyNumeric3 ?p3 .
+        FILTER (?p3 < 48 )
+    OPTIONAL {
+        ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature9> .
+        ?product rdfs:label ?testVar }
+    FILTER (!bound(?testVar))
+}
+ORDER BY ?label
+LIMIT 10

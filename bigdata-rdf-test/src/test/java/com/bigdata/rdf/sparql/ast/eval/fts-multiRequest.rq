@@ -1,0 +1,13 @@
+PREFIX fts: <http://www.bigdata.com/rdf/fts#>
+SELECT ?res ?searchTerm WHERE {
+  <http://example.com/SearchTerms> ?p ?searchTerm .
+  SERVICE <http://www.bigdata.com/rdf/fts#search> {
+    ?res fts:search ?searchTerm .
+    ?res fts:endpoint "http://localhost:8983/solr/solrtest/select" .
+    ?res fts:endpointType  "SOLR" .
+    ?res fts:params "fl=uri" .
+    ?res fts:searchField "uri" .
+    ?res fts:searchResultType "URI" .    
+  }
+  hint:Prior hint:runLast "true" .
+}

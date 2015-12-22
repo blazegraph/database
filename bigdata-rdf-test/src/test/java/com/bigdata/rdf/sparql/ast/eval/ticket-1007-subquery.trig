@@ -1,0 +1,24 @@
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix grddl: <http://www.w3.org/2003/g/data-view#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+   
+
+<http://www.default.graph> {
+   owl:annotatedProperty a rdf:Property ;
+        rdfs:label "annotatedProperty" ;
+        rdfs:comment "The property that determines the predicate of an annotated axiom or annotated annotation." ;
+        rdfs:domain rdfs:Resource ;
+        rdfs:isDefinedBy <http://www.w3.org/2002/07/owl#> ;
+        rdfs:range rdfs:Resource . 
+   
+   owl:annotatedSource a rdf:Property ;
+        rdfs:label "annotatedSource" ;
+        rdfs:comment "The property that determines the subject of an annotated axiom or annotated annotation." ;
+        rdfs:domain rdfs:Resource ;
+        rdfs:isDefinedBy <http://www.w3.org/2002/07/owl#> ;
+        rdfs:range rdfs:Resource . 
+}

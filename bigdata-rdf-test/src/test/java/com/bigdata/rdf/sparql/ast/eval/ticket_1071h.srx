@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='A'/>
+        <variable name='B'/>
+        <variable name='C'/>
+    </head>
+    <results>
+        <result>
+            <binding name='A'><literal datatype="http://www.w3.org/2001/XMLSchema#integer">1</literal></binding>
+            <binding name='B'><literal datatype="http://www.w3.org/2001/XMLSchema#integer">2</literal></binding>
+            <binding name='C'><literal>unbound</literal></binding>
+        </result>
+        <result>
+            <binding name='A'><literal datatype="http://www.w3.org/2001/XMLSchema#integer">1</literal></binding>
+            <binding name='B'><literal>unbound</literal></binding>
+            <binding name='C'><literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal></binding>
+        </result>
+    </results>
+</sparql>

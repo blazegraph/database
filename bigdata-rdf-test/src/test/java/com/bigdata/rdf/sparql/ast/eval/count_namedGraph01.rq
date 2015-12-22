@@ -1,0 +1,5 @@
+SELECT (COUNT(?s) AS ?size)
+FROM <http://www.bigdata.com/systap>
+WHERE { 
+    ?s ?p ?o . 
+}

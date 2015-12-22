@@ -1,0 +1,17 @@
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX ex: <http://www.example.com/>
+
+
+ex:document1 a ex:Document ;
+		ex:created "2014-04-11T04:40:00.000Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+ex:document2 a ex:Document ;
+		ex:created "2014-05-29T09:51:00.000Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+ex:document3 a ex:Document ;
+		ex:created "2014-05-29T09:51:00.000Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+ex:document4 a ex:Document ;
+		ex:created "2014-06-29T09:51:00.000Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+ex:document5 a ex:Document ;
+		ex:created "2014-04-11T06:40:00.000Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+ex:document6 a ex:Document ;
+		ex:created "2014-04-11T06:40:00.000Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .

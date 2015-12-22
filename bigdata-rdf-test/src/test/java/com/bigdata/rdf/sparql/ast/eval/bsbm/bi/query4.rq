@@ -1,0 +1,40 @@
+# BSBM BI Q4
+#
+# Query 4: Feature with the highest ratio between price with that feature and price without that feature.
+#
+# Use Case Motivation: A customer wants to inform herself which features have the most impact on the product price to get hints on how to restrict the following product search.
+#
+# Note: xsd:string => str(), but 2x faster if you just do sum(?price)!
+#
+# Last Changed Rev: 5682
+# Last Changed Date: 2011-11-17 20:09:12 -0500 (Thu, 17 Nov 2011)
+# solutions=100, chunks=1, elapsed=56500ms.
+# solutions=100, chunks=1, elapsed=55114ms.
+#
+# The sub-selects are very similar, but ?feature is pulled out in the 2nd one.
+
+prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+
+Select ?feature ((?sumF*(?countTotal-?countF))/(?countF*(?sumTotal-?sumF)) As ?priceRatio)
+  {
+    { Select (count(?price) As ?countTotal) (sum(xsd:float(str(?price))) As ?sumTotal)
+      {
+        ?product a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType3> .
+        ?offer bsbm:product ?product ;
+               bsbm:price ?price .
+      }
+    }
+    { Select ?feature (count(?price2) As ?countF) (sum(xsd:float(str(?price2))) As ?sumF)
+      {
+        ?product2 a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType3> ;
+                 bsbm:productFeature ?feature .
+        ?offer2 bsbm:product ?product2 ;
+               bsbm:price ?price2 .
+      }
+      Group By ?feature
+    }
+  }
+ Order By desc(?priceRatio) ?feature
+ Limit 100

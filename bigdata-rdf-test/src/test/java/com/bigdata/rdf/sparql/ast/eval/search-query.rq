@@ -1,0 +1,9 @@
+PREFIX bd: <http://www.bigdata.com/rdf/search#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+select ?x ?y
+where {
+    ?y bd:search "Chris*" .
+    ?x rdfs:label ?y .
+    ?y bd:minRelevance "0" .
+}

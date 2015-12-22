@@ -1,0 +1,27 @@
+PREFIX g: <http://example.org/graphs#>
+PREFIX d: <http://example.org/data#>
+PREFIX p: <http://example.org/person#>
+
+# since all 3 predicates are used in the test data, all 3 variables should end up bound here
+SELECT ?id ?fullName ?legalName {
+  {select ?entity ?id {
+      graph ?g { ?entity p:id ?id }
+      graph g:pointers { ?entity ?a ?g }
+  }}
+
+  # ?a and ?g end up being projected into the next query
+  # changing ?a => ?a1; ?g => ?g1 fixes this
+  optional {
+    select ?entity ?fullName {
+        graph g:pointers { ?entity ?a ?g }
+        graph ?g { ?entity p:fullName ?fullName  }
+    }
+  }
+
+  optional {
+    select ?entity ?legalName {
+        graph ?g { ?entity p:legalName ?legalName  }
+        graph g:pointers { ?entity ?a ?g }
+    }
+  }
+}

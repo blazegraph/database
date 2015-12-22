@@ -1,0 +1,21 @@
+@prefix g: <http://example.org/graphs#> .
+@prefix d: <http://example.org/data#> .
+@prefix p: <http://example.org/person#> .
+
+g:graph1 {
+  d:foo p:id "123"
+}
+
+g:graph2 {
+  d:foo p:fullName "Bryan Thompson"
+}
+
+g:graph3 {
+  d:foo p:legalName "Bryan Thompson 123"
+}
+
+g:pointers {
+  d:foo d:a g:graph1 .
+  d:foo d:b g:graph2 .
+  d:foo d:c g:graph3
+}

@@ -1,0 +1,6 @@
+SELECT (COUNT(*) as ?count) 
+
+FROM NAMED <http://bigdata.com#g1>
+FROM NAMED <http://bigdata.com#g3>
+
+{ GRAPH ?g {?s ?p ?o} }

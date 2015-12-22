@@ -1,0 +1,2 @@
+SELECT  (COUNT(*) as ?count) ?z 
+WHERE {  ?z rdf:type ?x  } GROUP BY ?z

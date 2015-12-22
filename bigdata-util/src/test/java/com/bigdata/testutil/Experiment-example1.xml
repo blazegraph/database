@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "C:\Documents and Settings\bthompson\workspace\bigdata\src\test\com\bigdata\journal\Experiment.dtd">
+<experiment class="com.bigdata.journal.StressTestConcurrent">
+	<defaults>
+		<property name="Timeout">5</property>
+	</defaults>
+	<condition>
+		<property name="bufferMode">Disk</property>
+	</condition>
+</experiment>

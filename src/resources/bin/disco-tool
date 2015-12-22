@@ -1,0 +1,253 @@
+#!/usr/bin/python
+
+import os, sys, socket
+from getopt import getopt, GetoptError
+from os.path import dirname
+from sys import stderr
+
+def usage():
+    str = """Usage: %s [options]
+
+Convenient command line utility that executes the class
+com.bigdata.disco.DiscoveryTool to perform service
+discovery based on lookup groups, locators, and/or the
+service type itself.
+
+Options:
+    -g <name>, --group=<name>
+        Specifies a lookup group to use for service discovery.
+        Multiple group names can be specified by providing this
+        option repeatedly in the command line.
+
+    -a, --allGroups
+        Specifies that all multicast-discoverable lookup services should
+        be used to discover services, regardless of their group memberships.
+
+    -l <host>:<port>, --locator=<host>[:<port>]
+        Specifies the host and port number of a specific lookup service to
+        use for service discovery. If no port number is specified, then the
+        default unicast discovery port number (4160) is used.  Multiple lookup
+        services can be specified by providing this option repeatedly in the
+        command line.  If no groups (see the -g/--group option) or locators
+        are specified, then all discoverable lookup services are used for 
+        service discovery, regardless of group membership.
+
+    -s <regexp>, --service=<regexp>
+        Specifies a Java-style (see java.util.regex.Pattern) regular expression
+        against which to match the type names of services.  Only information
+        pertaining to matched services is output by this tool (i.e. services
+        that don't match a service type regular expression, if one or more is
+        specified, are ignored). Multiple service type regular expressions can
+        be indicated by specifying this option repeatedly in the command line,
+        in which case a service is considered a match if it matches at least
+        one of the regular expressions. If no service type regular expressions
+        are specified, then discovery events pertaining to all services are
+        displayed, regardless of service type.
+
+    -t <duration>, --timeout=<duration>
+        Specifies the duration of time to wait, in milliseconds, before
+        terminating. If this option is not specified, then the tool
+        will continue running until externally killed.
+
+    -o <file>, --output=<file>
+        Specifies the name of a file into which to write discovery output.
+        If this option is not specified, then output is written to stdout.
+        Specifying a filename of "-" will also direct output to stdout.
+
+    --networkInterface=<interface>
+        Sets the network interface to use for multicast discovery
+
+    -D<name>=<value>
+        Sets a Java system property for DiscoveryTool.
+
+    --appHome=<path>
+        Sets the path to the installed release directory where Jars, libraries,
+        and config files will be found.
+
+    -v, --verbose
+        Enables verbose output.
+
+    -h, --help
+        Prints this help message.
+
+Useful properties:
+    default.nic=<interfacename>
+        Specifies the name of the network interface on which the
+        ServiceDiscoveryManager's remote event listener will be exported. This
+        property takes precedence over exportHost. The default behavior
+        regarding this property (in conjunction with the use of NicUtil
+        in the disco.config configuration file to retrieve the interface's
+        associated ip address) is to direct the configuration file to use
+        the IPv4 address of the first active network inteface that can
+        be found on the system.
+
+    exportHost=<ipaddress|hostname>
+        Specifies the IP address on which the ServiceDiscoveryManager's
+        remote event listener will be exported. This property will be
+        employed only when the value of the default.nic property
+        is set to the empty string ("") or a value that does not
+        correspond to any of the network interfaces on the system.
+
+Examples:
+    Show information about all services, discovered through all
+    multicast-discoverable lookup services:
+        $ disco-tool -a
+
+    Show information about all services registered in the lookup service
+    running on the local machine:
+        $ disco-tool -l localhost
+
+    Show information about the quorum peer service (zookeeper),
+    using any lookup service(s) with the group name "foo" (note
+    that the fully-qualified service interface name for that
+    service object is com.bigdata.service.QuorumPeerService):
+        $ disco-tool -g foo -s QuorumPeerService
+
+    Write discovery information gathered over 30 seconds into the file
+    "foo.txt":
+        $ disco-tool -a -t 30000 -o foo.txt
+
+"""
+    stderr.write(str % os.path.basename(sys.argv[0]))
+
+class ArgumentError(Exception):
+    pass
+
+def try_pop(list, default):
+    if len(list) > 0:
+        return list.pop(0)
+    else:
+        return default
+
+class Paths:
+    def __init__(self, classpath, config, properties):
+        self.classpath = classpath
+        self.config = config
+        self.properties = properties
+
+    def transform(self, func):
+        return Paths(
+            classpath = [func(p) for p in self.classpath],
+            config = func(self.config),
+            properties = dict([(k, func(v)) for k, v in
+                               self.properties.iteritems()]))
+
+app_paths = Paths(
+    classpath = [
+        "lib/bigdata.jar",
+        "lib/jsk-platform.jar",
+        "lib/jsk-lib.jar",
+        "lib/log4j.jar"],
+    config = "bin/config/disco.config",
+    properties = {
+        "java.security.policy":
+            "var/config/policy/policy.all",
+        "java.security.properties":
+            ("var/config/policy/provider/" +
+             "dynamic-policy.properties"),
+        "log4j.primary.configuration":
+            "var/config/logging/disco-logging.properties",
+        "appHome": ""})
+
+java_class = "com.bigdata.disco.DiscoveryTool"
+
+if __name__ == '__main__':
+    err = None
+    verbose = False
+    num_groups = 0
+    num_locators = 0
+    num_services = 0
+    app_home = None
+    java_args = {
+        "verbose": False,
+        "allGroups": False }
+    java_props = {
+        "java.security.manager": "",
+        "java.net.preferIPv4Stack": "true",
+        "default.nic": "${default.nic}",
+        "networkInterface": "all",
+        "exportHost": socket.gethostname() }
+
+    try:
+        opts, args = getopt(
+            sys.argv[1:], "g:l:s:t:o:D:avh",
+            ["group=", "allGroups", "locator=", "service=", "timeout=",
+             "output=", "appHome=", "networkInterface=", "verbose", "help"])
+
+        for o, v in opts:
+            if o == "-g" or o == "--group":
+                java_args["group" + str(num_groups)] = v
+                num_groups += 1
+            elif o == "-a" or o == "--allGroups":
+                java_args["allGroups"] = True
+            elif o == "-l" or o == "--locator":
+                java_args["locator" + str(num_locators)] = v
+                num_locators += 1
+            elif o == "-s" or o == "--service":
+                java_args["service" + str(num_services)] = v
+                num_services += 1
+            elif o == "-t" or o == "--timeout":
+                if "timeout" in java_args:
+                    raise ArgumentError("multiple --timeout flags")
+                java_args["timeout"] = v
+            elif o == "-o" or o == "--output":
+                if "output" in java_args:
+                    raise ArgumentError("multiple --output flags")
+                java_args["output"] = v
+            elif o == "-D":
+                kv = v.split("=", 1)
+                if len(kv) != 2:
+                    raise ArgumentError("invalid property definition: " + v)
+                java_props[kv[0]] = kv[1]
+            elif o == "--networkInterface":
+                java_props["networkInterface"] = v
+            elif o == "--appHome":
+                if app_home != None:
+                    raise ArgumentError("multiple --appHome flags")
+                app_home = v
+            elif o == "-v" or o == "--verbose":
+                verbose = True
+                java_args["verbose"] = True
+            elif o == "-h" or o == "--help":
+                usage()
+                sys.exit(0)
+            else:
+                raise ArgumentError("unknown option: " + o)
+
+        if len(args) > 0:
+            raise ArgumentError("Extra arguments: " + " ".join(args))
+        if (num_groups == 0 and num_locators == 0 and
+            not java_args["allGroups"]):
+            raise ArgumentError("no lookup groups or locators specified")
+        elif java_args["allGroups"] and num_groups > 0:
+            raise ArgumentError("options --groups and --allGroups conflict")
+
+        if app_home:
+            paths = app_paths
+            root = app_home
+        else:
+            paths = app_paths
+            root = dirname(dirname(os.path.abspath(sys.argv[0])))
+        paths = paths.transform(
+            lambda p: os.path.join(root, p.replace("/", os.path.sep)))
+
+        java_args["config"] = paths.config
+        for k, v in paths.properties.iteritems():
+            java_props.setdefault(k, v)
+
+        exec_args = ["java", "-cp", os.path.pathsep.join(paths.classpath)]
+        exec_args.extend(
+            ["-D%s=%s" % (k, v) for k, v in java_props.iteritems()])
+        exec_args.append(java_class)
+        exec_args.extend(["%s=%s" % (k, v) for k, v in java_args.iteritems()])
+        if verbose:
+            stderr.write("exec: " + " ".join(exec_args) + "\n")
+        os.execvp(exec_args[0], exec_args)
+    except IndexError:
+        err = "insufficient arguments"
+    except (GetoptError, ArgumentError), e:
+        err = str(e)
+    if err:
+        stderr.write(err + "\n")
+        stderr.write("run with -h flag to print usage\n")
+        sys.exit(1)

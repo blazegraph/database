@@ -1,0 +1,47 @@
+#!/bin/bash
+
+#
+# Script brings down the bigdata services on the local host.
+#
+
+# Setup the environment.
+cd `dirname $0`
+source ./bigdataenv
+
+# Verify critical environment variables.
+if [ -z "$lockFile" ]; then
+    echo $"`date` : `hostname` : environment not setup."
+    exit 1;
+fi
+if [ -z "$pidFile" ]; then
+    echo $"`date` : `hostname` : environment not setup."
+    exit 1;
+fi
+
+# Verify subsystem lock.
+if [ ! -f "$lockFile" ]; then
+    echo $"`date` : `hostname` : lock file not found."
+    exit 1;
+fi
+
+if [ -f "$pidFile" ]; then
+    read pid < "$pidFile"
+    pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+    if [ -z "$pidno" ]; then
+	echo $"`date` : `hostname` : process died? pid=$pid."
+    else
+# Note: SIGTERM [kill $pid] is normal shutdown and the children will
+# be shutdown too.  In contrast, SIGKILL [kill -9 $pid] will kill the
+# services manager but leave the children running.
+	kill $pid
+	echo $"`date` : `hostname` SIGTERM : pid=$pid."
+    fi
+    rm -f "$pidFile"
+else
+    echo $"`date` : `hostname` : no pid?"
+fi
+
+rm -f "$lockFile"
+echo $"`date` : `hostname` : removed lock file."
+
+exit 0

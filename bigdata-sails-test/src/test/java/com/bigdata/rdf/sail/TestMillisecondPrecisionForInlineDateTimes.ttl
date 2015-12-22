@@ -1,0 +1,17 @@
+@prefix  rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<os:r1> a <os:class/AnalysisResults> ;
+	<os:prop/analysis/datePublished> "2011-03-08T08:48:23"^^<http://www.w3.org/2001/XMLSchema#dateTime>.
+
+<os:r2> a <os:class/AnalysisResults> ;
+	<os:prop/analysis/datePublished> "2011-03-08T08:48:27.002"^^<http://www.w3.org/2001/XMLSchema#dateTime>.
+
+<os:r3> a <os:class/AnalysisResults> ;
+	<os:prop/analysis/datePublished> "2011-03-08T08:48:27.003"^^<http://www.w3.org/2001/XMLSchema#dateTime>.
+
+<os:r4> a <os:class/AnalysisResults> ;
+	<os:prop/analysis/datePublished> "2011-03-08T08:48:27.004"^^<http://www.w3.org/2001/XMLSchema#dateTime>.
+	
+<os:r5> a <os:class/AnalysisResults> ;
+	<os:prop/analysis/datePublished> "2011-03-08T08:48:28"^^<http://www.w3.org/2001/XMLSchema#dateTime>.

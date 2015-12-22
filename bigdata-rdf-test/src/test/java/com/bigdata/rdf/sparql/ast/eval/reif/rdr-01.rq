@@ -1,0 +1,10 @@
+# Who says Bob knows Alice?
+
+prefix foaf:       <http://xmlns.com/foaf/0.1/> 
+prefix dc:        <http://purl.org/dc/terms/>
+
+select ?src where {
+  ?x foaf:name "Alice" .
+  ?y foaf:name "Bob" .
+  <<?x foaf:knows ?y>> dc:source ?src .
+}

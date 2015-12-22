@@ -1,0 +1,12 @@
+select * where { 
+  BIND(xsd:unsignedLong("0") AS ?val1)
+  BIND(xsd:unsignedLong("1234") AS ?val2)
+  BIND(xsd:unsignedLong("18446744073709551615"^^xsd:integer) AS ?val3)
+  BIND(xsd:unsignedLong("18446744073709551616") AS ?val4)
+  BIND(xsd:unsignedLong("-1") AS ?val5)
+  BIND(datatype(?val1) AS ?dtVal1)
+  BIND(datatype(?val2) AS ?dtVal2)
+  BIND(datatype(?val3) AS ?dtVal3)
+  BIND(datatype(?val4) AS ?dtVal4)
+  BIND(datatype(?val5) AS ?dtVal5)
+}

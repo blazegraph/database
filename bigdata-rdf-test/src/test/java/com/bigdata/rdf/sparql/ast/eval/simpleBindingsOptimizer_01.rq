@@ -1,0 +1,4 @@
+SELECT * WHERE { 
+  BIND ( <http://bigdata.com#Person> as ?type )
+  ?personId rdf:type ?type 
+}

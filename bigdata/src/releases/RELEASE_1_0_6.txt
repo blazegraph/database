@@ -1,0 +1,125 @@
+This is a 1.0.x maintenance release of bigdata(R).  New users are encouraged to go directly to the 1.1.0 release.  Bigdata is a horizontally-scaled, open-source architecture for indexed data with an emphasis on RDF capable of loading 1B triples in under one hour on a 15 node cluster.  Bigdata operates in both a single machine mode (Journal) and a cluster mode (Federation).  The Journal provides fast scalable ACID indexed storage for very large data sets, up to 50 billion triples / quads.  The federation provides fast scalable shard-wise parallel indexed storage using dynamic sharding and shard-wise ACID updates and incremental cluster size growth.  Both platforms support fully concurrent readers with snapshot isolation.
+
+Distributed processing offers greater throughput but does not reduce query or update latency.  Choose the Journal when the anticipated scale and throughput requirements permit.  Choose the Federation when the administrative and machine overhead associated with operating a cluster is an acceptable tradeoff to have essentially unlimited data scaling and throughput.
+
+See [1,2,8] for instructions on installing bigdata(R), [4] for the javadoc, and [3,5,6] for news, questions, and the latest developments. For more information about SYSTAP, LLC and bigdata, see [7].
+
+Starting with the 1.0.0 release, we offer a WAR artifact [8] for easy installation of the single machine RDF database.  For custom development and cluster installations we recommend checking out the code from SVN using the tag for this release. The code will build automatically under eclipse.  You can also build the code using the ant script.  The cluster installer requires the use of the ant script.
+
+You can download the WAR from:
+
+http://sourceforge.net/projects/bigdata/
+
+You can checkout this release from:
+
+https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_0_6
+
+Feature summary:
+
+- Single machine data storage to ~50B triples/quads (RWStore);
+- Clustered data storage is essentially unlimited;
+- Simple embedded and/or webapp deployment (NanoSparqlServer);
+- Triples, quads, or triples with provenance (SIDs);
+- 100% native SPARQL 1.0 evaluation with lots of query optimizations;
+- Fast RDFS+ inference and truth maintenance;
+- Fast statement level provenance mode (SIDs).
+  
+Road map [3]:
+
+- High-volume analytic query and SPARQL 1.1 query, including aggregations;
+- SPARQL 1.1 Update, Property Paths, and Federation support;
+- Simplified deployment, configuration, and administration for clusters; and
+- High availability for the journal and the cluster.
+
+Change log:
+
+   Note: Versions with (*) require data migration. For details, see [9].
+
+1.0.6
+
+- http://sourceforge.net/apps/trac/bigdata/ticket/473 (PhysicalAddressResolutionException after reopen using RWStore and recycler)
+
+1.0.5
+
+- http://sourceforge.net/apps/trac/bigdata/ticket/362 (Fix incompatible with log4j - slf4j bridge.)
+- http://sourceforge.net/apps/trac/bigdata/ticket/440 (BTree can not be cast to Name2Addr)
+- http://sourceforge.net/apps/trac/bigdata/ticket/453 (Releasing blob DeferredFree record)
+- http://sourceforge.net/apps/trac/bigdata/ticket/467 (IllegalStateException trying to access lexicon index using RWStore with recycling)
+
+1.0.4
+
+- http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for RWStore transaction service and recycler)
+- http://sourceforge.net/apps/trac/bigdata/ticket/445 (RWStore does not track tx release correctly)
+- http://sourceforge.net/apps/trac/bigdata/ticket/437 (Thread-local cache combined with unbounded thread pools causes effective memory leak: termCache memory leak & thread-local buffers)
+
+1.0.3
+
+ - http://sourceforge.net/apps/trac/bigdata/ticket/217 (BTreeCounters does not track bytes released)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/269 (Refactor performance counters using accessor interface)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/329 (B+Tree should delete bloom filter when it is disabled.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/372 (RWStore does not prune the CommitRecordIndex)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/375 (Persistent memory leaks (RWStore/DISK))
+ - http://sourceforge.net/apps/trac/bigdata/ticket/385 (FastRDFValueCoder2: ArrayIndexOutOfBoundsException)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/391 (Release age advanced on WORM mode journal)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/392 (Add a DELETE by access path method to the NanoSparqlServer)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/393 (Add "context-uri" request parameter to specify the default context for INSERT in the REST API)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/394 (log4j configuration error message in WAR deployment)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/399 (Add a fast range count method to the REST API)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/422 (Support temp triple store wrapped by a BigdataSail)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/424 (NQuads support for NanoSparqlServer)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/425 (Bug fix to DEFAULT_RDF_FORMAT for bulk data loader in scale-out)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/426 (Support either lockfile (procmail) and dotlockfile (liblockfile1) in scale-out)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/427 (BigdataSail#getReadOnlyConnection() race condition with concurrent commit)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/435 (Address is 0L)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/436 (TestMROWTransactions failure in CI)
+
+1.0.2
+
+ - http://sourceforge.net/apps/trac/bigdata/ticket/32  (Query time expansion of (foo rdf:type rdfs:Resource) drags in SPORelation for scale-out.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/181 (Scale-out LUBM "how to" in wiki and build.xml are out of date.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/356 (Query not terminated by error.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/359 (NamedGraph pattern fails to bind graph variable if only one binding exists.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/361 (IRunningQuery not closed promptly.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/371 (DataLoader fails to load resources available from the classpath.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/376 (Support for the streaming of bigdata IBindingSets into a sparql query.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/378 (ClosedByInterruptException during heavy query mix.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/379 (NotSerializableException for SPOAccessPath.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/382 (Change dependencies to Apache River 2.2.0)
+
+1.0.1 (*)
+
+ - http://sourceforge.net/apps/trac/bigdata/ticket/107 (Unicode clean schema names in the sparse row store).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/124 (TermIdEncoder should use more bits for scale-out).     
+ - http://sourceforge.net/apps/trac/bigdata/ticket/225 (OSX requires specialized performance counter collection classes).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/348 (BigdataValueFactory.asValue() must return new instance when DummyIV is used).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/349 (TermIdEncoder limits Journal to 2B distinct RDF Values per triple/quad store instance).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/351 (SPO not Serializable exception in SIDS mode (scale-out)).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/352 (ClassCastException when querying with binding-values that are not known to the database).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/353 (UnsupportedOperatorException for some SPARQL queries).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/355 (Query failure when comparing with non materialized value).
+ - http://sourceforge.net/apps/trac/bigdata/ticket/357 (RWStore reports "FixedAllocator returning null address, with freeBits".)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/359 (NamedGraph pattern fails to bind graph variable if only one binding exists.)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/362 (log4j - slf4j bridge.)
+
+For more information about bigdata, please see the following links:
+
+[1] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=Main_Page
+[2] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=GettingStarted
+[3] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=Roadmap
+[4] http://www.bigdata.com/bigdata/docs/api/
+[5] http://sourceforge.net/projects/bigdata/
+[6] http://www.bigdata.com/blog 
+[7] http://www.systap.com/bigdata.htm
+[8] http://sourceforge.net/projects/bigdata/files/bigdata/
+[9] http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=DataMigration
+
+About bigdata: 
+
+Bigdata® is a horizontally-scaled, general purpose storage and computing fabric
+for ordered data (B+Trees), designed to operate on either a single server or a
+cluster of commodity hardware. Bigdata® uses dynamically partitioned key-range
+shards in order to remove any realistic scaling limits - in principle, bigdata®
+may be deployed on 10s, 100s, or even thousands of machines and new capacity may
+be added incrementally without requiring the full reload of all data. The bigdata®
+RDF database supports RDFS and OWL Lite reasoning, high-level query (SPARQL),
+and datum level provenance. 

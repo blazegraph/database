@@ -1,0 +1,7 @@
+prefix : <http://bigdata.com/> 
+
+SELECT ?s ?p ?o
+FROM :c1
+WHERE {
+    ?s ?p ?o
+}

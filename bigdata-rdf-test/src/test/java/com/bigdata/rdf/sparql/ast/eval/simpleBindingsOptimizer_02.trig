@@ -1,0 +1,5 @@
+@prefix : <http://bigdata.com#> .
+
+:mygraph {
+   :Datapoint :value 10 . 
+}

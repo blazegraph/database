@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sparql
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+     xmlns="http://www.w3.org/2005/sparql-results#" >
+   <head>
+    <variable name="val1"/>
+    <variable name="val2"/>
+    <variable name="val3"/>
+    <variable name="val4"/>
+    <variable name="val5"/>
+    <variable name="dtVal1"/>
+    <variable name="dtVal2"/>
+    <variable name="dtVal3"/>
+    <variable name="dtVal4"/>
+    <variable name="dtVal5"/>
+   </head>
+   <results>
+     <result>
+     	<binding name="val1"><literal datatype="http://www.w3.org/2001/XMLSchema#unsignedLong">0</literal></binding>
+        <binding name="val2"><literal datatype="http://www.w3.org/2001/XMLSchema#unsignedLong">1234</literal></binding>
+        <binding name="val3"><literal datatype="http://www.w3.org/2001/XMLSchema#unsignedLong">18446744073709551615</literal></binding>
+        <binding name="dtVal1"><uri>http://www.w3.org/2001/XMLSchema#unsignedLong</uri></binding>
+        <binding name="dtVal2"><uri>http://www.w3.org/2001/XMLSchema#unsignedLong</uri></binding>
+        <binding name="dtVal3"><uri>http://www.w3.org/2001/XMLSchema#unsignedLong</uri></binding>
+     </result>
+   </results>
+</sparql>

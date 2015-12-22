@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='o'/>
+    </head>
+    <results>
+        <result>
+            <binding name='o'>
+			   <uri>http://bigdata.com#o1</uri>
+            </binding>
+        </result>
+        <result>
+            <binding name='o'>
+			   <uri>http://bigdata.com#o2</uri>
+            </binding>
+        </result>
+        <result>
+            <binding name='o'>
+			   <uri>http://bigdata.com#o3</uri>
+            </binding>
+        </result>
+        <result>
+            <binding name='o'>
+			   <uri>http://bigdata.com#o4</uri>
+            </binding>
+        </result>
+        <result>
+            <binding name='o'>
+			   <uri>http://bigdata.com#o5</uri>
+            </binding>
+        </result>
+    </results>
+</sparql>

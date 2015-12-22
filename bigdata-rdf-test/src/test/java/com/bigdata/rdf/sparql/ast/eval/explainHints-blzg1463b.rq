@@ -1,0 +1,13 @@
+SELECT *
+  
+  WITH {
+    SELECT ?val
+    WHERE { 
+      bind (?inject as ?val)
+    }
+
+} AS %links
+where { 
+  include %links 
+}
+BINDINGS ?inject { ( <http://myIncomingUri> ) }

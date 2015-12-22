@@ -1,0 +1,13 @@
+PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+SELECT * {
+  SERVICE gas:service {
+    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.SSSP" .
+    gas:program gas:in </:source> . # starting point
+    gas:program gas:target </:target1> . # target vertices
+    gas:program gas:target </:target2> . # target vertices
+    gas:program gas:linkAttrType </:cost> . # link attribute type
+    gas:program gas:out ?v . # bound to the visited vertices.
+    gas:program gas:out1 ?distance . # bound to the distance of the visited vertices.
+    gas:program gas:out2 ?pred . # bound to the predecessor
+  }
+} order by ?distance

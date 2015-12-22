@@ -1,0 +1,9 @@
+select * {
+  {
+    select $a
+    {
+      hint:SubQuery hint:runOnce true .
+    }
+    VALUES ($a) { (1) (2) }
+  }
+}

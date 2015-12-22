@@ -1,0 +1,3 @@
+@prefix : <http://example/> .
+
+#:z :label  "RNK-16-2B3" .

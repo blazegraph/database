@@ -1,0 +1,5 @@
+
+SELECT  (<os:0> as ?A)
+WHERE {
+     <eg:a> <eg:b> * <eg:a>
+}

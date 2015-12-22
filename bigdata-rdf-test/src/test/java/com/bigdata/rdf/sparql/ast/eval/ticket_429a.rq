@@ -1,0 +1,3 @@
+SELECT * WHERE { 
+  GRAPH <http://example.com/g1> { }
+}

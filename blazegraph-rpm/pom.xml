@@ -1,0 +1,360 @@
+<?xml version="1.0"?>
+<!--
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-artifacts</artifactId>
+    <version>2.0.0-RC1</version>
+    <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
+  </parent>
+  <groupId>com.blazegraph</groupId>
+  <artifactId>blazegraph-rpm</artifactId>
+  <version>2.0.0-RC1</version>
+  <name>Blazegraph RPM Package</name>
+  <url>https://www.blazegraph.com/</url>
+  <packaging>rpm</packaging>
+
+  <properties>
+     <rpm.user>blzg</rpm.user>
+     <rpm.group>blzg</rpm.group>
+     <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
+     <rpm.release>SNAPSHOT</rpm.release>
+     <app.name>blazegraph</app.name>
+  </properties>
+
+  <build>
+    <extensions>
+      <extension>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>rpm-maven-plugin</artifactId>
+          <version>2.1.4</version>
+      </extension>
+    </extensions>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>rpm-maven-plugin</artifactId>
+          <version>2.1.4</version>
+          <extensions>true</extensions>
+          <configuration>
+          <license>GPL v2</license>
+          <distribution>Blazegraph</distribution>
+          <group>High Performance Graph Database</group>
+          <packager>SYSTAP, LLC</packager>
+          <prefix>${rpm.installDir}</prefix>
+          <changelogFile>src/changelog</changelogFile>
+          <mappings>
+            <mapping>
+              <directory>${rpm.installDir}/lib</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>${project.build.directory}/dependency</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>${rpm.installDir}/war</directory>
+              <filemode>750</filemode>
+              <recurseDirectories>true</recurseDirectories>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>${project.build.directory}/classes/war</location>
+                </source>
+              </sources>
+            </mapping>
+<!--
+            <mapping>
+              <directory>${rpm.installDir}/lib</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <dependency>
+                <includes>
+                </includes>
+              </dependency>
+            </mapping>
+-->
+            <mapping>
+              <directory>${rpm.installDir}/bin</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>src/rpm/bin</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>${rpm.installDir}/conf</directory>
+              <configuration>true</configuration>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+              <sources>
+                <source>
+                  <location>src/rpm/conf</location>
+                </source>
+                <source>
+                  <location>${project.build.directory}/classes/RWStore.properties</location>
+                </source>
+                <source>
+                  <location>${project.build.directory}/classes/war/WEB-INF/classes/log4j.properties</location>
+                </source>
+                <source>
+                  <location>${project.build.directory}/classes/jetty.xml</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>${rpm.installDir}/data</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+	    </mapping>
+            <mapping>
+              <directory>/var/log/${app.name}</directory>
+              <filemode>750</filemode>
+              <username>${rpm.user}</username>
+              <groupname>${rpm.group}</groupname>
+            </mapping>
+            <mapping>
+              <directory>/usr/local</directory>
+              <sources>
+                <softlinkSource>
+                  <location>${rpm.installDir}</location>
+                  <destination>${app.name}</destination>
+                </softlinkSource>
+              </sources>
+            </mapping>
+          </mappings>
+          <preinstallScriptlet>
+            <scriptFile>src/rpm/scripts/preinst</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </preinstallScriptlet>
+          <postinstallScriptlet>
+            <scriptFile>src/rpm/scripts/postinst</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </postinstallScriptlet>
+          <postremoveScriptlet>
+            <scriptFile>src/rpm/scripts/postremove</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </postremoveScriptlet>
+          <provides>
+             <provide>blazegraph</provide>
+	  </provides>
+          <requires>
+		<require>/usr/sbin/useradd</require>
+		<require>/usr/bin/getent</require>
+	  </requires>
+        </configuration>
+       </plugin>
+      </plugins>
+     </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war-html</artifactId>
+                  <version>${project.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/classes/</outputDirectory>
+                  <destFileName></destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>blazegraph-jar</artifactId>
+                  <version>${project.version}</version>
+                  <type>jar</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/classes/</outputDirectory>
+                  <destFileName>blazegraph.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-dependencies</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>false</overWriteSnapshots>
+              <overWriteIfNewer>true</overWriteIfNewer>
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
+       <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+               <id>unpack-war</id>
+               <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>compile</phase>
+               <configuration>
+                 <target>
+ 		   <unzip dest="target/classes/war">
+                        <patternset>
+                           <include name="**/*"/>
+                        </patternset>
+        		<fileset dir="target/classes/">
+            			<include name="" />
+        		</fileset>    
+    		   </unzip>
+		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
+ 		   <unzip dest="target/classes/jar">
+                        <patternset>
+                           <include name="jetty.xml"/>
+                        </patternset>
+        		<fileset dir="target/classes/">
+            			<include name="blazegraph.jar" />
+        		</fileset>    
+    		   </unzip>
+		   <copy file="target/classes/jar/jetty.xml" todir="target/classes" />
+                 </target>
+               </configuration>
+             </execution>
+           </executions>
+	</plugin>
+   </plugins>
+   </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <stylesheetfile>${basedir}/src/rpm/javadoc/stylesheet.css</stylesheetfile>
+          <show>public</show>
+          <maxmemory>1000m</maxmemory>
+          <author>true</author>
+	  <version>true</version>
+          <doctitle><![CDATA[<h1>Blazegraph RPM</h1>]]></doctitle>
+          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+<script>
+jQuery(document).ready(function(){
+  jQuery('ul.sf-menu').superfish({
+  pathClass: 'current',
+  cssArrows: false
+  });
+});
+
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-50971023-6', 'blazegraph.com');
+ga('send', 'pageview');
+</script>
+]]></bottom>
+ 
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+  
+  <dependencies>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core</artifactId>
+      <version>${project.version}</version>
+       <exclusions>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-rio-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-sparql-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-store-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-blueprints</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>junit-ext</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>bigdata-war-html</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+  </project>

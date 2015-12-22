@@ -1,0 +1,5 @@
+org.openrdf.rio.datatypes.XMLSchemaDatatypeHandler
+org.openrdf.rio.datatypes.RDFDatatypeHandler
+org.openrdf.rio.datatypes.DBPediaDatatypeHandler
+org.openrdf.rio.datatypes.VirtuosoGeometryDatatypeHandler
+org.openrdf.rio.datatypes.GeoSPARQLDatatypeHandler

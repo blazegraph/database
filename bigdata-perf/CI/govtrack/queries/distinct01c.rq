@@ -1,0 +1,11 @@
+# Query producing 20968700 solutions before the DISTINCT.
+#
+# compare distinct01{a,b,c}
+
+SELECT DISTINCT ?_var3 # 67351ms (1k chunks), 11849 results (added time is DISTINCT SOLUTIONS cost).
+WHERE {
+  GRAPH ?g {
+    ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k
+    ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M
+  }
+}

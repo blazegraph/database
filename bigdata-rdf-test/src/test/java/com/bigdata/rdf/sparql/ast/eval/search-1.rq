@@ -1,0 +1,22 @@
+# Search query.
+PREFIX bd: <http://www.bigdata.com/rdf/search#>
+
+SELECT ?subj ?score 
+
+  WITH {
+   SELECT ?subj ?score
+    WHERE {
+      ?lit bd:search "mike" .
+      ?lit bd:relevance ?score .
+      ?subj ?p ?lit .
+      }
+    ORDER BY DESC(?score)
+    LIMIT 10
+    OFFSET 0
+  } as %searchSet1
+
+WHERE {
+   
+   include %searchSet1
+   
+}

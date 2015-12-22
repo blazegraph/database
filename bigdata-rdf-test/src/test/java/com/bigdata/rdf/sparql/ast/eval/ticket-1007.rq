@@ -1,0 +1,13 @@
+PREFIX : <http://www.interition.net/ref/>
+
+SELECT * WHERE
+{
+  GRAPH <http://www.interition.net/g1>
+  {
+    <http://s1> :aProperty ?literal .
+    BIND ( URI(CONCAT("http://www.interition.net/graphs/", ?literal )) AS ?graph) .
+  }
+    GRAPH ?graph {
+      ?s ?p ?o .
+    }
+}

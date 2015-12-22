@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<!-- There are 4 conditions. -->
+<experiment class="com.bigdata.journal.StressTestGroupCommit">
+ <defaults>
+  <property name="maximumExtent">419430400</property>
+  <property name="timeout">5</property>
+  <property name="createTempFile">true</property>
+  <property name="ntasks">10000</property>
+ </defaults>
+ <condition>
+  <property name="writeServiceQueueCapacity">500</property>
+  <property name="bufferMode">Disk</property>
+  <property name="writeServiceMaximumPoolSize">500</property>
+  <property name="writeServiceCorePoolSize">500</property>
+ </condition>
+ <condition>
+  <property name="writeServiceQueueCapacity">1000</property>
+  <property name="bufferMode">Disk</property>
+  <property name="writeServiceMaximumPoolSize">1000</property>
+  <property name="writeServiceCorePoolSize">1000</property>
+ </condition>
+ <condition>
+  <property name="writeServiceQueueCapacity">1500</property>
+  <property name="bufferMode">Disk</property>
+  <property name="writeServiceMaximumPoolSize">1500</property>
+  <property name="writeServiceCorePoolSize">1500</property>
+ </condition>
+ <condition>
+  <property name="writeServiceQueueCapacity">2000</property>
+  <property name="bufferMode">Disk</property>
+  <property name="writeServiceMaximumPoolSize">2000</property>
+  <property name="writeServiceCorePoolSize">2000</property>
+ </condition>
+</experiment>
