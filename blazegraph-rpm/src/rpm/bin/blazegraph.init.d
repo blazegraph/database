@@ -180,6 +180,12 @@ blazegraph_sh() {
 	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
 	$SU - $BLZG_USER -c "$BLZGCMD_SH start"
 	status="$?"
+
+	if [ $status -gt 0 ] ; then
+		PID=`cat $BLZG_PID`
+		echo "Started $NAME (pid: $PID)"
+	fi
+
 	set +a -e
 	return $status
 }
