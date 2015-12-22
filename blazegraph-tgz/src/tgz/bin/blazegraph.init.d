@@ -51,6 +51,9 @@ NAME="$(basename $0)"
 
 NAME=blazegraph
 DESC="Blazegraph High Performance Database"
+
+#Modify this value to the current location of your conf/blazegraph.
+#You may also create a symbolic link to to /etc/blazegraph/blazegraph.
 DEFAULT=/etc/${NAME}/$NAME
 JVM_TMP=/tmp/blazegraph-$NAME-tmp
 

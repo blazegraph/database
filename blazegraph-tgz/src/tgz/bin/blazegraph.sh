@@ -5,6 +5,12 @@ if [ -z "${BLZG_HOME}" ]; then
    # set BLZG_HOME to the top-level of the installation.
    pushd `dirname $0` > /dev/null;cd ..;BLZG_HOME=`pwd`;popd > /dev/null
    echo "BLZG_HOME Not specified: using ${BLZG_HOME}";
+   export BLZG_HOME
+fi
+
+#Check for default configuration file
+if [ -f "${BLZG_HOME}/conf/blazegraph" ] ; then
+   . "${BLZG_HOME}/conf/blazegraph"
 fi
 
 export INSTALL_DIR=${BLZG_HOME}
