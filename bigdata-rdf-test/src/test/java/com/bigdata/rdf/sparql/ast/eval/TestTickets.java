@@ -1897,5 +1897,39 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
           "ticket_bg1683.srx"// resultFileURL
          ).runTest();   
    }
+   
+   /**
+
+    * BLZG-852: MINUS and UNION.
+
+    */
+
+   public void test_ticket_852a() throws Exception {
+
+      new TestHelper(
+          "ticket_bg852a",// testURI,
+          "ticket_bg852a.rq",// queryFileURL
+          "empty.trig",// dataFileURL
+          "ticket_bg852a.srx"// resultFileURL
+         ).runTest();   
+   }
+
+
+
+   /**
+
+    * BLZG-852: MINUS and UNION.
+
+    */
+
+   public void test_ticket_852b() throws Exception {
+
+      new TestHelper(
+          "ticket_bg852b",// testURI,
+          "ticket_bg852b.rq",// queryFileURL
+          "empty.trig",// dataFileURL
+          "ticket_bg852b.srx"// resultFileURL
+         ).runTest();   
+   }
 
 }
