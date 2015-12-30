@@ -856,6 +856,10 @@ public class NanoSparqlServer {
         String resourceBaseStr = System
                 .getProperty(SystemProperties.JETTY_RESOURCE_BASE);
 
+        // Check the environment variable for the override web.
+        final String jettyOverrideWeb = System
+                .getProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML);
+
         // true iff declared as an environment variable.
         final boolean isDeclared = resourceBaseStr != null
                 && resourceBaseStr.trim().length() > 0;
@@ -941,6 +945,7 @@ public class NanoSparqlServer {
 
             }
 
+
             if (resourceBaseURL != null) {
 
                 /*
@@ -962,13 +967,17 @@ public class NanoSparqlServer {
 
                 System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
                         tmp);
+                
+                //Don't override the value if it is explicitly declared.
+				if (jettyOverrideWeb == null) {
 
-                final URL overrideWebXmlURL = new URL(tmp
-                        + (tmp.endsWith("/") ? "" : "/")
-                        + "WEB-INF/override-web.xml");
+					final URL overrideWebXmlURL = new URL(tmp
+							+ (tmp.endsWith("/") ? "" : "/")
+							+ "WEB-INF/override-web.xml");
 
-                System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
-                        overrideWebXmlURL.toExternalForm());
+					System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
+							overrideWebXmlURL.toExternalForm());
+                }
                 
             }
 
