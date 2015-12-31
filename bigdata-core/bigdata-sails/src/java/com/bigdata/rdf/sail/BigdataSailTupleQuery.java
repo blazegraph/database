@@ -12,6 +12,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -104,8 +105,9 @@ public class BigdataSailTupleQuery extends SailTupleQuery
         originalQuery.setIncludeInferred(getIncludeInferred());
 
         final QueryRoot optimized = ASTEvalHelper.optimizeQuery(
-                getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
+                astContainer,
+                new AST2BOpContext(astContainer, getTripleStore()),
+                new QueryBindingSet(getBindings()), getDataset());
 
         return optimized;
         
