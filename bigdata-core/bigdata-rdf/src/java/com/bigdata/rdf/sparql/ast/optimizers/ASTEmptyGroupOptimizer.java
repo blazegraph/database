@@ -292,12 +292,13 @@ This case 4 appears to be misconceived: Jeremy Carroll.
 
         } else if (arity == 1 && 
         		op instanceof JoinGroupNode &&
-        		!op.isOptional() &&
+        		!op.isOptional() && !op.isMinus() &&
     			op.get(0) instanceof UnionNode) {
             
         	/*
         	 * If a JoinGroupNode contains a single UnionNode, we can lift the
-        	 * UnionNode unless the JoinGroupNode is optional.
+        	 * UnionNode unless the JoinGroupNode is optional or minus. 
+        	 * The MINUS case was added as part of BLZG-852.
         	 */
             final JoinGroupNode parent = (JoinGroupNode) op;
 
