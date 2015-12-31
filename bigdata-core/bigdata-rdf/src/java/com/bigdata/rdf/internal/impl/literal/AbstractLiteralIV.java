@@ -98,7 +98,8 @@ abstract public class AbstractLiteralIV<V extends BigdataLiteral, T>
      */
     @Override
     public URI getDatatype() {
-    	return getDTE().getDatatypeURI();
+        return getDTE() == DTE.Extension ? 
+                getDTEX().getDatatypeURI() : getDTE().getDatatypeURI();
     }
     
     /**
