@@ -33,7 +33,7 @@ import java.util.UUID;
  * @author beebs
  *
  */
-public class QueryCancelledException extends Exception {
+public class QueryCancelledException extends RuntimeException {
 
 	/**
 	 * 
