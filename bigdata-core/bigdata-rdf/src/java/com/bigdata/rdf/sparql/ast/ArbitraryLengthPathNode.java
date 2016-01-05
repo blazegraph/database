@@ -134,6 +134,7 @@ public class ArbitraryLengthPathNode
 
         super(args, anns);
 
+        subgroup().setProperty( JoinGroupNode.Annotations.IS_SUBGROUP_OF_ALP_NODE, true );
     }
 
     /**
