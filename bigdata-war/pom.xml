@@ -34,7 +34,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-war</artifactId>
   <version>2.0.0-RC2</version>
-  <name>Blazegraph WAR (Legacy Bigdata context path)</name>
+  <name>Blazegraph WAR (bigdata legacy context path)</name>
   <url>http://maven.apache.org</url>
   <packaging>war</packaging>
   <build>
