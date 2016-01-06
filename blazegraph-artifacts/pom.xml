@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!--
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
@@ -24,19 +25,35 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
-<!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
-  <artifactId>bigdata-ganglia</artifactId>
+  <artifactId>blazegraph-artifacts</artifactId>
   <version>2.0.0-RC2</version>
-  <name>Blazegraph Ganglia</name>
-  <packaging>jar</packaging>
+  <name>Blazegraph Deployment Artifacts</name>
+  <url>http://www.blazegraph.com</url>
+  <packaging>pom</packaging>
+
+  <build>
+     <pluginManagement>
+      <plugins>
+        <plugin>
+         <artifactId>maven-assembly-plugin</artifactId>
+         <version>2.5.3</version>
+         <configuration>
+          <descriptors>
+             <descriptor>src/main/assembly/blazegraph.xml</descriptor>
+          </descriptors>
+          <tarLongFileMode>posix</tarLongFileMode>
+          </configuration>
+        </plugin>
+      </plugins>
+     </pluginManagement>
+   </build>
 
   <reporting>
     <plugins>
@@ -49,8 +66,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>Blazegraph Ganglia</h1>]]></doctitle>
-          <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <doctitle><![CDATA[<h1>Blazegraph Deployment Artifacts</h1>]]></doctitle>
+          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -67,30 +84,20 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
+ 
         </configuration>
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
-
-  <dependencies>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>junit-ext</artifactId>
-      <version>${junit-ext.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-       <!-- log4j is the primary logger for bigdata. -->
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
-  </dependencies>
+  <modules>
+    <!-- Legacy artifacts for /bigdata context path -->
+    <module>../bigdata-war</module>
+    <module>../bigdata-jar</module>
+    <!-- Blazegraph artifacts -->
+    <module>../blazegraph-war</module>
+    <module>../blazegraph-jar</module>
+    <module>../blazegraph-deb</module>
+    <module>../blazegraph-rpm</module>
+    <module>../blazegraph-tgz</module>
+  </modules>
 </project>
