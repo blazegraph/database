@@ -14,3 +14,6 @@ mvn versions:set -DnewVersion=${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT} versions:
 
 mvn versions:set -DnewVersion=${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT} versions:update-child-modules -f ${ARTIFACTS_POM}
 
+mvn versions:set -DnewVersion=${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT} versions:update-parent -f ${ARTIFACTS_POM}
+
+
