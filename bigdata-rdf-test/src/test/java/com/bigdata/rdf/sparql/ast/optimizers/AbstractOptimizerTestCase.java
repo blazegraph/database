@@ -160,7 +160,13 @@ public abstract class AbstractOptimizerTestCase extends
 			public void apply(ASTBase rslt) {
 				((QueryBase) rslt).getProjection().setReduced(false);
 			}
-		};
+		},
+      SUBGROUP_OF_ALP {
+         @Override
+         public void apply(ASTBase sp) {
+            ((JoinGroupNode) sp).setSubgroupOfALPNode(true);
+         }
+      };
 
 		/**
 		 * 
