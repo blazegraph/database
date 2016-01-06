@@ -255,6 +255,12 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
         
     }
 
+    final public void setSubgroupOfALPNode( final boolean isSubgroup ) {
+       
+       setProperty(Annotations.IS_SUBGROUP_OF_ALP_NODE, isSubgroup);
+       
+    }
+
     /**
      * Return the {@link QueryOptimizerEnum} that is in effect for this
      * {@link JoinGroupNode}. This will be the value specified through
