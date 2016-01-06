@@ -167,25 +167,6 @@ public interface ConfigParams {
     String DEFAULT_WARMUP_NAMESPACE_LIST = "";
     
     /**
-     * A class that extends {@link BigdataRDFServletContextListener}. This
-     * offers applications a means to hook the {@link ServletContextListener}
-     * methods.
-     * <p>
-     * Note:
-     *
-     * @see BigdataRDFServletContextListener#contextInitialized(ServletContextEvent)
-     * @see BigdataRDFServletContextListener#contextDestroyed(ServletContextEvent)
-     * @see #DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS
-     *
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/667" >
-     *      Provide NanoSparqlServer initialization hook </a>
-     */
-    final String SERVLET_CONTEXT_LISTENER_CLASS = "servletContextListenerClass";
-
-    String DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS = BigdataRDFServletContextListener.class
-            .getName();
-    
-    /**
      * A class that implements the {@link BlueprintsServletProxy}.
      * 
      * @see <a href="https://jira.blazegraph.com/browse/BLZG-1295"> Refactor Blueprints </a>

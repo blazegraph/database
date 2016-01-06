@@ -33,7 +33,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-artifacts</artifactId>
+<<<<<<< HEAD
   <version>2.0.0-RC2</version>
+=======
+  <version>1.6.1-master-SNAPSHOT</version>
+>>>>>>> 17e970388e2e871a00cd72e1047164700d0ed391
   <name>Blazegraph Deployment Artifacts</name>
   <url>http://www.blazegraph.com</url>
   <packaging>pom</packaging>

@@ -218,6 +218,7 @@ dependencies.
     <module>../blazegraph-war</module>
     <module>../bigdata-war</module>
     <module>../bigdata-jar</module>
+    <module>../blazegraph-jar</module>
     <module>../blazegraph-deb/</module>
     <module>../blazegraph-rpm/</module>
     -->
