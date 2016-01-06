@@ -6,9 +6,9 @@ PARENT_POM="${BASE_DIR}"/../blazegraph-parent/pom.xml
 DEPLOYER_POM="${BASE_DIR}"/../blazegraph-artifacts/pom.xml
 CURRENT_VERSION=2.0.0
 BRANCH="master"
-SNAPSHOT="RC2"
+SNAPSHOT="RC2-SNAPSHOT"
 
-echo "Updating POM versions to ${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT}"
+echo "Updating POM versions to ${CURRENT_VERSION}-${SNAPSHOT}"
 
 mvn versions:set -DnewVersion=${CURRENT_VERSION}-${SNAPSHOT} versions:update-child-modules -f ${PARENT_POM}
 
