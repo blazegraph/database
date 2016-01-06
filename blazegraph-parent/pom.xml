@@ -209,13 +209,13 @@ dependencies.
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
     <module>../bigdata-war-html</module>
-    <module>../blazegraph-war</module>
     <module>../bigdata-blueprints</module>
     <module>../bigdata-runtime</module>
     <module>../bigdata-core-test/</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
     <!-- Moved to blazegraph-deployers
+    <module>../blazegraph-war</module>
     <module>../bigdata-war</module>
     <module>../bigdata-jar</module>
     <module>../blazegraph-deb/</module>
