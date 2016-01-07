@@ -727,7 +727,7 @@ public class DataLoader {
 
     }
 
-    private class MyLoadStats extends LoadStats {
+    public class MyLoadStats extends LoadStats {
     	
     	/**
     	 * The set of resources that failed during a load.
@@ -793,7 +793,7 @@ public class DataLoader {
 		 * 
 		 * @see BLZG-1534 (durable queues)
 		 */
-		private void commit() {
+		public void commit() {
 
 			if (durableQueues) {
 
@@ -816,7 +816,7 @@ public class DataLoader {
     /**
      * Factory for {@link DataLoader} specific {@link LoadStats} extension.
      */
-    private MyLoadStats newLoadStats() {
+    public MyLoadStats newLoadStats() {
 		
     	return new MyLoadStats();
     	
@@ -1233,7 +1233,7 @@ public class DataLoader {
 	 * @param endOfBatch
 	 * @throws IOException
 	 */
-    private void loadFiles(final MyLoadStats totals, final int depth,
+    public void loadFiles(final MyLoadStats totals, final int depth,
             final File file, final String baseURI, final RDFFormat rdfFormat,
             final String defaultGraph, final FilenameFilter filter,
             final boolean endOfBatch)
@@ -1703,7 +1703,7 @@ public class DataLoader {
 	 * 
 	 * @see Options#VERBOSE
 	 */
-    private void logCounters(final AbstractTripleStore database) {
+    public void logCounters(final AbstractTripleStore database) {
 
 		final IIndexManager store = database.getIndexManager();
 		
@@ -1956,96 +1956,13 @@ public class DataLoader {
             usage();
 
         }
-
-        final File propertyFile = new File(args[i++]);
-
-        if (!propertyFile.exists()) {
-
-            throw new FileNotFoundException(propertyFile.toString());
-
-        }
-
-        final Properties properties = new Properties();
-        {
-            if(!quiet)
-                System.out.println("Reading properties: "+propertyFile);
-            final InputStream is = new FileInputStream(propertyFile);
-            try {
-                properties.load(is);
-            } finally {
-                if (is != null) {
-                    is.close();
-                }
-            }
-//			if (System.getProperty(com.bigdata.journal.Options.FILE) != null) {
-//				// Override/set from the environment.
-//				final String file = System
-//						.getProperty(com.bigdata.journal.Options.FILE);
-//				if(!quiet) System.out.println("Using: " + com.bigdata.journal.Options.FILE
-//						+ "=" + file);
-//                properties.setProperty(com.bigdata.journal.Options.FILE, file);
-//            }
-        }
-		if (durableQueues) {
-			// @see BLZG-1534 (durable queues)
-			properties.setProperty(Options.DURABLE_QUEUES, "true");
-		}
-		if (verbose > 0) {
-			properties.setProperty(Options.VERBOSE, Integer.toString(verbose));
-		}
-        /*
-         * Allow override of select options.
-         */
-        {
-            final String[] overrides = new String[] {
-                    // Journal options.
-                    com.bigdata.journal.Options.FILE,
-                    // RDFParserOptions.
-                    RDFParserOptions.Options.DATATYPE_HANDLING,
-                    RDFParserOptions.Options.PRESERVE_BNODE_IDS,
-                    RDFParserOptions.Options.STOP_AT_FIRST_ERROR,
-                    RDFParserOptions.Options.VERIFY_DATA,
-                    // DataLoader options.
-                    DataLoader.Options.BUFFER_CAPACITY,
-                    DataLoader.Options.QUEUE_CAPACITY,
-                    DataLoader.Options.CLOSURE,
-                    DataLoader.Options.COMMIT,
-                    DataLoader.Options.FLUSH,
-                    DataLoader.Options.IGNORE_INVALID_FILES,
-                    DataLoader.Options.DURABLE_QUEUES,
-                    DataLoader.Options.DUMP_JOURNAL,
-                    DataLoader.Options.VERBOSE,
-                    // Useful Journal options.
-                    Journal.Options.WRITE_CACHE_BUFFER_COUNT,
-                    Journal.Options.WRITE_CACHE_MIN_CLEAN_LIST_SIZE,
-                    // HttpPlugin
-                    com.bigdata.journal.HttpPlugin.Options.HTTPD_PORT,
-                    // DirectBufferPool options.
-                    com.bigdata.io.DirectBufferPool.Options.BUFFER_CAPACITY,
-                    // B+Tree
-                    com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
-                    // Index procedure // FIXME Remove or replace with symbolic Options.
-                    // @see BLZG-1537 (Schedule more IOs when loading data)
-                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.maxReaders",
-                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.skipCount",
-                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.spannedRangeMultiplier",
-                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.batchSize",
-                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.queueCapacity",
-
-            };
-            for (String s : overrides) {
-                if (System.getProperty(s) != null) {
-                    // Override/set from the environment.
-                    final String v = System.getProperty(s);
-                    if(!quiet)
-                        System.out.println("Using: " + s + "=" + v);
-                    properties.setProperty(s, v);
-                }
-            }
-        }
         
-		final List<File> files = new LinkedList<File>();
+        final String propertyFileName = args[i++];
+        
+        final List<File> files = new LinkedList<File>();
 		
+		final Properties properties = processProperties(propertyFileName, quiet, verbose, durableQueues);
+        
 		while (i < args.length) {
 
             final File fileOrDir = new File(args[i++]);
@@ -2168,6 +2085,99 @@ public class DataLoader {
 
     }
 
+   public static Properties processProperties(final String propertyFileName, final boolean quiet, 
+		   final int verbose, final boolean durableQueues ) throws IOException {
+
+        final File propertyFile = new File(propertyFileName);
+
+        if (!propertyFile.exists()) {
+
+            throw new FileNotFoundException(propertyFile.toString());
+
+        }
+
+        final Properties properties = new Properties();
+        {
+            if(!quiet)
+                System.out.println("Reading properties: "+propertyFile);
+            final InputStream is = new FileInputStream(propertyFile);
+            try {
+                properties.load(is);
+            } finally {
+                if (is != null) {
+                    is.close();
+                }
+            }
+//			if (System.getProperty(com.bigdata.journal.Options.FILE) != null) {
+//				// Override/set from the environment.
+//				final String file = System
+//						.getProperty(com.bigdata.journal.Options.FILE);
+//				if(!quiet) System.out.println("Using: " + com.bigdata.journal.Options.FILE
+//						+ "=" + file);
+//                properties.setProperty(com.bigdata.journal.Options.FILE, file);
+//            }
+        }
+		if (durableQueues) {
+			// @see BLZG-1534 (durable queues)
+			properties.setProperty(Options.DURABLE_QUEUES, "true");
+		}
+		if (verbose > 0) {
+			properties.setProperty(Options.VERBOSE, Integer.toString(verbose));
+		}
+        /*
+         * Allow override of select options.
+         */
+        {
+            final String[] overrides = new String[] {
+                    // Journal options.
+                    com.bigdata.journal.Options.FILE,
+                    // RDFParserOptions.
+                    RDFParserOptions.Options.DATATYPE_HANDLING,
+                    RDFParserOptions.Options.PRESERVE_BNODE_IDS,
+                    RDFParserOptions.Options.STOP_AT_FIRST_ERROR,
+                    RDFParserOptions.Options.VERIFY_DATA,
+                    // DataLoader options.
+                    DataLoader.Options.BUFFER_CAPACITY,
+                    DataLoader.Options.QUEUE_CAPACITY,
+                    DataLoader.Options.CLOSURE,
+                    DataLoader.Options.COMMIT,
+                    DataLoader.Options.FLUSH,
+                    DataLoader.Options.IGNORE_INVALID_FILES,
+                    DataLoader.Options.DURABLE_QUEUES,
+                    DataLoader.Options.DUMP_JOURNAL,
+                    DataLoader.Options.VERBOSE,
+                    // Useful Journal options.
+                    Journal.Options.WRITE_CACHE_BUFFER_COUNT,
+                    Journal.Options.WRITE_CACHE_MIN_CLEAN_LIST_SIZE,
+                    // HttpPlugin
+                    com.bigdata.journal.HttpPlugin.Options.HTTPD_PORT,
+                    // DirectBufferPool options.
+                    com.bigdata.io.DirectBufferPool.Options.BUFFER_CAPACITY,
+                    // B+Tree
+                    com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
+                    // Index procedure // FIXME Remove or replace with symbolic Options.
+                    // @see BLZG-1537 (Schedule more IOs when loading data)
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.maxReaders",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.skipCount",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.spannedRangeMultiplier",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.batchSize",
+                    "com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.queueCapacity",
+
+            };
+            for (String s : overrides) {
+                if (System.getProperty(s) != null) {
+                    // Override/set from the environment.
+                    final String v = System.getProperty(s);
+                    if(!quiet)
+                        System.out.println("Using: " + s + "=" + v);
+                    properties.setProperty(s, v);
+                }
+            }
+        }
+        
+        return properties;
+   } 
+
     private static void usage() {
         
         System.err.println("usage: [-closure][-verbose][-durableQueues][-namespace namespace] propertyFile (fileOrDir)+");
@@ -2175,6 +2185,11 @@ public class DataLoader {
         System.exit(1);
         
     }
+    
+    public static FilenameFilter getFilenameFilter() {
+    	return filter;
+    }
+    
 
     /**
      * Note: The filter is chosen to select RDF data files and to allow the data
