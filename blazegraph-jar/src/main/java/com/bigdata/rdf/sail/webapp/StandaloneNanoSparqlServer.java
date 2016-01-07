@@ -53,8 +53,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
-        String servletContextListenerClass = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
-     
+
         /*
          * Note: This default will locate the jetty.xml resource that is bundled
          * with the JAR. This preserves the historical behavior. If you want to
@@ -106,8 +105,6 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
                                 "Read lock must be commit time or -1 (MINUS ONE) to assert a read lock on the last commit time: "
                                         + readLock);
                     }
-                } else if (arg.equals("-servletContextListenerClass")) {
-                    servletContextListenerClass = args[++i];
                 } else if (arg.equals("-jettyXml")) {
                     jettyXml = args[++i];
                 } else {
@@ -140,9 +137,6 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
                     ConfigParams.READ_LOCK,
                     Long.toString(readLock));
         }
-        
-        initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-                servletContextListenerClass);
         
         //Set the resource base to inside of the jar file
 		System.setProperty("jetty.home",
