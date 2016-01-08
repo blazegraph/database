@@ -33,9 +33,14 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
@@ -267,6 +272,84 @@ public class FileChannelUtility {
         
         return nreads;
         
+    }
+    
+    /**
+     * Define interface to support callback from readAllAsync
+     */
+    public interface IAsyncOpener {
+        AsynchronousFileChannel getAsyncChannel();
+    }
+    
+    /**
+     * The AsyncTransfer class encapsulates the state required to make
+     * asynchronous transfer requests.  It was written explicitly to support
+     * asynchronous transfer of blob data that requires multiple reads.
+     */
+    static public class AsyncTransfer {
+    	final long m_addr;
+    	final ByteBuffer m_buffer;
+    	Future<Integer> m_fut = null;
+    	
+    	public AsyncTransfer(final long addr, final ByteBuffer buffer) {
+    		m_addr = addr;
+    		m_buffer = buffer;
+    		m_buffer.mark(); // mark buffer to support reset on any retries
+    	}
+    	
+    	protected void read(AsynchronousFileChannel channel) {
+    		if (!isDone()) {
+    			// ensure buffer is ready
+    			m_buffer.reset();
+    			m_fut = channel.read(m_buffer,  m_addr);
+    		}
+    	}
+
+		public int complete() throws InterruptedException, ExecutionException {
+			return m_fut.get();
+		}
+
+		public void cancel() {
+			m_fut.cancel(true);
+		}
+
+		public boolean isDone() {
+			return m_fut != null && m_fut.isDone();
+		}
+    }
+
+    /**
+     * readAllAsync will make repeated attempts to read data into the transfer buffers defined
+     * in the List of AsyncTransfer instances.
+     * 
+     * @param opener provides AsynchronouseFileChannel
+     * @param transfers defines the list of required transfers
+     * @return the total number of bytes read asynchronously
+     * @throws IOException 
+     */
+    static public int readAllAsync(final IAsyncOpener opener, List<AsyncTransfer> transfers) throws IOException {
+    	while (true) {
+	        final AsynchronousFileChannel channel = opener.getAsyncChannel();
+			try {
+				for (AsyncTransfer transfer : transfers) {
+					// the AsyncTransfer object handles retries by checking any existing transfer state
+					transfer.read(channel);
+				}
+				
+				int totalReads = 0;
+				for (AsyncTransfer transfer : transfers) {
+					totalReads += transfer.complete();
+				}
+				
+				return totalReads;
+			} catch (Exception e) {
+	            log.info("Error from async IO", e); // just log and retry
+			} finally {
+				for (AsyncTransfer transfer : transfers) {
+					transfer.cancel();
+				}
+	        }
+    	}
     }
 
     /**
