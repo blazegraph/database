@@ -139,15 +139,15 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	  <!-- --> 
 	  <!-- RDF Format (Default is rdf/xml) --> 
 	  <!-- --> 
-	  <entry key="format">true</entry> 
+	  <entry key="format">rdf/xml</entry> 
 	  <!-- --> 
 	  <!-- Base URI (Optional) --> 
 	  <!-- -->
-	  <entry key="baseURI">true</entry> 
+	  <entry key="baseURI">http://baseuri/</entry> 
 	  <!-- --> 
 	  <!-- Default Graph URI (Optional -- Required for quads mode namespace) --> 
 	  <!-- --> 
-	  <entry key="defaultGraph">true</entry> 
+	  <entry key="defaultGraph">http://defaultgraph/</entry> 
 	  <!-- -->
 	  <!-- Suppress all stdout messages (Optional) --> 
 	  <!-- --> 
