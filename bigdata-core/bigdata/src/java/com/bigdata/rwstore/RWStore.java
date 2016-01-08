@@ -33,9 +33,13 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -48,6 +52,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -79,6 +84,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.FileChannelUtility.AsyncTransfer;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.MergeStreamWithSnapshotData;
@@ -2085,6 +2091,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
     }
     
+    /*
+     * Set the option below to true to enable asynchronous reads of blob data.
+     * The aim is to reduce latency when reading blobs from disk as it will enable the disk controllers
+     * to re-order IO requests nd where possible process in parallel.
+     * This should benefit all Blob reads but specifically helps large deferredFree data to reduce commit latency
+     * as described in BLZG-1663.
+     */
+    static boolean s_readBlobsAsync = true;
+    
     public void getData(final long addr, final byte buf[], final int offset,
             final int length) {
 
@@ -2138,15 +2153,80 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         blobHdr[i] = hdrstr.readInt();
                     }
                     // Now we have the header addresses, we can read MAX_FIXED_ALLOCS until final buffer
-                    int cursor = 0;
-                    int rdlen = m_maxFixedAlloc;
-                    for (int i = 0; i < nblocks; i++) {
-                        if (i == (nblocks - 1)) {
-                            rdlen = length - cursor;
-                        }
-                        getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
-                        cursor += rdlen-4; // but only increase cursor by data
-                    }
+                    if (!s_readBlobsAsync) { // synchronous read of blob data
+	                    int cursor = 0;
+	                    int rdlen = m_maxFixedAlloc;
+	                    for (int i = 0; i < nblocks; i++) {
+	                        if (i == (nblocks - 1)) {
+	                            rdlen = length - cursor;
+	                        }
+	                        getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
+	                        cursor += rdlen-4; // but only increase cursor by data
+	                    }
+//                    } else { // s_readBlobsAsync
+//	                    final AsynchronousFileChannel channel = m_reopener.getAsyncChannel();
+//						final ArrayList<Future<Integer>> reads = new ArrayList<Future<Integer>>();
+//						try {
+//							int cursor = 0;
+//							int rdlen = m_maxFixedAlloc;
+//							int cacheReads = 0;
+//							for (int i = 0; i < nblocks; i++) {
+//								if (i == (nblocks - 1)) {
+//									rdlen = length - cursor;
+//								}
+//								final ByteBuffer bb = ByteBuffer.wrap(buf,
+//										cursor, rdlen-4); // strip off checksum to avoid overlapping buffer reads!
+//								final long paddr = physicalAddress(blobHdr[i]);
+//								final ByteBuffer cache = m_writeCacheService._readFromCache(paddr, rdlen);
+//								if (cache != null) {
+//									bb.put(cache); // write cached data!
+//									cacheReads++;
+//								} else {
+//									reads.add(channel.read(bb,
+//											paddr));
+//								}
+//								cursor += rdlen - 4; // but only increase cursor by data
+//							}
+//							for (Future<Integer> r : reads) {
+//								r.get();
+//							}
+//						} catch (Exception e) {
+//	                         throw new IOException("Error from async IO", e);
+//	    				} finally {
+//							for (Future r : reads) {
+//								r.cancel(true);
+//							}
+//	                    }
+					} else { // read non-cached data with FileChannelUtility
+						final ArrayList<AsyncTransfer> transfers = new ArrayList<AsyncTransfer>();
+							int cursor = 0;
+							int rdlen = m_maxFixedAlloc;
+							for (int i = 0; i < nblocks; i++) {
+								if (i == (nblocks - 1)) {
+									rdlen = length - cursor;
+								}
+								final ByteBuffer bb = ByteBuffer.wrap(buf,
+										cursor, rdlen - 4); // strip off
+															// checksum to avoid
+															// overlapping
+															// buffer reads!
+								final long paddr = physicalAddress(blobHdr[i]);
+								final ByteBuffer cache;
+								try {
+									cache = m_writeCacheService._readFromCache(paddr, rdlen);
+								} catch (Exception e) {
+									throw new IOException("Error from async IO", e);
+								}
+								if (cache != null) {
+									bb.put(cache); // write cached data!
+								} else {
+									transfers.add(new AsyncTransfer(paddr, bb));
+								}
+								cursor += rdlen - 4; // but only increase cursor
+														// by data
+							}
+							FileChannelUtility.readAllAsync(m_reopener, transfers);
+					}
                     
                     return;
                     
@@ -2154,7 +2234,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     log.error(e,e);
                     
                     throw new IllegalStateException("Unable to restore Blob allocation", e);
-                }
+				}
             }
 
             {
@@ -4797,14 +4877,18 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * backing store.
      */
     private class ReopenFileChannel implements
-            IReopenChannel<FileChannel> {
+            IReopenChannel<FileChannel>, FileChannelUtility.IAsyncOpener {
 
         final private File file;
 
         private final String mode;
 
         private volatile RandomAccessFile raf;
+        
+        private final Path path;
 
+        private volatile AsynchronousFileChannel asyncChannel;
+        
         public ReopenFileChannel(final File file, final RandomAccessFile raf,
                 final String mode) throws IOException {
 
@@ -4813,9 +4897,26 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             this.mode = mode;
             
             this.raf = raf;
+            
+            this.path = Paths.get(file.getAbsolutePath());
 
             reopenChannel();
 
+        }
+        
+        public AsynchronousFileChannel getAsyncChannel() {
+        	if (asyncChannel != null) {
+        		if (asyncChannel.isOpen())
+        			return asyncChannel;
+        	}
+        	
+        	try {
+				asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+        	
+        	return asyncChannel;
         }
 
         public String toString() {
@@ -5000,9 +5101,63 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     public void deferFree(final int rwaddr, final int sze) {
         m_allocationWriteLock.lock();
         try {
-            if (sze > (this.m_maxFixedAlloc-4)) {
+            if (sze > (this.m_maxFixedAlloc-4)) {          	
                 m_deferredFreeOut.writeInt(-rwaddr);
                 m_deferredFreeOut.writeInt(sze);
+                
+            	/*
+            	 * rather than write out blob address, instead flatten the blob addresses and
+            	 * write all to remove the latency on commit caused by reading potentially many blob headers.
+            	 * 
+            	 * This idea was propposed to support BLZG-641/BLZG-1663 to redcue commit latency.
+            	 * 
+            	 * However, it appears that deferFree is not called with the raw blob size and is already
+            	 * reduced to the blob part addrs.
+            	 */
+                log.debug("Unexpected code path deferring free of direct blob address");
+
+//                final int alloc = m_maxFixedAlloc-4;
+//                final int nblocks = (alloc - 1 + (sze-4))/alloc;
+//                if (nblocks < 0)
+//                    throw new IllegalStateException(
+//                            "Allocation error, m_maxFixedAlloc: "
+//                                    + m_maxFixedAlloc);
+//
+//                final byte[] hdrbuf = new byte[4 * (nblocks + 1) + 4]; // plus 4 bytes for checksum
+//                if (hdrbuf.length > m_maxFixedAlloc) {
+//                    if (log.isInfoEnabled()) {
+//                        log.info("LARGE BLOB - header is BLOB");
+//                    }
+//                }
+//                
+//                getData(rwaddr, hdrbuf); // will work even if header is also a blob
+//                
+//                // deferFree header
+//                deferFree(rwaddr, hdrbuf.length);
+//                
+//                // Now read all blob part addresses
+//                final DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
+//                final int rhdrs = hdrstr.readInt();
+//                if (rhdrs != nblocks) {
+//                    throw new IllegalStateException(
+//                            "Incompatible BLOB header record, expected: "
+//                                    + nblocks + ", got: " + rhdrs);
+//                }
+//                
+//                int remaining = sze;
+//                int partSize = alloc;
+//                for (int i = 0; i < nblocks; i++) {
+//                    final int blobpartAddr = hdrstr.readInt();
+//                    // deferFree(blobpartAddr, partSize);
+//                    m_deferredFreeOut.writeInt(blobpartAddr);             
+//                    
+//                    remaining -= partSize;
+//                    
+//                    if (remaining < partSize) {
+//                    	partSize = remaining;
+//                    }                  
+//                }
+
             } else {
                 m_deferredFreeOut.writeInt(rwaddr);             
             }
