@@ -35,6 +35,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.net.URL;
@@ -104,6 +105,11 @@ public class DataLoader {
 	 * {@link StatementBuffer}.
 	 */
     private final int queueCapacity;
+    
+    /**
+     * Utility to allow other {@link PrintStream} to be used for status.
+     */
+    private PrintStream output;
     
     /**
      * The target database.
@@ -572,7 +578,7 @@ public class DataLoader {
      */
     public DataLoader(final AbstractTripleStore database) {
         
-        this(database.getProperties(), database );
+        this(database.getProperties(), database , System.out);
         
     }
 
@@ -586,7 +592,9 @@ public class DataLoader {
      *            The database.
      */
     public DataLoader(final Properties properties,
-            final AbstractTripleStore database) {
+            final AbstractTripleStore database, final PrintStream os) {
+    	
+    	output = os;
 
         if (properties == null)
             throw new IllegalArgumentException();
@@ -1525,15 +1533,15 @@ public class DataLoader {
 					if (log.isInfoEnabled())
 						log.info(msg);
 					else if (verbose > 1)
-						System.out.println(msg);
+						output.println(msg);
 				}
 
 				if (verbose > 2) {
 					// Show more details, especially about the assertion buffers.
 					final StatementBuffer<?> tmp = buffer;
 					if (tmp != null) {
-						System.out.println(tmp.toString());
-						System.out.println(tmp.getCounters().toString());
+						output.println(tmp.toString());
+						output.println(tmp.getCounters().toString());
 					}
 				}
                 
@@ -1716,7 +1724,7 @@ public class DataLoader {
 			}
 		}
 
-		System.out.println(counters.toString());
+		output.println(counters.toString());
 
 		/*
 		 * This provides total page bytes written per index and average page
@@ -2007,7 +2015,7 @@ public class DataLoader {
             }
 
             final DataLoader dataLoader = //kb.getDataLoader();
-            	new DataLoader(properties,kb); // use the override properties.
+            	new DataLoader(properties,kb, System.out); // use the override properties.
             
             final MyLoadStats totals = dataLoader.newLoadStats();
             
