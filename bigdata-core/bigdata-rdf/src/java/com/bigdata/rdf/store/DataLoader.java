@@ -1530,9 +1530,11 @@ public class DataLoader {
 							+ (e.getStatementsProcessed()//
 							+ totals.toldTriples.get())//
 							);//
+
 					if (log.isInfoEnabled())
 						log.info(msg);
-					else if (verbose > 1)
+
+					if (verbose > 1)
 						output.println(msg);
 				}
 
