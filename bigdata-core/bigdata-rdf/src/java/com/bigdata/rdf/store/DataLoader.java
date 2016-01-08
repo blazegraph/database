@@ -581,6 +581,11 @@ public class DataLoader {
         this(database.getProperties(), database , System.out);
         
     }
+    
+	public DataLoader(final Properties properties,
+			final AbstractTripleStore database) {
+		this(properties, database, System.out);
+	}
 
     /**
      * Configure a data loader with overridden properties.
@@ -590,6 +595,10 @@ public class DataLoader {
      * 
      * @param database
      *            The database.
+     *            
+     * @param os
+     * 			  The {@link PrintStream} for output messages              
+     *            
      */
     public DataLoader(final Properties properties,
             final AbstractTripleStore database, final PrintStream os) {
