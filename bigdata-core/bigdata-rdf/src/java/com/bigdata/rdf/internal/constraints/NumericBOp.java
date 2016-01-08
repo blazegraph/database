@@ -43,7 +43,7 @@ import com.bigdata.rdf.sparql.ast.FilterNode;
  * operation to be applied to the operands is specified by the 
  * {@link Annotations#OP} annotation.
  */
-public class NumericBOp extends IVValueExpression<IV>  {
+public class NumericBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 9136864442064392445L;
     
@@ -154,5 +154,15 @@ public class NumericBOp extends IVValueExpression<IV>  {
         return sb.toString();
 
     }
+
+    /**
+     * The MathBOp can work on inline numerics. It is only when the operands
+     * evaluate to non-inline numerics that this bop needs materialization.
+     */
+    @Override
+    public Requirement getRequirement() {
+    	return INeedsMaterialization.Requirement.SOMETIMES;
+    }
+
 
 }
