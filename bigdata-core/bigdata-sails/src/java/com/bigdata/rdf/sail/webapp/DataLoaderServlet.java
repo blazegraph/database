@@ -24,6 +24,7 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.Properties;
 
 import javax.servlet.Servlet;
@@ -132,7 +133,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	 * The properties for invoking the DataLoader via the SERVLET are below.
 	 * This file should be POSTED to the SERVLET.
 	 * 
-	 * <?xml version="1.0" encoding="UTF-8" standalone="no"?> 
+	  <?xml version="1.0" encoding="UTF-8" standalone="no"?> 
 	  <!DOCTYPE * properties SYSTEM "http://java.sun.com/dtd/properties.dtd"> 
 	  <properties>
 	  <!-- --> 
@@ -144,7 +145,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	  <!-- -->
 	  <entry key="baseURI">true</entry> 
 	  <!-- --> 
-	  <!-- Default Graph URI (Optional) --> 
+	  <!-- Default Graph URI (Optional -- Required for quads mode namespace) --> 
 	  <!-- --> 
 	  <entry key="defaultGraph">true</entry> 
 	  <!-- -->
@@ -192,6 +193,8 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 		final BigdataRDFContext context = getBigdataRDFContext();
 
 		final IIndexManager indexManager = context.getIndexManager();
+		
+		final PrintStream os = new PrintStream(resp.getOutputStream());
 
 		/*
 		 * Read the request entity, which must be some kind of Properties
@@ -253,7 +256,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 		// baseURI
 		final String baseURI = props.getProperty("baseURI");
 
-		// defaultGraph
+		// defaultGraph  -- Required if namespace is in quads mode
 		final String defaultGraph = props.getProperty("defaultGraph");
 
 		// Path to the configuration file for the database instance. Must be
@@ -313,6 +316,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 					+ propertyFile + " ; fileOrDirs = " + fileOrDirs + " )");
 
 		}
+		
 
 		Properties properties = DataLoader.processProperties(propertyFile,
 				quiet, verbose, durableQueues);
@@ -333,8 +337,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 
 		}
 
-		final DataLoader dataLoader = // kb.getDataLoader();
-		new DataLoader(properties, kb); // use the override properties.
+		final DataLoader dataLoader = new DataLoader(properties, kb, os);
 
 		final MyLoadStats totals = dataLoader.newLoadStats();
 
@@ -368,7 +371,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 		dataLoader.endSource();
 
 		if (!quiet)
-			System.out.println("Load: " + totals);
+			os.println("Load: " + totals);
 
 		if (dataLoader.getClosureEnum() == ClosureEnum.None && closure) {
 
@@ -376,13 +379,15 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 				dataLoader.logCounters(dataLoader.getDatabase());
 
 			if (!quiet)
-				System.out.println("Computing closure.");
-			log.info("Computing closure.");
+				os.println("Computing closure.");
+
+			if (log.isInfoEnabled())
+			    log.info("Computing closure.");
 
 			final ClosureStats stats = dataLoader.doClosure();
 
 			if (!quiet)
-				System.out.println("Closure: " + stats.toString());
+				os.println("Closure: " + stats.toString());
 
 			if (log.isInfoEnabled())
 				log.info("Closure: " + stats.toString());
@@ -395,7 +400,8 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 
 		if (verbose > 1)
 			dataLoader.logCounters(dataLoader.getDatabase());
-
+		
+		os.flush();
 	}
 
 	private boolean getBooleanProperty(final Properties props,
