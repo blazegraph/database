@@ -134,7 +134,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	 * This file should be POSTED to the SERVLET.
 	 * 
 	  <?xml version="1.0" encoding="UTF-8" standalone="no"?> 
-	  <!DOCTYPE * properties SYSTEM "http://java.sun.com/dtd/properties.dtd"> 
+	  <!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd"> 
 	  <properties>
 	  <!-- --> 
 	  <!-- RDF Format (Default is rdf/xml) --> 
