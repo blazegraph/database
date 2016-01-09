@@ -155,7 +155,7 @@ dependencies.
   	</plugin>
      </plugins>
     <resources>
-	<resource>
+	   <resource>
             <directory>src/test/java</directory>
             <includes>
                 <include>**/*.properties</include>
@@ -168,6 +168,12 @@ dependencies.
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
+            </includes>
+        </resource>
+	   <resource>
+            <directory>src/test/resources</directory>
+            <includes>
+                <include>**</include>
             </includes>
         </resource>
     </resources>
