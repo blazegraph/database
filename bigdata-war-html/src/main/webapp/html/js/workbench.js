@@ -242,8 +242,13 @@ function getNamespaces(synchronous) {
                } else {
                   use = '<a href="#" class="use-namespace">Use</a>';
                }
+
                $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
+               
+               initMapgraphNamespaceMgmtExtensions(title);
+
             }
+            
            $('.use-namespace').click(function(e) {
               e.preventDefault();
               useNamespace($(this).parents('tr').data('name'));
@@ -430,6 +435,78 @@ function cloneNamespace(namespace) {
 function namespaceExists(name) {
    return $('#namespaces-list tr[data-name=' + name + ']').length !== 0;
 }
+
+function publishNamespace(namespace) {
+	
+	var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+
+	var settings = {
+	   method: 'POST',
+	   data: { 'mapgraph' : 'publish' },
+	   success: function() { location.reload(); },
+	   error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
+	};
+	
+	$.ajax(url, settings);
+}
+
+function dropNamespace(namespace) {
+
+	var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+
+	var settings = {
+	   method: 'POST',
+	   data: { 'mapgraph' : 'drop' },
+	   success: function() { location.reload(); },
+	   error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
+	};
+	
+	$.ajax(url, settings);
+
+}
+
+/**
+ * Optionally initialized the magraph extension, if mapgraph enabled.
+ * Has no effect if mapgraph not active.
+ */
+function initMapgraphNamespaceMgmtExtensions(namespace) {
+	
+	var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+	
+	var settings = {
+	   method: 'POST',
+	   data: { 'mapgraph' : 'checkPublished' },
+	   success: function(xml){
+		   var ret = $(xml).find("data").attr('result') == "true";
+		   
+		   if (ret) {
+			   $('#namespaces-list > tbody > tr[data-name=' + namespace + ']').append('<td><a href="#" class="drop-namespace">Drop from GPU</a></td>'); 
+		   } else {
+			   $('#namespaces-list > tbody > tr[data-name=' + namespace + ']').append('<td><a href="#" class="publish-namespace">Publish to GPU</a></td>'); 
+		   }
+		   
+		   // register event listeners
+           $('.publish-namespace').click(function(e) {
+               e.preventDefault();
+               publishNamespace($(this).parents('tr').data('name'));
+            }); 
+           $('.drop-namespace').click(function(e) {
+               e.preventDefault();
+               dropNamespace($(this).parents('tr').data('name'));
+            });
+           
+	   },
+	   error: function(jqXHR, textStatus, errorThrown) {  
+		   // nothing to do: mapgraph not initialized
+	   }
+	};
+	
+	$.ajax(url, settings);
+
+}
+
+
+
 
 function validateNamespaceOptions() {
    var errors = [], i;
