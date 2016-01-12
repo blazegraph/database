@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal.impl.literal;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -54,8 +55,16 @@ public abstract class NumericIV<V extends BigdataLiteral, T> extends
      * See https://github.com/SYSTAP/bigdata-gpu/issues/257.
      */
     public static final Set<URI> numericalDatatypes =
-        new HashSet<URI>(Arrays.asList(XSD.INTEGER, XSD.DECIMAL, XSD.FLOAT, XSD.DOUBLE));
-	
+        Collections.unmodifiableSet(
+            new HashSet<URI>(Arrays.asList(
+                // basic numeric data types
+                XSD.INTEGER, XSD.DECIMAL, XSD.FLOAT, XSD.DOUBLE,
+                // derived numeric data types
+                XSD.NON_POSITIVE_INTEGER, XSD.NEGATIVE_INTEGER, XSD.LONG,
+                XSD.INT, XSD.SHORT, XSD.BYTE, XSD.NON_NEGATIVE_INTEGER,
+                XSD.UNSIGNED_LONG, XSD.UNSIGNED_INT, XSD.UNSIGNED_SHORT,
+                XSD.UNSIGNED_INT, XSD.POSITIVE_INTEGER)));
+    
     public NumericIV(final DTE dte) {
         
         super(dte);
