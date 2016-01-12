@@ -34,7 +34,10 @@ import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.literal.NumericIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.util.Bytes;
 
@@ -293,6 +296,20 @@ public class TermId<V extends BigdataValue>
 
         return Long.toString(termId);
 
+    }
+    
+    @Override
+    public boolean isNumeric() {
+        
+        V value = getValue();
+        if (value==null)
+            throw new NotMaterializedException();
+        
+        if (!(value instanceof BigdataLiteral))
+            return false;
+
+        return NumericIV.numericalDatatypes.contains(((BigdataLiteral)value).getDatatype());
+        
     }
 
 //    /**
