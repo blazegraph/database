@@ -5772,7 +5772,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
         */
        if (vexp instanceof MathBOp ||
            vexp instanceof XSDBooleanIVValueExpression) {
-          return false;
+           
+           // need to take care of resolution if inlining of literals is disabled
+           return !ctx.getAbstractTripleStore().isInlineLiterals();
             
        }
        
