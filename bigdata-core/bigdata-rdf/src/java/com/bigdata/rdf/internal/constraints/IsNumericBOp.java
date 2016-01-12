@@ -24,21 +24,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-
-import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 
 /**
@@ -50,15 +42,6 @@ public class IsNumericBOp extends XSDBooleanIVValueExpression implements INeedsM
 	 * 
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
-
-	/**
-	 * Definition of numeric datatypes according to http://www.w3.org/TR/sparql11-query/#operandDataTypes:
-	 * "numeric denotes typed literals with datatypes xsd:integer, xsd:decimal, xsd:float, and xsd:double."
-	 * 
-	 * See https://github.com/SYSTAP/bigdata-gpu/issues/257.
-	 */
-	private static final Set<URI> numericalDatatypes =
-	    new HashSet<URI>(Arrays.asList(XSD.INTEGER, XSD.DECIMAL, XSD.FLOAT, XSD.DOUBLE));
 
     public IsNumericBOp(final IValueExpression<? extends IV<?,?>> x) {
 
@@ -92,28 +75,9 @@ public class IsNumericBOp extends XSDBooleanIVValueExpression implements INeedsM
         // not yet bound
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
+        
+        return iv.isNumeric() && !iv.isExtension();
 
-        if (iv.isInline()) {
-            
-            return iv.isNumeric() && !iv.isExtension();
-            
-        } else {
-            
-            // this is the case where the literal has not been inlined,
-            // see https://github.com/SYSTAP/bigdata-gpu/issues/257
-            if (iv.getValue()==null) {
-
-                // materialization needed
-                throw new NotMaterializedException();
-                
-            } else {
-
-                if (!(iv.getValue() instanceof BigdataLiteral))
-                    return false;
-                
-                return numericalDatatypes.contains(((BigdataLiteral)iv.getValue()).getDatatype());
-            }
-        }
     }
 
     @Override
