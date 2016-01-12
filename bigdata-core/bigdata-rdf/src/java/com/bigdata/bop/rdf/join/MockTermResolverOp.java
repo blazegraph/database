@@ -365,7 +365,7 @@ public class MockTermResolverOp extends PipelineOp {
          }
          
          // case 2: literals that have not been inlined need to be resolved
-         if (!lex.isInlineLiterals() && ivVal.getIV().isLiteral()) {
+         if (!lex.isInlineLiterals() && ivVal.getIV()!=null && ivVal.getIV().isLiteral()) {
              ivVal.clearInternalValue();
          }
       }      
