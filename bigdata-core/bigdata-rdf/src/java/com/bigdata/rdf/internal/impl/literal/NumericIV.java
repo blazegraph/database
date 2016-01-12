@@ -24,9 +24,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.impl.literal;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -41,6 +47,15 @@ public abstract class NumericIV<V extends BigdataLiteral, T> extends
 	 */
 	private static final long serialVersionUID = -2878889877313783890L;
 
+	/**
+     * Definition of numeric datatypes according to http://www.w3.org/TR/sparql11-query/#operandDataTypes:
+     * "numeric denotes typed literals with datatypes xsd:integer, xsd:decimal, xsd:float, and xsd:double."
+     * 
+     * See https://github.com/SYSTAP/bigdata-gpu/issues/257.
+     */
+    public static final Set<URI> numericalDatatypes =
+        new HashSet<URI>(Arrays.asList(XSD.INTEGER, XSD.DECIMAL, XSD.FLOAT, XSD.DOUBLE));
+	
     public NumericIV(final DTE dte) {
         
         super(dte);
