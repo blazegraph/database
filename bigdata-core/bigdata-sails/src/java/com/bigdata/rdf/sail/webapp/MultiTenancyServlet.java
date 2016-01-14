@@ -61,11 +61,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
-<<<<<<< HEAD
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
-=======
 import com.bigdata.relation.RelationSchema;
->>>>>>> refs/remotes/origin/master
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
