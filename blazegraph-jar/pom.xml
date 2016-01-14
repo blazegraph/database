@@ -35,9 +35,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>blazegraph-jar</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Executable Jar</name>
-  <url>http://maven.apache.org</url>
+  <description>Blazegraph Executable Jar file.  All files required to run Blazegraph DB in a single jar.</description>
   <packaging>jar</packaging>
-
   <build>
      <resources>
         <resource>
@@ -90,13 +89,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>compile</phase>
                <configuration>
                  <target>
- 		   <unzip dest="target/classes/war">
-        		<fileset dir="target/classes/war">
-            			<include name="blazegraph.war" />
-        		</fileset>    
-    		   </unzip>
- 		   <delete file="target/classes/war/blazegraph.war" />
-		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
+ 		             <unzip dest="target/classes/war">
+        		        <fileset dir="target/classes/war">
+            		    <include name="blazegraph.war" />
+        		        </fileset>    
+    		         </unzip>
+ 		             <delete file="target/classes/war/blazegraph.war" />
+		             <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
                  </target>
                </configuration>
              </execution>
@@ -146,7 +145,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   </excludes>
                 </filter>
                </filters>
-              <transformers>
+               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
                     <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
@@ -195,7 +194,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-  
   <dependencies>
     <dependency>
       <groupId>com.blazegraph</groupId>

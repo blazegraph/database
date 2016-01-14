@@ -35,14 +35,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>blazegraph-deb</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Debian Package</name>
-  <url>https://www.blazegraph.com/</url>
+  <description>Debian Deployer for Blazegraph DB</description>
   <packaging>deb</packaging>
-
   <properties>
      <debian.user>blzg</debian.user>
      <debian.group>blzg</debian.group>
   </properties>
-
   <build>
     <extensions>
       <!-- Add support for the "deb" packaging -->
@@ -336,20 +334,14 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
+<!--
   <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-    <repository>
-      <id>bigdata.snapshots</id>
-      <url>http://www.systap.com/maven/snapshots/</url>
-    </repository>
     <repository>
     <id>repo-for-dsiutils</id>
     <url>http://ir.dcs.gla.ac.uk/~bpiwowar/maven/</url>
     </repository>
   </repositories>
+-->
   <dependencies>
     <!-- only use the runtime jar here to make it straightforward to upgrade in place -->
     <dependency>

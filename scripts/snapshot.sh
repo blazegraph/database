@@ -1,7 +1,7 @@
 #!/bin/bash
 BASE_DIR=`dirname $0`
 
-PARENT_POM="${BASE_DIR}"/../blazegraph-parent/pom.xml
+PARENT_POM="${BASE_DIR}"/../pom.xml
 CURRENT_VERSION=1.6.0
 BRANCH=`git rev-parse --abbrev-ref HEAD`
 YYMMDD=`date +%Y%m%d`

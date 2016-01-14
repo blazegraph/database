@@ -22,27 +22,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
---><!-- 
-This POM is intended to support the use of bigdata(R) as an embedded
-database as part of your own maven project.  It declares the
-dependencies for the embedded database, but does not include the
-dependencies for the NanoSparqlServer or the clustered database - use
-the ant build.xml file to generate and deploy those artifacts.
-
-To install the dependencies into your local maven repository, do:
-
-        mvn clean install
-        
-If you change any of the dependencies that are published by the bigdata
-project (whether because we maintain them or because they are not readily
-available) then you need to publish the updated dependencies to the maven
-repository.  There are commands in comment blocks in this POM that will
-deploy those dependencies.  Be sure to update the version numbers in the
-commands first!
-
-See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=ReleaseGuide
-for information on publishing maven releases and snapshots for bigdata and its
-dependencies.
 
 --><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
    <modelVersion>4.0.0</modelVersion>
@@ -50,26 +29,14 @@ dependencies.
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-core-test</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-   <packaging>jar</packaging>
-   <name>Blazegraph Core Tests</name>
-    <description>Bigdata(R) Maven Build</description>
-    <url>http://www.systap.com/bigdata.htm</url>
-    <organization>
-        <name>SYSTAP, LLC</name>
-        <url>http://www.systap.com/</url>
-    </organization>
-    <inceptionYear>2006</inceptionYear>
-    <licenses>
-        <license>
-            <name>GNU General Public License Version 2 (GPLv2)</name>
-            <url>http://www.gnu.org/licenses/gpl-2.0.html</url>
-        </license>
-    </licenses>
+    <packaging>jar</packaging>
+    <name>Blazegraph Core Tests</name>
+    <description>Blazegraph Core Platform Test Suites</description>
     <!-- properties are now in the parent POM. -->
     <build>
        <resources>
@@ -291,46 +258,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         </executions>
         </plugin>
         </plugins>
-    <extensions>
-      <!-- Enabling the use of SSH. -->
-      <extension>
-        <groupId>org.apache.maven.wagon</groupId>
-         <artifactId>wagon-ssh-external</artifactId>
-         <version>1.0-beta-6</version>
-      </extension>
-    </extensions>
     </build>
-    
-    <distributionManagement>
-        <repository>
-            <id>bigdata.releases</id>
-            <name>bigdata(R) releases</name>
-            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases</url>
-        </repository>
-        <snapshotRepository>
-            <id>bigdata.snapshots</id>
-            <name>bigdata(R) snapshots</name>
-            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/snapshots</url>
-            <uniqueVersion>true</uniqueVersion>
-        </snapshotRepository>
-    </distributionManagement>
-   <!-- 
-   <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-    <repository>
-      <id>jetty.releases</id>
-      <url>https://oss.sonatype.org/content/groups/jetty/</url>
-    </repository>
-  </repositories>
--->
-
-   <!-- This declares the basic dependencies that you need to use     -->
-   <!-- bigdata as an embedded database.  Use ant (build.xml) for     -->
-   <!-- NanoSparqlServer or cluster builds and deployments.           -->
-   
    <dependencies>
        <!--                                                           -->
        <!-- artifacts already present in public repositories          -->

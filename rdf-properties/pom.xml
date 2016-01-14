@@ -29,16 +29,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>rdf-properties</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph RDF Properties</name>
-  <url>http://maven.apache.org</url>
-  <build>
-  </build>
-
+  <description>RDF Property configurations</description>
   <reporting>
     <plugins>
       <plugin>
@@ -73,7 +70,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-  
   <dependencies>
      <dependency>
        <groupId>commons-io</groupId>
@@ -81,15 +77,15 @@ ga('send', 'pageview');
        <version>${apache.commons_io.version}</version>
      </dependency>
      <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-util</artifactId>
-	<version>${sesame.version}</version>
+	   <groupId>org.openrdf.sesame</groupId>
+	   <artifactId>sesame-util</artifactId>
+	   <version>${sesame.version}</version>
      </dependency>
-    <dependency>
-      <groupId>org.openrdf.sesame</groupId>
-      <artifactId>sesame-rio-rdfxml</artifactId>
-      <version>${sesame.version}</version>
-    </dependency>
+     <dependency>
+       <groupId>org.openrdf.sesame</groupId>
+       <artifactId>sesame-rio-rdfxml</artifactId>
+       <version>${sesame.version}</version>
+     </dependency>
      <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-queryresultio-sparqljson</artifactId>
@@ -101,5 +97,4 @@ ga('send', 'pageview');
        <version>${log4j.version}</version>
      </dependency>
   </dependencies>
-
-  </project>
+</project>

@@ -35,9 +35,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>blazegraph-tgz</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Tarball Package</name>
-  <url>https://www.blazegraph.com/</url>
+  <description>Blazegraph Tarball deployment</description>
   <packaging>pom</packaging>
-
   <properties>
      <tgz.user>blzg</tgz.user>
      <tgz.group>blzg</tgz.group>
@@ -45,7 +44,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
      <tgz.release>SNAPSHOT</tgz.release>
      <app.name>blazegraph</app.name>
   </properties>
-
   <build>
     <extensions>
     </extensions>
@@ -125,13 +123,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <configuration>
                  <target>
  		                <unzip dest="target/classes/war">
-                        <patternset>
-                           <include name="**/*"/>
-                        </patternset>
-        		        <fileset dir="target/classes/">
-            			   <include name="bigdata.war" />
-        		        </fileset>    
-    		   </unzip>
+                          <patternset>
+                            <include name="**/*"/>
+                          </patternset>
+        		          <fileset dir="target/classes/">
+            			    <include name="bigdata.war" />
+        		          </fileset>    
+    		            </unzip>
 		                <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
  		                <unzip dest="target/classes/jar">
                         <patternset>
