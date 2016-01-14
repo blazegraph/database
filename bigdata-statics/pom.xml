@@ -29,13 +29,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-statics</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Statics</name>
-  <url>http://maven.apache.org</url>
+  <description>Blazegraph Static Utility Classes</description>
   <build>
    <plugins>
     <plugin>
@@ -52,7 +52,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
      </plugin>
     </plugins>
   </build>
-
   <reporting>
     <plugins>
       <plugin>
@@ -63,8 +62,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
-          <doctitle><![CDATA[<h1>Blazegraph Utilities</h1>]]></doctitle>
+	      <version>true</version>
+          <doctitle><![CDATA[<h1>Blazegraph Statics</h1>]]></doctitle>
           <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
@@ -87,7 +86,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-  
   <dependencies>
     <dependency>
        <groupId>log4j</groupId>
@@ -132,5 +130,4 @@ ga('send', 'pageview');
       <version>${jackson.version}</version>
     </dependency>
   </dependencies>
-
-  </project>
+</project>
