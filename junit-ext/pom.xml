@@ -24,20 +24,24 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
-<!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>junit-ext</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Junit Extensions</name>
+  <description>Blazegraph JUnit Extensions</description>
   <packaging>jar</packaging>
-
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
   <reporting>
     <plugins>
       <plugin>
@@ -73,14 +77,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
-
   <dependencies>
     <dependency>
       <groupId>junit</groupId>

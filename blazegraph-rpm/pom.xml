@@ -35,9 +35,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>blazegraph-rpm</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph RPM Package</name>
-  <url>https://www.blazegraph.com/</url>
+  <description>Blazegraph RPM deployer for the RHEL and CentOS package management systems</description>
   <packaging>rpm</packaging>
-
   <properties>
      <rpm.user>blzg</rpm.user>
      <rpm.group>blzg</rpm.group>
@@ -45,7 +44,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
      <rpm.release>SNAPSHOT</rpm.release>
      <app.name>blazegraph</app.name>
   </properties>
-
   <build>
     <extensions>
       <extension>

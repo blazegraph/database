@@ -30,16 +30,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-cache</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Cache</name>
+  <description>Blazegraph Cache utilities</description>
   <packaging>jar</packaging>
-
-  <profiles></profiles>
-
   <build>
    <plugins>
     <plugin>
@@ -90,14 +88,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
-
   <dependencies>
     <dependency>
       <groupId>junit</groupId>

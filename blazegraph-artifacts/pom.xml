@@ -29,15 +29,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-artifacts</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Deployment Artifacts</name>
-  <url>http://www.blazegraph.com</url>
+  <description>Parent POM for Blazegraph Deployment (war, jar, deb, rpm, tgz) artifacts</description>
   <packaging>pom</packaging>
-
   <build>
      <pluginManagement>
       <plugins>
@@ -53,8 +52,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         </plugin>
       </plugins>
      </pluginManagement>
-   </build>
-
+  </build>
   <reporting>
     <plugins>
       <plugin>
@@ -65,7 +63,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+	      <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Deployment Artifacts</h1>]]></doctitle>
           <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>

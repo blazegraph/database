@@ -29,15 +29,20 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
-<!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>dsi-utils</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph DSI Utils</name>
+  <description>Blazegraph Modifications to the DSI utils</description>
   <packaging>jar</packaging>
-
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
   <reporting>
     <plugins>
       <plugin>
@@ -75,10 +80,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   </reporting>
 
   <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
     <repository>
 	<id>repo-for-dsiutils</id>
 	<url>http://ir.dcs.gla.ac.uk/~bpiwowar/maven/</url>

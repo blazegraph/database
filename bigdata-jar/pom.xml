@@ -35,9 +35,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>bigdata-jar</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Executable Jar (bigdata legacy path)</name>
-  <url>http://maven.apache.org</url>
+  <description>Single Executable Jar file for running the Blazegraph DB platform</description>
   <packaging>jar</packaging>
-
   <build>
      <resources>
         <resource>
