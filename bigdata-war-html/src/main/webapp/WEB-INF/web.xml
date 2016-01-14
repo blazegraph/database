@@ -103,6 +103,14 @@
    <async-supported>true</async-supported>
   </servlet>
   <servlet>
+   <servlet-name>DataLoader</servlet-name>
+   <display-name>DataLoader Servlet</display-name>
+   <description>Servlet providing DataLoader functionality for bulk loading into
+   a namespace.</description>
+   <servlet-class>com.bigdata.rdf.sail.webapp.DataLoaderServlet</servlet-class>
+   <async-supported>true</async-supported>
+  </servlet>
+  <servlet>
    <servlet-name>Transaction Management API</servlet-name>
    <display-name>Transaction Management API</display-name>
    <description>The REST API for managing transactions for a Journal.
@@ -148,6 +156,11 @@
   <servlet-mapping>
   <servlet-name>Multi-Tenancy API</servlet-name>
   <url-pattern>/namespace/*</url-pattern>
+  </servlet-mapping>
+  <!-- Mappings for the DataLoader Servlet API. -->
+  <servlet-mapping>
+  <servlet-name>DataLoader</servlet-name>
+  <url-pattern>/dataloader</url-pattern>
   </servlet-mapping>
   <!-- Mappings for the TX API. -->
   <servlet-mapping>
