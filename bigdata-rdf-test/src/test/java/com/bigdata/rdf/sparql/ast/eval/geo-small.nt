@@ -1,0 +1,5 @@
+<http://s.90#180#0> <http://p> "90#180#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://s.90#-180#0> <http://p> "90#-180#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://s.-90#180#0> <http://p> "-90#180#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://s.-90#-180#0> <http://p> "-90#-180#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+<http://s.0#0#0> <http://p> "0#0#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .

@@ -153,6 +153,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
             -->
 <!-- Moved into bigdata-rdf-test
             <include>com/bigdata/rdf/TestAll.java</include>
+            <include>com/bigdata/rdf/internal/gis/TestAll.java</include>
 -->
 <!-- Moved into bigdata-sails-test
             <include>com/bigdata/rdf/sail/TestAll.java</include>

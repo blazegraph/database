@@ -1766,6 +1766,27 @@ the clear/dirty list threshold)
         }
     }
 
+    public void resetAndClear() throws InterruptedException {
+        final WriteLock writeLock = lock.writeLock();
+        writeLock.lockInterruptibly();
+        try {
+	    	reset();
+	        /*
+	         * Note: DO NOT clear the service record map. This still has valid
+	         * cache entries (the read cache).
+	         */
+	        // clear the service record map.
+	        serviceMap.clear();
+	
+	        // reset each buffer.
+	        for (WriteCache t : writeBuffers) {
+	            t.reset();
+	        }
+        } finally {
+        	writeLock.unlock();
+        }
+
+    }
     /**
      * Drain the dirty list; reset each dirty cache buffer, and then add the
      * reset buffers to the front of the cleanList (since they are known to be
@@ -3253,12 +3274,12 @@ the clear/dirty list threshold)
         }
 
     }
-
+    
     /**
      * Attempt to read record from cache (either write cache or read cache
      * depending on the service map state).
      */
-    private ByteBuffer _readFromCache(final long offset, final int nbytes)
+    public ByteBuffer _readFromCache(final long offset, final int nbytes)
             throws ChecksumError, InterruptedException {
     
         if (nbytes > capacity) {

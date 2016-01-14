@@ -58,8 +58,6 @@ import cutthecrap.utils.striterators.Striterator;
  */
 class DirectoryPage extends AbstractPage implements IDirectoryData {
     
-    private static final Logger log = Logger.getLogger(DirectoryPage.class);
-	
     /**
      * The depth of a bucket page which overflows is always <i>addressBits</i>.
      */
@@ -2032,7 +2030,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			
 			pd.replaceChildRef(this.self, blob);
 			
-			if (log.isInfoEnabled())
+			if (INFO)
 				log.info("New Overflow Level: " + getLevel());
 		}
 	}
@@ -2141,7 +2139,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         if (oldChild.parent != self) // must be same Reference.
             throw new IllegalStateException();
         
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("parent=" + toShortString() + ", buddyOffset="
                     + buddyOffset + ", child=" + oldChild.toShortString());
 
@@ -2339,7 +2337,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
                 for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot += 2) {
 
-                    if (log.isTraceEnabled())
+                    if (TRACE)
                         log.trace("moving: page(" + srcPage.toShortString()
                                 + "=>" + dstPage.toShortString() + ")"
                                 + ", buddyIndex(" + srcBuddyIndex + "=>"
@@ -2408,7 +2406,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
                 for (int srcSlot = lastSrcSlot-1, dstSlot = lastDstSlot-1; srcSlot >= firstSrcSlot; srcSlot--, dstSlot -= 2) {
 
-                    if (log.isTraceEnabled())
+                    if (TRACE)
                         log.trace("moving: page(" + srcPage.toShortString()
                                 + "=>" + dstPage.toShortString() + ")"
                                 + ", buddyIndex(" + srcBuddyIndex + "=>"
@@ -2741,7 +2739,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 							assert gdp != null;
 							gdp.replaceChildRef(dp.self, od);
 							dp.delete();
-							if (log.isDebugEnabled()) {
+							if (DEBUG) {
 								log.debug("Promoted child overflowDirectory after remove from last BucketPage");
 							}
 						}
@@ -2762,13 +2760,13 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		while (chs.hasNext()) {
 			final AbstractPage ch = chs.next();
 			if (ch instanceof BucketPage) {
-				if (log.isTraceEnabled())
+				if (TRACE)
 					log.trace("Removing bucket page: " + ch.PPID());
 				
 				if (ch.isPersistent())
 					htree.store.delete(ch.getIdentity());		
 			} else {
-				if (log.isTraceEnabled())
+				if (TRACE)
 					log.trace("Removing child directory page: " + ch.PPID());
 				
 				((DirectoryPage) ch).removeAll();

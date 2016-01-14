@@ -189,6 +189,24 @@ public class ASTBase extends ModifiableBOpBase {
     }
 
     /**
+     * Return the Integer value of the query hint.
+     * 
+     * @param name
+     *            The name of the query hint.
+     * @param defaultValue
+     *            The default value to use if the query hint is not defined.
+     */
+    public Integer getQueryHintAsInteger(final String name,
+            final Integer defaultValue) {
+
+        return Integer.valueOf(getQueryHint(name, 
+              Integer.toString(defaultValue)));
+
+    }
+
+    
+
+    /**
      * Set the query hints.
      * 
      * @param queryHints

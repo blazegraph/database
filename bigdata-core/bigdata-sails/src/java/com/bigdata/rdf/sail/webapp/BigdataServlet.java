@@ -534,7 +534,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * 
     * @throws IOException
     */
-   static protected void buildAndCommitResponse(final HttpServletResponse resp,
+   static public void buildAndCommitResponse(final HttpServletResponse resp,
          final int status, final String mimeType, final String content,
          final NV... headers) throws IOException {
 

@@ -58,6 +58,12 @@ public enum DTEExtension {
      */
     ARRAY((byte) 2, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS),
 
+    /**
+     * An mocked IV (used internally).
+     */
+    MOCKED_IV((byte) 3, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS),
+
+    
 	/**
 	 * This is a place holder for extension of the intrinsic data types. Its
 	 * code corresponds to 0xff, which is to say all four bits are on. When this
@@ -116,6 +122,8 @@ public enum DTEExtension {
             return PACKED_LONG;            
         case 2:
             return ARRAY;
+        case 3:
+            return MOCKED_IV;
          default:
             throw new IllegalArgumentException(Byte.toString(b));
         }

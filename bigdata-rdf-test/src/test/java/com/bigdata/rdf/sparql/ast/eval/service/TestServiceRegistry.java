@@ -323,7 +323,7 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
                     
                     final ServiceCall<?> serviceCall = ServiceRegistry
                             .getInstance().toServiceCall(store, cm,
-                                    serviceURI1, serviceNode);
+                                    serviceURI1, serviceNode, null /* BOpStats */);
                     
                     assertNotNull(serviceCall);
                     
@@ -334,7 +334,7 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
 
                     final ServiceCall<?> serviceCall = ServiceRegistry
                             .getInstance().toServiceCall(store, cm,
-                                    serviceURI2, serviceNode);
+                                    serviceURI2, serviceNode, null /* BOpStats */);
                     
                     assertNotNull(serviceCall);
 

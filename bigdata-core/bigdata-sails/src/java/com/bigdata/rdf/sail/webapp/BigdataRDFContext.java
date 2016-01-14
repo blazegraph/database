@@ -2395,7 +2395,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query exactly once in order to minimize the resources associated with
          * the query parser.
          */
-        final AbstractTripleStore tripleStore = cxn.getTripleStore();
+//        final AbstractTripleStore tripleStore = cxn.getTripleStore();
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
@@ -2714,7 +2714,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
 
-	/*package*/ List<String> getNamespacesTx(long tx) {
+	public List<String> getNamespacesTx(long tx) {
 
 		final IIndexManager indexManager = getIndexManager();
 		

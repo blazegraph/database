@@ -1157,7 +1157,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                          * Visit all source solutions having the same hash code.
                          * 
                          * @see <a
-                         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/763#comment:19">
+                         *      href="https://jira.blazegraph.com/browse/BLZG-848">
                          *      Stochastic results with Analytic Query Mode)
                          *      </a>
                          * 

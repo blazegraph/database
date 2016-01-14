@@ -34,7 +34,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jar</artifactId>
   <version>2.1.0-master-SNAPSHOT</version>
-  <name>Blazegraph Executable Jar</name>
+  <name>Blazegraph Executable Jar (bigdata legacy path)</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>
 

@@ -503,5 +503,31 @@ public interface IKeyBuilder extends ISortKeyBuilder<Object>, IManagedByteArray 
      *             if <i>val</i> is an instance of an unsupported class.
      */
     public IKeyBuilder append(Object val);
+
+    /**
+     * Converts the key into a z-order byte array, assuming numDimensions components
+     * of type Long (i.e., 64bit each). For instance, assume the current key's 
+     * buffer is 001001011010010001010100 and we call the method with
+     * numDimensions=3. The method logically proceeds as follows:
+     * 
+     * 1. Split the key into n components, namely: 00100101 10100100 01010100
+     * 2. Merge the component bit by bit: 010 001 110 001 000 111 000 100
+     * 3. The result is this merged array
+     * 
+     * @param baseSize
+     * @param numDimensions
+     */
+    byte[] toZOrder(int numDimensions);
+    
+    /**
+     * Inverts method above in the sense that it interprets the buffer as
+     * a zOrderString and returns an array of long values of size numDimensions,
+     * reflecting the individual components of the z-order string.
+     * 
+     * @param size
+     * @param numDimensions
+     * @return
+     */
+    long[] fromZOrder(int numDimensions);
     
 }

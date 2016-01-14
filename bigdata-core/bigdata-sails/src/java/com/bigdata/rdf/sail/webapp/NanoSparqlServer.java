@@ -308,7 +308,6 @@ public class NanoSparqlServer {
         int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
-        String servletContextListenerClass = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
         
         /*
          * Note: This default will locate the jetty.xml resource that is bundled
@@ -354,8 +353,6 @@ public class NanoSparqlServer {
                                 "Read lock must be commit time or -1 (MINUS ONE) to assert a read lock on the last commit time: "
                                         + readLock);
                     }
-                } else if (arg.equals("-servletContextListenerClass")) {
-                    servletContextListenerClass = args[++i];
                 } else if (arg.equals("-jettyXml")) {
                     jettyXml = args[++i];
                 } else {
@@ -463,9 +460,6 @@ public class NanoSparqlServer {
                     Long.toString(readLock));
         }
         
-        initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-                servletContextListenerClass);
-
         // Create the service.
         final Server server = NanoSparqlServer.newInstance(port, jettyXml,
                 null/* indexManager */, initParams);
@@ -856,6 +850,10 @@ public class NanoSparqlServer {
         String resourceBaseStr = System
                 .getProperty(SystemProperties.JETTY_RESOURCE_BASE);
 
+        // Check the environment variable for the override web.
+        final String jettyOverrideWeb = System
+                .getProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML);
+
         // true iff declared as an environment variable.
         final boolean isDeclared = resourceBaseStr != null
                 && resourceBaseStr.trim().length() > 0;
@@ -941,6 +939,7 @@ public class NanoSparqlServer {
 
             }
 
+
             if (resourceBaseURL != null) {
 
                 /*
@@ -962,13 +961,17 @@ public class NanoSparqlServer {
 
                 System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
                         tmp);
+                
+                //Don't override the value if it is explicitly declared.
+				if (jettyOverrideWeb == null) {
 
-                final URL overrideWebXmlURL = new URL(tmp
-                        + (tmp.endsWith("/") ? "" : "/")
-                        + "WEB-INF/override-web.xml");
+					final URL overrideWebXmlURL = new URL(tmp
+							+ (tmp.endsWith("/") ? "" : "/")
+							+ "WEB-INF/override-web.xml");
 
-                System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
-                        overrideWebXmlURL.toExternalForm());
+					System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
+							overrideWebXmlURL.toExternalForm());
+                }
                 
             }
 
