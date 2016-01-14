@@ -83,30 +83,122 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </developer>
     </developers>
     <contributors>
-      <contributor>
-         <name>Martyn Cutcher</name>
-         <email>martyn@blazegraph.com</email>
-         <organization>SYSTAP, LLC DBA Blazegraph</organization>
-         <organizationUrl>http://www.blazegraph.com</organizationUrl>
-      </contributor>
-      <contributor>
-         <name>Michael Schmidt</name>
-         <email>ms@metaphacts.com</email>
-         <organization>Metaphacts GmbH</organization>
-         <organizationUrl>http://www.metaphacts.com</organizationUrl>
-      </contributor>
-      <contributor>
-         <name>Jeremy Carroll</name>
-         <email>jjc@syapse.com</email>
-         <organization>Syapse</organization>
-         <organizationUrl>http://www.syapse.com</organizationUrl>
-      </contributor>
-      <contributor>
-         <name>Igor Kim</name>
-         <email>igor.kim@ms2w.com</email>
-         <organization>MagInfo</organization>
-         <organizationUrl>http://www.maginfo.com</organizationUrl>
-       </contributor>
+     <contributor>
+      <name>Artem Kozlov</name>
+      <email>ak@metaphacts.com</email>
+      <organization>Metaphacts GmbH</organization>
+      <organizationUrl>http://www.metaphacts.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Igor Kim</name>
+      <email>igor.kim@ms2w.com</email>
+      <organization>MagInfo</organization>
+      <organizationUrl>http://www.maginfo.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Jeremy Carroll</name>
+      <email>jjc@syapse.com</email>
+      <organization>Syapse</organization>
+      <organizationUrl>http://www.syapse.com</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Martyn Cutcher</name>
+      <email>martyn.cutcher@gmail.com</email>
+      <organization>SYSTAP, LLC DBA Blazegraph</organization>
+      <organizationUrl>http://www.blazegraph.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Michael Schmidt</name>
+      <email>ms@metaphacts.com</email>
+      <organization>Metaphacts GmbH</organization>
+      <organizationUrl>http://www.metaphacts.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Nik Everett</name>
+      <email>neverett@wikimedia.org</email>
+      <organization>Wikimedia</organization>
+      <organizationUrl>http://wikimedia.org/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Olaf Hartig</name>
+      <email>ohartig@uwaterloo.ca</email>
+      <url>https://github.com/hartig</url>
+     </contributor>
+     <contributor>
+      <name>Peter Haase</name>
+      <email>ph@metaphacts.com</email>
+      <organization>Metaphacts GmbH</organization>
+      <organizationUrl>http://www.metaphacts.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Rushan Shaymardanov</name>
+      <email>rushan.shaymardanov@maginfo.com</email>
+      <organization>MagInfo</organization>
+      <organizationUrl>http://www.maginfo.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Stanislav Malyshev</name>
+      <email>smalyshev@wikimedia.org</email>
+      <organization>Wikimedia</organization>
+      <organizationUrl>http://wikimedia.org/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Brian Levine</name>
+      <email>blevine218@users.sourceforge.net</email>
+      <url>http://sourceforge.net/u/blevine218</url>
+     </contributor>
+     <contributor>
+      <name>Brian Murphy</name>
+      <email>btmurphy@users.sourceforge.net</email>
+      <url>http://sourceforge.net/u/btmurphy</url>
+     </contributor>
+     <contributor>
+      <name>David MacMillan</name>
+      <email>dmacgbr@users.sourceforge.net</email>
+      <url>http://sourceforge.net/u/dmacgbr</url>
+     </contributor>
+     <contributor>
+      <name>Daniel Mekonnen</name>
+      <email>dmekonnen@users.sourceforge.net</email>
+      <url>http://sourceforge.net/u/dmekonnen</url>
+     </contributor>
+     <contributor>
+      <name>Fred Oliver</name>
+      <email>fkoliver@users.sourceforge.net</email>
+      <url>http://sourceforge.net/u/fkoliver</url>
+     </contributor>
+     <contributor>
+      <name>James Carbonaro</name>
+      <email>jjcarbo-systap@users.noreply.github.com</email>
+      <organization>SYSTAP, LLC DBA Blazegraph</organization>
+      <organizationUrl>http://www.blazegraph.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Mariya Kroxaleva</name>
+      <email>mariya.kroxaleva@maginfo.com</email>
+      <organization>MagInfo</organization>
+      <organizationUrl>http://www.maginfo.com/</organizationUrl>
+     </contributor>
+     <contributor>
+      <name>Matthew Roy</name>
+      <email>mroycsi@users.sourceforge.net</email>
+      <url>http://sourceforge.net/u/mroycsi</url>
+     </contributor>
+     <contributor>
+      <name>Robert Resendes</name>
+      <email>resendes@users.sourceforge.net</email>
+       <url>http://sourceforge.net/u/resendes</url>
+     </contributor>
+     <contributor>
+      <name>Sean Gossard</name>
+      <email>sgossard@users.sourceforge.net</email>
+       <url>http://sourceforge.net/u/sgossard</url>
+     </contributor>
+     <contributor>
+      <name>Toby Craig</name>
+      <email>tobycraig@users.sourceforge.net</email>
+      <url>http://sourceforge.net/u/tobycraig</url>
+     </contributor>
     </contributors>
     <properties>
       <icu.version>4.8</icu.version>
