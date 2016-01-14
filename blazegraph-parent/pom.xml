@@ -66,11 +66,6 @@ dependencies.
         </license>
     </licenses>
     <properties>
-      <!--                                                            -->
-      <!-- Note: Dependency versions are declared in build.properties -->
-      <!-- This is a copy of that information. However, there are a   -->
-      <!-- few subtle differences.  See build.properties for details. -->
-      <!--                                                            -->
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
@@ -99,7 +94,6 @@ dependencies.
       <jettison.version>1.3.3</jettison.version>
       <rexster.version>2.5.0</rexster.version>
       <striterator.version>1.0</striterator.version>
-      <!-- <junit-ext.version>1.1-b3-dev</junit-ext.version> -->
       <junit-ext.version>${project.version}</junit-ext.version>
       <junit4.version>4.11</junit4.version>
       <junit3.version>3.8.1</junit3.version>
@@ -108,8 +102,76 @@ dependencies.
       <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <scm>
-      <connection>scm:git:https://github.com/SYSTAP/bigdata.git</connection>
+      <connection>scm:git:https://github.com/blazegraph/database.git</connection>
     </scm>
+    <profiles>
+       <profile> 
+         <id>release</id>
+         <!-- 
+                Plugins for Maven Central Deployment 
+                See:  http://central.sonatype.org/pages/apache-maven.html 
+         -->
+         <build>
+           <plugins>
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.5</version>
+            <configuration>
+               <keyname>Blazegraph</keyname>
+               <passphraseServerId>${gpg.keyname}</passphraseServerId>
+            </configuration>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+            </plugin>
+            <plugin>
+              <groupId>org.sonatype.plugins</groupId>
+              <artifactId>nexus-staging-maven-plugin</artifactId>
+              <version>1.6.3</version>
+              <extensions>true</extensions>
+              <configuration>
+                <serverId>ossrh</serverId>
+                <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                <autoReleaseAfterClose>true</autoReleaseAfterClose>
+              </configuration>
+            </plugin>
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>2.2.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>2.9.1</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+           </plugin>
+          </plugins>
+        </build>
+      </profile>
+    </profiles>
     <build>
     <plugins>
       <plugin>
@@ -152,46 +214,8 @@ dependencies.
         </configuration>
       </plugin>
     </plugins>
-    <extensions>
-      <extension>
-        <groupId>org.apache.maven.wagon</groupId>
-         <artifactId>wagon-ssh-external</artifactId>
-         <version>1.0-beta-6</version>
-      </extension>
-    </extensions>
     </build>
     
-    <distributionManagement>
-        <repository>
-            <id>bigdata.releases</id>
-            <name>bigdata(R) releases</name>
-            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases</url>
-        </repository>
-        <snapshotRepository>
-            <id>bigdata.snapshots</id>
-            <name>bigdata(R) snapshots</name>
-            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/snapshots</url>
-            <uniqueVersion>true</uniqueVersion>
-        </snapshotRepository>
-    </distributionManagement>
-    
-   <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-    <repository>
-      <id>bigdata.snapshots</id>
-      <url>http://www.systap.com/maven/snapshots/</url>
-    </repository>
-    <!-- 
-    <repository>
-      <id>jetty.releases</id>
-      <url>https://oss.sonatype.org/content/groups/jetty/</url>
-    </repository>
-    -->
-  </repositories>
-
   <modules>
     <module>../junit-ext</module>
     <module>../ctc-striterators</module>
@@ -214,13 +238,14 @@ dependencies.
     <module>../bigdata-core-test/</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
-    <!-- Moved to blazegraph-deployers
+    <!-- Moved to blazegraph-artifacts
     <module>../blazegraph-war</module>
     <module>../bigdata-war</module>
     <module>../bigdata-jar</module>
     <module>../blazegraph-jar</module>
     <module>../blazegraph-deb/</module>
     <module>../blazegraph-rpm/</module>
+    <module>../blazegraph-tgz/</module>
     -->
   </modules>
 
