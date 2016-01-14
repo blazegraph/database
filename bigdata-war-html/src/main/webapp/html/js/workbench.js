@@ -1703,7 +1703,7 @@ function updateExploreStart(data) {
    $('#explore-results a').click(function(e) {
       e.preventDefault();
       var components = parseHash(this.hash);
-      explore(components[2], components[3]);
+      explore(components[2], decodeURIComponent(components[3]));
    });
 }
 

@@ -29,13 +29,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.1.0-master-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
-<!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-gas</artifactId>
   <version>2.1.0-master-SNAPSHOT</version>
   <name>Blazegraph Gather Apply Scatter (GAS) API</name>
+  <description>Blazegraph DB Gather Apply Scatter API for graph analytics</description>
+  <url>https://wiki.blazegraph.com/wiki/index.php/RDF_GAS_API</url>
   <packaging>jar</packaging>
   <build>
    <plugins>
@@ -87,13 +88,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
