@@ -92,18 +92,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </source>
               </sources>
             </mapping>
-<!--
-            <mapping>
-              <directory>${rpm.installDir}/lib</directory>
-              <filemode>750</filemode>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-              <dependency>
-                <includes>
-                </includes>
-              </dependency>
-            </mapping>
--->
             <mapping>
               <directory>${rpm.installDir}/bin</directory>
               <filemode>750</filemode>
@@ -141,7 +129,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <filemode>750</filemode>
               <username>${rpm.user}</username>
               <groupname>${rpm.group}</groupname>
-	    </mapping>
+	        </mapping>
             <mapping>
               <directory>/var/log/${app.name}</directory>
               <filemode>750</filemode>
@@ -172,11 +160,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </postremoveScriptlet>
           <provides>
              <provide>blazegraph</provide>
-	  </provides>
+	      </provides>
           <requires>
-		<require>/usr/sbin/useradd</require>
-		<require>/usr/bin/getent</require>
-	  </requires>
+		     <require>/usr/sbin/useradd</require>
+		     <require>/usr/bin/getent</require>
+	      </requires>
         </configuration>
        </plugin>
       </plugins>
@@ -310,7 +298,7 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
     <!-- External and third party dependencies -->
-    <dependency>
+      <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-continuation</artifactId>
         <version>${jetty.version}</version>
