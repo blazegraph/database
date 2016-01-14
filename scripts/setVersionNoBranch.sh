@@ -2,7 +2,7 @@
 # Script to update the version numbers with the git branch of the snapshot build.
 
 BASE_DIR=`dirname $0`
-PARENT_POM="${BASE_DIR}"/../blazegraph-parent/pom.xml
+PARENT_POM="${BASE_DIR}"/../pom.xml
 DEPLOYER_POM="${BASE_DIR}"/../blazegraph-artifacts/pom.xml
 CURRENT_VERSION=2.0.0
 BRANCH="master"
