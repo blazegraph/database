@@ -1029,6 +1029,67 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         }
 
     }
+    
+    /**
+     * 
+     * Initiate the data loader for a namespace within the a NSS
+     * 
+     * @param properties
+     *            The properties for the DataLoader Servlet
+     * 
+     * @throws Exception
+     * 
+     * @see BLZG-1713
+     */
+    public void doDataLoader(final Properties properties)
+            throws Exception {
+
+        if (properties == null)
+            throw new IllegalArgumentException();
+        
+        final Properties tmp = PropertyUtil.flatCopy(properties);
+
+        /*
+         * Note: This operation does not currently permit embedding into a
+         * read/write tx.
+         */
+        final ConnectOptions opts = newConnectOptions(baseServiceURL + "/dataloader", UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            final PropertiesFormat format = PropertiesFormat.XML;
+
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+            final PropertiesWriter writer = PropertiesWriterRegistry.getInstance().get(format).getWriter(baos);
+
+            writer.write(tmp);
+
+            final byte[] data = baos.toByteArray();
+
+            final ByteArrayEntity entity = new ByteArrayEntity(data);
+
+            entity.setContentType(format.getDefaultMIMEType());
+
+            opts.entity = entity;
+            
+            opts.method = "POST";
+
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+        } finally {
+            if (response != null)
+                response.abort();
+
+        }
+
+    }
 
     /**
      * Connect to a SPARQL end point (GET or POST query only).
