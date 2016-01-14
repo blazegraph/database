@@ -19,6 +19,8 @@ quiet=false
 verbose=0
 closure=false
 durableQueues=true
+#Needed for quads
+#defaultGraph=
 com.bigdata.rdf.store.DataLoader.flush=false
 com.bigdata.rdf.store.DataLoader.bufferCapacity=100000
 com.bigdata.rdf.store.DataLoader.queueCapacity=10
