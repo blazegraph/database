@@ -22,51 +22,23 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
--->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+--><project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.0.0-RC2-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-runtime</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph Runtime</name>
-  <url>https//www.blazegraph.com/</url>
-  <description>This file contains all of the blazegraph artifacts without any external artifacts.</description>
-   
+  <description>This file contains all of the Blazegraph DB artifacts without any external artifacts.</description>
   <packaging>jar</packaging>
-
-  <properties>
-	<build.timestamp>${maven.build.timestamp}</build.timestamp>
-        <maven.build.timestamp.format>yyyyMMdd</maven.build.timestamp.format> 
-  </properties>
-
   <build>
     <plugins>
-<!--
-     <plugin>
-       <artifactId>maven-assembly-plugin</artifactId>
-       <executions>
-         <execution>
-           <id>create-assembly</id>
-           <phase>package</phase>
-           <goals>
-             <goal>single</goal>
-           </goals>
-           <configuration>
-		<descriptors>
-                    <descriptor>/src/main/assembly/assembly.xml</descriptor>
-                </descriptors>
-           </configuration>
-         </execution>
-  	</executions>
-      </plugin>
--->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -106,13 +78,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                <phase>compile</phase>
                <configuration>
                  <target>
- 		   <unzip dest="target/classes/war">
-        		<fileset dir="target/classes/war">
+ 		           <unzip dest="target/classes/war">
+        		      <fileset dir="target/classes/war">
             			<include name="bigdata.war" />
-        		</fileset>    
-    		   </unzip>
- 		   <delete file = "target/classes/war/bigdata.war"/>
-		   <copy file = "target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
+        		      </fileset>    
+    		       </unzip>
+ 		           <delete file = "target/classes/war/bigdata.war"/>
+		           <copy file = "target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
                  </target>
                </configuration>
              </execution>
@@ -130,13 +102,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <goal>shade</goal>
             </goals>
             <configuration>
-<!--
-	       <finalName>${project.artifactId}-${project.version}-${maven.build.timestamp}</finalName>
--->
 	       <artifactSet>
-		<includes>
-		  <include>com.blazegraph:*</include>
-		</includes>
+		   <includes>
+		      <include>com.blazegraph:*</include>
+		   </includes>
 		<excludes>
                   <exclude>commons-io:*</exclude>
                   <exclude>commons-lang:*</exclude>
@@ -206,7 +175,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-  
   <dependencies>
     <dependency>
       <groupId>com.blazegraph</groupId>
@@ -261,5 +229,4 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
   </dependencies>
-
-  </project>
+</project>

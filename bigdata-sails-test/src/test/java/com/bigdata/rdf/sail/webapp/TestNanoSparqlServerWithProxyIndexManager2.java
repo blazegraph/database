@@ -200,6 +200,7 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
 		suite.addTest(TestProtocolAll.suite());
 
         suite.addTestSuite(TestMultiTenancyAPI.class);
+        suite.addTestSuite(TestDataLoaderServlet.class); // Data Loader Servlet
         
         return suite;
     

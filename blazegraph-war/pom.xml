@@ -35,7 +35,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>blazegraph-war</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph WAR</name>
-  <url>http://maven.apache.org</url>
+  <description>Blazegraph Web Application Archive</description>
   <packaging>war</packaging>
   <build>
     <plugins>
@@ -44,13 +44,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
        <artifactId>maven-war-plugin</artifactId>
        <version>2.6</version>
        <configuration>
-        <webXml>../bigdata-war-html/src/main/webapp/WEB-INF/web.xml</webXml>
-	<failOnMissingWebXml>false</failOnMissingWebXml>
+         <webXml>../bigdata-war-html/src/main/webapp/WEB-INF/web.xml</webXml>
+	     <failOnMissingWebXml>false</failOnMissingWebXml>
          <overlays>
            <overlay>
              <groupId>com.blazegraph</groupId>
              <artifactId>bigdata-war-html</artifactId>
-	     <includes>
+	          <includes>
                 <include>WEB-INF/web.xml</include>
                 <include>**/*</include>
               </includes>
@@ -60,7 +60,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </plugin>
     </plugins>
   </build>
-
   <reporting>
     <plugins>
       <plugin>
@@ -95,7 +94,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-  
   <dependencies>
     <dependency>
       <groupId>com.blazegraph</groupId>
