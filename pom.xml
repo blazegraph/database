@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+--><!--
+    For information on Blazegraph and Maven see:  https://wiki.blazegraph.com/wiki/index.php/MavenNotes.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+   <modelVersion>4.0.0</modelVersion>
+   <groupId>com.blazegraph</groupId>
+   <artifactId>blazegraph-parent</artifactId>
+   <version>2.1.0-master-SNAPSHOT</version>
+   <packaging>pom</packaging>
+   <name>Blazegraph Database Platform</name>
+   <description>Blazegraph™ DB is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for customers such as EMC, Syapse, Wikidata Query Service, the British Museum, and many others.  GPU acceleration and High Availability (HA) are available in the Enterprise edition.  It contains war, jar, deb, rpm, and tar.gz deployment artifacts.</description>
+    <url>http://www.blazegraph.com/</url>
+    <organization>
+        <name>SYSTAP, LLC DBA Blazegraph</name>
+        <url>https://www.blazegraph.com/</url>
+    </organization>
+    <inceptionYear>2006</inceptionYear>
+    <licenses>
+        <license>
+            <name>GNU General Public License Version 2 (GPLv2)</name>
+            <url>http://www.gnu.org/licenses/gpl-2.0.html</url>
+        </license>
+    </licenses>
+    <mailingLists>
+       <mailingList>
+           <name>Developer</name>
+           <subscribe>https://lists.sourceforge.net/lists/listinfo/bigdata-developers</subscribe>
+           <unsubscribe>https://lists.sourceforge.net/lists/listinfo/bigdata-developers</unsubscribe>
+           <archive>https://sourceforge.net/p/bigdata/mailman/bigdata-developers/</archive>
+       </mailingList>
+    </mailingLists>
+    <issueManagement>
+        <system>JIRA</system>
+        <url>https://jira.blazegraph.com/</url>
+    </issueManagement>
+    <scm>
+      <connection>scm:git:https://github.com/blazegraph/database.git</connection>
+      <developerConnection>scm:git:git@github.com:blazegraph/database.git</developerConnection>
+      <url>https://github.com/blazegraph/database.git</url>
+    </scm>
+    <developers>
+      <developer>
+         <name>Bryan Thompson</name>
+         <email>bryan@blazegraph.com</email>
+         <organization>SYSTAP, LLC DBA Blazegraph</organization>
+         <organizationUrl>http://www.blazegraph.com</organizationUrl>
+      </developer>
+      <developer>
+         <name>Mike Personick</name>
+         <email>mike@blazegraph.com</email>
+         <organization>SYSTAP, LLC DBA Blazegraph</organization>
+         <organizationUrl>http://www.blazegraph.com</organizationUrl>
+      </developer>
+      <developer>
+         <name>Brad Bebee</name>
+         <email>beebs@blazegraph.com</email>
+         <organization>SYSTAP, LLC DBA Blazegraph</organization>
+         <organizationUrl>http://www.blazegraph.com</organizationUrl>
+      </developer>
+    </developers>
+    <contributors>
+      <contributor>
+         <name>Martyn Cutcher</name>
+         <email>martyn@blazegraph.com</email>
+         <organization>SYSTAP, LLC DBA Blazegraph</organization>
+         <organizationUrl>http://www.blazegraph.com</organizationUrl>
+      </contributor>
+      <contributor>
+         <name>Michael Schmidt</name>
+         <email>ms@metaphacts.com</email>
+         <organization>Metaphacts GmbH</organization>
+         <organizationUrl>http://www.metaphacts.com</organizationUrl>
+      </contributor>
+      <contributor>
+         <name>Jeremy Carroll</name>
+         <email>jjc@syapse.com</email>
+         <organization>Syapse</organization>
+         <organizationUrl>http://www.syapse.com</organizationUrl>
+      </contributor>
+      <contributor>
+         <name>Igor Kim</name>
+         <email>igor.kim@ms2w.com</email>
+         <organization>MagInfo</organization>
+         <organizationUrl>http://www.maginfo.com</organizationUrl>
+       </contributor>
+    </contributors>
+    <properties>
+      <icu.version>4.8</icu.version>
+      <zookeeper.version>3.4.5</zookeeper.version>
+      <sesame.version>2.7.12</sesame.version>
+      <slf4j.version>1.6.1</slf4j.version>
+      <jetty.version>9.2.3.v20140905</jetty.version>
+      <servlet.version>3.1.0</servlet.version>
+      <lucene.version>3.0.0</lucene.version>
+      <apache.commons_codec.version>1.4</apache.commons_codec.version>
+      <apache.commons_configuration.version>1.10</apache.commons_configuration.version>
+      <apache.commons_fileupload.version>1.3.1</apache.commons_fileupload.version>
+      <apache.commons_io.version>2.1</apache.commons_io.version>
+      <apache.commons_logging.version>1.1.1</apache.commons_logging.version>
+      <apache.httpclient.version>4.1.3</apache.httpclient.version>
+      <apache.httpclient_cache.version>4.1.3</apache.httpclient_cache.version>
+      <apache.httpcore.version>4.1.4</apache.httpcore.version>
+      <apache.httpmime.version>4.1.3</apache.httpmime.version>
+      <highscalelib.version>1.1.2</highscalelib.version>
+      <log4j.version>1.2.17</log4j.version>
+      <colt.version>1.2.0</colt.version>
+      <fastutil.version>6.5.16</fastutil.version>
+      <dsiutils.version>1.0.10</dsiutils.version>
+      <lgplutils.version>1.0.7-270114</lgplutils.version>
+      <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
+      <jackson.version>2.2.3</jackson.version>
+      <blueprints.version>2.5.0</blueprints.version>
+      <jettison.version>1.3.3</jettison.version>
+      <rexster.version>2.5.0</rexster.version>
+      <striterator.version>1.0</striterator.version>
+      <junit-ext.version>${project.version}</junit-ext.version>
+      <junit4.version>4.11</junit4.version>
+      <junit3.version>3.8.1</junit3.version>
+      <servlet.version>3.1.0</servlet.version>
+      <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <profiles>
+       <profile> 
+         <id>release</id>
+         <!-- 
+                Plugins for Maven Central Deployment 
+                See:  http://central.sonatype.org/pages/apache-maven.html 
+         -->
+         <build>
+           <plugins>
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.5</version>
+            <configuration>
+               <keyname>Blazegraph</keyname>
+               <passphraseServerId>${gpg.keyname}</passphraseServerId>
+            </configuration>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+            </plugin>
+            <plugin>
+              <groupId>org.sonatype.plugins</groupId>
+              <artifactId>nexus-staging-maven-plugin</artifactId>
+              <version>1.6.3</version>
+              <extensions>true</extensions>
+              <configuration>
+                <serverId>ossrh</serverId>
+                <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                <autoReleaseAfterClose>true</autoReleaseAfterClose>
+              </configuration>
+            </plugin>
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>2.2.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>2.9.1</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+           </plugin>
+          </plugins>
+        </build>
+      </profile>
+    </profiles>
+    <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>2.5.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.3</version>
+        <configuration>
+          <source>1.7</source>
+          <target>1.7</target>
+	      <encoding>${project.build.sourceEncoding}</encoding>
+        </configuration>
+      </plugin>
+      <plugin>
+       <groupId>org.apache.maven.plugins</groupId>
+       <artifactId>maven-war-plugin</artifactId>
+       <version>2.6</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+          <includes>
+            <include>**/TestAll.java</include>
+          </includes>
+          <excludes>
+            <exclude>com/bigdata/TestAll.java</exclude>
+          </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+	      <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx4g</argLine>
+	      <rerunFailingTestsCount>2</rerunFailingTestsCount>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <modules>
+    <module>junit-ext</module>
+    <module>ctc-striterators</module>
+    <module>lgpl-utils</module>
+    <module>dsi-utils</module>
+    <module>system-utils</module>
+    <module>rdf-properties</module>
+    <module>sparql-grammar</module>
+    <module>bigdata-util</module>
+    <module>bigdata-common-util</module>
+    <module>bigdata-statics</module>
+    <module>bigdata-cache</module>
+    <module>bigdata-client</module>
+    <module>bigdata-ganglia</module>
+    <module>bigdata-gas</module>
+    <module>bigdata-core/</module>
+    <module>bigdata-war-html</module>
+    <module>bigdata-blueprints</module>
+    <module>bigdata-runtime</module>
+    <module>bigdata-core-test/</module>
+    <module>bigdata-rdf-test/</module>
+    <module>bigdata-sails-test/</module>
+    <!-- Moved to blazegraph-artifacts
+    <module>blazegraph-war</module>
+    <module>bigdata-war</module>
+    <module>bigdata-jar</module>
+    <module>blazegraph-jar</module>
+    <module>blazegraph-deb/</module>
+    <module>blazegraph-rpm/</module>
+    <module>blazegraph-tgz/</module>
+    -->
+  </modules>
+</project>
