@@ -6,6 +6,7 @@ PARENT_POM="${BASE_DIR}"/../pom.xml
 ARTIFACTS_POM="${BASE_DIR}"/../blazegraph-artifacts/pom.xml
 CURRENT_VERSION=2.1.0
 BRANCH=`git rev-parse --abbrev-ref HEAD`
+BRANCH=master
 SNAPSHOT="SNAPSHOT"
 
 echo "Updating POM versions to ${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT}"
