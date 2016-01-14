@@ -16,21 +16,14 @@ export NSS_DATALOAD_PROPERTIES=/usr/local/blazegraph/conf/RWStore.properties
 
 cat <<EOT >> $LOAD_PROP_FILE
 quiet=false
-verbose=2
+verbose=0
 closure=false
-durableQueues=false
-com.bigdata.journal.AbstractJournal.writeCacheBufferCount=2000
-com.bigdata.journal.AbstractJournal.writeCacheMinCleanListSize=50
+durableQueues=true
+#Needed for quads
+#defaultGraph=
 com.bigdata.rdf.store.DataLoader.flush=false
 com.bigdata.rdf.store.DataLoader.bufferCapacity=100000
 com.bigdata.rdf.store.DataLoader.queueCapacity=10
-com.bigdata.btree.writeRetentionQueue.capacity=8000
-com.bigdata.io.DirectBufferPool.bufferCapacity=1048576
-com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.maxReaders=0
-com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.skipCount=256
-com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.spannedRangeMultiplier=10
-com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.batchSize=10240
-com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.queueCapacity=40
 #Namespace to load
 namespace=kb
 #Files to load
