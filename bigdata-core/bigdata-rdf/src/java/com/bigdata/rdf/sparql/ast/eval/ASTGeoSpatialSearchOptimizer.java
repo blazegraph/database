@@ -57,8 +57,8 @@ public class ASTGeoSpatialSearchOptimizer extends ASTSearchOptimizerBase {
         set.add(GeoSpatial.CONTEXT);
         set.add(GeoSpatial.SPATIAL_CIRCLE_CENTER);
         set.add(GeoSpatial.SPATIAL_CIRCLE_RADIUS);
-        set.add(GeoSpatial.SPATIAL_RECTANGLE_UPPER_LEFT);
-        set.add(GeoSpatial.SPATIAL_RECTANGLE_LOWER_RIGHT);
+        set.add(GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST);
+        set.add(GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST);
         set.add(GeoSpatial.SPATIAL_UNIT);        
         set.add(GeoSpatial.TIME_START);
         set.add(GeoSpatial.TIME_END);

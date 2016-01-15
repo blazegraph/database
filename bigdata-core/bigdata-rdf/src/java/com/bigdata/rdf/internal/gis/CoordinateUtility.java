@@ -134,7 +134,7 @@ public class CoordinateUtility {
         return lengthOfArc;
     }
     
-    public static CoordinateDD boundingBoxUpperLeft(
+    public static CoordinateDD boundingBoxSouthWest(
        final CoordinateDD start, double distance, UNITS units) {
        
        double distanceAsMeters = unitsToMeters(distance, units);
@@ -167,7 +167,7 @@ public class CoordinateUtility {
        return ret;
     }
     
-    public static CoordinateDD boundingBoxLowerRight(
+    public static CoordinateDD boundingBoxNorthEast(
           final CoordinateDD start, double distance, UNITS units) {
           
           double distanceAsMeters = unitsToMeters(distance, units);

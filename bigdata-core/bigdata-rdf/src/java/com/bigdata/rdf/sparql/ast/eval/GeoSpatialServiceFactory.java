@@ -434,8 +434,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final TermNode context;
       private final TermNode spatialCircleCenter;
       private final TermNode spatialCircleRadius;
-      private final TermNode spatialRectangleUpperLeft;
-      private final TermNode spatialRectangleLowerRight;
+      private final TermNode spatialRectangleSouthWest;
+      private final TermNode spatialRectangleNorthEast;
       private final TermNode spatialUnit;
       private final TermNode timeStart;
       private final TermNode timeEnd;
@@ -502,8 +502,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          TermNode context = null;
          TermNode spatialCircleCenter = null;
          TermNode spatialCircleRadius = null;
-         TermNode spatialRectangleUpperLeft = null;
-         TermNode spatialRectangleLowerRight = null;
+         TermNode spatialRectangleSouthWest = null;
+         TermNode spatialRectangleNorthEast = null;
          TermNode spatialUnit = null;
          TermNode timeStart = null;
          TermNode timeEnd = null;
@@ -527,10 +527,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                spatialCircleCenter = meta.o();
             } else if (GeoSpatial.SPATIAL_CIRCLE_RADIUS.equals(p)) {
                spatialCircleRadius = meta.o();
-            } else if (GeoSpatial.SPATIAL_RECTANGLE_UPPER_LEFT.equals(p)) {
-               spatialRectangleUpperLeft = meta.o();
-            } else if (GeoSpatial.SPATIAL_RECTANGLE_LOWER_RIGHT.equals(p)) {
-               spatialRectangleLowerRight = meta.o();
+            } else if (GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST.equals(p)) {
+               spatialRectangleSouthWest = meta.o();
+            } else if (GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST.equals(p)) {
+               spatialRectangleNorthEast = meta.o();
             } else if (GeoSpatial.SPATIAL_UNIT.equals(p)) {
                spatialUnit = meta.o();
             } else if (GeoSpatial.TIME_START.equals(p)) {
@@ -554,8 +554,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.context = context;
          this.spatialCircleCenter = spatialCircleCenter;
          this.spatialCircleRadius = spatialCircleRadius;
-         this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
-         this.spatialRectangleLowerRight = spatialRectangleLowerRight;
+         this.spatialRectangleSouthWest = spatialRectangleSouthWest;
+         this.spatialRectangleNorthEast = spatialRectangleNorthEast;
          this.spatialUnit = spatialUnit;
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
@@ -592,7 +592,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          // for all bindings in the binding set
          return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction,
                searchVar, predicate, context, spatialCircleCenter, spatialCircleRadius,
-               spatialRectangleUpperLeft, spatialRectangleLowerRight, spatialUnit,
+               spatialRectangleSouthWest, spatialRectangleNorthEast, spatialUnit,
                timeStart, timeEnd, locationVar, timeVar, locationAndTimeVar, defaults, kb, this);
 
       }
@@ -751,15 +751,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 /**
                  * Get the bounding boxes for the subsequent scan
                  */
-                final PointLatLonTime upperLeftWithTime = 
-                    query.getBoundingBoxUpperLeftWithTime(); 
-                final Object[] lowerBorderComponents = 
-                        PointLatLonTime.toComponentString(upperLeftWithTime);
+                final PointLatLonTime southWestWithTime = 
+                    query.getBoundingBoxSouthWestWithTime(); 
+                final Object[] southWestComponents = 
+                        PointLatLonTime.toComponentString(southWestWithTime);
                     
-                final PointLatLonTime lowerRightWithTime =
-                    query.getBoundingBoxLowerRightWithTime();
-                final Object[] upperBorderComponents =
-                    PointLatLonTime.toComponentString(lowerRightWithTime);
+                final PointLatLonTime northEastWithTime =
+                    query.getBoundingBoxNorthEastWithTime();
+                final Object[] northEastComponents =
+                    PointLatLonTime.toComponentString(northEastWithTime);
     
                 /**
                  * We proceed as follows:
@@ -770,7 +770,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                  * 4.) For each of these subranges, we set up a subtask to process the subrange
                  */
                 final AccessPath<ISPO> accessPath = 
-                    getAccessPath(lowerBorderComponents, upperBorderComponents, query);
+                    getAccessPath(southWestComponents, northEastComponents, query);
+                
+                if (accessPath==null) // known unsatisfiable, e.g. if predicate unknown
+                    continue;
                 
                 final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
                 
@@ -798,8 +801,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 
                 long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
                 
-                LiteralExtensionIV lowerBorderIV = litExt.createIV(lowerBorderComponents);
-                LiteralExtensionIV upperBorderIV = litExt.createIV(upperBorderComponents);
+                LiteralExtensionIV lowerBorderIV = litExt.createIV(southWestComponents);
+                LiteralExtensionIV upperBorderIV = litExt.createIV(northEastComponents);
                 
                 if (log.isDebugEnabled()) {
                    
@@ -812,7 +815,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 
                 // split range into nrSubRanges, equal-length pieces
                 final GeoSpatialSubRangePartitioner partitioner = 
-                   new GeoSpatialSubRangePartitioner(upperLeftWithTime, lowerRightWithTime, nrSubRanges, litExt);
+                   new GeoSpatialSubRangePartitioner(southWestWithTime, northEastWithTime, nrSubRanges, litExt);
                 
                 // set up tasks for partitions
                 final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder(); // will be the same for all partitions
@@ -822,7 +825,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                    
                    // set up a subtask for the partition
                    final GeoSpatialServiceCallSubRangeTask subTask = 
-                      getSubTask(upperLeftWithTime, lowerRightWithTime, 
+                      getSubTask(southWestWithTime, northEastWithTime, 
                          partition.lowerBorder, partition.upperBorder, 
                          keyOrder, subjectPos, objectPos, stats, query);
                    
@@ -2035,8 +2038,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                || predicate.equals(GeoSpatial.SEARCH)
                || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_CENTER)
                || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_RADIUS)
-               || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_LOWER_RIGHT) 
-               || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_UPPER_LEFT)
+               || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST) 
+               || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST)
                || predicate.equals(GeoSpatial.SPATIAL_UNIT)
                || predicate.equals(GeoSpatial.TIME_START)
                || predicate.equals(GeoSpatial.TIME_END)
