@@ -66,6 +66,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <packager>SYSTAP, LLC</packager>
           <prefix>${rpm.installDir}</prefix>
           <changelogFile>src/changelog</changelogFile>
+          <!-- Note that RPM signing is currently broken on OS-X:  https://github.com/mojohaus/rpm-maven-plugin/issues/11 -->
+          <!--
+          <key>${gpg.keyname}</key>
+          -->
           <mappings>
             <mapping>
               <directory>${rpm.installDir}/lib</directory>
