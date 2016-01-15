@@ -1176,6 +1176,19 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
                 "geo-unknown-predicate.srx").runTest();     
     }
     
+    /**
+     * BLZG-1719: test rectangle for real-world example
+     * 
+     * @throws Exception
+     */
+    public void testRectangleRealworld() throws Exception {
+        new TestHelper(
+                "geo-rectangle-realworld",
+                "geo-rectangle-realworld.rq", 
+                "geo-rectangle-realworld.n3",
+                "geo-rectangle-realworld.srx").runTest();     
+    }
+    
     @Override
     public Properties getProperties() {
 
