@@ -242,15 +242,10 @@ function getNamespaces(synchronous) {
                } else {
                   use = '<a href="#" class="use-namespace">Use</a>';
                }
-<<<<<<< HEAD
                $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="namespace-rebuild-text-index">Rebuild Full Text Index</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
-=======
-
-               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
                
                initMapgraphNamespaceMgmtExtensions(title);
 
->>>>>>> refs/remotes/origin/master
             }
             
            $('.use-namespace').click(function(e) {
@@ -345,7 +340,6 @@ function getNamespaceProperties(namespace, download) {
    });
 }
 
-<<<<<<< HEAD
 function rebuildTextIndex(namespace) {
 	var url = RO_URL_PREFIX + 'namespace/' + namespace + '/textIndex';
 	
@@ -383,8 +377,9 @@ function rebuildTextIndex(namespace) {
 						}
 		   };
 	$.ajax(url, settings);
+}
 
-=======
+
 function getPreparedProperties(elem) {
 
 	   var url = RO_URL_PREFIX + 'namespace/prepareProperties';
@@ -443,7 +438,6 @@ function getPreparedProperties(elem) {
 					  }
 	    	   	};
 	  $.ajax(url, settings);
->>>>>>> refs/remotes/origin/master
 }
 
 function cloneNamespace(namespace) {
@@ -1753,7 +1747,7 @@ function updateExploreStart(data) {
    $('#explore-results a').click(function(e) {
       e.preventDefault();
       var components = parseHash(this.hash);
-      explore(components[2], components[3]);
+      explore(components[2], decodeURIComponent(components[3]));
    });
 }
 

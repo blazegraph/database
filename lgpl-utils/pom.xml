@@ -29,15 +29,20 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.1.0-master-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
-<!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>lgpl-utils</artifactId>
   <version>2.1.0-master-SNAPSHOT</version>
   <name>Blazegraph LGPL Utils</name>
+  <description>Blazegraph LGPL Utils extensions</description>
   <packaging>jar</packaging>
-
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
   <reporting>
     <plugins>
       <plugin>
@@ -73,14 +78,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
-
   <dependencies>
     <dependency>
       <groupId>junit</groupId>

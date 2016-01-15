@@ -26,9 +26,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +56,6 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.RelationSchema;
@@ -196,7 +193,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
     }
 
-    /**
+   
+
+	/**
      * Delete the KB associated with the effective namespace.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
@@ -513,10 +512,6 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             // Service must be writable.
             return;
         }
-
-        final BigdataRDFContext context = getBigdataRDFContext();
-
-        final IIndexManager indexManager = context.getIndexManager();
 
         /*
          * 1. Read the request entity, which must be some kind of Properties

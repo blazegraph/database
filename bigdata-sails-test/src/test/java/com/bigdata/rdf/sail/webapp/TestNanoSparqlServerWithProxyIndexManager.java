@@ -280,6 +280,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(Test_REST_DELETE_WITH_BODY.class);
          suite.addTestSuite(TestNanoSparqlClient.class);
          suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
+         suite.addTestSuite(TestDataLoaderServlet.class); // Data Loader Servlet
 
          // Transaction management API.
          suite.addTestSuite(Test_REST_TX_API.class);

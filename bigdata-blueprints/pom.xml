@@ -29,12 +29,13 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>2.1.0-master-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-blueprints</artifactId>
   <version>2.1.0-master-SNAPSHOT</version>
   <name>Blazegraph Blueprints API</name>
+  <description>Blazegraph support for Tinkerpop 2.5</description>
   <packaging>jar</packaging>
   <build>
    <plugins>
@@ -54,7 +55,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <artifactItem>
       		  <groupId>com.blazegraph</groupId>
                   <artifactId>bigdata-war-html</artifactId>
-      		  <version>${project.version}</version>
+      		      <version>${project.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target</outputDirectory>
@@ -102,13 +103,6 @@ ga('send', 'pageview');
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
