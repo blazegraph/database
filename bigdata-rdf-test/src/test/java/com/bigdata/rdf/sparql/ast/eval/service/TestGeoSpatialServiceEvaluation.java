@@ -1163,6 +1163,18 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
             "geo-grid180-circle04.srx").runTest();     
     }
 
+    /**
+     * BLZG-1718: exception if search predicate is unknown
+     * 
+     * @throws Exception
+     */
+    public void testUnknwonPredicate() throws Exception {
+        new TestHelper(
+                "geo-unknown-predicate",
+                "geo-unknown-predicate.rq", 
+                "geo-unknown-predicate.nt",
+                "geo-unknown-predicate.srx").runTest();     
+    }
     
     @Override
     public Properties getProperties() {

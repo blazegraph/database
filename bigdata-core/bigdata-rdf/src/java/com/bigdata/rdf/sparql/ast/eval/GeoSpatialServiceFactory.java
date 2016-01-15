@@ -772,6 +772,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 final AccessPath<ISPO> accessPath = 
                     getAccessPath(lowerBorderComponents, upperBorderComponents, query);
                 
+                if (accessPath==null) // known unsatisfiable, e.g. if predicate unknown
+                    continue;
+                
                 final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
                 
                 // TODO: rangeCount() returns quite strange results, e.g. for 3.3.1 we get >1M although the range
