@@ -81,14 +81,14 @@ public interface IGeoSpatialQuery {
     public Double getSpatialCircleRadius();
 
     /**
-     * @return the boundary box'es upper left
+     * @return the boundary box'es south-west border point.
      */
-    public PointLatLon getSpatialRectangleUpperLeft();
+    public PointLatLon getSpatialRectangleSouthWest();
 
     /**
-     * @return the boundary box'es lower right
+     * @return the boundary box'es north-east border point.
      */
-    public PointLatLon getSpatialRectangleLowerRight();
+    public PointLatLon getSpatialRectangleNorthEast();
 
     /**
      * @return the spatial unit underlying the query
@@ -127,14 +127,20 @@ public interface IGeoSpatialQuery {
 
     
     /**
-     * Get a bounding box including timestamp representing the upper left.
+     * Get a bounding box including timestamp representing the south-west corner point.
+     * 
+     * Note that we return south-west since for a south-west pair (lat1, lon1) and
+     * its corresponding north-east pair (lat2,lon2) it holds that lat1<=lat2 and lon1<=lon2.
      */
-    public PointLatLonTime getBoundingBoxUpperLeftWithTime();
+    public PointLatLonTime getBoundingBoxSouthWestWithTime();
     
     /**
-     * Get a bounding box including timestamp representing the lower right.
+     * Get a bounding box including timestamp representing the north-east corner point.
+     * 
+     * Note that we return north-east since for a north-east pair (lat1, lon1) and
+     * its corresponding north-west pair (lat2,lon2) it holds that lat1>=lat2 and lon1>=lon2.
      */
-    public PointLatLonTime getBoundingBoxLowerRightWithTime();
+    public PointLatLonTime getBoundingBoxNorthEastWithTime();
 
     
     /**

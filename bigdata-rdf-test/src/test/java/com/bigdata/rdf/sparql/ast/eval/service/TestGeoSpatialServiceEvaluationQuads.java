@@ -68,8 +68,8 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *   }
@@ -102,8 +102,8 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
      *     ?res geo:context <http://c4> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *   }
@@ -140,8 +140,8 @@ public class TestGeoSpatialServiceEvaluationQuads extends AbstractDataDrivenSPAR
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
      *     ?res geo:context <http://c5> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *   }

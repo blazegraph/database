@@ -68,8 +68,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *   }
@@ -94,8 +94,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "5#5" .
-     *     ?res geo:spatialRectangleLowerRight "5#5" .
+     *     ?res geo:spatialRectangleSouthWest "5#5" .
+     *     ?res geo:spatialRectangleNorthEast "5#5" .
      *     ?res geo:timeStart "1" .
      *     ?res geo:timeEnd "10" .
      *   }
@@ -121,8 +121,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "-1#9" .
-     *     ?res geo:spatialRectangleLowerRight "1#12" .
+     *     ?res geo:spatialRectangleSouthWest "-1#9" .
+     *     ?res geo:spatialRectangleNorthEast "1#12" .
      *     ?res geo:timeStart "7" .
      *     ?res geo:timeEnd "12" .
      *   }
@@ -147,8 +147,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "-90#8.8837" .
-     *     ?res geo:spatialRectangleLowerRight "1.00#12.2344" .
+     *     ?res geo:spatialRectangleSouthWest "-90#8.8837" .
+     *     ?res geo:spatialRectangleNorthEast "1.00#12.2344" .
      *     ?res geo:timeStart "7" .
      *     ?res geo:timeEnd "100000000000000" .
      *   }
@@ -173,8 +173,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "-90E0#.88837E1" .
-     *     ?res geo:spatialRectangleLowerRight "1.00#179.2344" .
+     *     ?res geo:spatialRectangleSouthWest "-90E0#.88837E1" .
+     *     ?res geo:spatialRectangleNorthEast "1.00#179.2344" .
      *     ?res geo:timeStart "7" .
      *     ?res geo:timeEnd "1000000" .
      *   }
@@ -199,8 +199,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      * SELECT ?res WHERE {
      *   ?res geo:search "inRectangle" .
      *   ?res geo:predicate <http://p> .
-     *   ?res geo:spatialRectangleUpperLeft "-90E0#.88837E1" .
-     *   ?res geo:spatialRectangleLowerRight "1.00#179.2344" .
+     *   ?res geo:spatialRectangleSouthWest "-90E0#.88837E1" .
+     *   ?res geo:spatialRectangleNorthEast "1.00#179.2344" .
      *   ?res geo:timeStart "7" .
      *   ?res geo:timeEnd "1000000" .
      * } 
@@ -224,8 +224,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *   }
@@ -252,8 +252,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "1.10#1.100000001111" .
-     *     ?res geo:spatialRectangleLowerRight "6.666666#7" .
+     *     ?res geo:spatialRectangleSouthWest "1.10#1.100000001111" .
+     *     ?res geo:spatialRectangleNorthEast "6.666666#7" .
      *     ?res geo:timeStart "0" .
      *     ?res geo:timeEnd "0" .
      *   }
@@ -281,8 +281,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "1.10#1.1" .
-     *     ?res geo:spatialRectangleLowerRight "6.66666#7" .
+     *     ?res geo:spatialRectangleSouthWest "1.10#1.1" .
+     *     ?res geo:spatialRectangleNorthEast "6.66666#7" .
      *     ?res geo:timeStart "0" .
      *     ?res geo:timeEnd "0" .
      *   }
@@ -324,8 +324,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "4#4" .
-     *     ?res geo:spatialRectangleLowerRight "5#5" .
+     *     ?res geo:spatialRectangleSouthWest "4#4" .
+     *     ?res geo:spatialRectangleNorthEast "5#5" .
      *     ?res geo:timeStart "1" .
      *     ?res geo:timeEnd "10" .
      *   }
@@ -751,8 +751,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *     ?res geo:locationValue ?location .
@@ -778,8 +778,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *     ?res geo:timeValue ?time .
@@ -805,8 +805,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *     ?res geo:locationAndTimeValue ?locationAndTime .    
@@ -834,8 +834,8 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
      *   SERVICE geo:search {
      *     ?res geo:search "inRectangle" .
      *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleUpperLeft "2#2" .
-     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:spatialRectangleSouthWest "2#2" .
+     *     ?res geo:spatialRectangleNorthEast "3#6" .
      *     ?res geo:timeStart "4" .
      *     ?res geo:timeEnd "4" .
      *     ?res geo:locationValue ?location .
