@@ -36,6 +36,7 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -106,6 +107,10 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     private final static Logger log = Logger
             .getLogger(ASTDeferredIVResolutionInitializer.class);
+
+    private final static boolean INFO = log.isInfoEnabled();
+
+    private final static List<URI> RDF_VOCAB = Arrays.asList(RDF.FIRST, RDF.REST, RDF.NIL, BD.VIRTUAL_GRAPH);
 
     private final Map<Value, BigdataValue> vocab;
 
@@ -277,7 +282,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
          */
         
         // RDF Collection syntactic sugar vocabulary items.
-        for (Value value: Arrays.asList(RDF.FIRST, RDF.REST, RDF.NIL, BD.VIRTUAL_GRAPH)) {
+        for (Value value: RDF_VOCAB) {
             BigdataValue bigdataValue = valueFactory.asValue(value);
             fillInDummyIV(bigdataValue);
             vocab.put(value, bigdataValue);
@@ -301,7 +306,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
              * to the kb.
              */
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Not in knowledge base: " + value);
 
             /*
