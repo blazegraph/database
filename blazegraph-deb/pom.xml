@@ -59,6 +59,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <!-- Customize deb package  -->
             <configuration>
               <deb>${project.build.directory}/${project.artifactId}-${project.version}.deb</deb>
+              <signPackage>true</signPackage>
+              <keyring>${gpg.keyring}</keyring>
+              <key>${gpg.keysig}</key>
+              <passphrase>${gpg.passphrase}</passphrase>
               <dataSet>
                 <!-- dependencies go in /usr/local/blazegraph-[version]/lib -->
                 <data>
