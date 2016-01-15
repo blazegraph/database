@@ -238,7 +238,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     </properties>
     <profiles>
        <profile> 
-         <id>release</id>
+         <id>maven-central</id>
          <!-- 
                 Plugins for Maven Central Deployment 
                 See:  http://central.sonatype.org/pages/apache-maven.html 
@@ -303,6 +303,27 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </plugins>
         </build>
       </profile>
+      <profile>
+         <id>local-deploy</id>
+         <distributionManagement>
+            <snapshotRepository>
+               <id>bigdata.snapshots</id>
+               <name>bigdata(R) snapshots</name>
+               <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/snapshots</url>
+               <uniqueVersion>true</uniqueVersion>
+            </snapshotRepository>
+          </distributionManagement>
+          <repositories>
+            <repository>
+               <id>bigdata.releases</id>
+               <url>http://www.systap.com/maven/releases/</url>
+            </repository>
+            <repository>
+               <id>bigdata.snapshots</id>
+               <url>http://www.systap.com/maven/snapshots/</url>
+            </repository>
+          </repositories>
+      </profile>
     </profiles>
     <build>
     <plugins>
@@ -346,6 +367,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         </configuration>
       </plugin>
     </plugins>
+    <!-- Used for Legacy deployments to Blazegraph-hosted maven -->
+    <extensions>
+         <extension>
+            <groupId>org.apache.maven.wagon</groupId>
+            <artifactId>wagon-ssh-external</artifactId>
+            <version>1.0-beta-6</version>
+         </extension>
+    </extensions>
   </build>
   <modules>
     <module>junit-ext</module>
