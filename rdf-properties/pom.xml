@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <!--
-Copyright (C) SYSTAP, LLC 2006-2016.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
      licenses@blazegraph.com
@@ -48,7 +48,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <author>true</author>
           <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph RDF Properties</h1>]]></doctitle>
-          <bottom><![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC DBA Blazegraph. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({

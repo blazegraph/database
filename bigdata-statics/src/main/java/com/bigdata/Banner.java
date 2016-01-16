@@ -1,9 +1,9 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2016.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
      licenses@blazegraph.com
@@ -502,7 +502,7 @@ public class Banner {
         "\n                  Affordable"+//
         "\n      Web-Scale Computing for the Enterprise"+//
         "\n"+//
-        "\nCopyright SYSTAP, LLC 2006-2016.  All rights reserved."+//
+        "\nCopyright SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved."+//
         "\n"+//
         "\n"+fullyQualifiedHostName+//
         "\n"+new Date()+//

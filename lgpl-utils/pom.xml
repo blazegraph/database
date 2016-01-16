@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <!--
-Copyright (C) SYSTAP, LLC 2006-2016.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
      licenses@blazegraph.com
@@ -56,7 +56,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph LGPL Utils</h1>]]></doctitle>
           <bottom><![CDATA[ <i> 
-                           Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.<p>
+                           Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2012.  All rights reserved.<p>
 
                            Licensed under the Apache License, Version 2.0 (the "License");
                            you may not use this file except in compliance with the License.

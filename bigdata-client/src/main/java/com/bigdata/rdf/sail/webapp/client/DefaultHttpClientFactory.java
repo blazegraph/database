@@ -1,8 +1,8 @@
 /**
-1Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
+1Copyright (C) SYSTAP, LLC DBA Blazegraph 2014.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
      licenses@blazegraph.com
