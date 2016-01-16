@@ -43,6 +43,7 @@ export JETTY_OPTS="\
  -Djetty.port=${JETTY_PORT}\
  -Djetty.resourceBase=${JETTY_RESOURCE_BASE}\
  -Djetty.home=${JETTY_RESOURCE_BASE}\
+ -Djetty.overrideWebXml=${JETTY_RESOURCE_BASE}/WEB-INF/override-web.xml\
  -DJETTY_XML=${JETTY_XML}\
  -Djava.util.logging.config.file=${LOGGING_CONFIG}\
  -Dlog4j.configuration=${LOG4J_CONFIG}\
