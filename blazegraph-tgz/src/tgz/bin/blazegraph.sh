@@ -20,7 +20,7 @@ else
    export LIB_DIR=${INSTALL_DIR}/lib
 fi
 
-export JETTY_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
+export JETTY_CLASSPATH=`find ${LIB_DIR} -name 'blazegraph-*.jar' -print0 | tr '\0' ':'`:`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
 export DATA_DIR=${BLZG_HOME}/data
 
