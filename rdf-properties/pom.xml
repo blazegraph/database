@@ -46,9 +46,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph RDF Properties</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -65,36 +65,35 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
   </reporting>
   <dependencies>
-     <dependency>
-       <groupId>commons-io</groupId>
-       <artifactId>commons-io</artifactId>
-       <version>${apache.commons_io.version}</version>
-     </dependency>
-     <dependency>
-	   <groupId>org.openrdf.sesame</groupId>
-	   <artifactId>sesame-util</artifactId>
-	   <version>${sesame.version}</version>
-     </dependency>
-     <dependency>
-       <groupId>org.openrdf.sesame</groupId>
-       <artifactId>sesame-rio-rdfxml</artifactId>
-       <version>${sesame.version}</version>
-     </dependency>
-     <dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>${apache.commons_io.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-util</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-rdfxml</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-queryresultio-sparqljson</artifactId>
       <version>${sesame.version}</version>
     </dependency>
     <dependency>
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
   </dependencies>
 </project>

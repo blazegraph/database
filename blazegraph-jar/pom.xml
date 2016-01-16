@@ -38,16 +38,16 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <description>Blazegraph Executable Jar file.  All files required to run Blazegraph DB in a single jar.</description>
   <packaging>jar</packaging>
   <build>
-     <resources>
-        <resource>
-            <directory>src/main/resources</directory>
-            <includes>
-		<include>**/*.xml</include>
-		<include>**/*.properties</include>
-		<include>**/org.openrdf.rio.*</include>
-		<include>**/com.bigdata.*</include>
-	    </includes>
-	</resource>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <includes>
+          <include>**/*.xml</include>
+          <include>**/*.properties</include>
+          <include>**/org.openrdf.rio.*</include>
+          <include>**/com.bigdata.*</include>
+        </includes>
+      </resource>
     </resources>
     <plugins>
       <plugin>
@@ -76,31 +76,31 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             </configuration>
           </execution>
         </executions>
-        </plugin>
-       <plugin>
-           <artifactId>maven-antrun-plugin</artifactId>
-           <version>1.6</version>
-           <executions>
-             <execution>
-               <id>unpack-war</id>
-               <goals>
-                 <goal>run</goal>
-               </goals>
-               <phase>compile</phase>
-               <configuration>
-                 <target>
- 		             <unzip dest="target/classes/war">
-        		        <fileset dir="target/classes/war">
-            		    <include name="blazegraph.war" />
-        		        </fileset>    
-    		         </unzip>
- 		             <delete file="target/classes/war/blazegraph.war" />
-		             <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
-                 </target>
-               </configuration>
-             </execution>
-           </executions>
-	</plugin>
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.6</version>
+        <executions>
+          <execution>
+            <id>unpack-war</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>compile</phase>
+            <configuration>
+              <target>
+                <unzip dest="target/classes/war">
+                  <fileset dir="target/classes/war">
+                    <include name="blazegraph.war"/>
+                  </fileset>
+                </unzip>
+                <delete file="target/classes/war/blazegraph.war"/>
+                <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -112,19 +112,19 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <goal>shade</goal>
             </goals>
             <configuration>
-               <filters>
-		<filter>
-          <artifact>com.blazegraph:rdf-properties</artifact>
-		  <includes>
-		    <include>**/*</include>
-		  </includes>
-	   	 </filter>
-		  <filter>
+              <filters>
+                <filter>
+                  <artifact>com.blazegraph:rdf-properties</artifact>
+                  <includes>
+                    <include>**/*</include>
+                  </includes>
+                </filter>
+                <filter>
                   <artifact>com.blazegraph:blazegraph-jar</artifact>
-		  <includes>
-		    <include>**/*</include>
-		  </includes>
-	   	</filter>
+                  <includes>
+                    <include>**/*</include>
+                  </includes>
+                </filter>
                 <filter>
                   <artifact>*:*</artifact>
                   <excludes>
@@ -144,8 +144,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                     <exclude>**/sesame*testsuite/**</exclude>
                   </excludes>
                 </filter>
-               </filters>
-               <transformers>
+              </filters>
+              <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
                     <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
@@ -157,9 +157,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </execution>
         </executions>
       </plugin>
-     </plugins>
-   </build>
-
+    </plugins>
+  </build>
   <reporting>
     <plugins>
       <plugin>
@@ -170,9 +169,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Executable Jar</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -189,7 +188,6 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
@@ -204,7 +202,7 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
       <version>${project.version}</version>
-       <exclusions>
+      <exclusions>
         <exclusion>
           <groupId>org.openrdf.sesame</groupId>
           <artifactId>sesame-rio-testsuite</artifactId>
@@ -248,5 +246,4 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
   </dependencies>
-
-  </project>
+</project>

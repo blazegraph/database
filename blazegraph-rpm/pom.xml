@@ -38,18 +38,18 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <description>Blazegraph RPM deployer for the RHEL and CentOS package management systems</description>
   <packaging>rpm</packaging>
   <properties>
-     <rpm.user>blzg</rpm.user>
-     <rpm.group>blzg</rpm.group>
-     <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
-     <rpm.release>SNAPSHOT</rpm.release>
-     <app.name>blazegraph</app.name>
+    <rpm.user>blzg</rpm.user>
+    <rpm.group>blzg</rpm.group>
+    <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
+    <rpm.release>SNAPSHOT</rpm.release>
+    <app.name>blazegraph</app.name>
   </properties>
   <build>
     <extensions>
       <extension>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>rpm-maven-plugin</artifactId>
-          <version>2.1.4</version>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>rpm-maven-plugin</artifactId>
+        <version>2.1.4</version>
       </extension>
     </extensions>
     <pluginManagement>
@@ -60,117 +60,117 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <version>2.1.4</version>
           <extensions>true</extensions>
           <configuration>
-          <license>GPL v2</license>
-          <distribution>Blazegraph</distribution>
-          <group>High Performance Graph Database</group>
-          <packager>SYSTAP, LLC</packager>
-          <prefix>${rpm.installDir}</prefix>
-          <changelogFile>src/changelog</changelogFile>
-          <!-- Note that RPM signing is currently broken on OS-X:  https://github.com/mojohaus/rpm-maven-plugin/issues/11 -->
-          <!--
+            <license>GPL v2</license>
+            <distribution>Blazegraph</distribution>
+            <group>High Performance Graph Database</group>
+            <packager>SYSTAP, LLC</packager>
+            <prefix>${rpm.installDir}</prefix>
+            <changelogFile>src/changelog</changelogFile>
+            <!-- Note that RPM signing is currently broken on OS-X:  https://github.com/mojohaus/rpm-maven-plugin/issues/11 -->
+            <!--
           <key>${gpg.keyname}</key>
           -->
-          <mappings>
-            <mapping>
-              <directory>${rpm.installDir}/lib</directory>
-              <filemode>750</filemode>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-              <sources>
-                <source>
-                  <location>${project.build.directory}/dependency</location>
-                </source>
-              </sources>
-            </mapping>
-            <mapping>
-              <directory>${rpm.installDir}/war</directory>
-              <filemode>750</filemode>
-              <recurseDirectories>true</recurseDirectories>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-              <sources>
-                <source>
-                  <location>${project.build.directory}/classes/war</location>
-                </source>
-              </sources>
-            </mapping>
-            <mapping>
-              <directory>${rpm.installDir}/bin</directory>
-              <filemode>750</filemode>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-              <sources>
-                <source>
-                  <location>src/rpm/bin</location>
-                </source>
-              </sources>
-            </mapping>
-            <mapping>
-              <directory>${rpm.installDir}/conf</directory>
-              <configuration>true</configuration>
-              <filemode>750</filemode>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-              <sources>
-                <source>
-                  <location>src/rpm/conf</location>
-                </source>
-                <source>
-                  <location>${project.build.directory}/classes/RWStore.properties</location>
-                </source>
-                <source>
-                  <location>${project.build.directory}/classes/war/WEB-INF/classes/log4j.properties</location>
-                </source>
-                <source>
-                  <location>${project.build.directory}/classes/jetty.xml</location>
-                </source>
-              </sources>
-            </mapping>
-            <mapping>
-              <directory>${rpm.installDir}/data</directory>
-              <filemode>750</filemode>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-	        </mapping>
-            <mapping>
-              <directory>/var/log/${app.name}</directory>
-              <filemode>750</filemode>
-              <username>${rpm.user}</username>
-              <groupname>${rpm.group}</groupname>
-            </mapping>
-            <mapping>
-              <directory>/usr/local</directory>
-              <sources>
-                <softlinkSource>
-                  <location>${rpm.installDir}</location>
-                  <destination>${app.name}</destination>
-                </softlinkSource>
-              </sources>
-            </mapping>
-          </mappings>
-          <preinstallScriptlet>
-            <scriptFile>src/rpm/scripts/preinst</scriptFile>
-            <fileEncoding>utf-8</fileEncoding>
-          </preinstallScriptlet>
-          <postinstallScriptlet>
-            <scriptFile>src/rpm/scripts/postinst</scriptFile>
-            <fileEncoding>utf-8</fileEncoding>
-          </postinstallScriptlet>
-          <postremoveScriptlet>
-            <scriptFile>src/rpm/scripts/postremove</scriptFile>
-            <fileEncoding>utf-8</fileEncoding>
-          </postremoveScriptlet>
-          <provides>
-             <provide>blazegraph</provide>
-	      </provides>
-          <requires>
-		     <require>/usr/sbin/useradd</require>
-		     <require>/usr/bin/getent</require>
-	      </requires>
-        </configuration>
-       </plugin>
+            <mappings>
+              <mapping>
+                <directory>${rpm.installDir}/lib</directory>
+                <filemode>750</filemode>
+                <username>${rpm.user}</username>
+                <groupname>${rpm.group}</groupname>
+                <sources>
+                  <source>
+                    <location>${project.build.directory}/dependency</location>
+                  </source>
+                </sources>
+              </mapping>
+              <mapping>
+                <directory>${rpm.installDir}/war</directory>
+                <filemode>750</filemode>
+                <recurseDirectories>true</recurseDirectories>
+                <username>${rpm.user}</username>
+                <groupname>${rpm.group}</groupname>
+                <sources>
+                  <source>
+                    <location>${project.build.directory}/classes/war</location>
+                  </source>
+                </sources>
+              </mapping>
+              <mapping>
+                <directory>${rpm.installDir}/bin</directory>
+                <filemode>750</filemode>
+                <username>${rpm.user}</username>
+                <groupname>${rpm.group}</groupname>
+                <sources>
+                  <source>
+                    <location>src/rpm/bin</location>
+                  </source>
+                </sources>
+              </mapping>
+              <mapping>
+                <directory>${rpm.installDir}/conf</directory>
+                <configuration>true</configuration>
+                <filemode>750</filemode>
+                <username>${rpm.user}</username>
+                <groupname>${rpm.group}</groupname>
+                <sources>
+                  <source>
+                    <location>src/rpm/conf</location>
+                  </source>
+                  <source>
+                    <location>${project.build.directory}/classes/RWStore.properties</location>
+                  </source>
+                  <source>
+                    <location>${project.build.directory}/classes/war/WEB-INF/classes/log4j.properties</location>
+                  </source>
+                  <source>
+                    <location>${project.build.directory}/classes/jetty.xml</location>
+                  </source>
+                </sources>
+              </mapping>
+              <mapping>
+                <directory>${rpm.installDir}/data</directory>
+                <filemode>750</filemode>
+                <username>${rpm.user}</username>
+                <groupname>${rpm.group}</groupname>
+              </mapping>
+              <mapping>
+                <directory>/var/log/${app.name}</directory>
+                <filemode>750</filemode>
+                <username>${rpm.user}</username>
+                <groupname>${rpm.group}</groupname>
+              </mapping>
+              <mapping>
+                <directory>/usr/local</directory>
+                <sources>
+                  <softlinkSource>
+                    <location>${rpm.installDir}</location>
+                    <destination>${app.name}</destination>
+                  </softlinkSource>
+                </sources>
+              </mapping>
+            </mappings>
+            <preinstallScriptlet>
+              <scriptFile>src/rpm/scripts/preinst</scriptFile>
+              <fileEncoding>utf-8</fileEncoding>
+            </preinstallScriptlet>
+            <postinstallScriptlet>
+              <scriptFile>src/rpm/scripts/postinst</scriptFile>
+              <fileEncoding>utf-8</fileEncoding>
+            </postinstallScriptlet>
+            <postremoveScriptlet>
+              <scriptFile>src/rpm/scripts/postremove</scriptFile>
+              <fileEncoding>utf-8</fileEncoding>
+            </postremoveScriptlet>
+            <provides>
+              <provide>blazegraph</provide>
+            </provides>
+            <requires>
+              <require>/usr/sbin/useradd</require>
+              <require>/usr/bin/getent</require>
+            </requires>
+          </configuration>
+        </plugin>
       </plugins>
-     </pluginManagement>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -219,45 +219,44 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             </configuration>
           </execution>
         </executions>
-        </plugin>
-       <plugin>
-           <artifactId>maven-antrun-plugin</artifactId>
-           <version>1.6</version>
-           <executions>
-             <execution>
-               <id>unpack-war</id>
-               <goals>
-                 <goal>run</goal>
-               </goals>
-               <phase>compile</phase>
-               <configuration>
-                 <target>
- 		           <unzip dest="target/classes/war">
-                        <patternset>
-                           <include name="**/*"/>
-                        </patternset>
-        		        <fileset dir="target/classes/">
-            			   <include name="blazegraph.war" />
-        		       </fileset>    
-    		        </unzip>
-		            <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
- 		            <unzip dest="target/classes/jar">
-                        <patternset>
-                           <include name="jetty.xml"/>
-                        </patternset>
-        		       <fileset dir="target/classes/">
-            			  <include name="blazegraph.jar" />
-        		       </fileset>    
-    		        </unzip>
-		            <copy file="target/classes/jar/jetty.xml" todir="target/classes" />
-                 </target>
-               </configuration>
-             </execution>
-           </executions>
-	</plugin>
-   </plugins>
-   </build>
-
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.6</version>
+        <executions>
+          <execution>
+            <id>unpack-war</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>compile</phase>
+            <configuration>
+              <target>
+                <unzip dest="target/classes/war">
+                  <patternset>
+                    <include name="**/*"/>
+                  </patternset>
+                  <fileset dir="target/classes/">
+                    <include name="blazegraph.war"/>
+                  </fileset>
+                </unzip>
+                <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
+                <unzip dest="target/classes/jar">
+                  <patternset>
+                    <include name="jetty.xml"/>
+                  </patternset>
+                  <fileset dir="target/classes/">
+                    <include name="blazegraph.jar"/>
+                  </fileset>
+                </unzip>
+                <copy file="target/classes/jar/jetty.xml" todir="target/classes"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
   <reporting>
     <plugins>
       <plugin>
@@ -268,9 +267,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph RPM</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -287,7 +286,6 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
@@ -300,115 +298,115 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
     <!-- External and third party dependencies -->
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-continuation</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-http</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-io</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-jmx</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-jndi</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-server</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-util</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-webapp</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-servlet</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-security</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-xml</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-rewrite</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-client</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-proxy</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-       <dependency>
-        <groupId>javax.servlet</groupId>
-        <artifactId>javax.servlet-api</artifactId>
-        <version>${servlet.version}</version>
-      </dependency>
-      <dependency>
-           <groupId>com.github.stephenc.high-scale-lib</groupId>
-           <artifactId>high-scale-lib</artifactId>
-           <version>${highscalelib.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>colt</groupId>
-           <artifactId>colt</artifactId>
-           <version>${colt.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.apache.lucene</groupId>
-           <artifactId>lucene-core</artifactId>
-           <version>${lucene.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.apache.lucene</groupId>
-           <artifactId>lucene-analyzers</artifactId>
-           <version>${lucene.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>com.ibm.icu</groupId>
-           <artifactId>icu4j</artifactId>
-           <version>${icu.version}</version>
-       </dependency>
-       <dependency>
-           <!-- log4j is the primary logger for bigdata. -->
-           <groupId>log4j</groupId>
-           <artifactId>log4j</artifactId>
-           <version>${log4j.version}</version>
-           <!-- There is a bug with log4j 1.2.15 where it has a lot  -->
-           <!-- of dependencies that we do not need in its POM. The  --> 
-           <!-- exclusions are only necessary with that version.     -->
-           <!-- 
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-continuation</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-http</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-io</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-jmx</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-jndi</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-server</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-util</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-webapp</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-servlet</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-security</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-xml</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-rewrite</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-client</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-proxy</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>javax.servlet-api</artifactId>
+      <version>${servlet.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.stephenc.high-scale-lib</groupId>
+      <artifactId>high-scale-lib</artifactId>
+      <version>${highscalelib.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>colt</groupId>
+      <artifactId>colt</artifactId>
+      <version>${colt.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-core</artifactId>
+      <version>${lucene.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-analyzers</artifactId>
+      <version>${lucene.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.ibm.icu</groupId>
+      <artifactId>icu4j</artifactId>
+      <version>${icu.version}</version>
+    </dependency>
+    <dependency>
+      <!-- log4j is the primary logger for bigdata. -->
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+      <!-- There is a bug with log4j 1.2.15 where it has a lot  -->
+      <!-- of dependencies that we do not need in its POM. The  -->
+      <!-- exclusions are only necessary with that version.     -->
+      <!-- 
            <exclusions>
              <exclusion>
                <groupId>javax.jms</groupId>
@@ -424,116 +422,116 @@ ga('send', 'pageview');
              </exclusion>
            </exclusions>
            -->
-        </dependency>
-       <dependency>
-           <groupId>org.slf4j</groupId>
-           <artifactId>slf4j-api</artifactId>
-           <version>${slf4j.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.slf4j</groupId>
-           <artifactId>slf4j-log4j12</artifactId>
-           <version>${slf4j.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.apache.httpcomponents</groupId>
-           <artifactId>httpclient</artifactId>
-           <version>${apache.httpclient.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.apache.httpcomponents</groupId>
-           <artifactId>httpclient-cache</artifactId>
-           <version>${apache.httpclient_cache.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.apache.httpcomponents</groupId>
-           <artifactId>httpcore</artifactId>
-           <version>${apache.httpcore.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.apache.httpcomponents</groupId>
-           <artifactId>httpmime</artifactId>
-           <version>${apache.httpmime.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>commons-codec</groupId>
-           <artifactId>commons-codec</artifactId>
-           <version>${apache.commons_codec.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>commons-fileupload</groupId>
-           <artifactId>commons-fileupload</artifactId>
-           <version>${apache.commons_fileupload.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>commons-io</groupId>
-           <artifactId>commons-io</artifactId>
-           <version>${apache.commons_io.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>commons-logging</groupId>
-           <artifactId>commons-logging</artifactId>
-           <version>${apache.commons_logging.version}</version>
-       </dependency>
-        <dependency>
-           <groupId>com.fasterxml.jackson.core</groupId>
-           <artifactId>jackson-core</artifactId>
-           <version>${jackson.version}</version>
-        </dependency>
-        <dependency>
-           <groupId>com.fasterxml.jackson.core</groupId>
-           <artifactId>jackson-annotations</artifactId>
-           <version>${jackson.version}</version>
-        </dependency>
-        <dependency>
-           <groupId>com.fasterxml.jackson.core</groupId>
-           <artifactId>jackson-databind</artifactId>
-           <version>${jackson.version}</version>
-        </dependency>
-	    <dependency>
-           <groupId>org.codehaus.jettison</groupId>
-           <artifactId>jettison</artifactId>
-           <version>${jettison.version}</version>
-    	</dependency>	
-        <dependency>
-           <groupId>org.openrdf.sesame</groupId>
-           <artifactId>sesame-runtime</artifactId>
-           <version>${sesame.version}</version>
-        </dependency>
-        <dependency>
-           <groupId>org.openrdf.sesame</groupId>
-           <artifactId>sesame-rio-rdfxml</artifactId>
-           <version>${sesame.version}</version>
-        </dependency>
-        <dependency>
-           <groupId>org.openrdf.sesame</groupId>
-           <artifactId>sesame-queryresultio-sparqljson</artifactId>
-           <version>${sesame.version}</version>
-        </dependency>
-        <dependency>
-	       <groupId>com.tinkerpop.blueprints</groupId>
-	       <artifactId>blueprints-core</artifactId>
-	       <version>${blueprints.version}</version>
-        </dependency>
-        <dependency>
-	       <groupId>com.tinkerpop.rexster</groupId>
-	       <artifactId>rexster-core</artifactId>
-	       <version>${rexster.version}</version>
-        </dependency>
-        <dependency>
-	       <groupId>commons-configuration</groupId>
-	       <artifactId>commons-configuration</artifactId>
-	       <version>${apache.commons_configuration.version}</version>
-        </dependency> 
-        <dependency>
-          <groupId>it.unimi.dsi</groupId>
-          <artifactId>fastutil</artifactId>
-          <version>${fastutil.version}</version>
-       </dependency>
-       <dependency>
-          <groupId>it.unimi.dsi</groupId>
-          <artifactId>dsiutils</artifactId>
-          <version>1.0.10</version>
-       </dependency>
-   </dependencies>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <version>${slf4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+      <version>${apache.httpclient.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient-cache</artifactId>
+      <version>${apache.httpclient_cache.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore</artifactId>
+      <version>${apache.httpcore.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpmime</artifactId>
+      <version>${apache.httpmime.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <version>${apache.commons_codec.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-fileupload</groupId>
+      <artifactId>commons-fileupload</artifactId>
+      <version>${apache.commons_fileupload.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>${apache.commons_io.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
+      <version>${apache.commons_logging.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.jettison</groupId>
+      <artifactId>jettison</artifactId>
+      <version>${jettison.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-runtime</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-rdfxml</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-queryresultio-sparqljson</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.tinkerpop.blueprints</groupId>
+      <artifactId>blueprints-core</artifactId>
+      <version>${blueprints.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.tinkerpop.rexster</groupId>
+      <artifactId>rexster-core</artifactId>
+      <version>${rexster.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-configuration</groupId>
+      <artifactId>commons-configuration</artifactId>
+      <version>${apache.commons_configuration.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>it.unimi.dsi</groupId>
+      <artifactId>fastutil</artifactId>
+      <version>${fastutil.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>it.unimi.dsi</groupId>
+      <artifactId>dsiutils</artifactId>
+      <version>1.0.10</version>
+    </dependency>
+  </dependencies>
 </project>

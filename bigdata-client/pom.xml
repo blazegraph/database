@@ -37,8 +37,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <name>Blazegraph Client API</name>
   <description>Blazegraph Client API tools</description>
   <build>
-  <plugins>
-    <plugin>
+    <plugins>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>2.6</version>
@@ -50,7 +50,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </execution>
         </executions>
       </plugin>
-  </plugins>
+    </plugins>
   </build>
   <reporting>
     <plugins>
@@ -62,9 +62,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Client API<</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -81,13 +81,12 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
   </reporting>
   <dependencies>
-     <dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit4.version}</version>
@@ -100,16 +99,16 @@ ga('send', 'pageview');
       <scope>test</scope>
     </dependency>
     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>rdf-properties</artifactId>
-       <version>${project.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${project.version}</version>
     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-util</artifactId>
-       <version>${project.version}</version>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${project.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
       <version>${sesame.version}</version>
@@ -123,17 +122,16 @@ ga('send', 'pageview');
       <groupId>log4j</groupId>
       <artifactId>log4j</artifactId>
       <version>${log4j.version}</version>
-     </dependency>
-     <dependency>
-       <groupId>org.apache.httpcomponents</groupId>
-       <artifactId>httpclient</artifactId>
-       <version>${apache.httpclient.version}</version>
-      </dependency>
-      <dependency>
-       <groupId>org.apache.httpcomponents</groupId>
-           <artifactId>httpmime</artifactId>
-           <version>${apache.httpmime.version}</version>
-       </dependency>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+      <version>${apache.httpclient.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpmime</artifactId>
+      <version>${apache.httpmime.version}</version>
+    </dependency>
   </dependencies>
-
-  </project>
+</project>

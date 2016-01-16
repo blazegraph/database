@@ -22,8 +22,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
---><project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
@@ -65,32 +65,31 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             </configuration>
           </execution>
         </executions>
-        </plugin>
-       <plugin>
-           <artifactId>maven-antrun-plugin</artifactId>
-           <version>1.6</version>
-           <executions>
-             <execution>
-               <id>unpack-war</id>
-               <goals>
-                 <goal>run</goal>
-               </goals>
-               <phase>compile</phase>
-               <configuration>
-                 <target>
- 		           <unzip dest="target/classes/war">
-        		      <fileset dir="target/classes/war">
-            			<include name="bigdata.war" />
-        		      </fileset>    
-    		       </unzip>
- 		           <delete file = "target/classes/war/bigdata.war"/>
-		           <copy file = "target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
-                 </target>
-               </configuration>
-             </execution>
-           </executions>
-	</plugin>
-
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.6</version>
+        <executions>
+          <execution>
+            <id>unpack-war</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>compile</phase>
+            <configuration>
+              <target>
+                <unzip dest="target/classes/war">
+                  <fileset dir="target/classes/war">
+                    <include name="bigdata.war"/>
+                  </fileset>
+                </unzip>
+                <delete file="target/classes/war/bigdata.war"/>
+                <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -102,11 +101,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <goal>shade</goal>
             </goals>
             <configuration>
-	       <artifactSet>
-		   <includes>
-		      <include>com.blazegraph:*</include>
-		   </includes>
-		<excludes>
+              <artifactSet>
+                <includes>
+                  <include>com.blazegraph:*</include>
+                </includes>
+                <excludes>
                   <exclude>commons-io:*</exclude>
                   <exclude>commons-lang:*</exclude>
                   <exclude>commons-codec:*</exclude>
@@ -124,8 +123,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <exclude>com.tinkerpop.*:*</exclude>
                   <exclude>javax.servlet:*</exclude>
                   <exclude>log4j:*</exclude>
-		</excludes>
- 	      </artifactSet>
+                </excludes>
+              </artifactSet>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
@@ -138,9 +137,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </execution>
         </executions>
       </plugin>
-     </plugins>
-   </build>
-
+    </plugins>
+  </build>
   <reporting>
     <plugins>
       <plugin>
@@ -151,9 +149,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Runtime</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -170,7 +168,6 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
@@ -185,7 +182,7 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
       <version>${project.version}</version>
-       <exclusions>
+      <exclusions>
         <exclusion>
           <groupId>org.openrdf.sesame</groupId>
           <artifactId>sesame-rio-testsuite</artifactId>

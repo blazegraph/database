@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!--
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
@@ -24,7 +25,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
@@ -47,7 +47,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Ganglia</h1>]]></doctitle>
           <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
@@ -78,10 +78,10 @@ ga('send', 'pageview');
       <scope>test</scope>
     </dependency>
     <dependency>
-       <!-- log4j is the primary logger for bigdata. -->
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
+      <!-- log4j is the primary logger for bigdata. -->
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
   </dependencies>
 </project>
