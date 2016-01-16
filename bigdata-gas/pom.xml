@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <!--
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2016.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -66,7 +66,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <author>true</author>
           <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Gather Apply Scatter (GAS) API</h1>]]></doctitle>
-          <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
