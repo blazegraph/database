@@ -415,4 +415,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <module>blazegraph-tgz/</module>
     -->
   </modules>
+  <!-- Needed for old version fo dsi utils that is not in maven central -->
+  <repositories>
+    <repository>
+      <id>repo-for-dsiutils</id>
+      <url>http://ir.dcs.gla.ac.uk/~bpiwowar/maven/</url>
+    </repository>
+  </repositories>
 </project>
