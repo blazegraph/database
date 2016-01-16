@@ -20,4 +20,4 @@ for file in `find "${BASE_DIR}"/.. -maxdepth 2 -type f -name "pom.xml" -print`; 
 
 done
 
-
+rm -f $TMP_FILE
