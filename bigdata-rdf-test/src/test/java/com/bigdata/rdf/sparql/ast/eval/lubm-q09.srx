@@ -1,0 +1,1484 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+	<head>
+		<variable name='x'/>
+		<variable name='y'/>
+		<variable name='z'/>
+	</head>
+	<results>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/Course38</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/UndergraduateStudent331</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/GraduateCourse19</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/GraduateStudent29</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssociateProfessor11</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/GraduateCourse27</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/GraduateStudent37</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssistantProfessor9</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course47</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent198</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssociateProfessor12</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course30</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent202</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department2.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department2.University0.edu/Course23</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department2.University0.edu/UndergraduateStudent0</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department2.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department2.University0.edu/Course21</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department2.University0.edu/UndergraduateStudent106</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department2.University0.edu/AssistantProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department2.University0.edu/GraduateCourse34</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department2.University0.edu/GraduateStudent98</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department2.University0.edu/AssistantProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department2.University0.edu/Course30</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department2.University0.edu/UndergraduateStudent308</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/Course19</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/UndergraduateStudent42</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/FullProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course4</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent17</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/FullProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course6</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent193</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssociateProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course20</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent84</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor9</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/GraduateCourse31</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/GraduateStudent112</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/FullProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/GraduateCourse3</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/GraduateStudent122</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/FullProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/UndergraduateStudent275</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor9</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/Course30</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/UndergraduateStudent413</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department2.University0.edu/FullProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department2.University0.edu/Course7</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department2.University0.edu/UndergraduateStudent127</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/AssociateProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/Course25</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/UndergraduateStudent119</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/Course28</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/UndergraduateStudent40</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/AssociateProfessor10</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/Course32</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/UndergraduateStudent56</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department2.University0.edu/FullProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department2.University0.edu/Course5</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department2.University0.edu/UndergraduateStudent310</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department2.University0.edu/FullProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department2.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department2.University0.edu/UndergraduateStudent336</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssistantProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/GraduateCourse36</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/GraduateStudent138</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssistantProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course41</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent24</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department0.University0.edu/FullProfessor9</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department0.University0.edu/Course13</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/UndergraduateStudent403</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department1.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department1.University0.edu/Course26</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department1.University0.edu/UndergraduateStudent54</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/FullProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/Course14</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/UndergraduateStudent138</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course23</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent69</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/AssistantProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/Course33</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/UndergraduateStudent48</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/AssociateProfessor10</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/GraduateCourse31</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/GraduateStudent43</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department1.University0.edu/FullProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department1.University0.edu/GraduateCourse4</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department1.University0.edu/GraduateStudent32</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department1.University0.edu/FullProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department1.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department1.University0.edu/UndergraduateStudent151</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department1.University0.edu/FullProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department1.University0.edu/Course11</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department1.University0.edu/UndergraduateStudent315</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/FullProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/Course7</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/UndergraduateStudent128</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/FullProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/Course4</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/UndergraduateStudent219</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department13.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department13.University0.edu/GraduateCourse39</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department13.University0.edu/GraduateStudent47</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department13.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department13.University0.edu/Course37</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department13.University0.edu/UndergraduateStudent264</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/AssociateProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/GraduateCourse26</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/GraduateStudent81</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/FullProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/Course3</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/UndergraduateStudent139</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/FullProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/UndergraduateStudent142</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/FullProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/UndergraduateStudent33</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/FullProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent103</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/FullProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent3</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course38</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent145</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/AssociateProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course17</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent264</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department1.University0.edu/FullProfessor9</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department1.University0.edu/GraduateCourse11</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department1.University0.edu/GraduateStudent29</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/Course29</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/UndergraduateStudent21</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department13.University0.edu/AssociateProfessor11</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department13.University0.edu/Course28</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department13.University0.edu/UndergraduateStudent471</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department12.University0.edu/AssociateProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department12.University0.edu/GraduateCourse20</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department12.University0.edu/GraduateStudent84</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/AssistantProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course34</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent102</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course28</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent134</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/AssociateProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course26</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent30</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course31</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent35</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/GraduateCourse6</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/GraduateStudent50</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department5.University0.edu/AssistantProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department5.University0.edu/Course37</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department5.University0.edu/UndergraduateStudent89</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/FullProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course7</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent265</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department12.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department12.University0.edu/Course25</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department12.University0.edu/UndergraduateStudent152</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department12.University0.edu/AssociateProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department12.University0.edu/Course20</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department12.University0.edu/UndergraduateStudent307</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department13.University0.edu/FullProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department13.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department13.University0.edu/UndergraduateStudent413</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department12.University0.edu/FullProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department12.University0.edu/Course6</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department12.University0.edu/UndergraduateStudent253</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department13.University0.edu/AssistantProfessor10</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department13.University0.edu/Course46</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department13.University0.edu/UndergraduateStudent154</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department1.University0.edu/AssociateProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department1.University0.edu/GraduateCourse14</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department1.University0.edu/GraduateStudent53</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department1.University0.edu/AssistantProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department1.University0.edu/Course32</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department1.University0.edu/UndergraduateStudent21</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/AssistantProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course29</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent94</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/FullProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/GraduateCourse0</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/GraduateStudent64</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/FullProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/GraduateCourse6</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/GraduateStudent9</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/FullProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course2</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent54</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department5.University0.edu/AssociateProfessor9</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department5.University0.edu/Course32</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department5.University0.edu/UndergraduateStudent297</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department5.University0.edu/FullProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department5.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department5.University0.edu/UndergraduateStudent97</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department13.University0.edu/FullProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department13.University0.edu/Course12</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department13.University0.edu/UndergraduateStudent221</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssistantProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/GraduateCourse36</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/GraduateStudent118</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssociateProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course16</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent143</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/Course24</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/UndergraduateStudent102</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/FullProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course6</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent210</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/FullProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course1</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent312</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/AssistantProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/GraduateCourse38</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/GraduateStudent31</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/Course34</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/UndergraduateStudent98</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/GraduateCourse19</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/GraduateStudent11</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssociateProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course16</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent222</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course21</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent51</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssociateProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course23</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent87</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department5.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department5.University0.edu/GraduateCourse35</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department5.University0.edu/GraduateStudent103</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department5.University0.edu/AssociateProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department5.University0.edu/Course14</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department5.University0.edu/UndergraduateStudent416</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course47</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent250</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course43</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent41</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/GraduateCourse10</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/GraduateStudent50</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssistantProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course29</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent15</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department5.University0.edu/AssociateProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department5.University0.edu/Course23</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department5.University0.edu/UndergraduateStudent6</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course47</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent424</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course48</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent52</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssistantProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/GraduateCourse46</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/GraduateStudent51</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssistantProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course45</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent15</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/FullProfessor7</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course12</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent237</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department11.University0.edu/AssociateProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department11.University0.edu/Course19</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department11.University0.edu/UndergraduateStudent299</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department8.University0.edu/AssistantProfessor10</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department8.University0.edu/Course50</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department8.University0.edu/UndergraduateStudent268</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/AssociateProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/Course18</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/UndergraduateStudent243</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/AssistantProfessor9</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/Course44</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/UndergraduateStudent34</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/GraduateCourse28</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/GraduateStudent55</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/GraduateCourse10</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/GraduateStudent105</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/AssociateProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/GraduateCourse14</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/GraduateStudent41</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course9</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent1</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/FullProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course6</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent66</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course9</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent90</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/Course23</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/UndergraduateStudent184</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department3.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department3.University0.edu/Course22</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department3.University0.edu/UndergraduateStudent268</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course32</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent76</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/AssociateProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/GraduateCourse9</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/GraduateStudent127</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department9.University0.edu/AssistantProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department9.University0.edu/Course31</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department9.University0.edu/UndergraduateStudent56</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssociateProfessor12</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course31</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent209</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssociateProfessor10</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course24</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent129</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssistantProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course30</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent46</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course27</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent92</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course28</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent92</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssociateProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course9</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent99</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/GraduateCourse32</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/GraduateStudent41</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/AssistantProfessor5</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course42</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent19</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course38</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent232</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department6.University0.edu/AssociateProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department6.University0.edu/Course18</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department6.University0.edu/UndergraduateStudent248</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssistantProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course39</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent95</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/FullProfessor4</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/GraduateCourse7</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/GraduateStudent121</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department13.University0.edu/AssociateProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department13.University0.edu/GraduateCourse16</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department13.University0.edu/GraduateStudent9</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department5.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department5.University0.edu/Course27</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department5.University0.edu/UndergraduateStudent31</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course49</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent381</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssistantProfessor1</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course36</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent70</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/GraduateCourse23</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/GraduateStudent114</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department7.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department7.University0.edu/Course25</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department7.University0.edu/UndergraduateStudent170</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department14.University0.edu/AssociateProfessor2</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department14.University0.edu/Course11</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department14.University0.edu/UndergraduateStudent145</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course30</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent106</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course24</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent301</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course30</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent389</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department4.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department4.University0.edu/Course25</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department4.University0.edu/UndergraduateStudent85</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/GraduateCourse7</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/GraduateStudent54</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='y'>
+				<uri>http://www.Department10.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='z'>
+				<uri>http://www.Department10.University0.edu/Course11</uri>
+			</binding>
+			<binding name='x'>
+				<uri>http://www.Department10.University0.edu/UndergraduateStudent39</uri>
+			</binding>
+		</result>
+	</results>
+</sparql>
