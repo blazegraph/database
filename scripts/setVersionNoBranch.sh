@@ -6,7 +6,7 @@ PARENT_POM="${BASE_DIR}"/../pom.xml
 DEPLOYER_POM="${BASE_DIR}"/../blazegraph-artifacts/pom.xml
 CURRENT_VERSION=2.0.0
 BRANCH="master"
-SNAPSHOT="RC2-SNAPSHOT"
+SNAPSHOT="SNAPSHOT"
 
 echo "Updating POM versions to ${CURRENT_VERSION}-${SNAPSHOT}"
 
