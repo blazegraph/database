@@ -414,14 +414,14 @@ ga('send', 'pageview');
       <version>${apache.commons_configuration.version}</version>
     </dependency>
     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
-      <version>${fastutil.version}</version>
+      <groupId>colt</groupId>
+      <artifactId>colt</artifactId>
+      <version>${colt.version}</version>
     </dependency>
     <dependency>
       <groupId>it.unimi.dsi</groupId>
-      <artifactId>dsiutils</artifactId>
-      <version>1.0.10</version>
+      <artifactId>fastutil</artifactId>
+      <version>${fastutil.version}</version>
     </dependency>
   </dependencies>
 </project>

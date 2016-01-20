@@ -9,8 +9,8 @@ Contact:
      licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; version 2.1 of the License.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -35,14 +35,58 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>dsi-utils</artifactId>
   <version>2.0.0-RC2-SNAPSHOT</version>
   <name>Blazegraph DSI Utils</name>
-  <description>Blazegraph Modifications to the DSI utils</description>
+  <description>Blazegraph Modifications to the DSI utils.  This are forked from a version under LGPLv2.1.</description>
   <packaging>jar</packaging>
   <licenses>
     <license>
-      <name>The Apache License, Version 2.0</name>
-      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <name>GNU LESSER GENERAL PUBLIC LICENSE Version 2.1</name>
+      <url>http://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt</url>
     </license>
   </licenses>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>2.4.3</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <artifactSet>
+                <excludes>
+                  <exclude>colt:colt</exclude>
+                  <exclude>concurrent:concurrent</exclude>
+                  <exclude>it.unimi.dsi:fastutil</exclude>
+                </excludes>
+              </artifactSet>
+              <filters>
+                <filter>
+                  <!--
+                     Make sure that the Blazegraph fork of the LGPL 2.1 DSI Utils shows up first in the classpath.
+                  -->
+                  <artifact>it.unimi.dsi:dsiutils</artifact>
+                  <excludes>
+                    <exclude>it/unimi/dsi/compression/CanonicalFast64CodeWordDecoder.class</exclude>
+                    <exclude>it/unimi/dsi/compression/Fast64CodeWordCoder.class</exclude>
+                    <exclude>it/unimi/dsi/compression/HuffmanCodec*.class</exclude>
+                    <exclude>it/unimi/dsi/io/InputBitStream.class</exclude>
+                    <exclude>it/unimi/dsi/io/NullOutputStream.class</exclude>
+                    <exclude>it/unimi/dsi/io/OutputBitStream.class</exclude>
+                    <exclude>it/unimi/dsi/util/BloomFilter2.class</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <minimizeJar>true</minimizeJar>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
   <reporting>
     <plugins>
       <plugin>
@@ -58,11 +102,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <bottom><![CDATA[ <i> 
                            Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2012.  All rights reserved.<p>
 
-                           Licensed under the Apache License, Version 2.0 (the "License");
+                           Licensed under the GNU LESSER GENERAL PUBLIC LICENSE Version 2.1 (the "License");
                            you may not use this file except in compliance with the License.
                            You may obtain a copy of the License at<p>
 
-                               http://www.apache.org/licenses/LICENSE-2.0<p>
+                               http://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
 
                            Unless required by applicable law or agreed to in writing, software
                            distributed under the License is distributed on an 'AS IS' BASIS,
@@ -71,8 +115,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                            limitations under the License.<p>
 
                                                         <hr>
-                        This product includes software developed by The Apache Software Foundation (http://www.apache.org/).
-                        License: http://www.apache.org/licenses/LICENSE-2.0 </i>]]></bottom>
+                            This product includes software developed by the dsiutils project (http://dsiutils.dsi.unimi.it/).  
+                            Copyright (C) 2002-2009 Sebastiano Vigna</i>]]></bottom>
         </configuration>
       </plugin>
     </plugins>
