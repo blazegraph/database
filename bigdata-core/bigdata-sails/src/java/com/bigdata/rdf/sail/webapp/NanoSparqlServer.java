@@ -321,10 +321,22 @@ public class NanoSparqlServer {
 //                SystemProperties.DEFAULT_JETTY_XML
                 );
         
-      //Set the resource base to inside of the jar file if jetty.home is not set
-        if(System.getProperty(SystemProperties.JETTY_HOME) == null)
-        	System.setProperty(SystemProperties.JETTY_HOME,
-      				jettyXml.getClass().getResource("/war").toExternalForm());
+		// Set the resource base to inside of the jar file if jetty.home is not set
+		// This is for running as the executable jar
+		if (System.getProperty(SystemProperties.JETTY_HOME) == null) {
+
+			final URL jettyJarXml = jettyXml.getClass().getResource("/war");
+
+			System.setProperty(SystemProperties.JETTY_HOME,
+					jettyJarXml.toExternalForm());
+
+			// Also set the Jetty Resource Base to this value, if it is not
+			// configured.
+			if (System.getProperty(SystemProperties.JETTY_RESOURCE_BASE) == null) {
+				System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
+						jettyJarXml.toExternalForm());
+			}
+		}
 
         /*
          * Handle all arguments starting with "-". These should appear before
@@ -849,6 +861,12 @@ public class NanoSparqlServer {
         // Check the environment variable.
         String resourceBaseStr = System
                 .getProperty(SystemProperties.JETTY_RESOURCE_BASE);
+        
+        //Try JETTY_HOME if the Resource Base is null
+        if(resourceBaseStr == null ) {
+        	   resourceBaseStr = System
+                       .getProperty(SystemProperties.JETTY_HOME);
+        }
 
         // Check the environment variable for the override web.
         final String jettyOverrideWeb = System
@@ -924,6 +942,8 @@ public class NanoSparqlServer {
                      */
                     tmp = ClassLoader.getSystemClassLoader().getResource(
                             src = "war/src/main/webapp/WEB-INF/web.xml");
+                    
+                    
                 }
                 
                 if (tmp != null) {
@@ -957,24 +977,25 @@ public class NanoSparqlServer {
                  * to jetty itself since it will interpret the jetty.xml file
                  * itself.
                  */
-                final String tmp = resourceBaseURL.toExternalForm();
+                resourceBaseStr = resourceBaseURL.toExternalForm();
 
                 System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
-                        tmp);
+                        resourceBaseStr);
                 
-                //Don't override the value if it is explicitly declared.
-				if (jettyOverrideWeb == null) {
+            }
 
-					final URL overrideWebXmlURL = new URL(tmp
-							+ (tmp.endsWith("/") ? "" : "/")
+        }
+
+        //Don't override the value if it is explicitly declared.
+        //If we have a resource base, but not a declared jetty override
+        //use the WEB-INF/override-web.xml as the default.
+		if (resourceBaseStr != null && jettyOverrideWeb == null) {
+					final URL overrideWebXmlURL = new URL(resourceBaseStr
+							+ (resourceBaseStr.endsWith("/") ? "" : "/")
 							+ "WEB-INF/override-web.xml");
 
 					System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
 							overrideWebXmlURL.toExternalForm());
-                }
-                
-            }
-
         }
 
         if (log.isInfoEnabled())

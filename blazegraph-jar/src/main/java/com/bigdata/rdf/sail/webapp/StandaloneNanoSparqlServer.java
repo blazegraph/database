@@ -73,7 +73,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         
         String portStr = System.getProperty(
         		SystemProperties.JETTY_PORT ,
-        		"9999"
+        		Integer.toString(Config.BLAZEGRAPH_HTTP_PORT)
         		);
         
         port = Integer.parseInt(portStr);

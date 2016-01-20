@@ -73,7 +73,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         
         String portStr = System.getProperty(
         		SystemProperties.JETTY_PORT ,
-        		"9999"
+        		Integer.toString(Config.BLAZEGRAPH_HTTP_PORT)
         		);
         
         port = Integer.parseInt(portStr);
@@ -151,7 +151,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
 
         System.out.println("\n\nWelcome to Blazegraph(tm) by SYSTAP.\n");
         //BLZG-1377 Included for legacy support.
-        System.out.println("Go to http://localhost:9999/bigdata/ to get started.");
+        System.out.println("Go to http://" + Config.DEFAULT_HOST + ":" + Config.BLAZEGRAPH_HTTP_PORT + "/bigdata/ to get started.");
         
         // Wait for the service to terminate.
         server.join();
