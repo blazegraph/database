@@ -36,7 +36,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <description>Blazegraph™ DB is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for customers such as EMC, Syapse, Wikidata Query Service, the British Museum, and many others.  GPU acceleration and High Availability (HA) are available in the Enterprise edition.  It contains war, jar, deb, rpm, and tar.gz deployment artifacts.</description>
   <url>http://www.blazegraph.com/</url>
   <organization>
-    <name>SYSTAP, LLC DBA Blazegraph DBA Blazegraph</name>
+    <name>SYSTAP, LLC DBA Blazegraph</name>
     <url>https://www.blazegraph.com/</url>
   </organization>
   <inceptionYear>2006</inceptionYear>
@@ -67,19 +67,19 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <developer>
       <name>Bryan Thompson</name>
       <email>bryan@blazegraph.com</email>
-      <organization>SYSTAP, LLC DBA Blazegraph DBA Blazegraph</organization>
+      <organization>SYSTAP, LLC DBA Blazegraph</organization>
       <organizationUrl>http://www.blazegraph.com</organizationUrl>
     </developer>
     <developer>
       <name>Mike Personick</name>
       <email>mike@blazegraph.com</email>
-      <organization>SYSTAP, LLC DBA Blazegraph DBA Blazegraph</organization>
+      <organization>SYSTAP, LLC DBA Blazegraph</organization>
       <organizationUrl>http://www.blazegraph.com</organizationUrl>
     </developer>
     <developer>
       <name>Brad Bebee</name>
       <email>beebs@blazegraph.com</email>
-      <organization>SYSTAP, LLC DBA Blazegraph DBA Blazegraph</organization>
+      <organization>SYSTAP, LLC DBA Blazegraph</organization>
       <organizationUrl>http://www.blazegraph.com</organizationUrl>
     </developer>
   </developers>
@@ -105,7 +105,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <contributor>
       <name>Martyn Cutcher</name>
       <email>martyn.cutcher@gmail.com</email>
-      <organization>SYSTAP, LLC DBA Blazegraph DBA Blazegraph</organization>
+      <organization>SYSTAP, LLC DBA Blazegraph</organization>
       <organizationUrl>http://www.blazegraph.com/</organizationUrl>
     </contributor>
     <contributor>
@@ -171,7 +171,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <contributor>
       <name>James Carbonaro</name>
       <email>jjcarbo-systap@users.noreply.github.com</email>
-      <organization>SYSTAP, LLC DBA Blazegraph DBA Blazegraph</organization>
+      <organization>SYSTAP, LLC DBA Blazegraph</organization>
       <organizationUrl>http://www.blazegraph.com/</organizationUrl>
     </contributor>
     <contributor>
