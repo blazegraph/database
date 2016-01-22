@@ -552,19 +552,9 @@ ga('send', 'pageview');
       <version>${rexster.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.jettison</groupId>
-      <artifactId>jettison</artifactId>
-      <version>${jettison.version}</version>
-    </dependency>
-    <dependency>
       <groupId>commons-configuration</groupId>
       <artifactId>commons-configuration</artifactId>
       <version>${apache.commons_configuration.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>colt</groupId>
-      <artifactId>colt</artifactId>
-      <version>${colt.version}</version>
     </dependency>
     <dependency>
       <groupId>it.unimi.dsi</groupId>

@@ -205,6 +205,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <icu.version>4.8</icu.version>
     <zookeeper.version>3.4.5</zookeeper.version>
     <sesame.version>2.7.12</sesame.version>
+    <semargl.version>0.6.1</semargl.version>
     <slf4j.version>1.6.1</slf4j.version>
     <jetty.version>9.2.3.v20140905</jetty.version>
     <servlet.version>3.1.0</servlet.version>
@@ -405,6 +406,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <module>bigdata-core-test/</module>
     <module>bigdata-rdf-test/</module>
     <module>bigdata-sails-test/</module>
+    <module>blazegraph-artifacts/</module>
     <!-- Moved to blazegraph-artifacts
     <module>blazegraph-war</module>
     <module>bigdata-war</module>
