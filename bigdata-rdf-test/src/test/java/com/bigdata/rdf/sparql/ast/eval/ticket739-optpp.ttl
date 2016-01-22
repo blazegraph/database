@@ -1,0 +1,5 @@
+
+<eg:s> <eg:p> <eg:o> .
+
+<eg:b> <eg:part> <eg:mid> .
+<eg:mid> <eg:q> <eg:o> .

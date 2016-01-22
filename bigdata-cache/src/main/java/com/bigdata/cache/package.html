@@ -1,0 +1,101 @@
+<html>
+<head>
+<title>Object Cache.</title>
+</head>
+<body>
+
+<p>A canonicalizing object cache may be constructed from an outer weak
+reference value hash map backed by an inner hard reference LRU policy.
+The weak reference value map ensures that there is never more than one
+runtime object for a given object identifier (OID) within the same
+context. This guarentee means that we can use reference testing on
+persistence capable runtime objects to test for equality.  Further,
+unlike testing the OID, a reference test also differentiates between
+runtime objects with the same OID in different contexts and distinct
+object references will result in each context for the same object
+identifier.</p>
+
+<h3>WeakValueCache</h3>
+
+<p>This class implements a hash map using weak or soft references as
+its values and object identifiers as its keys. When an object is
+touched in the outer weak value map its ordering is updated in the
+inner hard reference map. Java does not support notification before a
+weak (or soft) reference is cleared. Therefore cache eviction notices
+are generated eagerly when the object is evicted from the inner hard
+reference cache. When a weak reference is cleared, that fact is
+recorded on a ReferenceQueue. Various operations on the cache poll the
+queue and remove entries corresponding to objects which are no longer
+reachable.  A facility is provided to remove individual objects from
+the weak value cache, however objects automatically removed when the
+garbage collector clears the weak reference.</p>
+
+<p>
+Note: Many methods on the WeakValueCache are delegated to the inner
+hard reference cache, including: size(), iterator(), entryIterator(),
+etc.  Among other things this means that you can NOT enumerate the
+entries in the weak value cache, but only in the inner hard reference
+cache.
+</p>
+
+<h3>LRUCache</h3>
+
+<p>This class implements an LRU policy. Once the cache reaches capacity
+inserting a new object into the cache causes the Least Recently Used
+object to be evicted from the cache. A listener may be registered
+against the cache and will be notified when objects are evicted from the
+cache.</p>
+
+<h3>Integration</h3>
+
+<p>This package is designed to support efficient incremental writes of
+dirty objects which are no longer strongly reachable against a
+persistence layer. The application is typically an object database
+framework, such as the Generic Object Model (GOM).</p>
+
+<p>A WeakValueCache is constructed using the LRUCache as its inner
+hard reference map.  The persistence layer then registers a listener
+for cache eviction events against the WeakValueCache, but the listener
+is actually set on the inner hard reference map - the LRUCache.  When
+the persistence layer receivies cache eviction notices they are from
+the inner hard reference map.</p>
+
+<p>The capacity of the inner LRUCache determines the maximum #of dirty
+objects that may exist within the context administered by the
+WeakValueCache (there is no limit imposed on the #of clean
+objects). When the persistence layer fetches an object, it put()s it
+into the WeakValueCache with the dirty flag set to <code>false</code>.
+When the object becomes dirty it notifies the WeakValueCache using
+put() with the dirty flag set to <code>true</code>. Both operations
+cause the LRUCache ordering to be updated. While the WeakValueCache
+will contain all weakly reachable objects that it administers, the
+LRUCache capacity is fixed when it is created. Once the LRUCache is at
+capacity a put() of an object against the WeakValueCache that is not
+also in the LRUCache force the eviction of another object from the
+LRUCache.</p>
+
+<p>When the LRUCache evicts an object, the listener receives notice
+via the WeakValueCache listener. If the notice indicates that the
+object is dirty, then the listener must cause the persistent state of
+the object to be updated within the backing store (which may be a
+transaction scope). Typically this means serializing the persistent
+state of the object and requesting that the persistence layer update
+its copy of the object state.</p>
+
+<p>On commit, all dirty objects on the inner LRUCache must be flushed
+to the persistence layer.</p>
+
+<p>Each object in the cache is either clear or dirty. The dirty flag
+state is normally managed using {@link ICachePolicy#put(long, Object,
+boolean)}. During a cache eviction, the object evicted from the cache
+gets written through to the persistence layer. However it is not
+necessary to clear the dirty flag during a cache eviction since the
+cache entry will be either recycled or discarded. The only case where
+the client needs to directly set the dirty flag state is during a
+commit iff the application layer will continue to have access to the
+object cache.  This is because objects may remain in the cache after
+the commit but they are no longer dirty since they were written
+through to the persistence layer during the commit.</p>
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+@prefix : <http://example/> .
+
+:x :broader :y .
+:x :inScheme :z .
+
+

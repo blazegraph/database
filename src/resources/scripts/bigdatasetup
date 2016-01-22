@@ -1,0 +1,106 @@
+#!/bin/bash
+
+#
+# This provides an extensible hook for site-specific setup of the
+# hosts in a cluster.
+
+# Setup the environment.
+cd `dirname $0`
+source ./bigdataenv
+
+##############################
+# Turn down swappiness on linux kernel (presumes that bigdata is a long
+# running process and the primary load on the servers).
+#
+#echo $"`date` : `hostname` : `sysctl -w vm.swappiness=0`"
+
+##############################
+# Configure huge pages.
+#
+# See http://java.sun.com/javase/technologies/hotspot/largememory.jsp
+# See http://andrigoss.blogspot.com/2008/02/jvm-performance-tuning.html
+# See http://www.puschitz.com/TuningLinuxForOracle.shtml#LargeMemoryOptimization
+# See http://www.puschitz.com/TuningLinuxForOracle.shtml#RemovingSharedMemory
+# See http://www.mjmwired.net/kernel/Documentation/vm/hugetlbpage.txt (older)
+#
+# CAUTION: Read the links above, figure out the existing values for your
+# kernel (and make a note of them), and compute the new values based on
+# the advice in that article.
+#
+# CAUTION: Once large pages are enabled you MUST tell the JVM to request
+# them (-XX:+UseLargePages) or it will be unable to access the portion
+# of your RAM which you give over to large pages!!!!
+#
+# Use 'cat /proc/meminfo' to examine the huge page use.
+# Use 'ipcs -m' to examine the shared memory segment use.
+
+# Increase RAM available used as shared memory
+# 
+# was: kernel.shmmax = 33554432 (32M)
+#
+#echo $"`date` : `hostname` : `sysctl -w kernel.shmmax=34359738368`"
+
+# Allow some #of huge pages (required).
+#
+# See the link referenced above and compute your own value here!
+# 
+# was: vm.nr_hugepages=0
+#
+#echo $"`date` : `hostname` : `sysctl -w vm.nr_hugepages=8192`"
+
+# The group (id) permitted to use huge pages (not required for root
+# and must be done by root, so you can't do it from this script if
+# you are not root).
+#
+# Before:
+#
+# vm.hugetlb_shm_group=0
+#
+# Allow non-root users in this group to create SysV shared memory
+# segment using hugetlb page (only necessary if you are not running
+# as root).
+#
+# sysctl vm.hugetlb_shm_group=XXX
+
+##############################
+# uncomment to stop ntpd on other hosts and set the time using
+# ntpdate. when you have the clocks synchronized, re-comment the [ntpd
+# stop] and [ntpdate] commands and then uncomment the [ntdp start]
+# command.  Once ntpd is running on all the hosts recomment [ntpd
+# start].  You can see if the clocks are modestly synchronized just by
+# watching the 'date' output or uncomment the [ntpdate -q] line to get
+# some exact information.. Unfortunately this is not more automatic.
+#
+# See http://www.cis.udel.edu/~mills/ntp/html/ntpdate.html
+#
+# See http://www.brennan.id.au/09-Network_Time_Protocol.html
+#
+#   action $"`date` : `hostname` : stopping ntpd: " /etc/init.d/ntpd stop
+#   if [ ! -f /etc/ntp.conf.backup ]; then
+#       cp /etc/ntp.conf /etc/ntp.conf.backup
+#   fi
+#   cp --backup --update /opt2/scripts/ntp-client.conf /etc/ntp.conf
+#   chown root.root /etc/ntp.conf
+#   chmod u+rw,go+r-wx /etc/ntp.conf
+#   action $"`date` : `hostname` : setting clock: " /usr/sbin/ntpdate 192.168.6.21
+#
+#   action $"`date` : `hostname` : starting ntpd: " /etc/init.d/ntpd start
+#
+#   action $"`date` : `hostname` : clock status " /usr/sbin/ntpdate -q 192.168.6.21
+
+##############################
+# ensure that sysstat is installed
+#
+# @todo using 'which' does not work as it reports an error when no
+# such file is found.  If there is a declared location then check that
+# first.  Otherwise, use which but check the return code in order to
+# decide if the file could be located.
+#if [ ! -x `which pidstat` ]; then
+#    echo $"`date` : `hostname` : installing sysstat."
+#    cd /opt2/install/sysstat-8.0.4.1
+#    make install
+#fi
+#
+#yum -y install sysstat
+
+exit 0

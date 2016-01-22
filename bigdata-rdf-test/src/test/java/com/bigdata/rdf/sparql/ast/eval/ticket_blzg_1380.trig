@@ -1,0 +1,4 @@
+<http://example.com/g1>
+{
+  <http://www.wikidata.org/entity/Q23> <http://www.w3.org/2000/01/rdf-schema#label> "George Washington"@en 
+}

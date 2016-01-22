@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='val'/>
+        <variable name='doubleVal'/>
+    </head>
+    <results>
+        <result>
+            <binding name='val'>
+			   <literal datatype="http://www.w3.org/2001/XMLSchema#integer">10</literal>
+            </binding>
+            <binding name='doubleVal'>
+            <literal datatype="http://www.w3.org/2001/XMLSchema#integer">20</literal>
+            </binding>
+        </result>
+    </results>
+</sparql>

@@ -1,0 +1,11 @@
+
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?A ?val
+WHERE {
+    ?A <os:prop> <os:P> .
+    ?A rdf:value ?val .
+    ?A rdf:type  / rdfs:subClassOf *
+            <os:ClassA> ;
+}

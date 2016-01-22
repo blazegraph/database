@@ -1,0 +1,22 @@
+SELECT * { 
+
+{ SELECT $Y
+ {
+   BIND ("y" AS $Y)
+ }
+}
+{ SELECT $Y
+ {
+      { BIND ( "y0" as $Y ) .
+        BIND( "x0" as $xx )
+      } UNION {
+        BIND ( "y" as $Y) .
+        BIND( "x" as $xx )
+      } UNION {
+        BIND ( "y1" as $Y ) .
+        BIND( "x2" as $xx )
+      }
+ }
+}
+
+}

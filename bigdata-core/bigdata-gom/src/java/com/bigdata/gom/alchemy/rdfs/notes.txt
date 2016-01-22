@@ -1,0 +1,50 @@
+While RDFS appears to support the basic requirements, the semantics are not always clear.
+
+Specifically, the whole RDF composition model appears to be at odds with the general Object view we want to be able to take.
+
+The rdf:subPropertyOf is a case in point, here is an example
+
+:hasSon rdfs:subPropertyOf :hasChild
+
+This effective states that X :hasSon Y => X :hasChild Y
+
+In Prolog this would be expressed differently
+
+
+hasSon(X, Y) :-
+	male(Y),
+	hasChild(X, Y).
+
+hasChild(#12, #32).
+male(#32).
+
+then hasSon(#12, Y) would bind Y to #32.
+
+The RDFS aspiration seems closer to the DWIM pragma (do what I mean).
+
+Can we really process this in GPO?
+
+Well, the sub-property could be interpreted as a directional alias.  In other words
+hasSon => hasChild but not hasChild => hasSon.
+
+Does this imply that properties that have sub properties should not be asserted?
+
+So hasDaughter and hasSon would be asserted and therefore hasChild can be implied?
+
+The "reverse" mode of RDF is interesting
+
+Type inference through rdfs:range and rdfs:domain constraints. For example, the facts
+(rdfs:domain teaches Teacher)
+(rdfs:range teaches Student)
+(teaches Bob Scooter)
+
+imply the facts
+
+(rdf:type Bob Teacher)
+(rdf:type Scooter Student)
+
+Whereas, the Object view would instead assume that "teaches" requires a subject of type "Teacher" and
+an object of type "Student"
+
+JSON exchange of SIDS with Object Manager remote endpoint.
+

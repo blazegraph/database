@@ -1,0 +1,9 @@
+SELECT * WHERE {
+  ?s ?p ?o
+  {
+    SELECT ?s WHERE {
+      ?s ?p ?o .
+    }     
+  }
+  BIND(<http://o> AS ?o)
+} 

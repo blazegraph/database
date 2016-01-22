@@ -1,0 +1,86 @@
+Sean:
+
+Sorry for the delay, I've been double checking my info.  I'm going to
+wander a bit here, bear with me.
+
+There are three linux system calls that come into play here, sync(),
+fsync() and fdatasync().
+
+sync() requests the kernel flush all dirty pages in the page cache to
+disk.  It is worth noting that the page cache is global, and that
+sync() is a request, and is not required to block until the data is
+durable.  This is what is called when you execute "sync" from the
+shell.  You generally can't get at this from Java, but other apps can
+execute it and flush your stuff to disk "early".
+
+fsync() and fdatasync() force the kernel to write all buffers
+associated with a provided file descriptor.  fsync() will flush the
+inode metadata and content data, and fdatasync() will only flush the
+contents, no inode meta (IE, last access time).  Both of these calls
+will block until the physical device reports that the transfer was
+completed.  A word of caution, flushing a directory file descriptor
+doesn't mean the directory entries made it.
+
+OK, on to the Java specifics of your question.  flush() and close() on
+FileOutputStream and FileWriter make sure the data hit the OS cache,
+but do not perform any sync calls.  Same deal for RandomAccessFile,
+except that if you specify "rws" or "rwd" at construciton, *every*
+write call will be followed up by an fsync() or an fdatasync()
+respectively.  If you need finer grained control, you can get the
+FileChannel from them, and call force(boolean).  If you pass true, it
+is a fsync() call, otherwise a fdatasync() call.  This only affects
+stuff already in the OS cache, so make sure you call flush() on any
+wrapping BufferOutputStream, etc...  FileChannel.force() doesn't play
+well with a memmapped file, you need to call MappedByteBuffer.force().
+
+So from your email, I would expect you to call
+FileChannel.force(false) after writing the app data, then a
+FileChannel.force(false) after updating the root blocks.  Even if all
+the data is in one file, you would need to make two force() calls to
+ensure that the IO scheduler doesn't interleave the second root block
+write with trailing app data writes.
+
+   ---
+   
+If nobody calls any sync methods, the pdflush process will
+asynchronously write stuff out to disk after a number of seconds
+(/proc/sys/vm/dirty_expire_centiseconds, defaults to 3000, AKA 30
+seconds), or if the size of dirty pages exceeds a percentage of
+"active" memory (/proc/sys/vm/dirty_background_ratio, defaults to 10,
+active being tricky it's the amount available to the page cache, "free
++ cached - mapped").  If the number of dirty pages passes an upper
+bound, the callers will get throttled and have to process their own IO
+synchronously (/proc/sys/vm/dirty_ratio, default is 40%).
+
+So if a force() call returns successfully, data related to that file
+descriptor is durable, but any IO related to other file descriptors
+may still be sitting in the page cache.  In practice, you may wind up
+with a little over 40% of your unused memory footprint "in flight".
+
+Try repeatedly running "reboot -fn" on a running BigData instance with
+small transactions....
+
+----------
+
+Stan:
+
+Surely, he means "FileChannel.force(true)" after writing the file
+data; if you're appending to a file and changing its size, you
+certainly want the inode to be updated.
+
+I knew about FS behavior and was in the process of looking into Java
+side.  Good writeup; I knew about the loose consistency on close(),
+but would have thought that higher-level abstractions pass through the
+call to force() appropriately.
+
+Even following these guidelines strictly does not guarantee desired
+behavior in some cases.  In the past, I've encountered consumer-grade
+hard drives that ignored called to fsync() when they were more
+frequent than some fairly lazy rate threshold (laptop drives
+especially are prone to this to conserve energy).  Similarly, RAID
+controllers in write-back mode only push fsync as far as the device
+cache, and when operating without a battery and forced to use
+write-back this can be dangerous on power loss.  Luckily, fsync also
+acts as a barrier in the storage device's command queue, and while
+individual write requests may be reordered with respect to each other,
+they won't be reordered past the next fsync.

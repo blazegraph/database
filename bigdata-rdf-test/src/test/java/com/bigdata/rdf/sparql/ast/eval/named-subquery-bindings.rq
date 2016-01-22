@@ -1,0 +1,15 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+select ?x ?o
+  with {
+    select ?x where { ?x rdf:type foaf:Person }
+  } AS %namedSet1
+where {
+  ?x rdfs:label ?o
+  INCLUDE %namedSet1 
+}
+bindings ?x
+{
+  ( <http://www.bigdata.com/Mike> )
+}

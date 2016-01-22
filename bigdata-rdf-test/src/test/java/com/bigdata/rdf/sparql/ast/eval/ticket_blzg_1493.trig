@@ -1,0 +1,5 @@
+prefix : <http://localhost/>
+{
+  <http://S1> rdfs:subPropertyOf <http://S2> .
+  <http://S2> rdfs:subPropertyOf <http://S3> .
+}

@@ -1,0 +1,14 @@
+SELECT *
+WHERE {
+
+    GRAPH ?g {
+
+        BIND( "hello" as ?hello ) .
+        BIND( CONCAT(?hello, " world") as ?helloWorld ) .
+
+    ?member a ?class .
+
+    }
+
+}
+LIMIT 1

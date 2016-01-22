@@ -1,0 +1,7 @@
+prefix : <http://bigdata.com/> 
+
+SELECT ?g ?s ?p
+FROM NAMED VIRTUAL GRAPH :vg
+WHERE {
+    GRAPH ?g { ?s ?p :mary }
+}

@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<sparql
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+     xmlns="http://www.w3.org/2005/sparql-results#" >
+   <head>
+    <variable name="s"/>
+    <variable name="o"/>
+    <variable name="c"/>
+   </head>
+   <results>
+     <result>
+        <binding name="s">
+            <uri>http://example.com/Apple</uri>
+        </binding>
+        <binding name="o">
+            <uri>http://example.com/Siri</uri>
+        </binding>
+        <binding name="c">
+            <literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2013-04-05T12:00:00.000Z</literal>
+        </binding>
+     </result>
+     <result>
+        <binding name="s">
+            <uri>http://example.com/Google</uri>
+        </binding>
+        <binding name="o">
+            <uri>http://example.com/Youtube</uri>
+        </binding>
+        <binding name="c">
+            <literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2013-04-05T12:00:00.000Z</literal>
+        </binding>
+     </result>
+     <result>
+        <binding name="s">
+            <uri>http://example.com/SAP</uri>
+        </binding>
+        <binding name="o">
+            <uri>http://example.com/sybase</uri>
+        </binding>
+        <binding name="c">
+            <literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2011-04-05T12:00:00.000Z</literal>
+        </binding>
+     </result>     
+   </results>
+</sparql>

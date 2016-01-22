@@ -1,0 +1,77 @@
+@prefix foaf:       <http://xmlns.com/foaf/0.1/> .
+@prefix rdf:        <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:      <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dc:         <http://purl.org/dc/terms/> .
+@prefix re:       <http://reasoner.example.com/engines#> .
+@prefix rr:       <http://reasoner.example.com/rules#> .
+@prefix rv:       <http://reasoner.example.com/vocabulary#> .
+@prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
+@prefix bd:       <http://bigdata.com/RDF#> .
+
+bd:alice
+    rdf:type        foaf:Person ;
+    foaf:name       "Alice" ;
+    foaf:mbox       <mailto:alice@work> ;
+    foaf:knows      bd:bob.
+    
+# The terse syntax:
+<<bd:alice foaf:mbox <mailto:alice@work>>> 
+   dc:source   <http://hr.example.com/employees#bob> ;
+   dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
+# The expanded syntax.
+#_:s1 rdf:subject bd:alice .
+#_:s1 rdf:predicate foaf:mbox .
+#_:s1 rdf:object <mailto:alice@work> .
+#_:s1 rdf:type rdf:Statement .
+#_:s1 dc:source   <http://hr.example.com/employees#bob> ;
+#     dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
+
+# Terse
+<<bd:alice foaf:knows bd:bob>>
+   dc:source      re:engine_1;
+   rv:rule     rr:rule524 ;
+   rv:confidence  0.9835 .
+# Expanded
+#_:s2 rdf:subject bd:alice .
+#_:s2 rdf:predicate foaf:knows .
+#_:s2 rdf:object bd:bob .
+#_:s2 rdf:type rdf:Statement .
+#_:s2
+#   dc:source      re:engine_1;
+#   rv:rule     rr:rule524 ;
+#   rv:confidence  0.9835 .
+   
+bd:bob
+    rdf:type        foaf:Person ;
+    foaf:name       "Bob" ;
+    foaf:knows      bd:alice ;
+    foaf:mbox       <mailto:bob@work> ;
+    foaf:mbox       <mailto:bob@home> .
+
+# Terse
+<<bd:bob foaf:mbox    <mailto:bob@home>>>
+   dc:creator     <http://hr.example.com/infra/crawlers#we1> ;
+   dc:created     "2012-02-05T12:34:00Z"^^xsd:dateTime ;
+   dc:source      <http://whatever.nu/profile/bob1975> .
+# Expanded
+#_:s3 rdf:subject bd:bob .
+#_:s3 rdf:predicate foaf:mbox .
+#_:s3 rdf:object <mailto:bob@home> .
+#_:s3 rdf:type rdf:Statement .
+#_:s3
+#   dc:creator     <http://hr.example.com/infra/crawlers#we1> ;
+#   dc:created     "2011-04-05T12:00:00Z"^^xsd:dateTime ;
+#   dc:source      <http://whatever.nu/profile/bob1975> .
+
+# Terse
+<<bd:bob foaf:mbox <mailto:bob@home>>>
+   dc:source   <http://hr.example.com/employees/bob> ;
+   dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
+# Expanded
+#_:s4 rdf:subject bd:bob .
+#_:s4 rdf:predicate foaf:mbox .
+#_:s4 rdf:object <mailto:bob@home> .
+#_:s4 rdf:type rdf:Statement .
+#_:s4
+#   dc:source   <http://hr.example.com/employees/bob> ;
+#   dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .

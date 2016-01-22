@@ -1,0 +1,3 @@
+INSERT { <http://example/s>  <http://example/p> <http://example/o> }
+USING <http://example/c> 
+WHERE { <http://example/s1>  <http://example/p1> <http://example/o1> } 

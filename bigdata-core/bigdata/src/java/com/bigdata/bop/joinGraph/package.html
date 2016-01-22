@@ -1,0 +1,45 @@
+<html>
+<head>
+<title>Join graphs and query optimization.</title>
+</head>
+<body>
+
+<p>
+
+    This package provides support for join graphs, query optimization,
+    and generating full query plans from a join graph and the
+    evaluation order identified by a query optimizer.
+
+</p>
+<p>
+
+    Support is provided for both static query optimization, based on
+    an analysis of variable bindings and the cardinality of the
+    various access paths, and adaptive query optimization.
+
+</p>
+<p>
+
+    The adaptive query optimization technique is based on breadth
+    first cutoff sampling of join paths and dynamically selects a join
+    path providing efficient execution plan for the query.  Fast and
+    accurate cardinality estimates are available based on range counts
+    are used to decide which joins to execute first.  Without accurate
+    knowledge of detailed correlation in joins, estimation error
+    rapidly sets in as variable bindings are propagated.  Adaptive
+    query optimization iteratively explores the join path identified
+    as having lowest cost for a common set of vertices.  Join paths
+    whose costs are dominated by a better solution are eliminated.
+    Sampling of longer and longer join paths continues until one join
+    path is found to have the lowest cost, at which point it is
+    executed.  This approach bears some similarity to the one
+    described in <a href="http://doi.acm.org/10.1145/1559845.1559910"
+    >ROX : Run-time Optimization of XQueries </a>, by Kader and Boncz
+    (2009) (<a
+    href="http://homepages.cwi.nl/~boncz/Thursday_Afternoon_ROX.pdf"
+    >presentation </a>), but there are numerous differences as well.
+    
+</p>
+
+</body>
+</html>

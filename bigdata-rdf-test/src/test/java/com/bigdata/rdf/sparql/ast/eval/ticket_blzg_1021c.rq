@@ -1,0 +1,6 @@
+select * { 
+   ?s <eg:p>  ?o .
+  FILTER NOT EXISTS {
+    ?s <eg:apX> ?oo
+  }
+}

@@ -1,0 +1,8 @@
+SELECT * WHERE {
+  <http://www.wikidata.org/entity/Q23> ?p ?o .
+  FILTER NOT EXISTS {
+    VALUES ( ?s ?p ?o )
+           { ( <http://www.wikidata.org/entity/Q23> <http://www.w3.org/2000/01/rdf-schema#label> "George Washingmoved"@en ) }
+
+  }
+}

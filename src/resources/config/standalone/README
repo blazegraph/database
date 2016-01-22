@@ -1,0 +1,7 @@
+This configuration is suitable for running a bigdata federation on a single
+machine without using the installer (this is mainly used for testing).  The
+configuration includes its own log4j configuration file is since parameter
+substitution is not performed by the installer. You MUST start jini separately
+for this configuration (the bundled jini configuration has metavariables which
+are set by the installer, but the standalone configuration is designed to run
+without the installer).

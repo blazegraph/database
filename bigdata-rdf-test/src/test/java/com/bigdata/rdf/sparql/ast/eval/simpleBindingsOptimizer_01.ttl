@@ -1,0 +1,5 @@
+@prefix : <http://bigdata.com#> .
+
+:Michael rdf:type :Person .
+:Bryan rdf:type :Person .
+:VW rdf:type :Car .

@@ -1,0 +1,7 @@
+DELETE 
+{ <http://example/s>  <http://example/p> <http://example/o> }
+WHERE
+{
+	GRAPH ?g 
+	{ <http://example/s1>  <http://example/p1> <http://example/o1> } 
+}

@@ -1,0 +1,14 @@
+#Add the blazegraph user with the home directory
+/usr/bin/getent group blzg || /usr/sbin/groupadd -r blzg >& /dev/null
+/usr/bin/getent passwd blzg || /usr/sbin/useradd -r -g blzg -d /usr/local/blazegraph -s /sbin/nologin blzg >& /dev/null
+echo ""
+echo "***********************************************************"
+echo "* The following kernel tuning parameters are recommended. *"
+echo "* They are not automatically configured.                  *"
+echo "***********************************************************"
+echo ""
+#Enable TCP_TW_REUSE
+echo "echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse"
+#Set VM swappiness to 0
+echo "echo "vm.swappiness = 0" >> /etc/sysctl.d/10-vm.swappiness.conf"
+echo "sysctl -p || true >& /dev/null"

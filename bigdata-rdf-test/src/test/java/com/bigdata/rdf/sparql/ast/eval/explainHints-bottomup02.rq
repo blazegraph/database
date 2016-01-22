@@ -1,0 +1,12 @@
+SELECT ?s ?type WHERE {
+  BIND(<http://example.com/Person> AS ?type)
+  {
+    ?s a ?o
+    FILTER(?o=?type)
+  }
+  UNION
+  {
+    ?s a ?o
+    FILTER(?o!=?type)
+  }
+}

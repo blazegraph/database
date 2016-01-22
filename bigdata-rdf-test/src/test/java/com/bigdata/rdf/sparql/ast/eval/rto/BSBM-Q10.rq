@@ -1,0 +1,27 @@
+# BSBM Q10 on pc100.
+
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> 
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+
+SELECT DISTINCT ?offer ?price
+WHERE {
+
+  # Control all RTO parameters for repeatable behavior.
+  hint:Query hint:optimizer "Runtime".
+  hint:Query hint:RTO-sampleType "DENSE".
+  hint:Query hint:RTO-limit "100".
+  hint:Query hint:RTO-nedges "1".
+
+   ?offer bsbm:product <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromProducer1/Product27> .
+   ?offer bsbm:vendor ?vendor .
+    ?offer dc:publisher ?vendor .
+   ?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#US> .
+   ?offer bsbm:deliveryDays ?deliveryDays .
+   FILTER (?deliveryDays <= 3)
+   ?offer bsbm:price ?price .
+    ?offer bsbm:validTo ?date .
+    FILTER (?date > "2008-06-20T00:00:00"^^<http://www.w3.org/2001/XMLSchema#dateTime> )
+}
+ORDER BY xsd:double(str(?price))
+LIMIT 10

@@ -1,0 +1,5 @@
+@prefix : <http://example.org/diagram/> .
+
+<http://example.org/diagram/> {
+  <http://example.org/diagram/1> <http://example.org/diagram/member> <http://www4.wiwiss.fu-berlin.de/diseasome/resource/genes/CIAS1> .
+}

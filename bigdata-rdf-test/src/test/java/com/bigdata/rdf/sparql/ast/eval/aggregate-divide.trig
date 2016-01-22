@@ -1,0 +1,28 @@
+@prefix : <http://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> . 
+
+:aggregate-divide {
+	:i1 :i2d :d1 .
+	:i1 :i2d :d2 .
+	:i1 :i2d :d3 .
+	:i1 :i2d :d4 .
+	:i2 :i2d :d5 .
+	:i2 :i2d :d6 .
+	:i2 :i2d :d7 .
+	:i3 :i2d :d8 .
+	:i3 :i2d :d9 .
+	:i4 :i2d :d10 .
+	:i5 :i2d :d11 .
+	:i5 :i2d :d12 .
+	
+	:i1 :p1 "1"^^xsd:int .
+	:i2 :p1 "2"^^xsd:int .
+	:i3 :p1 "3"^^xsd:int .
+	:i4 :p1 "4"^^xsd:int .
+	
+	:i1 :i2c :c1 .
+	:i2 :i2c :c2 .
+	:i3 :i2c :c3 .
+	:i4 :i2c :c4 .
+	:i5 :i2c :c4 .
+}

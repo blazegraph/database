@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+	xmlns:ns1="http://bigdata.com/test/ontology#"
+	xmlns:ns5="http://www.w3.org/2002/07/owl#"
+	xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+	xmlns:foaf="http://xmlns.com/foaf/0.1/"
+	xmlns:ns2="http://bigdata.com/test/ontology#">
+
+<!-- ONTOLOGY -->
+
+<rdf:Description rdf:about="http://bigdata.com/test/ontology#Person">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/data#mike">
+	<rdfs:label>Michael Personick</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/ontology#Person"/>
+	<foaf:age rdf:datatype="http://www.w3.org/2001/XMLSchema#int">30</foaf:age>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/data#blob">
+	<rdfs:label>
+	
+	 * mroycsi wrote: Based on sparql bottom up evaluation, the subquery will
+     * return s1,s2,s3 as the solutions for ?s. Joined with the ?s :p ?o, you
+     * should only get the statements where ?s is s1,s2,s3.
+     
+     * I haven't debugged bigdata so I don't know exactly what it is doing, but
+     * it seems that currently with the bigdata evaluation, for each solution
+     * produced from ?s :p ?o, the subquery is run, and it seems that the ?s
+     * binding in the subquery is getting constrained by the ?s from the inbound
+     * solution, so results of the subquery are not always s1,s2,s3, depending
+     * on the inbound solution.
+     
+     * thompsonbry wrote: Normally bottom up evaluation only differs when you
+     * are missing a shared variable such that the bindings for variables having
+     * the same name are actually not correlated.
+     
+     * This is a bit of an odd case with an interaction between the order/limit
+     * and the as-bound evaluation which leads to the "wrong" result. We
+     * probably do not want to always do bottom up evaluation for a subquery
+     * (e.g., by lifting it into a named subquery). Are you suggesting that
+     * there is this special case which needs to be recognized where the
+     * subquery MUST be evaluated first because the order by/limit combination
+     * means that the results of the outer query joined with the inner query
+     * could be different in this case?
+     
+     * mroycsi wrote: This is [a] pattern that is well known and commonly used
+     * with sparql 1.1 subqueries. It is definitely a case where the subquery
+     * needs to be evaluated first due to the limit clause. The order clause
+     * probably doesn't matter if there isn't a limit since all the results are
+     * just joined, so order doesn't matter till the solution gets to the order
+     * by operations.
+     
+     * thompsonbry wrote: Ok. ORDER BY by itself does not matter and neither
+     * does LIMIT by itself. But if you have both it matters and we need to run
+     * the subquery first.
+     
+     **********
+     
+	 * mroycsi wrote: Based on sparql bottom up evaluation, the subquery will
+     * return s1,s2,s3 as the solutions for ?s. Joined with the ?s :p ?o, you
+     * should only get the statements where ?s is s1,s2,s3.
+     
+     * I haven't debugged bigdata so I don't know exactly what it is doing, but
+     * it seems that currently with the bigdata evaluation, for each solution
+     * produced from ?s :p ?o, the subquery is run, and it seems that the ?s
+     * binding in the subquery is getting constrained by the ?s from the inbound
+     * solution, so results of the subquery are not always s1,s2,s3, depending
+     * on the inbound solution.
+     
+     * thompsonbry wrote: Normally bottom up evaluation only differs when you
+     * are missing a shared variable such that the bindings for variables having
+     * the same name are actually not correlated.
+     
+     * This is a bit of an odd case with an interaction between the order/limit
+     * and the as-bound evaluation which leads to the "wrong" result. We
+     * probably do not want to always do bottom up evaluation for a subquery
+     * (e.g., by lifting it into a named subquery). Are you suggesting that
+     * there is this special case which needs to be recognized where the
+     * subquery MUST be evaluated first because the order by/limit combination
+     * means that the results of the outer query joined with the inner query
+     * could be different in this case?
+     
+     * mroycsi wrote: This is [a] pattern that is well known and commonly used
+     * with sparql 1.1 subqueries. It is definitely a case where the subquery
+     * needs to be evaluated first due to the limit clause. The order clause
+     * probably doesn't matter if there isn't a limit since all the results are
+     * just joined, so order doesn't matter till the solution gets to the order
+     * by operations.
+     
+     * thompsonbry wrote: Ok. ORDER BY by itself does not matter and neither
+     * does LIMIT by itself. But if you have both it matters and we need to run
+     * the subquery first.
+
+	 ************
+     
+	 * mroycsi wrote: Based on sparql bottom up evaluation, the subquery will
+     * return s1,s2,s3 as the solutions for ?s. Joined with the ?s :p ?o, you
+     * should only get the statements where ?s is s1,s2,s3.
+     
+     * I haven't debugged bigdata so I don't know exactly what it is doing, but
+     * it seems that currently with the bigdata evaluation, for each solution
+     * produced from ?s :p ?o, the subquery is run, and it seems that the ?s
+     * binding in the subquery is getting constrained by the ?s from the inbound
+     * solution, so results of the subquery are not always s1,s2,s3, depending
+     * on the inbound solution.
+     
+     * thompsonbry wrote: Normally bottom up evaluation only differs when you
+     * are missing a shared variable such that the bindings for variables having
+     * the same name are actually not correlated.
+     
+     * This is a bit of an odd case with an interaction between the order/limit
+     * and the as-bound evaluation which leads to the "wrong" result. We
+     * probably do not want to always do bottom up evaluation for a subquery
+     * (e.g., by lifting it into a named subquery). Are you suggesting that
+     * there is this special case which needs to be recognized where the
+     * subquery MUST be evaluated first because the order by/limit combination
+     * means that the results of the outer query joined with the inner query
+     * could be different in this case?
+     
+     * mroycsi wrote: This is [a] pattern that is well known and commonly used
+     * with sparql 1.1 subqueries. It is definitely a case where the subquery
+     * needs to be evaluated first due to the limit clause. The order clause
+     * probably doesn't matter if there isn't a limit since all the results are
+     * just joined, so order doesn't matter till the solution gets to the order
+     * by operations.
+     
+     * thompsonbry wrote: Ok. ORDER BY by itself does not matter and neither
+     * does LIMIT by itself. But if you have both it matters and we need to run
+     * the subquery first.
+
+	 ************
+	 
+	 * mroycsi wrote: Based on sparql bottom up evaluation, the subquery will
+     * return s1,s2,s3 as the solutions for ?s. Joined with the ?s :p ?o, you
+     * should only get the statements where ?s is s1,s2,s3.
+     
+     * I haven't debugged bigdata so I don't know exactly what it is doing, but
+     * it seems that currently with the bigdata evaluation, for each solution
+     * produced from ?s :p ?o, the subquery is run, and it seems that the ?s
+     * binding in the subquery is getting constrained by the ?s from the inbound
+     * solution, so results of the subquery are not always s1,s2,s3, depending
+     * on the inbound solution.
+     
+     * thompsonbry wrote: Normally bottom up evaluation only differs when you
+     * are missing a shared variable such that the bindings for variables having
+     * the same name are actually not correlated.
+     
+     * This is a bit of an odd case with an interaction between the order/limit
+     * and the as-bound evaluation which leads to the "wrong" result. We
+     * probably do not want to always do bottom up evaluation for a subquery
+     * (e.g., by lifting it into a named subquery). Are you suggesting that
+     * there is this special case which needs to be recognized where the
+     * subquery MUST be evaluated first because the order by/limit combination
+     * means that the results of the outer query joined with the inner query
+     * could be different in this case?
+     
+     * mroycsi wrote: This is [a] pattern that is well known and commonly used
+     * with sparql 1.1 subqueries. It is definitely a case where the subquery
+     * needs to be evaluated first due to the limit clause. The order clause
+     * probably doesn't matter if there isn't a limit since all the results are
+     * just joined, so order doesn't matter till the solution gets to the order
+     * by operations.
+     
+     * thompsonbry wrote: Ok. ORDER BY by itself does not matter and neither
+     * does LIMIT by itself. But if you have both it matters and we need to run
+     * the subquery first.
+
+	</rdfs:label>
+</rdf:Description>
+
+</rdf:RDF>

@@ -1,0 +1,7 @@
+SELECT *
+WHERE {
+  ?s ^<http://p2> "A" . 
+  minus {
+    ?s rdf:type <http://T> 
+  }
+}

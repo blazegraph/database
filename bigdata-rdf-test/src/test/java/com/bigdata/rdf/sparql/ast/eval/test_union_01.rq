@@ -1,0 +1,10 @@
+SELECT ?p ?o
+WHERE { 
+    {
+        <http://www4.wiwiss.fu-berlin.de/dailymed/resource/drugs/1080> ?p ?o . 
+    } UNION { 
+        <http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB01254> ?p ?o . 
+    } UNION { 
+        <http://www4.wiwiss.fu-berlin.de/sider/resource/drugs/3062316> ?p ?o . 
+    }
+}

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+      <variable name='vocabProp'/>
+      <variable name='literalProp'/>
+      <variable name='s'/>
+      <variable name='term'/>
+      <variable name='concept'/>
+    </head>
+    <results>
+    </results>
+</sparql>

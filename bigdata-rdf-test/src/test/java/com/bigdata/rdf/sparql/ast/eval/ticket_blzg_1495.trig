@@ -1,0 +1,4 @@
+prefix : <http://localhost/>
+{
+  <http://s1> <http://p1> <http://s2> .
+}

@@ -1,0 +1,15 @@
+@prefix : <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+# Note: This includes a statement that would be discovered if we traverse
+# both the forward and reverse links when describing :DC.
+:sparql-subselect {
+	:Mike rdf:type foaf:Person .
+	:Bryan rdf:type foaf:Person .
+	:Mike rdfs:label "Mike" .
+	:Bryan rdfs:label "Bryan" .
+	:DC rdfs:label "DC" .
+   :Bryan foaf:based_near :DC .
+}

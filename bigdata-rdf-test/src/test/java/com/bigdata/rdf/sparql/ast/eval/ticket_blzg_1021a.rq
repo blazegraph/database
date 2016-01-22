@@ -1,0 +1,6 @@
+select * { 
+   ?s <eg:p>  ?o .
+  FILTER EXISTS {
+    ?s <eg:ap> ?oo
+  }
+}

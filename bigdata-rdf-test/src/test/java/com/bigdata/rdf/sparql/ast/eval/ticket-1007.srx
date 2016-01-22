@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='literal'/>
+        <variable name='graph'/>
+        <variable name='s'/>
+        <variable name='p'/>
+        <variable name='o'/>
+    </head>
+    <results>
+        <result>
+            <binding name='literal'>
+                <literal>g2</literal>
+            </binding>
+            <binding name='graph'>
+               <uri>http://www.interition.net/graphs/g2</uri>
+            </binding>
+            <binding name='s'>
+               <uri>http://s2</uri>
+            </binding>
+            <binding name='p'>
+               <uri>http://www.interition.net/ref/aState</uri>
+            </binding>
+            <binding name='o'>
+                <literal>happy</literal>
+            </binding>
+        </result>
+    </results>
+</sparql>

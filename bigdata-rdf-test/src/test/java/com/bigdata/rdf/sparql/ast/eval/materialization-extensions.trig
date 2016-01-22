@@ -1,0 +1,7 @@
+@prefix : <http://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:order-by-datetime {
+	:s1 :dateProperty "2008-07-28T08:53:25-04:00"^^xsd:dateTime .
+	:s2 :dateProperty "2009-07-28T08:53:25-04:00"^^xsd:dateTime .
+}

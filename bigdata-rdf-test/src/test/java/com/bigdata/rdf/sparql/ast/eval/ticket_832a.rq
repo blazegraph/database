@@ -1,0 +1,22 @@
+PREFIX  rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX  rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX  xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT ?ps ?p ?o
+WHERE {
+   GRAPH <http://example.com/graph1>
+   {
+      ?ps ?p ?o.
+		{
+         SELECT ?ps
+         WHERE {
+            ?ps a  <http://example.com/data/Person>. 
+            ?ps <http://example.com/data/age> ?age.
+            filter(?age >3)
+         }
+         ORDER BY desc(?age)
+         #LIMIT 1
+      }
+   }
+}
+ORDER BY ?ps

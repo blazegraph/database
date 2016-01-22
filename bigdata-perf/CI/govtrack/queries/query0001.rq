@@ -1,0 +1,3 @@
+# Query with limit of one is used to verify that the slice is properly imposed.
+
+SELECT * WHERE {?s ?p ?p} LIMIT 1

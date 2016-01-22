@@ -1,0 +1,31 @@
+<html>
+<head>
+<title>Write Cache Service</title>
+</head>
+<body>
+
+<p>
+
+Low-level write cache service.  Application writes are absorbed on records
+destined for some byte offset on the backing persistent store.  Those records
+are transferred into a write cache rather than writing them directly onto the
+backing file.  The write cache service provides an abstraction supporting one
+or more write cache blocks so the application can write ahead of the disk. The
+write cache itself consists of a record map, which specifies where each record
+will be written onto the backing file, and a large direct ByteBuffer, which
+contains the raw data to be written onto the file.  For the RW store, those
+records will be scattered.  For the WORM, they will be appended (and the record
+map is ignored).  The write cache coordinates with the journal to provide per-
+record checksums.
+
+</p>
+
+<p>
+
+The write cache is also the basis for replicated writes in support of high
+availability.  The entire write cache is check summed and transfered using
+NIO to each service in a highly available quorum. 
+
+</p>
+</body>
+</html>

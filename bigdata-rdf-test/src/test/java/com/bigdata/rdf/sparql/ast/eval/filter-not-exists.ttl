@@ -1,0 +1,6 @@
+<os:0> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <os:class/AnalysisResults> .
+<os:0> <os:prop/analysis/refEntity> <os:elem/loc/Artis> .
+<os:0> <os:prop/analysis/refEntity> <os:elem/loc/Kriterion> .
+<os:1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <os:class/AnalysisResults> .
+<os:1> <os:prop/analysis/refEntity> <os:elem/loc/Artis> .
+<os:2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <os:class/AnalysisResults> .

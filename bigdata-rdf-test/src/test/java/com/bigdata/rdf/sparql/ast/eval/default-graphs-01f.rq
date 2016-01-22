@@ -1,0 +1,8 @@
+prefix : <http://bigdata.com/> 
+
+SELECT ?s ?p
+FROM :c1
+FROM :c2
+WHERE {
+    ?s ?p :mary
+}

@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="res"/>
+  </head>
+  <results>
+     <result>
+      <binding name="res"><uri>http://s.0#17#0</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.0#170#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#171#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#172#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#173#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#174#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#175#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#176#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#177#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#178#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-17#0</uri></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s.0#-170#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-171#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-172#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-173#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-174#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-175#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-176#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-177#0</uri></binding>
+     </result>     
+     <result>
+      <binding name="res"><uri>http://s.0#-178#0</uri></binding>
+     </result>          
+  </results>
+</sparql>

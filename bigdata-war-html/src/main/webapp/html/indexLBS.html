@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html><!-- This is a version of the old index.html that targets the HA load balancer. This file will be removed as part of the HA LBS ticket. -->
+<head profile="http://www.w3.org/2005/10/profile">
+<link rel="icon" 
+      type="image/png" 
+      href="html/favicon.ico" />
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+<title>bigdata&#174; NanoSparqlServer</title>
+<!-- $Id: index.html 7921 2014-03-10 21:15:00Z thompsonbry $ -->
+<!-- junit test marker: index.html -->
+</head>
+<body>
+
+<h2>Welcome to bigdata&#174;.</h2>  
+<p>Please consult the 
+<a href="http://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer"
+ target="_blank"
+   > documentation</a> for information on using the NanoSparqlServer's REST Api. </br>See the 
+   <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page" 
+    target="_blank"
+   >wiki</a> for help on query optimization, bigdata SPARQL extensions, etc.
+</p>
+
+<p>
+The following URLs should be active when deployed in the default configuration:
+</p>
+<dl>
+<dt>http://hostname:port/blazegraph</dt>
+<dd>This page.</dd>
+<dt>http://hostname:port/blazegraph/LBS/sparql</dt>
+<dd>The SPARQL REST API (<a href="/blazegraph/LBS/sparql">Service Description + VoID Description</a>).</dd>
+<dt>http://hostname:port/blazegraph/namespace</dt>
+<dd>VoID <a href="/blazegraph/LBS/namespace">graph of available KBs</a> from this service.</dd>
+<dt>http://hostname:port/blazegraph/status</dt>
+<dd>A <a href="/blazegraph/status">status</a> page.</dd>
+<dt>http://hostname:port/blazegraph/counters</dt>
+<dd>A <a href="/blazegraph/counters"> performance counters</a> page.</dd>
+</dl>
+
+<p>
+Where <i>hostname</i> is the name of this host and <i>port</i> is the port at
+which this page was accessed.
+</p>
+
+<!-- Note: Some applications (firefox 7) can not handle a GET with a very long
+     URL.  For that reason ONLY this operation defaults to a POST.  You SHOULD
+     use GET for database queries since they are, by and large, idempotent. 
+     -->
+<h2><a href="http://www.w3.org/TR/sparql11-query/" 
+      title="W3C SPARQL 1.1 Query Recommendation"
+     target="_blank"
+      > SPARQL Query </a></h2>
+<FORM action="LBS/read/sparql" method="GET" name="QUERY">
+   <P>
+   <TEXTAREA name="query" rows="10" cols="80" title="Enter SPARQL Query."
+   >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
+   </P><P>
+   Tenant Namespace
+   <INPUT type="text" name="namespace" title="Tenant namespace."
+   > (leave empty for default KB)
+   </P><P>
+   <INPUT type="submit" value="Send" title="Submit query.">
+   <INPUT type="checkbox" name="explain" value="true"
+          title="Explain query plan rather than returning the query results."
+          > Explain
+  (<INPUT type="checkbox" name="explain" value="details"
+          title="Explain query plan rather than returning the query results (with extra details)."
+          > Details)
+   <INPUT type="checkbox" name="analytic" value="true"
+          title="Enable the analytic query package."
+          > Analytic
+<!-- TODO Uncomment to reveal the RTO option. -->
+   <INPUT type="checkbox" name="RTO" value="true"
+          title="Enable the Runtime Query Optimizer (RTO) - This is an alpha feature."
+          > RTO (Alpha)
+<!-- -->
+    <INPUT type="checkbox" name="xhtml" value="true"
+          title="Request XHTML response (results formatted as table)."
+          checked="checked"
+          > XHTML
+   </P>
+</FORM>
+<h2><a href="http://www.w3.org/TR/sparql11-update/"
+      title="W3C SPARQL Update Recommendation"
+     target="_blank"
+     >SPARQL Update</a></h2>
+<FORM action="LBS/leader/sparql" method="post">
+   <P>
+   <TEXTAREA name="update" rows="10" cols="80" title="Enter SPARQL Update."
+   >
+PREFIX dc: &lt;http:&#47;&#47;purl.org&#47;dc&#47;elements&#47;1.1&#47;&gt;
+INSERT DATA
+{ 
+  &lt;http:&#47;&#47;example&#47;book1&gt; dc:title "A new book" ;
+                         dc:creator "A.N.Other" .
+}</TEXTAREA>
+   </P><P>
+   Tenant Namespace
+   <INPUT type="text" name="namespace" title="Tenant namespace."
+   > (leave empty for default KB)
+   </P><P>
+   <INPUT type="submit" value="Send" title="Submit Update.">
+   <!--INPUT type="checkbox" name="explain" value="true"
+          title="Explain query plan rather than returning the query results."
+          > Explain-->
+   <INPUT type="checkbox" name="analytic" value="true"
+          title="Enable the analytic query package."
+          > Analytic
+   <INPUT type="checkbox" name="monitor" value="true"
+          title="Monitor the execution of the UPDATE request."
+          checked="checked"
+          > Monitor
+   </P>
+</FORM>
+<p>
+<!-- Note: Some common characters need to be escaped here and also in the SPARQL
+     examples above.
+ -->
+Here are some useful namespaces:
+</p>
+<pre>
+prefix dc:   &lt;http:&#47;&#47;purl.org&#47;dc&#47;elements&#47;1.1&#47;&gt;
+prefix xsd:  &lt;http:&#47;&#47;www.w3.org&#47;2001&#47;XMLSchema#&gt;
+prefix rdfs: &lt;http:&#47;&#47;www.w3.org&#47;2000&#47;01&#47;rdf-schema#&gt;
+prefix rdf:  &lt;http:&#47;&#47;www.w3.org&#47;1999&#47;02&#47;22-rdf-syntax-ns#&gt;
+prefix owl:  &lt;http:&#47;&#47;www.w3.org&#47;2002&#47;07&#47;owl#&gt;
+prefix foaf: &lt;http:&#47;&#47;xmlns.com&#47;foaf&#47;0.1&#47;&gt;
+prefix hint: &lt;http:&#47;&#47;www.bigdata.com&#47;queryHints#&gt; 
+prefix bd:   &lt;http:&#47;&#47;www.bigdata.com&#47;rdf#&gt; 
+prefix bds:  &lt;http:&#47;&#47;www.bigdata.com&#47;rdf&#47;search#&gt; 
+</pre>
+<!-- Note: Use SPARQL Update "LOAD" instead.
+<h2>Upload Data (URL):</h2>
+<form action="sparql" method="post">
+    <p>
+    <textarea name="uri" rows="1" cols="100">file:/</textarea>
+    </p><p>
+    <input type="submit" value="Upload">
+    </p>
+</form>
+-->
+</body>
+</html>

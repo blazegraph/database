@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="People"/>
+  </head>
+  <results>
+    <result>
+      <binding name="People">
+         <uri>http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Alex</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="People">
+         <uri>http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Harold</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="People">
+         <uri>http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Jennifer</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="People">
+         <uri>http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/name1</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="People">
+         <uri>http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/name2</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="People">
+         <uri>http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Pramodh</uri>
+      </binding>
+    </result>
+  </results>
+</sparql>

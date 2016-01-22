@@ -1,0 +1,8 @@
+PREFIX : <http://example.org/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT DISTINCT ?date ?dateStr
+WHERE {
+	?s :dateProperty ?date
+	LET (?dateStr:=STR(?date))
+	FILTER (?date >= "2008-07-28T08:53:25-04:00"^^xsd:dateTime)
+}

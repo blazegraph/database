@@ -1,0 +1,50 @@
+prefix owl: <http://www.w3.org/2002/07/owl#>
+prefix dc: <http://purl.org/dc/elements/1.1/>
+prefix sys: <http://example.com/a0>
+prefix base: <http://example.com/a1>
+prefix skos: <http://www.w3.org/2004/02/skos/core#>
+prefix syapse: <http://example.com/a3>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+prefix sd: <http://www.w3.org/ns/sparql-service-description#>
+
+
+SELECT $j__1 $S__COUNT
+
+WITH {
+SELECT *
+
+WHERE {
+
+  ?Sample_A rdf:type / rdfs:subClassOf * <http://example.com/a18> .
+  ?Sample_A base:hasSubject ?Subject_B .
+  ?Subject_B rdf:type / rdfs:subClassOf * <http://example.com/a35> .
+  ?Sample_D rdf:type / rdfs:subClassOf * <http://example.com/a18> .
+  ?Sample_D sys:uniqueId $j__4
+  FILTER( $j__4 = 'TS-7' )
+  ?Sample_D rdf:type / rdfs:subClassOf * <http://example.com/a12> .
+  ?Sample_D syapse:part? $j__2 .
+  $j__2 $j__3 ?Subject_B
+}} AS %__MainQuery
+WITH {
+SELECT DISTINCT $j__1
+
+WHERE {
+
+  OPTIONAL {
+    ?Sample_A sys:name $j__1
+  }
+  INCLUDE %__MainQuery
+}} AS %__FullQuery
+
+WHERE {
+
+{ SELECT (COUNT(*) AS $S__COUNT)
+  WHERE {
+    INCLUDE %__FullQuery
+  }
+ }
+ INCLUDE %__FullQuery
+
+}

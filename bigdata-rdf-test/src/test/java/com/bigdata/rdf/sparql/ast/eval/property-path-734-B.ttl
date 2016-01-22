@@ -1,0 +1,24 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<os:0> rdf:type <os:ClassA> .
+<os:0> rdf:value <os:1> .
+<os:0> rdf:value <os:1a> .
+<os:0> rdf:value <os:1b> .
+<os:1> rdf:type <os:ClassB> .
+
+<os:0a> rdf:type <os:ClassAa> .
+<os:ClassAa> rdfs:subClassOf <os:ClassA> .
+<os:0a> rdf:value <os:1> .
+<os:0a> rdf:value <os:1a> .
+<os:0a> rdf:value <os:1b> .
+<os:1a> rdf:type <os:ClassBa> .
+<os:ClassBa> rdfs:subClassOf <os:ClassB> .
+
+<os:0b> rdf:type <os:ClassAb> .
+<os:ClassAb> rdfs:subClassOf <os:ClassAa> .
+<os:0b> rdf:value <os:1> .
+<os:0b> rdf:value <os:1a> .
+<os:0b> rdf:value <os:1b> .
+<os:1b> rdf:type <os:ClassBb> .
+<os:ClassBb> rdfs:subClassOf <os:ClassBa> .

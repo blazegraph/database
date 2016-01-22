@@ -1,0 +1,6 @@
+prefix :         <http://example/> 
+
+SELECT (MIN(?o) AS ?m)
+WHERE { 
+   ?s :p ?o 
+} 

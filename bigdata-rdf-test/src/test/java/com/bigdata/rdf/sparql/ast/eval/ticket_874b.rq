@@ -1,0 +1,17 @@
+prefix xsd:  <http://www.w3.org/2001/XMLSchema#>
+SELECT * 
+where { 
+?user <http://arvados.org/schema/api_token> <token:ckedd> .
+{
+  ?user <http://arvados.org/schema/user_is_admin> true .
+  ?s ?p ?o . 
+  FILTER strStarts(str(?s), "http://arvados.org/schema/modified") .
+} 
+union 
+{ 
+  ?user <http://arvados.org/schema/user_is_admin> false .
+  ?user <http://arvados.org/schema/permission/can_read> ?s .
+  ?s ?p ?o . 
+  FILTER strStarts(str(?s), "http://arvados.org/schema/modified") .
+}
+}

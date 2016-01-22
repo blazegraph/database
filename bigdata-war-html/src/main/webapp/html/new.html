@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+    <link rel="icon" 
+      type="image/png" 
+      href="html/favicon.ico" />
+    <!-- meta charset="utf-8" -->
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+    <title>Bigdata Workbench</title>
+    <link rel="stylesheet" href="html/css/style.css">
+  </head>
+
+  <body>
+    <div id="container">
+
+      <div id="top">
+        <img src="html/images/logo.png" id="logo">
+        <form id="search-form"><label for="search-text">Search:</label> <input type="text" id="search-text"></form>
+        <p>Current namespace: <span id="current-namespace"></span></p>
+      </div>
+
+      <div id="tab-selector">
+        <a data-target="load" class="active">Load</a>
+        <a data-target="query">Query</a>
+        <a data-target="explore">Explore</a>
+        <a data-target="status">Status</a>
+        <a data-target="performance">Performance</a>
+        <a data-target="namespaces">Namespaces</a>
+      </div>
+
+      <div class="tab" id="load-tab">
+
+        <div class="box">
+
+          <div class="namespace-shortcuts">
+            <ul>
+              <li data-ns="prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>">RDF</li>
+              <li data-ns="prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>">RDFS</li>
+              <li data-ns="prefix owl: <http://www.w3.org/2002/07/owl#>">OWL</li>
+              <li data-ns="prefix bd: <http://www.bigdata.com/rdf#> ">BD</li>
+              <li data-ns="prefix bds: <http://www.bigdata.com/rdf/search#> ">BDS</li>
+              <li data-ns="prefix foaf: <http://xmlns.com/foaf/0.1/>">FOAF</li>
+              <li data-ns="prefix hint: <http://www.bigdata.com/queryHints#>">HINT</li>
+              <li data-ns="prefix dc: <http://purl.org/dc/elements/1.1/>">DC</li>
+              <li data-ns="prefix xsd: <http://www.w3.org/2001/XMLSchema#>">XSD</li>
+            </ul>
+          </div>
+
+          <textarea id="load-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
+          <p id="large-file-message">Your file is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
+          <p>
+            <input type="file" id="load-file"><br>
+            <label for="load-type">Type:</label>
+            <select id="load-type">
+              <option value="sparql" selected="selected">SPARQL</option>
+              <option value="rdf">RDF</option>
+              <option value="path">File path</option>
+            </select>
+            <span id="rdf-type-container">
+              <label for="rdf-type">Format:</label>
+              <select id="rdf-type">
+                <option value="">Select RDF format</option>
+                <option value="n-quads">N-Quads</option>
+                <option value="n-triples">N-Triples</option>
+                <option value="n3">Notation3</option>
+                <option value="rdf/xml">RDF/XML</option>
+                <option value="trig">TriG</option>
+                <option value="trix">TriX</option>
+                <option value="turtle">Turtle</option>
+              </select>
+            </span>
+          </p>
+          <hr class="shadow">
+          <button id="load-load">Load</button>
+        </div>
+
+        <div class="box">
+          <pre id="load-response"></pre>
+        </div>
+
+        <div class="bottom">
+          <button id="load-clear">Clear output</button>
+        </div>
+
+      </div>
+
+      <div class="tab" id="query-tab">
+        <div class="box">
+
+          <div class="namespace-shortcuts">
+            <ul>
+              <li data-ns="prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>">RDF</li>
+              <li data-ns="prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>">RDFS</li>
+              <li data-ns="prefix owl: <http://www.w3.org/2002/07/owl#>">OWL</li>
+              <li data-ns="prefix bd: <http://www.bigdata.com/rdf#> ">BD</li>
+              <li data-ns="prefix bds: <http://www.bigdata.com/rdf/search#> ">BDS</li>
+              <li data-ns="prefix foaf: <http://xmlns.com/foaf/0.1/>">FOAF</li>
+              <li data-ns="prefix hint: <http://www.bigdata.com/queryHints#>">HINT</li>
+              <li data-ns="prefix dc: <http://purl.org/dc/elements/1.1/>">DC</li>
+              <li data-ns="prefix xsd: <http://www.w3.org/2001/XMLSchema#>">XSD</li>
+            </ul>
+          </div>
+
+          <form id="query-form">
+            <textarea id="query-box" name="query" placeholder="(Input a SPARQL query)"></textarea>
+
+            <a href="#" id="advanced-features-toggle">Advanced features</a>
+
+            <div id="advanced-features">
+              <input type="checkbox" id="query-explain"> <label for="query-explain">Explain</label>
+              <input type="checkbox" name="analytic" value="true" id="query-analytic"> <label for="query-analytic">Analytic</label>
+              <input type="checkbox" name="RTO" value="true" id="query-rto"> <label for="query-rto">Runtime Query Optimizer</label>
+            </div>
+
+            <hr class="shadow">
+
+            <div id="load-buttons">
+              <input type="submit" value="Execute">
+              <input type="reset" value="Clear">
+            </div>
+          </form>
+
+        </div>
+
+        <div id="query-response" class="box">
+        </div>
+
+        <div id="query-explanation" class="box">
+        </div>
+
+        <div class="bottom">
+          <button id="query-export-csv">Export CSV</button>
+          <button id="query-export-json">Export JSON</button>
+          <button id="query-export-xml">Export XML</button>
+          <button id="query-response-clear">Clear</button>
+        </div>
+
+      </div>
+
+      <div class="tab" id="explore-tab">
+
+        <div class="box">
+          <p>Enter a URI to begin navigation <form id="explore-form"><input type="text"> <input type="submit"></form></p>
+        </div>
+
+        <div id="explore-results">
+          <div class="box" id="explore-header"></div>
+          <div class="box" id="explore-incoming"></div>
+          <div class="box" id="explore-outgoing"></div>
+          <div class="box" id="explore-attributes"></div>
+        </div>
+
+      </div>
+
+      <div class="tab" id="status-tab">
+
+        <div class="box">
+          <p>Accepted query count: <span id="accepted-query-count"></span></p>
+          <p>Running query count: <span id="running-query-count"></span></p>
+          <p>Show <a href="#" id="show-queries">queries</a>, <a href="#" id="show-query-details">query details</a>.</p>
+          <pre id="status-numbers"></pre>
+          <ul id="running-queries"></ul>
+        </div>
+
+      </div>
+
+      <div class="tab" id="performance-tab">
+
+        <div class="box"></div>
+        
+      </div>
+
+      <div class="tab" id="namespaces-tab">
+        
+        <div class="box">
+          <h1>Namespaces</h1>
+          <ul id="namespaces-list"></ul>
+          <br>
+          <a href="namespace">Download VoID description of all namespaces</a>
+        </div>
+
+        <div id="namespace-properties" class="box">
+          <h1></h1>
+          <table></table>
+        </div>
+
+        <div class="box">
+          <form id="namespace-create"><input type="text"> <input type="submit" value="Create namespace"></form>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!--[if IE]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="html/js/vendor/jquery.min.js"><\/script>')</script>
+    <script src="html/js/vendor/jquery.hotkeys.js"></script>
+    <script src="html/js/workbench.js"></script>
+  </body>
+</html>

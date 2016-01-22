@@ -1,0 +1,13 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix bd: <http://www.bigdata.com/rdf#> .
+@prefix : <:> .
+
+# first path
+:source :edge :a .
+:a :edge :b .
+:b :edge :target .
+
+# second path
+:source :edge :c .
+:c :edge :d .
+:d :edge :target .

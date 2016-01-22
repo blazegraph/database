@@ -1,0 +1,6 @@
+SELECT * WHERE
+{
+  ?s ?p ?o .
+  LET (?tmp := ?o) .
+  LET( ?tmp2 := sameTerm(?tmp, "val") ) .
+}

@@ -1,0 +1,635 @@
+This is a refactor of asynchronous overflow processing designed to
+address a problem where the journal extent can grow without bound
+under heavy write load.  The root of the problem is that we are
+running all asynchronous overflow tasks before the journal is allowed
+to overflow again, those tasks include heavy operations such as merge,
+split and move, and those tasks are running with too much concurrency
+which leads to resource contention.
+
+This refactor always does builds first to clear the old journal and
+then schedules merges based on the complexity of the view and the
+estimated size of the index partition on the disk (sumSegBytes).
+Splits are taken based on the size of the index partition on the disk
+after a merge. Merges do not prevent synchronous overflow from
+retriggering (unless sumSegBytes is GT 200M for the index partition)
+and are run on a small thread pool.
+
+Moves may be taken at any time.  A move of a clean index partition
+(nothing on the journal or a compact view (one journal, one segment)
+is straightforward.  In fact, as long as there is at most one journal
+in the view, the segments can be sent over the socket level transport,
+which is quite efficient.  If there are multiple journals in the view,
+then, a move requires a build (to clear the old journal, assuming that
+we always clear the old journal by builds before allowing overflow
+again).  Since we want to move hot shards and we want to shed the load
+quickly, moves should be choosen from the existing compact views and
+the existing views with no more than one journal.
+  
+x. We could do a merge sort of the leaves regions of the segment files
+   for a merge, especially if we read the data into a GPU, and
+   especially if the GPU could decode the leaves.
+
+x. Forcing overflow causes too much concurrent work (fix by only build
+   to clear the journal and fewer threads for split/move/merge).  Use
+   a distributed job instead to do compacting merges on all shards.
+   Remove this as an option from the mapped job?
+
+x. (***) Faster builds w/o exact range count.
+
+x. Make sure that the SplitTail task still works (if it currently is
+   used).
+
+x. Can we toss out all of the "split acceleration" stuff?  
+
+x. Can we toss out all of the overflow acceleration stuff?
+
+x. Make the synchronous overflow handler "safe" by refactoring how the
+   journal write cache buffer is allocated.
+
+x. Add unit tests for safe logical row splits (sparse row store
+   constraints).
+
+----------------------------------------  
+
+Build, Merge, Split, Move refactor design narrative.
+
+   x. When a build or merge operation is invoked on other than the
+      lastCommitTime of the old journal it must create a checkpoint
+      which delineates the view before the operation from the view
+      against which that operation will be carried out. This is done
+      automatically by synchronous overflow today.  The build or merge
+      operation then runs against the view as defined before that
+      checkpoint while any writes buffered during the build or merge
+      will be accumulated by the current view (which may be on the
+      same journal or on a subsequent journal). 
+
+         readTime := the commitTime of the view from which the BTree
+		     was loaded by the unisolated task which replaces
+		     the root node with an empty root leaf.  Until now
+		     this has always been the lastCommitTime on the
+		     old journal.
+
+	 writeTime := 0L, which is to say, the accumulated writes for
+		      which we are responsible are all writes on the
+		      BTree.
+
+        - In order to coordinate this when the checkpoint is not at
+	  lastCommitTime of the old journal, the desired journal and
+	  commitTime need to be passed into the build (or merge)
+	  operation.  At present, that is done somewhat implicitly.
+	  This needs to be made explicit and generalized to handle
+	  more than just the lastCommitTime.
+
+	- The view "checkpoint" consists of atomically redefining the
+	  view to include the last checkpoint for the BTree and an
+	  empty BTree which can absorb future writes. As part of this
+	  operation the root of the BTree is replaced by an empty root
+	  leaf (or drop/add the BTree, which should have the same
+	  effect).
+
+	- Group commit can allow multiple writers on the same view
+	  within the same commit group.  This means that the
+	  checkpoint against which we would frame a split or move
+	  could be non-empty before we start the build or merge due to
+	  intervening writes which have already been buffered.  That
+	  should be Ok.  We do not need to identify the commitTime or
+	  the Checkpoint record for the split or move. All we need to
+	  know is the mutable view.  Anything buffered on the mutable
+	  view is our responsibility when we come to execute a split
+	  or move (or join).
+
+      In this manner, we have created a checkpoint which can be used
+      to gather up tuples written since that checkpoint as required
+      for a split or move operation executed while we are holding the
+      exclusive lock on the shard. Therefore, if the operation was a
+      merge and the new view once we incorporate the results of that
+      merge includes all data from historical journals and segments in
+      a single index segment, then we can execute a move or split
+      during the atomic update.
+
+      Split and move are always invoked on the results of a merge, but
+      unlike a merge they have to take responsibility for the buffered
+      writes.  This is simplified if we demand a "compact view" as the
+      precondition (a compact view being a view consisting of no more
+      than the live journal and at most one index segment).
+
+      Therefore, during the atomic update we check the view.  If it is
+      compact and if the segment is over the nominal shard extent
+      (200M) then we do a split.  Likewise, if the view is compact (or
+      if it includes no more than one journal) and the host is
+      overloaded in both an absolute sense and relative to its peers,
+      then we can do a move.
+
+      - It should be possible to execute a build, merge, split or move
+        at any time for any shard on demand.  This should be raised to
+        the level where build, merge, split, move, and join operations
+        can be demanded from a UI.  We create the checkpoint so we can
+        identify the buffered writes.  Then we do the build or merge.
+        Finally, the atomic update task handles the split or move.
+
+      - Join is just the compacting merge of two or more contiguous
+        shards.  Join is like split and move in that the atomic update
+        is also responsible for any buffered writes.  [With HA, joins
+        become easy since we do not have to move anything.]
+
+      - We need to disallow operations from being choosen from views
+        for which an operation is already running, which I think could
+        lead to lost updates.  In particular, make sure that views on
+        which a build is running are removed from the merge schedule
+        until the build is complete.
+
+      - If overflow is allowed while we are running a merge then we
+        need to be careful about the definition of the view.  For
+        example, if the view on J3 is being merged but we are on J5 by
+        the time that merge completes, then the post-merge view IS NOT
+        a compact view since the buffered writes are still present on
+        J4 and J5.  Another merge would be indicated in this case.  Or
+        we could disallow overflow while a merge is running and
+        disallow new merges when we are close to an overflow point.
+
+      - Overflow should be disallowed if we are running a merge where
+        sumSegBytes GT 200M since we have a very strong expectation
+        that the merge will result in a split and we need a compact
+        view (one index segment plus some buffered writes) if we are
+        to locate the separateKeys using the linear list API.
+
+      - There are several advantages to having splits occur only after
+	compacting merge.  First, we know the exact size on the disk
+	of the shard (excluding any buffered writes of course).
+	Second, since the data is in a single IndexSegment we can use
+	the linear list API to locate the separator keys for the
+	splits.
+
+      - Choose the split point by dividing the post-merge segmentSize
+	by the nominal shardSize.  Then choose the ith tuple from the
+	segment as the separator key using the linear list API.
+	Applications may override the choice of the separator key by
+	scanning in either direction until a suitable key boundary is
+	discovered.
+
+      ----
+
+      Build, merge, split, move refactor plan.
+      
+        done. Implement conditional atomic update of the view
+        definition and use whenever the view was loaded from a time
+        other than the lastCommitTime of the old journal.  This means
+        that we replace the root node of the BTree with an empty leaf
+        and update the IndexMetadata to reflect the new view.  We also
+        need to pass along the commitTime on which the build or merge
+        task must read (the journal can be discovered from the
+        commitTime).  Write unit tests for this.  Cover the edge
+        cases.  Make sure that the rest of the unit tests are not
+        broken by making the commitTime explicit rather than assuming
+        the lastCommitTime.
+
+	x. Update stress tests to run cover the view checkpoint
+	   condition as well.
+
+        x. Write a compacting merge against views other than the
+           lastCommitTime of the old journal.
+	   
+	x. Write unit tests for split if atomic update phase of a
+	   merge task discovers the view is compact (one journal, at
+	   most one segment) and the segment extent exceeds the
+	   configured threshold (200M).
+
+	x. Write unit tests for split/move where synchronous overflow
+	   occurs during a merge task.  In these cases the view is no
+	   longer compact (more than one journal) so we DO NOT split
+	   or move the shard.  The view will be rescheduled for a
+	   merge if its sizeOnDisk puts it at the top of the merge
+	   priority queue (it will not get there on complexity alone
+	   right after a merge).
+
+	   A command to split or move a shard must run a driver task
+	   to handle the case where the post-merge view is not compact
+	   by requeuing a merge request with split or move atomic
+	   update action.
+
+	   Another alternative is to grab the write lock for the
+	   shard, thus preventing synchronous overflow and ensuring
+	   that we can split or move the shard once the merge is
+	   complete.  This more or less guarantees that the operation
+	   will complete but it locks out application writes (and
+	   unisolated reads and hence tx commits) on the shard and
+	   should be reserved for emergency conditions or to make a UI
+	   command execute with more than a "best try" semantics.
+
+	x. These steps must be taken together and represent a break
+	   with the existing way of handling asychronous overflow.
+
+ 	   x. Modify asynchronous overflow to only invoke builds and
+	      to restrict the #of concurrent builds using a latch
+	      based on a configuration parameter (could be dynamic w/
+	      mbeans).
+
+	      Note: A "build" will incorporate multiple sources in the
+	      view, stopping when it hits the first source with
+	      "significant" amounts of data.  This keeps the view
+	      complexity from growing unless the index partition is
+	      absorbing writes at a high rate.
+
+	   x. The merge priority should be the #of sources in the view
+	      (drives costs and memory) and the size on the disk of
+	      the view (candidate for a split).  E.g., [njournals*A +
+	      nsegments*B + (sizeOnDisk/threshold)*C].
+
+	      There should be a minimum for doing a merge.  E.g., do
+	      not perform a merge for a compact view (one journal, one
+	      segment).  If that one segment is over size, then just
+	      do a split.
+
+	      Merges are run using latch limited concurrency (~1)
+	      outside of asynchronous overflow.
+
+	      Allow overflow during merge operations (unless
+	      sumSegBytes for a view is GTE 200M, in which case we
+	      want to defer overflow so we can do the split once the
+	      merge completes).  The resulting view will not be
+	      compact if overflow occurs during the merge, but the
+	      merge will still help the DS keep on top of the shards.
+
+           x. During merge atomic update, execute split if the segment
+	      extent of a compact view is GTE 200MB (a single
+	      configuration parameter).
+
+	      The logic to do the split can be passed in as a Callable
+	      factory so we can test with and without this behavior.
+
+	      Note: overflow:=false is specified for BTree#rangeCopy()
+	      by split tasks since the source and target journal were
+	      the same.  This is safe as long as we require the view
+	      to be compact since the buffered writes will be on the
+	      live journal.
+
+	   x. Rather than planning moves in an asynchronous overflow
+	      planning phase, a move can occur at any time for a
+	      compact view.
+
+	      When the DS decides it is overloaded and can find one or
+	      more DSs to which it can hand off some work, then we
+	      select move candidates from the set of compact views and
+	      run a move task for each with a latch limiting the #of
+	      moves that we will actually execute.  Only the first
+	      move tasks to gain the exclusive view lock will run.
+	      Other tasks will terminate without trying.
+
+	      Support a "move shard" command and a "move shard to DS"
+	      command. These will need to ensure the view is compact
+	      which is a bit more logic that we use otherwise.
+
+	   x. Simplify the split handler.  The history will all be on
+	      one segment with buffered writes on the live journal
+	      (this is guaranteed if the view is compact).  Therefore,
+	      we can use the linear list API to find the separator
+	      keys on the segment and then just allocate the keys from
+	      the live journal where they fall in the new shards.
+	      This means that the logic to decide whether an index
+	      should be split or joined can be removed from the split
+	      handler, leaving only the application constraint on the
+	      choice of the separator key.
+
+
+============================================================
+
+Errors in unit tests for com.bigdata.resources before the refactor.
+These errors are all related to whether resources are released during
+synchronous or asynchronous overflow.
+
+TestWithCopyNoRelease: No such store. unit test needs to be updated to
+reflect purge in sync overflow.
+
+TestWithCopyImmediateRelease: No such store.  unit test needs to be
+updated to reflect purge in sync overflow.
+
+TestReleaseResourcesWithCopy_NonZeroReleaseAge: expected <2> but was
+<1>.  unit test needs to be updated to reflect purge in sync overflow.
+
+============================================================
+Change log:
+
+- The IndexManager assumed that references to a journal in the 1st
+  position of the view were to the current state of the index while
+  references to journals in the 2nd plus positions of the view were to
+  the lastCommitTime of the previous journal.  This assumption has
+  been invalidated.  In order to perform a build or merge without
+  first triggering overflow processing we need to redefine the view on
+  the live journal to include the previous BTree checkpoint plus a new
+  BTree with an empty root leaf.  In order to identify that previous
+  checkpoint we have to include either its checkpointAddr or the
+  commitTime associated with the checkpoint from which the BTree was
+  loaded.  
+
+  The IResourceMetadata and IndexManager must be updated to support
+  this.  For backward compatibility, we can assume that a missing
+  field corresponds to the lastCommitTime on a historical journal.
+  The field must be present for the 2nd plus position in the view when
+  the resource is the live journal.
+
+  Given the way IndexManager is written, it will be easiest to make
+  this change by adding the commitTime of the desired BTree checkpoint
+  record to the IResourceMetadata.  That information can be captured
+  by an interface which extends IResourceMetadata and can only be
+  specified for a journal, so it will either extend or wrap the
+  JournalMetadata object.
+
+  done. Added IResourceManager#getCommitTime().  This resulted in a
+  serialization version change in AbstractResourceMetadata and
+  LocalPartitionMetadata, which does custom serialization for an
+  IResourceMetadata[].
+
+  done. Modified IndexManager.  It will not use the specified commit
+  time for a journal when it is non-zero when asked to materialize an
+  index view.
+
+  done. Added BTree#createViewCheckpoint().  This encapsulates all of
+  the trickery for creating the necessary checkpoint without exposing
+  any methods which could be used to replace the root node with an
+  empty root leaf.
+
+  done. The IncrementalBuildTask requires the ViewMetadata.  The
+	ViewMetadata already can be created for any commitTime (no
+	change was required).  I added BTreeCounters#clone() to
+	decouple the performance counters passed into the ViewMetadata
+	from the live counters for the index.
+
+  done. Modified BTreeCounters to support clone().
+
+  done. Modified the IncrementalBuildTask to allow builds where a view
+        checkpoint was created so the data for the IndexSegment was
+        drawn from the live journal rather than the old journal.
+
+  done. Modified BTreeCounters to use AtomicLong and AtomicInteger for
+	fields that are updated by read operations since those
+	operations can occur with high concurrency.  Fields which are
+	only updated by write operations remain native long and int
+	fields since the BTree is not safe for concurrent mutation.
+
+  @todo Asynchronous overflow schedules builds for all shards with
+	writes buffered on the old journal which were not simply
+	copied over to the new journal.  A small thread pool (~3) is
+	used to run the build tasks.  When we start a build for a
+	shard we remove it from the merge priority queue.  When the
+	build completes we return the shard to that queue if it meets
+	the acceptance criteria for the merge queue.
+
+	   - Overflow is disabled until the builds are done since we
+	     want to clear the old journal as fast as possible?
+
+	     The build can in fact run across an overflow event since
+	     it is read only until the atomic update so we do not have
+	     to prevent overflow during builds but this can lead to a
+	     build backlog, but that backlock could be cleared by the
+	     next build or merge for the shard.  It is all a question
+	     of how the system degrades least poorly under heavy load.
+
+	A small thread pool (~1) is used to run merges.  This thread
+	pool runs for the life of the data service, not just during
+	asynchronous overflow.  The thread pool is fed by a priority
+	queue.  The priority is a function of the complexity of the
+	view and the size of the data on the disk at the time the view
+	is entered into the queue.  Shards need to exceed a minimum
+	complexity to be on this queue (at least 2 segs in the view
+	and size on disk for a seg is such that a build would not
+	automatically incorporate all segments into the operation).
+
+	   - The design should also allow for other nodes to run merge
+	     tasks (builds we might still run locally since there will
+	     be more of them).  To support that, we need to register
+	     the shard with zookeeper.  Some design desiderata:
+
+	     - For efficiency, workers should reuse the same journal
+	       resources for a series of merge tasks.
+
+	     - For scale, we must be able to assign multiple workers
+               to each data service.
+
+	     - For failover, we must know when a worker has started a
+               merge and then died.
+
+	     - For consistency, the PDS must be able to withdraw a
+               merge task from the priority queue when it will do a
+               build (or merge) itself.
+
+	     - The size of the priority queue can be a limiting
+               factor, so it may make sense to break down the queue
+               into more than one queue, but this can create other
+               problems.
+
+	Merges, splits and moves can run at any time (regardless of
+	overflow, but we do not want to run two tasks for the same
+	shard at the same time.  This needs to be managed by a
+	concurrent hash map in which we putIfAbsent() the operation on
+	the shard.  If there is already an operation on the shard,
+	then the loser quits gracefully.
+
+	[The overflow latch might not be necessary if we split the
+	 shard before we do its build.  However, if the merge does not
+	 finish before the next build for that shard, then we will
+	 have to wait for another merge before we can do a split which
+	 is wasteful.  Also, this raises the possibility of more than
+	 one task running for the same shard and that will make the
+	 atomic update of the shard view more complex.]
+
+	As each merge task starts, it will increment the overflow
+	latch if the size of the data on the disk is GTE the split
+	threshold and the journal is less than 1x its nominal extent.
+	The latch will be decremented when the merge is complete.  The
+	purpose of the latch is to reserve the right to split the
+	shard by refusing overflow until the merge is done.
+	
+	If the post-merge size on disk exceeds the split threshold and
+	the journal the overflow latch is non-zero, then a split will
+	be performed; otherwise the overflow latch will be
+	decremented.
+
+	Splits are taken based on the size of the data on disk after a
+	merge.
+
+	
+
+	a) For any shard, if sumSegBytes is already over 200M, then
+	schedule this as a compacting merge rather than a build and
+	disallow overflow during the merge in case we need to split
+	the shard. [This still leaves us open to running too many
+	merges or splits at once.]
+
+	b) If 
+
+  @todo Here is an alternative design: Schedule builds using a simple
+	FIFO order, entering the view onto the buildQueue the each
+	time the journal overflows, updating its entry if it is
+	already present (FIFO hash map queue).  If a merge runs first,
+	then the entry is removed from the buildQueue.  If a build
+	runs first, then the mergeQueue entry is updated.  We want to
+	build anyway since that helps clear the old journals as
+	quickly as possible.
+
+	(***) This still has complex interdependencies between the
+	      shardTasks (running builds or merges), the buildQueue
+	      (work queue for the buildService) and the mergeQueue
+	      (work queue for the mergeService).
+
+  @todo I am running into what is now a familiar problem.  I have two
+	concurrent collection classes whose semantics I want to
+	compose but I can not do this because I lack access to
+	internal notification mechansims of the classes.  In this
+	case, what I want is a blocking take on a priority queue with
+	putIfAbsent() semantics.  This is really the same reason we
+	can not easily compose a concurrent LRU class.
+
+	The application is the build/merge/move tasks for overflow
+	processing.  Split is executed when a merge determines that
+	the view has enough data on the disk to be split, so it is no
+	longer a top level task.  I am thinking of this in terms of a
+	build queue and a merge queue.  At least the mergeQueue is a
+	priority queue, but both really could be priority queues.
+	Note that BlockingPriorityQueue does not support putIfAbsent()
+	semantics.  contains() is linear in the size of the queue.  If
+	we want to create putIfAbsent() semantics using a lock, then
+	we run into a deadlock problem with take() (contending for the
+	same lock).  That leads us to take() getting reimplemented as
+	polling.  Yuck.  We have the same delima in the BlockingBuffer
+	and its inner iterator class.
+
+	Anyway, for a given queue, there should be at most one task
+	for a given index partition.  An index partition could be on
+	both queues, but if it is accepted as a task to run then we
+	need to remove or discard the task on the other queue (I do
+	not want a build and a merge to run concurrently for the same
+	index partition.  This would be both wasted effort and could
+	cause the view to become inconsistent).
+
+	One option is to maintain the queues independently as lists of
+	tasks in priority order.  When we take() a task from a queue
+	and it starts to execute we determine somehow whether the view
+	has been modified by an intervening build or merge, in which
+	case we drop the task on the floor.  Maybe we could do this in
+	beforeExecute() on a ThreadPoolExecutor?  However, that
+	decision needs to be atomic, so there would have to be a lock
+	for the index partition for the purpose of executing a build
+	or merge task for that index partition and we would have to
+	make this decision with that lock held.  This can not be the
+	write lock for the index partition since the build and merge
+	tasks do not run as write operations.  The move task and the
+	HA "shed" task would also have to use this lock.
+
+	This approach would give us duplicate tasks in the build and
+	merge priority queues.  We would take those tasks in priority
+	order.  A per-shard lock would be used to serialize operations
+	for that shard (remember, these are read operations until
+	their atomic update phase so we need a different lock for
+	this).  Tasks whose preconditions have been invalidated would
+	be dropped.
+
+	   - What do we use to test the precondition? Overflow itself
+             should not invalidate a build/merge task since it can run
+             after overflow as well as before.  Maybe just increment a
+             counter on the pmd each time we do a build or merge but
+             not for overflow?  We can then just test the counter.
+
+	   - A compacting merge is a read-only operation and does not
+	     update the view definition. In fact, it can not update
+	     the view definition without running a unisolated task. So
+	     build or merge must finish and do their atomic update and
+	     then update the priority of the view on a splitQueue.
+	
+	     Once on the splitQueue, a split will eventually happen
+	     unless the index partition is moved or dropped.  When the
+	     split task runs, it recomputes sumSegBytes for the
+	     current view and drops the task if the view is within the
+	     constraints. [This handles the case where a subsequent
+	     merge demonstrates that the sumSegBytes has fallen and a
+	     split is no longer required].
+
+	     This means that I can rewrite just the logic to select
+	     the separatorKeys in the SplitIndexPartitionTask.
+
+	   - The first N items in the build, merge, and split queues
+             should be logged and reported to the LBS using
+             queue.toArray().
+
+  @todo (***) Finish the new SplitUtility#getSplits() method which
+        operates on the size on the disk of the index segment and the
+        linear list API and either write or adapt the existing unit
+        tests.  Modify to support application constraints on the
+        separator keys (search within a key-range for a separatorKey)
+        and handle cases where Split are discarded because separator
+        keys could not be found.
+
+  @todo Try nconcurrentBuilds=3,10,20.
+
+  @todo Accelerate scatter split of 1st index partition?  Build once
+        ntuples=100000?  Try run w/o scatter split acceleration.  How
+        does that look?
+
+  @todo OverflowMetadata and AsynchronousOverflowTask both use
+        lastCommitTime but do not appear to use it in a manner which
+        would conflict with a view checkpoint.
+
+  @todo When running in situ we need to be careful about which
+	commitTime is used as the basis for the build or the merge.
+	It needs to be the one returned by the view checkpoint so any
+	accumulated writes will be buffered by the BTree after that
+	checkpoint (when its root was replaced by an empty leaf).
+
+  @todo When the task runs which would create the checkpoint for the
+	view, first test whether sumSeqBytes is over the threshold. If
+	it is, then start a merge while holding the lock.  The merges
+	should use a latch to limit their concurrency, but no one
+	should be able to write on that index until the merge runs.
+
+  --------------------
+
+  @todo Clean up OverflowManager.Options.  Many of these options can
+        be discarded.
+
+	BTreeMetadata.manditoryMerge is not required.
+
+	OverflowManager.maximumJournalsPerView and
+	maximumSegmentsPerView are not required.
+
+  @todo Handle MOVE and COPY.  For MOVE, we do not need to BUILD first
+	(or perhaps jump to the head of the mergeQueue).  For COPY, we
+	do not need to schedule a BUILD.
+
+  @todo We can allow overflow during a build since any buffered writes
+        will be captured by the new BTree but we have to be careful
+        about not scheduling more than one operation for the same
+        shard and we need to make sure that the atomic update logic
+        replaces the correct part of the view.  For this purpose, it
+        might be nice to declare the part of the view which is to be
+        replaced.
+
+  done. Discard the readCache on the DiskOnlyStrategy.  The global LRU
+	does very much the same thing and has the potential to offer
+	both higher concurrency and better memory control.
+
+  done. The DiskOnlyStrategy should allocate and release the direct
+	byte buffer for the writeCache internally and always when the
+	instance is finalized.  The write cache can then be excised
+	from the rest of the system.  The only thing that we lose is
+	the ability to set the write cache size independently of the
+	index segment direct buffer size and that could be addressed
+	by adding a different direct buffer pool.
+
+	   - done. get rid of the journal options for the writeCache
+             (made it a boolean).
+
+	   - done. get rid of this parameter in the FileMetadata.
+
+	   - done. simplify doSynchronousOverflow.
+
+  done. Fixed logic in OverflowManager and StoreManager which was
+	using File#createTempFile() but then deleting the file before
+	passing its name into the Journal.  The journal will
+	automatically initialize an empty file so this was just
+	creating a hole in what was otherwise (and now is) sound
+	and distinct atomic file create semantics.
+
+  @todo Drop history field from LocalPartitionMetadata.
+
+  @todo Drop sourcePartitionId field from LocalPartitionMetadata?
+
+  @todo Possible concurrency issue with purge of journal.

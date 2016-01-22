@@ -1,0 +1,12 @@
+prefix : <http://www.bigdata.com/> 
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+
+select *
+where {
+  ?a :knows ?b .
+  OPTIONAL {
+    ?b :knows ?c .
+    ?c :knows ?d .
+    filter(?a != :paul) # Note: filter applies to variable in the outer group.
+  }
+}

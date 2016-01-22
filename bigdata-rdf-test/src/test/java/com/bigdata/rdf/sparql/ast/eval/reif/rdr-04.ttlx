@@ -1,0 +1,6 @@
+@prefix :          <http://example.com/> . 
+
+:a1 :b :c .
+:a2 :b :c .
+<<:a1 :b :c>>  :d  :e1 .
+<<:a2 :b :c>>  :d  :e2 .

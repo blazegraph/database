@@ -1,0 +1,6 @@
+prefix : <http://localhost/>
+{
+  <http://s> a <http://xmlns.com/foaf/0.1/Person> .
+  <http://s> <http://purl.org/dc/elements/1.1/title> "Some Title" .
+  <http://z> a <http://xmlns.com/foaf/0.1/Person> .  
+}

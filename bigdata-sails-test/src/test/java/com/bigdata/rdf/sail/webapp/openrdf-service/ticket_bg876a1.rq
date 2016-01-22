@@ -1,0 +1,10 @@
+SELECT * {
+ SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> {
+    FILTER (true)
+    { 
+    SELECT * {
+       ?s ?p ?o 
+      } LIMIT 2
+    } 
+  }
+} LIMIT 2

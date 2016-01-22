@@ -1,0 +1,27 @@
+SELECT *
+WHERE {
+
+   { FILTER ( false ) }
+    UNION
+    {
+    {  SELECT ?Subject_A 
+      WHERE {
+        { SELECT $j__5 ?Subject_A
+          {
+          } ORDER BY $j__5
+        }
+      } GROUP BY ?Subject_A
+    }
+   }
+  OPTIONAL {
+    {  SELECT ?Subject_A 
+      WHERE {
+        { SELECT $j__8 ?Subject_A
+          {
+         
+          }  ORDER BY $j_8
+        }
+      } GROUP BY ?Subject_A
+    }
+  }
+}

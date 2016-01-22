@@ -1,0 +1,7 @@
+<http://www.interition.net/g1> {
+   <http://s1> <http://www.interition.net/ref/aProperty> "g2" 
+}
+
+<http://www.interition.net/graphs/g2> {
+  <http://s2> <http://www.interition.net/ref/aState> "happy"
+}

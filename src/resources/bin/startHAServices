@@ -1,0 +1,147 @@
+#!/bin/bash
+
+# Start the services and put the JVM in the background.  All services will
+# run in a single JVM.  See Apache River com.sun.jini.start.ServiceStarter
+# for more details.  The services are configured in the accompanying 
+# startHAServices.config file.  Specific configuration options for each
+# service are defined in the documentation for that service.  
+#
+# Note: One drawback with running each service in the same JVM is that the
+# GC load of all services is combined and all services would be suspended
+# at the same time by a Full GC pass.  If this is a problem, then you can
+# break out the river services (ClassServer and Reggie) into a separate 
+# ServiceStarter instance from the HAJournalServer.
+
+# The top-level of the installation.
+pushd `dirname $0` > /dev/null;cd ..;INSTALL_DIR=`pwd`;popd > /dev/null
+
+echo ${INSTALL_DIR}
+
+# Setup the directory for the pid of the ServiceStarter process.
+lockDir=${INSTALL_DIR}/var/lock
+mkdir -p $lockDir
+pidFile=$lockDir/pid
+
+if [ -f ${INSTALL_DIR}/bin/config.sh ] ; then
+        . ${INSTALL_DIR}/bin/config.sh
+fi
+
+##
+# HAJournalServer configuration parameter overrides (see HAJournal.config).
+#
+# The bigdata HAJournal.config file may be heavily parameterized through 
+# environment variables that get passed through into the JVM started by 
+# this script and are thus made available to the HAJournalServer when it
+# interprets the contents of the HAJournal.config file. See HAJournal.config
+# for the meaning of these environment variables.
+#
+# Note: Many of these properties have defaults.
+##
+
+# Conditional defaults for required properties.  These can (and should) be
+# overridden from the environment outside of this script.  The defaults are
+# not suitable for deployment.
+if [ -z "${FEDNAME}" ]; then
+   export FEDNAME=installTest
+fi
+if [ -z "${LOGICAL_SERVICE_ID}" ]; then
+   export LOGICAL_SERVICE_ID=HAJournalServer-1
+fi
+if [ -z "${FED_DIR}" ]; then
+   export FED_DIR=$INSTALL_DIR
+fi
+if [ -z "${JETTY_XML}" ]; then
+   export JETTY_XML="${INSTALL_DIR}/var/jetty/jetty.xml"
+fi
+if [ -z "${JETTY_RESOURCE_BASE}" ]; then
+   export JETTY_RESOURCE_BASE="${INSTALL_DIR}/var/jetty"
+fi
+if [ -z "${GROUPS}" ]; then
+    export GROUPS="$FEDNAME"
+fi
+if [ -z "${LOCATORS}" ]; then
+#  export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+   echo "Must specify: LOCATORS"
+   exit 1
+fi
+if [ -z "${ZK_SERVERS}" ]; then
+#   export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081"
+   echo "Must specify and start: ZK_SERVERS"
+   exit 1
+fi
+
+export HA_OPTS="\
+ -DFEDNAME=${FEDNAME}\
+ -DLOGICAL_SERVICE_ID=${LOGICAL_SERVICE_ID}\
+ -DFED_DIR=${FED_DIR}\
+ -DDATA_DIR=${DATA_DIR}\
+ -DREPLICATION_FACTOR=${REPLICATION_FACTOR}\
+ -DGROUPS=${GROUPS}\
+ -DLOCATORS=${LOCATORS}\
+ -DZK_SERVERS=${ZK_SERVERS}\
+ -DRMI_PORT=${RMI_PORT}\
+ -DHA_PORT=${HA_PORT}\
+ -DgroupCommit=${GROUP_COMMIT}\
+ -DWRITE_CACHE_BUFFER_COUNT=${WRITE_CACHE_BUFFER_COUNT}\
+ "-Dcom.bigdata.hostname=${BIGDATA_HOSTNAME}"\
+ "-Djetty.port=${JETTY_PORT}"\
+ "-Djetty.threads.min=${JETTY_THREADS_MIN}"\
+ "-Djetty.threads.max=${JETTY_THREADS_MAX}"\
+ "-Djetty.threads.timeout=${JETTY_THREADS_TIMEOUT}"\
+ "-Djetty.resourceBase=${JETTY_RESOURCE_BASE}"\
+ "-DJETTY_XML=${JETTY_XML}"\
+ -DCOLLECT_QUEUE_STATISTICS=${COLLECT_QUEUE_STATISTICS}\
+ -DCOLLECT_PLATFORM_STATISTICS=${COLLECT_PLATFORM_STATISTICS}\
+ -DGANGLIA_REPORT=${GANGLIA_REPORT}\
+ -DGANGLIA_LISTEN=${GANGLIA_LISTEN}\
+ -DSYSSTAT_DIR=${SYSSTAT_DIR}\
+ -Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_DIR}\
+ -Dcom.bigdata.rdf.sail.webapp.HALoadBalancerServlet.policy=${LBS_POLICY}\
+ -Dcom.bigdata.rdf.sail.webapp.HALoadBalancerServlet.rewriter=${LBS_REWRITER}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostScoringRule=${LBS_HOST_SCORING_RULE}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.localForwardThreshold=${LBS_LOCAL_FORWARD_THRESHOLD}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostDiscoveryInitialDelay=${LBS_HOST_DISCOVERY_INITIAL_DELAY}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostDiscoveryDelay=${LBS_HOST_DISCOVERY_DELAY}\
+"
+
+##
+# ServiceStarter configuration parameters (see startHAServices.conf).
+##
+
+export LIB_DIR=${INSTALL_DIR}/lib
+export CONFIG_DIR=${INSTALL_DIR}/var/config
+export JINI_CLASS_SERVER_PORT=8081
+export JINI_CONFIG=${CONFIG_DIR}/jini/startHAServices.config
+export POLICY_FILE=${CONFIG_DIR}/policy/policy.all
+export LOGGING_CONFIG=${CONFIG_DIR}/logging/logging.properties
+export LOG4J_CONFIG=${CONFIG_DIR}/logging/log4jHA.properties
+
+# TODO Explicitly enumerate JARs so we can control order if necessary and
+# deploy on OS without find and tr.
+export HAJOURNAL_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
+
+export JAVA_OPTS="\
+ ${JVM_OPTS}\
+ ${HA_OPTS}\
+ -Djava.security.policy=${POLICY_FILE}\
+ -Djava.util.logging.config.file=${LOGGING_CONFIG}\
+ -Dlog4j.configuration=${LOG4J_CONFIG}\
+ -DLIB_DIR=${INSTALL_DIR}/lib\
+ -DLIBDL_DIR=${INSTALL_DIR}/lib-dl\
+ -DCONFIG_DIR=${CONFIG_DIR}\
+ -DPOLICY_FILE=${POLICY_FILE}\
+ -DJINI_CLASS_SERVER_PORT=${JINI_CLASS_SERVER_PORT}\
+ -DHAJOURNAL_CLASSPATH=${HAJOURNAL_CLASSPATH}\
+"
+
+cmd="java ${JAVA_OPTS} \
+    -cp ${HAJOURNAL_CLASSPATH} \
+    com.sun.jini.start.ServiceStarter \
+    ${JINI_CONFIG}"
+echo "Running: $cmd"
+$cmd&
+pid=$!
+echo "PID=$pid"
+echo "$pid">$pidFile
+
+# Note: To obtain the pid, do: read pid < "$pidFile"

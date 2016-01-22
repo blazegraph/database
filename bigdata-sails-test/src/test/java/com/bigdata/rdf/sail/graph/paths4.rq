@@ -1,0 +1,20 @@
+PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+SELECT * {
+  SERVICE gas:service {
+    gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.PATHS" .
+    gas:program gas:in </:target> . # starting point
+    gas:program gas:target </:source1> . # target vertices
+    # gas:program gas:target </:source2> . # target vertices
+    gas:program gas:traversalDirection "Reverse" .
+    # gas:program gas:maxIterations 2 .
+    gas:program gas:maxIterationsAfterTargets 0 .
+    # set this to something that reasonably constrains the runtime
+    gas:program gas:maxVisited 100000 . 
+    gas:program gas:out ?s . # bound to the visited vertices.
+    gas:program gas:out1 ?depth . # bound to the depth
+    gas:program gas:out2 ?o . # bound to the pred
+    gas:program gas:out3 ?p . # bound to the edge
+  }
+  #?s </:edge> ?o .
+  filter(?s != </:target>) .
+} order by ?depth

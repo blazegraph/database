@@ -1,0 +1,82 @@
+This directory contains some sample configuration for a highly available
+Journal.  
+
+Note: The bigdata scripts bundled in this directory are designed to be run
+from the root directory of the SVN checkout of the bigdata code base. This
+is used for developers.  The installation is done using the top-level ant
+build file and the "ant deploy-artifact" target.
+
+The basic procedure is:
+
+0. The nodes MUST have synchronized clocks, both for logging and to ensure
+   that the transaction services have closely correlated clocks for assigning
+   timestamps.  Make sure that ntp or a similar service is running to synchronize
+   the clocks.
+
+1. Edit the various configuration files.  You will have to specify the
+   replicationFactor for the HAJournal in the HAJournal.config file.  Make
+   sure to check all the configuration properties.
+
+2. Make sure that zookeeper is up and running with a consistent configuration
+   and that it is logging somewhere where you can find the log later.  A good
+   approach is to use nohup so the console output will wind up in the directory
+   from which you start zookeeper.  Do not put zookeeper in the background or
+   it can block once the console buffer is full.  For a highly available zk
+   configuration, you need to be running at least 3 zk nodes.  Consult the zk
+   documentation for more information.
+
+3. Start the ClassServer on each machine.  This will let the service registrar
+   find the downloadable jars on that machine.
+
+4. Start the service registrar on at least one machine (as configured by
+   the locators).  A highly available jini/river service will run multiple
+   service registrar and provide either multiple unicast locators or support
+   multicast discovery of the service registrar.  Consult the jini/river
+   documentation for more information.
+   
+5. Start the HAJournalServer on [k] machines, where [k] is the replication
+   factor you specified in the HAJournal.config file.  The quorum should
+   meet once (k+1)/2 services join (majority rule).  At this point one of
+   the nodes will be elected as the leader.  You can write on that node
+   (e.g., using SPARQL UPDATE).  You can read on any node that is joined
+   with the met quorum.
+   
+   Note: The default log4j configuration writes onto a file named 
+   "HAJournalServer.log" -- that is where you need to look for errors
+   and any other information about the running HAJournalServer process.
+
+A brief description of the files in this directory follows:
+
+HAJournal.env - A shell script containing sample configuration values. This
+                is sourced by the various scripts.  You need to review all
+                of these settings.
+
+HAJournal.config - A sample configuration file for the HAJournalServer. You
+                   need to review the settings in this file as well.
+
+classServer.sh - A shell script that will start the jini class server (for
+                 downloadable code).
+                 
+lookupStarter.sh - A shell script that will start the jini service registrar.
+
+HAJournalServer.sh - A shell script that will start the HAJournalServer. 
+
+                     The server process will create a directory in which it 
+                     logs the replicated writes in case other services need to 
+                     resynchronize.  This directory is named "HALog" by default
+                     and may be located on a normal disk.  The ha-log files in
+                     that directory are pure append files and do not need to be
+                     on a fast disk.  The ha-log files will be purged at any
+                     commit point when the quorum is fully met.  These HALog files
+                     can get large if you are doing a long running update.
+
+log4jHA.properties - A default log4j configuration file for use by the bigdata
+                     services.
+				   
+logging.properties - A default Java logging configuration.  This may be used
+					 to control the log levels for jini/river components inside
+					 of the bigdata services. Those components use java logging
+					 rather than log4j.
+
+policy.all - A default java permissions file.  This file grants ALL permissions.
+			 You may specify a more rigorous security policy.

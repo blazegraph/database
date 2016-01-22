@@ -1,0 +1,55 @@
+<html>
+<head>
+<title>Managing Journals and Index Segments for a Data Service</title>
+</head>
+<body>
+
+<p>
+
+  This package provides the logic to managed the live journal and the
+  historical journals and index segments for a {@link
+  com.bigdata.service.DataService}.
+
+</p>
+
+<h3>Overflow actions (Split, Join, Move, Build, Merge, etc.)</h3>
+
+<p>
+
+  The critical distinction among the actions is whether or not they
+  change the index partition identifier, in which case they define a
+  new index partition.  {@link OverflowActionEnum#Copy}, {@link
+  OverflowActionEnum#Build} and {@link OverflowActionEnum#Merge} are
+  "actions" which DO NOT change the index partition identifier.
+
+<p></p>
+
+  For actions which define a new index partition, the critical
+  distinction is whether the action is 1:N ({@link
+  OverflowActionEnum#Split}) or N:1 ({@link
+  OverflowActionEnum#Join}). Note that both {@link
+  OverflowActionEnum#Split} and {@link OverflowActionEnum#Join} can
+  conceptually locate the new index partition(s) on different data
+  service(s).  {@link OverflowActionEnum#Move} DOES change the index
+  partition identifier and is in effect a 1:1 action.  Since the
+  locator for an index partition MUST NOT change, MOVE serves to
+  "rename" an index partition, and in the process relocates it on
+  another data service.
+
+</p><p>
+
+  Neither {@link OverflowActionEnum#Split} nor {@link
+  OverflowActionEnum#Join} is restricted to operate on only the local
+  index partitions. The critical constaint when writing these
+  operations is that they MUST hold exclusive write locks on the
+  source index partition(s) such that the change in the index
+  partitions can be made atomic. However, the manner in which the
+  operation proceeds does differ when some of the output partition(s)
+  will be located on a different data service. It is also more complex
+  when some of the input partition(s) will be located on a different
+  data service as the write lock must be coordinated across two or
+  more data services.
+
+</p>
+</body>
+</html>

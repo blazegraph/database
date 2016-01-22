@@ -1,0 +1,10 @@
+# BSBM Explore Query 9: Get information about a reviewer.
+#
+# Use Case Motivation: In order to decide whether to trust a review, the consumer asks for any kind of information that is available about the reviewer.
+#
+# use DESCRIBE
+
+PREFIX rev: <http://purl.org/stuff/rev#>
+
+DESCRIBE ?x
+WHERE { <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromRatingSite1/Review84> rev:reviewer ?x }

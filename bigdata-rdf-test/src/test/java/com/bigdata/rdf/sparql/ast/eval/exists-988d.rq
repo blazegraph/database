@@ -1,0 +1,13 @@
+prefix eg: <http://www.bigdata.com/>
+
+SELECT DISTINCT ?a
+FROM eg:g
+{ { BIND( eg:d as ?a ) }
+  UNION
+  { BIND ( eg:z as ?a ) }
+  FILTER EXISTS {
+    ?a eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p/eg:p ?b .
+    # Note: Query hint specifies sub-query LIMIT ONE plan.
+    hint:SubQuery hint:filterExists "SubQueryLimitOne" .
+ }
+}

@@ -1,0 +1,12 @@
+SELECT ?o
+WHERE 
+{ 
+   ?s ?p ?o
+   {
+     SELECT ?o
+     WHERE
+     {
+        BIND (CONCAT("untyped","String") AS ?o)
+     }
+  }
+}

@@ -1,0 +1,7 @@
+SELECT ?s WHERE {
+  OPTIONAL { 
+    OPTIONAL {
+      ?s ?p ?o
+    }
+  }
+} VALUES ?s { 1 }

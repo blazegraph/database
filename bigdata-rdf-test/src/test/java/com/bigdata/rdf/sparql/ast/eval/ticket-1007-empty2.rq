@@ -1,0 +1,6 @@
+SELECT ?o
+WHERE 
+{
+  ?s ?p ?o
+  BIND ("10" AS ?o)
+}

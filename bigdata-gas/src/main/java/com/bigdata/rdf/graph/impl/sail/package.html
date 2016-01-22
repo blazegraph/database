@@ -1,0 +1,16 @@
+<html>
+<head>
+<title>GAS Engine for OpenRDF SAIL</title>
+</head>
+<body>
+	<p>This is an implementation of the GAS API for the openrdf SAIL. The
+		performance of this package will depend strongly on the SAIL
+		implementation. Good performance should be observed for SAILs that use
+		Java objects in main memory when combined with large heaps and Java 7,
+		which has the G1 garbage collector. Disk-base SAILs have overhead
+		associated with IO Wait and with decoding and materializing objects
+		from the indices. Main memory SAILs should attempt to minimize the
+		creation of duplicate objects in order to improve memory utilization
+		and memory bandwidth.</p>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<http://example.com/> {
+
+<http://example.com/SYSTAP> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://exmaple.com/Company> . 
+<http://example.com/SYSTAP> <http://www.w3.org/2000/01/rdf-schema#label> "SYSTAP (RDF)" .
+<http://example.com/metaphacts> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://exmaple.com/Company> .
+<http://example.com/metaphacts> <http://www.w3.org/2000/01/rdf-schema#label> "metaphacts (RDF)" .
+<http://example.com/SAP> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://exmaple.com/Company> .
+<http://example.com/SAP> <http://www.w3.org/2000/01/rdf-schema#label> "SAP (RDF)" .
+<http://example.com/Siemens> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://exmaple.com/Company> .
+<http://example.com/Siemens> <http://www.w3.org/2000/01/rdf-schema#label> "Siemens (RDF)" .
+<http://example.com/Apple> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://exmaple.com/Company> .
+<http://example.com/Apple> <http://www.w3.org/2000/01/rdf-schema#label> "Apple (RDF)" .
+
+<http://example.com/SYSTAP> <http://example.com/partnersWith> <http://example.com/metaphacts> .
+<http://example.com/metaphacts> <http://example.com/partnersWith> <http://example.com/SYSTAP> .
+
+<http://example.com/SearchTerms> <http://example.com/searchTerm1> "SYSTAP" .
+<http://example.com/SearchTerms> <http://example.com/searchTerm2> "company" .
+
+}

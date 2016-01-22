@@ -1,0 +1,35 @@
+# This crontab will execute the bigdata script once per minute, logging all
+# output onto a file in the NAS directory.  To change the run state of the
+# bigdata instance, you edit
+# 
+#    @STATE_FILE@
+#
+# and then watch
+#
+#    @STATE_LOG@
+#
+# until the hosts converge on the new run state.
+#
+# To use this crontab, you must register it on each host for the user
+#
+#    @INSTALL_USER@
+#
+# You can do this by issuing the command, which will _REPLACE_ any
+# existing crontab for that user.
+#
+#    crontab @BIN_DIR@/crontab.user
+#
+# That user must have sufficient permissions to execute the bigdata
+# script and read/write access to the necessary files in the shared
+# volume
+#
+#    @NAS@
+#
+# and the local storage directory
+#
+#    @LAS@
+#
+# on each host.
+
+# Run once per minute
+* * * * * @BIN_DIR@/bigdata file @STATE_FILE@ >> @STATE_LOG@ 2>&1

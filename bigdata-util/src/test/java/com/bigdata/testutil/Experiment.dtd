@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This is the required root element and describes an experiment comprised of experimental conditions.  Conditions should be varied so as to test the effect of various parameters on interesting behaviors of the system.  -->
+<!ELEMENT experiment ((defaults)?, (condition)*)>
+<!-- @class is the name of a Java class to be run that implements IComparisonTest. -->
+<!ATTLIST experiment
+	class CDATA #REQUIRED
+>
+<!-- Default properties are inherited by each condition and may be overriden within a given condition. -->
+<!ELEMENT defaults (property)*>
+<!-- An experimental condition is comprised properties that are interpreted as a configuration to be tested. -->
+<!ELEMENT condition ((property)*, (result)*)>
+<!ELEMENT property (#PCDATA)>
+<!ATTLIST property
+	name CDATA #REQUIRED
+>
+<!-- The result element makes it possible to serialize the results of the experiment as an experiment XML file. -->
+<!ELEMENT result (#PCDATA)>
+<!ATTLIST result
+	name CDATA #REQUIRED
+>

@@ -1,0 +1,6 @@
+SELECT ?o
+WHERE 
+{ 
+  ?s ?p ?o
+  BIND (URI("http://untypedString") AS ?o)
+}

@@ -1,0 +1,11 @@
+SELECT * WHERE {
+  {
+    BIND(2 AS ?s2)
+    FILTER(!bound(?s))
+  }
+  UNION
+  {
+    BIND(3 AS ?s2)
+    FILTER(!bound(?s))
+  }
+} VALUES ?s { 1 }

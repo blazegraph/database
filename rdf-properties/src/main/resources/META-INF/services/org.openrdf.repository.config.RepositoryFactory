@@ -1,0 +1,6 @@
+org.openrdf.repository.contextaware.config.ContextAwareFactory
+org.openrdf.repository.dataset.config.DatasetRepositoryFactory
+org.openrdf.repository.http.config.HTTPRepositoryFactory
+org.openrdf.repository.sail.config.SailRepositoryFactory
+org.openrdf.repository.sail.config.ProxyRepositoryFactory
+org.openrdf.repository.sparql.config.SPARQLRepositoryFactory

@@ -1,0 +1,4 @@
+SELECT * WHERE {
+  ?s ?p ?o
+  MINUS { ?s ?b ?c }
+} 

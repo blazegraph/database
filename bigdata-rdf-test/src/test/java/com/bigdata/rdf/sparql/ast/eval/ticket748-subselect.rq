@@ -1,0 +1,17 @@
+SELECT *
+WHERE {
+  BIND ( "y" as $Y )
+  { SELECT (?xx as ?X) (CONCAT("",$yy) as $Y)
+    {
+      { BIND ( "y0" as $yy ) .
+        BIND( "x0" as $xx )
+      } UNION {
+        BIND ( "y" as $yy ) .
+        BIND( "x" as $xx )
+      } UNION {
+        BIND ( "y1" as $yy ) .
+        BIND( "x2" as $xx )
+      }
+    }
+  }
+}

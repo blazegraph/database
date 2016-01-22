@@ -1,0 +1,1 @@
+This directory is for project announcements.

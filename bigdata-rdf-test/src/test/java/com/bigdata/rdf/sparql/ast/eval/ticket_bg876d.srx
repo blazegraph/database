@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+  <head>
+    <variable name="s"/>
+    <variable name="p"/>
+    <variable name="o"/>
+    <variable name="banana"/>
+  </head>
+  <results>
+    <result>
+      <binding name="s">
+         <uri>http://example.org/s</uri>
+      </binding>
+      <binding name="p">
+         <uri>http://example.org/p</uri>
+      </binding>
+      <binding name="o">
+         <literal>n-literal-longer-than-ten-characters</literal>
+      </binding>
+      <binding name="banana">
+         <literal>banana n-literal-longer-than-ten-characters</literal>
+      </binding>
+    </result>
+  </results>
+</sparql>

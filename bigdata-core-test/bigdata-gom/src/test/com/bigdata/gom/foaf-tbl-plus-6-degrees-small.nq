@@ -1,0 +1,1000 @@
+<http://www.w3.org/2002/01/tr-automation/tr.rdf> <http://purl.org/dc/elements/1.1/title> "W3C Standards and Technical Reports" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card> <http://creativecommons.org/ns#license> <http://creativecommons.org/licenses/by-nc/3.0/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card> <http://purl.org/dc/elements/1.1/title> "Tim Berners-Lee's FOAF file" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card> <http://xmlns.com/foaf/0.1/maker> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card> <http://xmlns.com/foaf/0.1/primaryTopic> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#cm> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#cm> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.koalie.net/foaf.rdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#cm> <http://xmlns.com/foaf/0.1/mbox> <mailto:coralie@w3.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#cm> <http://xmlns.com/foaf/0.1/name> "Coralie Mercier" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#dj> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#dj> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.grorg.org/dean/foaf.rdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#dj> <http://xmlns.com/foaf/0.1/homepage> <http://www.grorg.org/dean/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#dj> <http://xmlns.com/foaf/0.1/mbox> <mailto:dean@w3.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#dj> <http://xmlns.com/foaf/0.1/mbox> <mailto:dino@grorg.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#dj> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "6de4ff27ef927b9ba21ccc88257e41a2d7e7d293" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#dj> <http://xmlns.com/foaf/0.1/name> "Dean Jackson" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://heddley.com/edd/foaf.rdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://xmlns.com/foaf/0.1/homepage> <http://heddley.com/edd/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://xmlns.com/foaf/0.1/mbox> <mailto:edd@usefulinc.com> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://xmlns.com/foaf/0.1/mbox> <mailto:edd@xml.com> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://xmlns.com/foaf/0.1/mbox> <mailto:edd@xmlhack.com> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://xmlns.com/foaf/0.1/name> "Edd Dumbill" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#edd> <http://xmlns.com/foaf/0.1/nick> "edd" <http://www.w3.org/People/Berners-Lee/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/name> "Henry Story" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/Eli_Lilly_and_Company> <http://xmlns.com/foaf/0.1/member> _:b1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Gage> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Gage> <http://xmlns.com/foaf/0.1/name> "John Gage" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Klensin> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Klensin> <http://xmlns.com/foaf/0.1/name> "John Klensin" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Markoff> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Markoff> <http://xmlns.com/foaf/0.1/name> "John Markoff" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Seely_Brown> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Seely_Brown> <http://www.w3.org/2002/07/owl#sameAs> <http://www4.wiwiss.fu-berlin.de/bookmashup/persons/John+Seely+Brown> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Seely_Brown> <http://xmlns.com/foaf/0.1/homepage> <http://www.johnseelybrown.com/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/John_Seely_Brown> <http://xmlns.com/foaf/0.1/name> "John Seely Brown" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/Tim_Bray> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dbpedia.org/resource/Tim_Bray> <http://xmlns.com/foaf/0.1/name> "Tim Bray" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/2005/ajar/ajaw/data#Tabulator> <http://usefulinc.com/ns/doap#developer> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/2007/01/camp/data#course> <http://xmlns.com/foaf/0.1/maker> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/2007/wiki/people/JoeLambda#JL> <http://xmlns.com/foaf/0.1/firstName> "Joe" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/2007/wiki/people/JoeLambda#JL> <http://xmlns.com/foaf/0.1/name> "Joe Lambda" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/2007/wiki/people/RobertHoffmann#RMH> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/2007/wiki/people/RobertHoffmann#RMH> <http://xmlns.com/foaf/0.1/name> "Robert Hoffmann" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/People/RRS> <http://xmlns.com/foaf/0.1/img> <http://www.w3.org/2006/09/Ralph_Swick.jpg> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/People/RRS> <http://xmlns.com/foaf/0.1/name> "Ralph R. Swick" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/People/yosi#YES> <http://xmlns.com/foaf/0.1/name> "Yosi Scharf" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/breadcrumbs/blog/4> <http://purl.org/dc/elements/1.1/title> "timbl's blog" <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/breadcrumbs/blog/4> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://dig.csail.mit.edu/breadcrumbs/blog/feed/4> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/breadcrumbs/blog/4> <http://xmlns.com/foaf/0.1/maker> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://dig.csail.mit.edu/data#DIG> <http://xmlns.com/foaf/0.1/member> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://eikeon.com/foaf.rdf#eikeon> <http://xmlns.com/foaf/0.1/name> "Daniel Krech" <http://www.w3.org/People/Berners-Lee/card> .
+<http://hometown.aol.com/chbussler/foaf/chbussler.foaf#me> <http://xmlns.com/foaf/0.1/name> "Christoph Bussler" <http://www.w3.org/People/Berners-Lee/card> .
+<http://id.ecs.soton.ac.uk/person/1269> <http://xmlns.com/foaf/0.1/name> "Nicholas Gibbins" <http://www.w3.org/People/Berners-Lee/card> .
+<http://id.ecs.soton.ac.uk/person/1650> <http://xmlns.com/foaf/0.1/name> "Wendy Hall" <http://www.w3.org/People/Berners-Lee/card> .
+<http://id.ecs.soton.ac.uk/person/2686> <http://xmlns.com/foaf/0.1/name> "Nigel Shadbolt" <http://www.w3.org/People/Berners-Lee/card> .
+<http://id.ecs.soton.ac.uk/person/60> <http://xmlns.com/foaf/0.1/name> "Les Carr" <http://www.w3.org/People/Berners-Lee/card> .
+<http://inamidst.com/sbp/foaf#Sean> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://inamidst.com/sbp/foaf#Sean> <http://xmlns.com/foaf/0.1/name> "Sean Palmer" <http://www.w3.org/People/Berners-Lee/card> .
+<http://my.opera.com/chaals/xml/foaf#me> <http://xmlns.com/foaf/0.1/name> "Charles McCathieNevile" <http://www.w3.org/People/Berners-Lee/card> .
+<http://my.opera.com/danbri/xml/foaf#me> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://danbri.livejournal.com/data/foaf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://my.opera.com/danbri/xml/foaf#me> <http://www.w3.org/2002/07/owl#sameAs> <http://danbri.org/foaf.rdf#danbri> <http://www.w3.org/People/Berners-Lee/card> .
+<http://my.opera.com/danbri/xml/foaf#me> <http://www.w3.org/2002/07/owl#sameAs> <http://www4.wiwiss.fu-berlin.de/dblp/resource/person/336851> <http://www.w3.org/People/Berners-Lee/card> .
+<http://my.opera.com/danbri/xml/foaf#me> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "70c053d15de49ff03a1bcc374e4119b40798a66e" <http://www.w3.org/People/Berners-Lee/card> .
+<http://my.opera.com/howcome/xml/foaf#howcome> <http://xmlns.com/foaf/0.1/name> "H\u00E5kon Wium Lie" <http://www.w3.org/People/Berners-Lee/card> .
+<http://myopenlink.net/dataspace/person/kidehen#this> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://myopenlink.net/dataspace/person/kidehen#this> <http://xmlns.com/foaf/0.1/name> "Kingsley Idehen" <http://www.w3.org/People/Berners-Lee/card> .
+<http://norman.walsh.name/knows/who#norman-walsh> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://norman.walsh.name/knows/who#norman-walsh> <http://xmlns.com/foaf/0.1/name> "Norman Walsh" <http://www.w3.org/People/Berners-Lee/card> .
+<http://people.apache.org/~oshani/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Oshani Seneviratne" <http://www.w3.org/People/Berners-Lee/card> .
+<http://people.csail.mit.edu/lkagal/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://people.csail.mit.edu/lkagal/foaf.rdf#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:lalana@csail.mit.edu> <http://www.w3.org/People/Berners-Lee/card> .
+<http://people.csail.mit.edu/lkagal/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Lalana Kagal" <http://www.w3.org/People/Berners-Lee/card> .
+<http://people.csail.mit.edu/psz/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Peter Szolovits" <http://www.w3.org/People/Berners-Lee/card> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/name> "Simon J. Hernandez" <http://www.w3.org/People/Berners-Lee/card> .
+<http://qdos.com/people/tom.xrdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://qdos.com/people/tom.xrdf#me> <http://xmlns.com/foaf/0.1/name> "Tom Ilube" <http://www.w3.org/People/Berners-Lee/card> .
+<http://research.microsoft.com/~henrikn/foaf.xml#me> <http://xmlns.com/foaf/0.1/name> "Henrik Nielsen" <http://www.w3.org/People/Berners-Lee/card> .
+<http://rit.mellon.org/Members/ihf/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://rit.mellon.org/Members/ihf/foaf.rdf#me> <http://xmlns.com/foaf/0.1/homepage> <http://www.mellon.org/about_foundation/staff/program-area-staff/irafuchs> <http://www.w3.org/People/Berners-Lee/card> .
+<http://rit.mellon.org/Members/ihf/foaf.rdf#me> <http://xmlns.com/foaf/0.1/img> <http://www.sun.com/products-n-solutions/edu/images/jelc/fuchs.jpg> <http://www.w3.org/People/Berners-Lee/card> .
+<http://rit.mellon.org/Members/ihf/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Ira Fuchs" <http://www.w3.org/People/Berners-Lee/card> .
+<http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://xmlns.com/foaf/0.1/img> <http://swordfish.rdfweb.org/~libby/libby.jpg> <http://www.w3.org/People/Berners-Lee/card> .
+<http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:libby.miller@bristol.ac.uk> <http://www.w3.org/People/Berners-Lee/card> .
+<http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://xmlns.com/foaf/0.1/name> "Libby Miller" <http://www.w3.org/People/Berners-Lee/card> .
+<http://teole.jfouffa.org/People/Teole/card.rdf#me> <http://xmlns.com/foaf/0.1/name> "Philippe Le H\u00E9garet" <http://www.w3.org/People/Berners-Lee/card> .
+<http://users.ecs.soton.ac.uk/mc/mcfoaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "mc schraefel" <http://www.w3.org/People/Berners-Lee/card> .
+<http://web.mit.edu/shinnyih/foaf.rdf#> <http://xmlns.com/foaf/0.1/name> "Shinnyih Huang" <http://www.w3.org/People/Berners-Lee/card> .
+<http://wiki.ontoworld.org/index.php/_IRW2006> <http://purl.org/dc/elements/1.1/title> "Identity, Reference and the Web workshop 2006" <http://www.w3.org/People/Berners-Lee/card> .
+<http://wiki.ontoworld.org/index.php/_IRW2006> <http://www.w3.org/2000/10/swap/pim/contact#participant> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.aaronsw.com/about.xrdf#aaronsw> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.aaronsw.com/about.xrdf#aaronsw> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.aaronsw.com/about.xrdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.aaronsw.com/about.xrdf#aaronsw> <http://xmlns.com/foaf/0.1/mbox> <mailto:me@aaronsw.com> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.aaronsw.com/about.xrdf#aaronsw> <http://xmlns.com/foaf/0.1/name> "Aaron Swartz" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.cambridgesemantics.com/people/lee> <http://xmlns.com/foaf/0.1/name> "Lee Feigenbaum" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.cs.umd.edu/~hendler/2003/foaf.rdf#jhendler> <http://xmlns.com/foaf/0.1/name> "Jim Hendler" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.dajobe.org/foaf.rdf#i> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.dajobe.org/foaf.rdf#i> <http://xmlns.com/foaf/0.1/mbox> <mailto:dave@dajobe.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.dajobe.org/foaf.rdf#i> <http://xmlns.com/foaf/0.1/name> "Dave Beckett" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.ecs.soton.ac.uk/~dt2/dlstuff/www2006_data#panel-panelk01> <http://www.w3.org/2000/01/rdf-schema#label> "The Next Wave of the Web (Plenary Panel)" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.ecs.soton.ac.uk/~dt2/dlstuff/www2006_data#panel-panelk01> <http://www.w3.org/2000/10/swap/pim/contact#participant> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.isi.edu/~gil/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.isi.edu/~gil/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Yolanda Gill" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.ivan-herman.net/foaf.rdf#me> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "5ac8032d5f6012aa1775ea2f63e1676bafd5e80b" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.ivan-herman.net/foaf.rdf#me> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "c21b7ed00d78a35efcd8e567f8fd9cca71058c5" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.ivan-herman.net/foaf.rdf#me> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "eccd01ba8ce2391a439e9b052a9fbf37eae9f732" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.ivan-herman.net/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Ivan Herman" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.kjetil.kjernsmo.net/foaf#me> <http://xmlns.com/foaf/0.1/name> "Kjetil Kjernsmo" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.lassila.org/ora.rdf#me> <http://xmlns.com/foaf/0.1/name> "Ora Lassila" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.mindswap.org/2004/owl/mindswappers#Bijan.Parsia> <http://xmlns.com/foaf/0.1/name> "Bijan Parsia" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.mindswap.org/2004/owl/mindswappers#Jennifer.Golbeck> <http://xmlns.com/foaf/0.1/name> "Jennifer Golbeck" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/2000/10/swap/data#Cwm> <http://usefulinc.com/ns/doap#developer> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://www.w3.org/2000/01/rdf-schema#label> "Amy van der Hiel" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://people.w3.org/amy/foaf.rdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://www.w3.org/2000/10/swap/pim/contact#familyName> "van der Hiel" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://www.w3.org/2000/10/swap/pim/contact#givenName> "Amy" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://xmlns.com/foaf/0.1/mbox> <mailto:amy@w3.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "1839a1cc2e719a85ea7d9007f587b2899cd94064" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#amy> <http://xmlns.com/foaf/0.1/name> "Amy van der Hiel" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/10/swap/pim/contact#Male> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2000/01/rdf-schema#label> "Tim Berners-Lee" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2000/10/swap/pim/contact#assistant> <http://www.w3.org/People/Berners-Lee/card#amy> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2000/10/swap/pim/contact#homePage> <http://www.w3.org/People/Berners-Lee/> <http://www.w3.org/People/Berners-Lee/card> .
+_:genid2http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#city> "Cambridge" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid2http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#country> "USA" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid2http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#postalCode> "02139" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid2http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#street> "32 Vassar Street" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid2http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#street2> "MIT CSAIL Room 32-G524" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#address> _:genid2http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+_:genid1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#phone> <tel:+1-617-253-5702> <http://www.w3.org/People/Berners-Lee/card> .
+_:genid1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2003/01/geo/wgs84_pos#lat> "42.361860" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2003/01/geo/wgs84_pos#long> "-71.091840" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2000/10/swap/pim/contact#office> _:genid1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2000/10/swap/pim/contact#publicHomePage> <http://www.w3.org/People/Berners-Lee/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2002/07/owl#sameAs> <http://www.advogato.org/person/timbl/foaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2002/07/owl#sameAs> <http://www4.wiwiss.fu-berlin.de/bookmashup/persons/Tim+Berners-Lee> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/2002/07/owl#sameAs> <http://www4.wiwiss.fu-berlin.de/dblp/resource/person/100007> <http://www.w3.org/People/Berners-Lee/card> .
+_:genid3http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2003/01/geo/wgs84_pos#lat> "42.361860" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid3http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2003/01/geo/wgs84_pos#long> "-71.091840" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/based_near> _:genid3http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/family_name> "Berners-Lee" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/givenname> "Timothy" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/homepage> <http://www.w3.org/People/Berners-Lee/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/img> <http://www.w3.org/Press/Stock/Berners-Lee/2001-europaeum-eighth.jpg> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Berners-Lee/card#cm> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Berners-Lee/card#dj> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Berners-Lee/card#edd> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://bblfish.net/people/henry/card#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://danbri.org/foaf.rdf#danbri> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/John_Gage> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/John_Klensin> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/John_Markoff> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/John_Seely_Brown> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/Tim_Bray> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dig.csail.mit.edu/2007/wiki/people/JoeLambda#JL> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dig.csail.mit.edu/2007/wiki/people/RobertHoffmann#RMH> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dig.csail.mit.edu/People/RRS> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://dig.csail.mit.edu/People/yosi#YES> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://eikeon.com/foaf.rdf#eikeon> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://heddley.com/edd/foaf.rdf#edd> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://hometown.aol.com/chbussler/foaf/chbussler.foaf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://id.ecs.soton.ac.uk/person/1269> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://id.ecs.soton.ac.uk/person/1650> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://id.ecs.soton.ac.uk/person/2686> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://id.ecs.soton.ac.uk/person/60> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://inamidst.com/sbp/foaf#Sean> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://my.opera.com/chaals/xml/foaf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://my.opera.com/howcome/xml/foaf#howcome> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://myopenlink.net/dataspace/person/kidehen#this> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://norman.walsh.name/knows/who#norman-walsh> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://people.apache.org/~oshani/foaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://people.csail.mit.edu/crowell/foaf.rdf#crowell> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://people.csail.mit.edu/lkagal/foaf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://people.csail.mit.edu/lkagal/foaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://people.csail.mit.edu/psz/foaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://people.csail.mit.edu/ryanlee/about#ryanlee> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://people.w3.org/simon/foaf#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://presbrey.mit.edu/foaf.rdf#presbrey> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://qdos.com/people/tom.xrdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://research.microsoft.com/~henrikn/foaf.xml#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://rit.mellon.org/Members/ihf/foaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://teole.jfouffa.org/People/Teole/card.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://users.ecs.soton.ac.uk/mc/mcfoaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://web.mit.edu/ruthdhan/www/foaf.rdf#ruthdhan> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://web.mit.edu/shinnyih/foaf.rdf#> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.aaronsw.com/about.xrdf#aaronsw> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.cambridgesemantics.com/people/lee> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.cs.umd.edu/~hendler/2003/foaf.rdf#jhendler> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.dajobe.org/foaf.rdf#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.isi.edu/~gil/foaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.ivan-herman.net/foaf.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.kjetil.kjernsmo.net/foaf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.lassila.org/ora.rdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.mindswap.org/2004/owl/mindswappers#Bijan.Parsia> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.mindswap.org/2004/owl/mindswappers#Jennifer.Golbeck> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Berners-Lee/card#amy> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Connolly/#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/EM/contact#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Jacobs/contact.rdf#IanJacobs> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/djweitzner/foaf#DJW> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/karl/karl-foaf.xrdf#me> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> _:b1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+_:genid4http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+_:genid4http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://dannyayers.com/me.rdf> <http://www.w3.org/People/Berners-Lee/card> .
+_:genid4http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://xmlns.com/foaf/0.1/mbox_sha1sum> "669fe353dbef63d12ba11f69ace8acbec1ac8b17" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid4http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://xmlns.com/foaf/0.1/name> "Danny Ayers" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/knows> _:genid4http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/mbox> <mailto:timbl@w3.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "965c47c5a70db7407210cef6e4e6f5374a525c5c" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/name> "Timothy Berners-Lee" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/nick> "TimBL" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/nick> "timbl" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/openid> <http://www.w3.org/People/Berners-Lee/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/phone> <tel:+1-(617)-253-5702> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/title> "Sir" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/weblog> <http://dig.csail.mit.edu/breadcrumbs/blog/4> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/workplaceHomepage> <http://www.w3.org/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Connolly/#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Connolly/#me> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Connolly/home-smart.rdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Connolly/#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:connolly@w3.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Connolly/#me> <http://xmlns.com/foaf/0.1/name> "Dan Connolly" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Connolly/#me> <http://xmlns.com/foaf/0.1/nick> "DanCon" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/EM/contact#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/EM/contact#me> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/EM/contact> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/EM/contact#me> <http://xmlns.com/foaf/0.1/homepage> <http://purl.org/net/eric/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/EM/contact#me> <http://xmlns.com/foaf/0.1/img> <http://www.ilrt.bristol.ac.uk/people/cmdjb/events/dc7/orig/eric.png> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/EM/contact#me> <http://xmlns.com/foaf/0.1/img> <http://www.oclc.org/~emiller/capture.jpg> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/EM/contact#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:em@w3.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/EM/contact#me> <http://xmlns.com/foaf/0.1/name> "Eric Miller" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/Jacobs/contact.rdf#IanJacobs> <http://xmlns.com/foaf/0.1/name> "Ian Jacobs" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/djweitzner/foaf#DJW> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/djweitzner/foaf#DJW> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "032c319f439f63efba54f4fa51bfb3a3fafedfbe" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/djweitzner/foaf#DJW> <http://xmlns.com/foaf/0.1/name> "Daniel J Weitzner" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/karl/karl-foaf.xrdf#me> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/karl/karl-foaf.xrdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/karl/karl-foaf.xrdf#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:karl@w3.org> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/People/karl/karl-foaf.xrdf#me> <http://xmlns.com/foaf/0.1/name> "Karl Dubost" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/data#W3C> <http://www.w3.org/2000/01/rdf-schema#label> "W3C" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/data#W3C> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2002/01/tr-automation/tr.rdf> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/data#W3C> <http://www.w3.org/2000/10/swap/pim/contact#publicHomePage> <http://www.w3.org/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/data#W3C> <http://xmlns.com/foaf/0.1/homepage> <http://www.w3.org/> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/data#W3C> <http://xmlns.com/foaf/0.1/logo> <http://www.w3.org/Icons/w3c_home> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/data#W3C> <http://xmlns.com/foaf/0.1/member> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www.w3.org/data#W3C> <http://xmlns.com/foaf/0.1/name> "World Wide Web Consortium" <http://www.w3.org/People/Berners-Lee/card> .
+<http://www4.wiwiss.fu-berlin.de/booksMeshup/books/006251587X> <http://purl.org/dc/elements/1.1/creator> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+<http://www4.wiwiss.fu-berlin.de/booksMeshup/books/006251587X> <http://purl.org/dc/elements/1.1/title> "Weaving the Web: The Original Design and Ultimate Destiny of the World Wide Web" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid5http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/auth/rsa#RSAPublicKey> <http://www.w3.org/People/Berners-Lee/card> .
+_:genid5http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/ns/auth/cert#identity> <http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/People/Berners-Lee/card> .
+_:genid6http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/ns/auth/cert#hex> "84554e39b67f5e3912068773655d855d222fa2c05cd9784693f8919aa46a61be703069c5f3266eebc21d6bb429ee47fac347b012eb7da8b1e4b02f7680e39767b0086f1fd48b9a420de3e70df9c2504c87006e7722ab6df210dec768dae454e65b31752379d7032dd2269646562593d8b5c621860a0f929ad64b9dce1d6cb12f" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid5http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/ns/auth/rsa#modulus> _:genid6http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+_:genid7http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/ns/auth/cert#decimal> "65537" <http://www.w3.org/People/Berners-Lee/card> .
+_:genid5http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/ns/auth/rsa#public_exponent> _:genid7http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://www.w3.org/People/Berners-Lee/card> .
+_:b1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://xmlns.com/foaf/0.1/mbox> <mailto:susie.stephens@gmail.com> <http://www.w3.org/People/Berners-Lee/card> .
+_:b1http-3A-2F-2Fwww-2Ew3-2Eorg-2FPeople-2FBerners-2DLee-2Fcard <http://xmlns.com/foaf/0.1/name> "Susie Stephens" <http://www.w3.org/People/Berners-Lee/card> .
+<http://grorg.org/dino/> <http://purl.org/dc/elements/1.1/title> "Dean Jackson" <http://grorg.org/dino/> .
+<http://grorg.org/dino/> <http://www.w3.org/1999/xhtml#link> <http://grorg.org/feeds/atom> <http://grorg.org/dino/> .
+<http://grorg.org/feeds/atom> <http://purl.org/dc/elements/1.1/format> "application/atom+xml" <http://grorg.org/dino/> .
+<http://people.w3.org/amy/foaf.rdf> <http://purl.org/dc/elements/1.1/title> "FOAF data for Amy van der Hiel" <http://people.w3.org/amy/foaf.rdf> .
+<http://people.w3.org/amy/foaf.rdf> <http://purl.org/dc/elements/1.1/description> "Friend-of-a-Friend (FOAF) is an RDFWeb project. More information located at: http://www.foaf-project.org/)\"" <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Amy van der Hiel" <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/mbox_sha1sum> "1839a1cc2e719a85ea7d9007f587b2899cd94064" <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/homepage> <http://people.w3.org/amy/> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/workplaceHomepage> <http://www.w3.org/> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/workInfoHomepage> <http://www.w3.org/People/all#amy> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/myersBriggs> "INTJ" <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/openid> <http://getopenid.com/amyvdh> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/img> <http://farm1.static.flickr.com/59/183629511_1f2eeffaef.jpg?v=0> <http://people.w3.org/amy/foaf.rdf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Dean Jackson" <http://people.w3.org/amy/foaf.rdf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/mbox_sha1sum> "6de4ff27ef927b9ba21ccc88257e41a2d7e7d293" <http://people.w3.org/amy/foaf.rdf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://cuboidal.org/dean/foaf.rdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Max Froumentin" <http://people.w3.org/amy/foaf.rdf> .
+_:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/mbox_sha1sum> "fc99d51b14c8ca95f071d319d5a62a9b4a10f851" <http://people.w3.org/amy/foaf.rdf> .
+_:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/maxf/foaf.rdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Eric Prud'hommeaux" <http://people.w3.org/amy/foaf.rdf> .
+_:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/mbox_sha1sum> "5697bf372610b25e0058f5f62cc75276d9606d44" <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Dan Brickley" <http://people.w3.org/amy/foaf.rdf> .
+_:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/mbox_sha1sum> "362ce75324396f0aa2d3e5f1246f40bf3bb44401" <http://people.w3.org/amy/foaf.rdf> .
+_:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://danbri.org/danbri.rdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Libby Miller" <http://people.w3.org/amy/foaf.rdf> .
+_:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/mbox_sha1sum> "289d4d44325d0b0218edc856c8c3904fa3fd2875" <http://people.w3.org/amy/foaf.rdf> .
+_:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Coralie Mercier" <http://people.w3.org/amy/foaf.rdf> .
+_:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.koalie.net/foaf.rdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Tim Berners-Lee" <http://people.w3.org/amy/foaf.rdf> .
+_:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Berners-Lee/card.rdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Karl Dubost" <http://people.w3.org/amy/foaf.rdf> .
+_:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/karl/karl-foaf.xrdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Dan Connolly" <http://people.w3.org/amy/foaf.rdf> .
+_:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Connolly/home-smart.rdf> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+_:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/amy/foaf.rdf> .
+_:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/name> "Lalana Kagal" <http://people.w3.org/amy/foaf.rdf> .
+_:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://ebiquity.umbc.edu/person/foaf/Lalana/Kagal/foaf#lk> <http://people.w3.org/amy/foaf.rdf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://xmlns.com/foaf/0.1/knows> _:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Famy-2Ffoaf-2Erdf <http://people.w3.org/amy/foaf.rdf> .
+<http://axel.deri.ie/~axepol/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://axel.deri.ie/~axepol/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Axel Polleres" <http://bblfish.net/people/henry/card> .
+<http://b4mad.net/FOAF/goern.rdf#goern> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://b4mad.net/FOAF/goern.rdf#goern> <http://xmlns.com/foaf/0.1/name> "Christoph  G\u00F6rn" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card> <http://www.iana.org/assignments/relation/alternate> <http://bblfish.net/people/henry/card.n3> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card> <http://www.iana.org/assignments/relation/alternate> <http://bblfish.net/people/henry/card.rdf> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card> <http://xmlns.com/foaf/0.1/maker> <http://bblfish.net/people/henry/card#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card> <http://xmlns.com/foaf/0.1/primaryTopic> <http://bblfish.net/people/henry/card#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card> <http://xmlns.com/foaf/0.1/title> "Henry Story's FOAF file" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid1http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/10/swap/pim/contact#ContactLocation> <http://bblfish.net/people/henry/card> .
+_:genid2http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#city> "Fontainebleau" <http://bblfish.net/people/henry/card> .
+_:genid2http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#country> "France" <http://bblfish.net/people/henry/card> .
+_:genid2http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#postalCode> "77300" <http://bblfish.net/people/henry/card> .
+_:genid2http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#street> "21 rue Saint Honore" <http://bblfish.net/people/henry/card> .
+_:genid1http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/10/swap/pim/contact#address> _:genid2http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid1http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2003/01/geo/wgs84_pos#lat> "48.404532" <http://bblfish.net/people/henry/card> .
+_:genid1http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2003/01/geo/wgs84_pos#long> "2.700448" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://www.w3.org/2000/10/swap/pim/contact#home> _:genid1http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://www.w3.org/2002/07/owl#sameAs> <http://sixiron.sfbay.sun.com:8080/FoafServer/services/people/155492#HS> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/aimChatID> "unbabelfish" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/birthday> "07-29" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/currentProject> <http://bblfish.net/work/atom-owl/2006-06-06/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/currentProject> <https://bloged.dev.java.net/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/currentProject> <https://sommer.dev.java.net/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/depiction> <http://farm1.static.flickr.com/164/373663745_e2066a4950.jpg> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/family_name> "Story" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/gender> "male" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/givenname> "Henry" <http://bblfish.net/people/henry/card> .
+_:genid3http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid3http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's skype account"@en <http://bblfish.net/people/henry/card> .
+_:genid3http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid3http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://www.skype.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid3http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid4http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid4http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's flickr pictures account"@en <http://bblfish.net/people/henry/card> .
+_:genid4http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid4http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountProfilePage> <http://www.flickr.com/people/bblfish> <http://bblfish.net/people/henry/card> .
+_:genid4http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://www.flickr.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid4http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid5http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid5http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's last.fm music account"@en <http://bblfish.net/people/henry/card> .
+_:genid5http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid5http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountProfilePage> <http://www.last.fm/user/bblfish> <http://bblfish.net/people/henry/card> .
+_:genid5http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://www.last.fm/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid5http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid6http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid6http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's delicious bookmarking account"@en <http://bblfish.net/people/henry/card> .
+_:genid6http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid6http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountProfilePage> <http://delicious.com/bblfish> <http://bblfish.net/people/henry/card> .
+_:genid6http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://delicious.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid6http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid7http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid7http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's java.net developer account"@en <http://bblfish.net/people/henry/card> .
+_:genid7http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid7http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://java.net/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid7http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid8http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid8http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's twitter micro blogging account"@en <http://bblfish.net/people/henry/card> .
+_:genid8http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid8http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountProfilePage> <http://twitter.com/bblfish> <http://bblfish.net/people/henry/card> .
+_:genid8http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://twitter.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid8http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid9http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid9http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's twine semantic aggregation account"@en <http://bblfish.net/people/henry/card> .
+_:genid9http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid9http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountProfilePage> <http://www.twine.com/user/bblfish> <http://bblfish.net/people/henry/card> .
+_:genid9http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://twine.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid9http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid10http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid10http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's facebook social networking account"@en <http://bblfish.net/people/henry/card> .
+_:genid10http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid10http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://www.facebook.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid10http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid11http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://bblfish.net/people/henry/card> .
+_:genid11http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#label> "Henry Story's linked in business social network account"@en <http://bblfish.net/people/henry/card> .
+_:genid11http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountName> "bblfish" <http://bblfish.net/people/henry/card> .
+_:genid11http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountProfilePage> <http://www.linkedin.com/pub/0/482/680> <http://bblfish.net/people/henry/card> .
+_:genid11http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/accountServiceHomepage> <http://www.linkedin.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/holdsAccount> _:genid11http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/homepage> <http://bblfish.net/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/interest> <http://en.wikipedia.org/wiki/Go_(game)> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/interest> <http://wikipedia.org/wiki/Cycling> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/interest> <http://wikipedia.org/wiki/Philosophy> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/interest> <http://wikipedia.org/wiki/Semantic_Web> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://axel.deri.ie/~axepol/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://b4mad.net/FOAF/goern.rdf#goern> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://bigasterisk.com/foaf.rdf#drewp> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://crschmidt.net/foaf.rdf#crschmidt> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://danbri.org/foaf.rdf#danbri> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://data.boab.info/david/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://davelevy.info/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://dblp.l3s.de/d2r/page/authors/Christian_Bizer> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/James_Gosling> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/Roy_Fielding> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/Tim_Bray> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://dbpedia.org/resource/Yochai_Benkler> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://foafbuilder.qdos.com/people/tboudreau.myopenid.com/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://handtwerk.de/foaf.rdf#arne> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://heddley.com/edd/foaf.rdf#edd> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://kashori.com/JohnBlack/foaf.rdf#jpb> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://metacognition.info/profile/webwho.xrdf#chime> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://purl.oclc.org/NET/gearon/people/PaulGearon/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://purl.org/captsolo/semweb/foaf-captsolo.rdf#Uldis_Bojars> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://richard.cyganiak.de/foaf.rdf#cygri> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://semedia.deit.univpm.it/people/christian/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://torrez.us/who#elias> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.aifb.uni-karlsruhe.de/Personen/viewPersonOWL/id2076instance> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.anjeve.de/foaf.rdf#AnjaJentzsch> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.dfki.uni-kl.de/~grimnes/foaf.rdf#ggrimnes> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.fosi.org/people/philarcher/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.ibiblio.org/hhalpin/#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.ifi.unizh.ch/ddis/fileadmin/user_upload/kiefer/foaf.rdf#christophkiefer> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.ifi.uzh.ch/ddis/fileadmin/user_upload/avi/#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.informatik.uni-leipzig.de/~auer/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.pipian.com/rdf/tami/juliette.n3#juliette> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.semantic-web.at/people/blumauer/card#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.sw-app.org/foaf/mic.rdf#mic> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.topquadrant.com/people/dallemang/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.uni-koblenz.de/~sschenk/foaf.rdf#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Berners-Lee/card#i> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://www.w3.org/People/Connolly/#me> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> <http://xircles.codehaus.org/users/evenisse/foaf#me> <http://bblfish.net/people/henry/card> .
+_:genid12http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid12http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.webmink.net/foaf.rdf> <http://bblfish.net/people/henry/card> .
+_:genid12http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://www.webmink.net/> <http://bblfish.net/people/henry/card> .
+_:genid12http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/mbox_sha1sum> "4e377376e6977b765c1e78b2d0157a933ba11167" <http://bblfish.net/people/henry/card> .
+_:genid12http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Simon Phipps" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid12http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid13http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid13http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://dannyayers.com/me.rdf> <http://bblfish.net/people/henry/card> .
+_:genid13http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://dannyayers.com/> <http://bblfish.net/people/henry/card> .
+_:genid13http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Danny Ayers" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid13http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid14http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid14http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://g1o.net/> <http://bblfish.net/people/henry/card> .
+_:genid14http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Giovanni Tummarello" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid14http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid15http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid15http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://www.pst.ifi.lmu.de/people/staff/rauschmayer/axel-rauschmayer/> <http://bblfish.net/people/henry/card> .
+_:genid15http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Axel Rauschmayer" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid15http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid16http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid16http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.openrdf.org/people/foaf-jeen.rdf> <http://bblfish.net/people/henry/card> .
+_:genid16http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://wwwis.win.tue.nl/~jbroekst/> <http://bblfish.net/people/henry/card> .
+_:genid16http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Jeen Broekstra" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid16http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid17http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid17http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Eric/ericP-foaf.rdf> <http://bblfish.net/people/henry/card> .
+_:genid17http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://www.w3.org/People/Eric/> <http://bblfish.net/people/henry/card> .
+_:genid17http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Eric Prud'hommeaux" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid17http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid18http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid18http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://bitworking.org/foaf.rdf> <http://bblfish.net/people/henry/card> .
+_:genid18http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://bitworking.org/> <http://bblfish.net/people/henry/card> .
+_:genid18http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Joe Gregorio" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid18http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid19http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid19http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://novaspivack.typepad.com/foaf.rdf> <http://bblfish.net/people/henry/card> .
+_:genid19http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/mbox> <mailto:nova@radarnetworks.com> <http://bblfish.net/people/henry/card> .
+_:genid19http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Spivack Nova" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid19http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid20http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid20http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://www.j-paine.org/> <http://bblfish.net/people/henry/card> .
+_:genid20http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Jocelyn Paine" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid20http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid21http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid21http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://catbauer.com/> <http://bblfish.net/people/henry/card> .
+_:genid21http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Cat Bauer" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid21http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid22http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid22http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://kronkltd.net/data/foaf.rdf> <http://bblfish.net/people/henry/card> .
+_:genid22http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://kronkltd.net/> <http://bblfish.net/people/henry/card> .
+_:genid22http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Renfer Daniel" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid22http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid23http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid23http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.openrdf.org/people/foaf-arjohn.rdf> <http://bblfish.net/people/henry/card> .
+_:genid23http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Arjohn Kampman" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid23http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid24http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+_:genid24http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://aeim.niij.org/about/me.n3> <http://bblfish.net/people/henry/card> .
+_:genid24http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/homepage> <http://niij.org/> <http://bblfish.net/people/henry/card> .
+_:genid24http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://xmlns.com/foaf/0.1/name> "Michael Zeltner" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/knows> _:genid24http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/logo> <http://bblfish.net/pix/bfish.large.jpg> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:henry.story@bblfish.net> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:henry.story@gmail.com> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/mbox> <mailto:henry.story@sun.com> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/name> "Henry J. Story" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/nick> "bblfish" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/openid> <http://bblfish.videntity.org/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/openid> <http://openid.sun.com/bblfish> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/pastProject> <http://babelfish.altavista.com/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/phone> <tel:+1-510-931-5491> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/phone> <tel:+33-8-70-44-86-64> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/schoolHomepage> <http://www.bbk.ac.uk/phil/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/schoolHomepage> <http://www.doc.ic.ac.uk/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/schoolHomepage> <http://www.kcl.ac.uk/kis/schools/hums/philosophy/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/title> "Mr" <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/weblog> <http://bblfish.net/blog/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/weblog> <http://blogs.sun.com/bblfish/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/weblog> <http://del.icio.us/bblfish> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/weblog> <http://www.flickr.com/photos/bblfish/> <http://bblfish.net/people/henry/card> .
+<http://bblfish.net/people/henry/card#me> <http://xmlns.com/foaf/0.1/workplaceHomepage> <http://sun.com/> <http://bblfish.net/people/henry/card> .
+<http://bigasterisk.com/foaf.rdf#drewp> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://bigasterisk.com/foaf.rdf#drewp> <http://xmlns.com/foaf/0.1/homepage> <http://bigasterisk.com/> <http://bblfish.net/people/henry/card> .
+<http://bigasterisk.com/foaf.rdf#drewp> <http://xmlns.com/foaf/0.1/name> "Drew Perttula" <http://bblfish.net/people/henry/card> .
+<http://crschmidt.net/foaf.rdf#crschmidt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://crschmidt.net/foaf.rdf#crschmidt> <http://xmlns.com/foaf/0.1/homepage> <http://crschmidt.net/> <http://bblfish.net/people/henry/card> .
+<http://crschmidt.net/foaf.rdf#crschmidt> <http://xmlns.com/foaf/0.1/name> "Christopher Schmidt" <http://bblfish.net/people/henry/card> .
+<http://danbri.org/foaf.rdf#danbri> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://danbri.org/foaf.rdf#danbri> <http://xmlns.com/foaf/0.1/homepage> <http://danbri.org/> <http://bblfish.net/people/henry/card> .
+<http://danbri.org/foaf.rdf#danbri> <http://xmlns.com/foaf/0.1/name> "Dan Brickley" <http://bblfish.net/people/henry/card> .
+<http://data.boab.info/david/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://data.boab.info/david/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "David Peterson" <http://bblfish.net/people/henry/card> .
+<http://davelevy.info/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://davelevy.info/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Dave Levy" <http://bblfish.net/people/henry/card> .
+<http://dblp.l3s.de/d2r/page/authors/Christian_Bizer> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://dblp.l3s.de/d2r/page/authors/Christian_Bizer> <http://xmlns.com/foaf/0.1/homepage> <http://www.bizer.de/> <http://bblfish.net/people/henry/card> .
+<http://dblp.l3s.de/d2r/page/authors/Christian_Bizer> <http://xmlns.com/foaf/0.1/name> "Chris Bizer" <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/James_Gosling> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/James_Gosling> <http://xmlns.com/foaf/0.1/name> "James Gosling" <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/Roy_Fielding> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/Roy_Fielding> <http://xmlns.com/foaf/0.1/homepage> <http://roy.gbiv.com/> <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/Roy_Fielding> <http://xmlns.com/foaf/0.1/name> "Roy Fielding" <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/Tim_Bray> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/Tim_Bray> <http://xmlns.com/foaf/0.1/name> "Tim Bray" <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/Yochai_Benkler> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://dbpedia.org/resource/Yochai_Benkler> <http://xmlns.com/foaf/0.1/name> "Yochai Benkler" <http://bblfish.net/people/henry/card> .
+<http://foafbuilder.qdos.com/people/tboudreau.myopenid.com/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://foafbuilder.qdos.com/people/tboudreau.myopenid.com/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Tim Boudreau" <http://bblfish.net/people/henry/card> .
+<http://foafbuilder.qdos.com/people/tboudreau.myopenid.com/foaf.rdf#me> <http://xmlns.com/foaf/0.1/weblog> <http://weblogs.java.net/blog/timboudreau/> <http://bblfish.net/people/henry/card> .
+<http://handtwerk.de/foaf.rdf#arne> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://handtwerk.de/foaf.rdf#arne> <http://xmlns.com/foaf/0.1/homepage> <http://www.handtwerk.de/> <http://bblfish.net/people/henry/card> .
+<http://handtwerk.de/foaf.rdf#arne> <http://xmlns.com/foaf/0.1/name> "Arne Handt" <http://bblfish.net/people/henry/card> .
+<http://heddley.com/edd/foaf.rdf#edd> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://heddley.com/edd/foaf.rdf#edd> <http://xmlns.com/foaf/0.1/homepage> <http://heddley.com/edd/> <http://bblfish.net/people/henry/card> .
+<http://heddley.com/edd/foaf.rdf#edd> <http://xmlns.com/foaf/0.1/name> "Edd Dumbill" <http://bblfish.net/people/henry/card> .
+<http://kashori.com/JohnBlack/foaf.rdf#jpb> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://kashori.com/JohnBlack/foaf.rdf#jpb> <http://xmlns.com/foaf/0.1/homepage> <http://kashori.com/JohnBlack> <http://bblfish.net/people/henry/card> .
+<http://kashori.com/JohnBlack/foaf.rdf#jpb> <http://xmlns.com/foaf/0.1/name> "John Black" <http://bblfish.net/people/henry/card> .
+<http://metacognition.info/profile/webwho.xrdf#chime> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://metacognition.info/profile/webwho.xrdf#chime> <http://xmlns.com/foaf/0.1/name> "Chimezie Ogbuji" <http://bblfish.net/people/henry/card> .
+<http://purl.oclc.org/NET/gearon/people/PaulGearon/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://purl.oclc.org/NET/gearon/people/PaulGearon/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Paul Gearon" <http://bblfish.net/people/henry/card> .
+<http://purl.org/captsolo/semweb/foaf-captsolo.rdf#Uldis_Bojars> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://purl.org/captsolo/semweb/foaf-captsolo.rdf#Uldis_Bojars> <http://xmlns.com/foaf/0.1/homepage> <http://kaste.lv/~captsolo> <http://bblfish.net/people/henry/card> .
+<http://purl.org/captsolo/semweb/foaf-captsolo.rdf#Uldis_Bojars> <http://xmlns.com/foaf/0.1/name> "Uldis Bojars" <http://bblfish.net/people/henry/card> .
+<http://richard.cyganiak.de/foaf.rdf#cygri> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://richard.cyganiak.de/foaf.rdf#cygri> <http://xmlns.com/foaf/0.1/homepage> <http://richard.cyganiak.de/> <http://bblfish.net/people/henry/card> .
+<http://richard.cyganiak.de/foaf.rdf#cygri> <http://xmlns.com/foaf/0.1/name> "Richard Cyganiak" <http://bblfish.net/people/henry/card> .
+<http://semedia.deit.univpm.it/people/christian/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://semedia.deit.univpm.it/people/christian/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Christian Morbidoni" <http://bblfish.net/people/henry/card> .
+<http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://xmlns.com/foaf/0.1/homepage> <http://nicecupoftea.org/> <http://bblfish.net/people/henry/card> .
+<http://swordfish.rdfweb.org/people/libby/rdfweb/webwho.xrdf#me> <http://xmlns.com/foaf/0.1/name> "Libby Miller" <http://bblfish.net/people/henry/card> .
+<http://torrez.us/who#elias> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://torrez.us/who#elias> <http://xmlns.com/foaf/0.1/name> "Elias Torres" <http://bblfish.net/people/henry/card> .
+<http://torrez.us/who#elias> <http://xmlns.com/foaf/0.1/name> "Torres Elias" <http://bblfish.net/people/henry/card> .
+<http://www.aifb.uni-karlsruhe.de/Personen/viewPersonOWL/id2076instance> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.aifb.uni-karlsruhe.de/Personen/viewPersonOWL/id2076instance> <http://xmlns.com/foaf/0.1/name> "Max V\u00F6lkel" <http://bblfish.net/people/henry/card> .
+<http://www.anjeve.de/foaf.rdf#AnjaJentzsch> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.anjeve.de/foaf.rdf#AnjaJentzsch> <http://xmlns.com/foaf/0.1/homepage> <http://www.anjeve.de/> <http://bblfish.net/people/henry/card> .
+<http://www.anjeve.de/foaf.rdf#AnjaJentzsch> <http://xmlns.com/foaf/0.1/name> "Anja Jentzsch" <http://bblfish.net/people/henry/card> .
+<http://www.dfki.uni-kl.de/~grimnes/foaf.rdf#ggrimnes> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.dfki.uni-kl.de/~grimnes/foaf.rdf#ggrimnes> <http://xmlns.com/foaf/0.1/homepage> <http://www.dfki.uni-kl.de/~grimnes/> <http://bblfish.net/people/henry/card> .
+<http://www.dfki.uni-kl.de/~grimnes/foaf.rdf#ggrimnes> <http://xmlns.com/foaf/0.1/name> "Gunnar AAstrand Grimnes" <http://bblfish.net/people/henry/card> .
+<http://www.fosi.org/people/philarcher/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.fosi.org/people/philarcher/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Archer Phil" <http://bblfish.net/people/henry/card> .
+<http://www.ibiblio.org/hhalpin/#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.ibiblio.org/hhalpin/#me> <http://xmlns.com/foaf/0.1/homepage> <http://www.ibiblio.org/hhalpin/> <http://bblfish.net/people/henry/card> .
+<http://www.ibiblio.org/hhalpin/#me> <http://xmlns.com/foaf/0.1/name> "Halpin Harry" <http://bblfish.net/people/henry/card> .
+<http://www.ifi.unizh.ch/ddis/fileadmin/user_upload/kiefer/foaf.rdf#christophkiefer> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.ifi.unizh.ch/ddis/fileadmin/user_upload/kiefer/foaf.rdf#christophkiefer> <http://xmlns.com/foaf/0.1/homepage> <http://www.ifi.unizh.ch/ddis/christophkiefer.html> <http://bblfish.net/people/henry/card> .
+<http://www.ifi.unizh.ch/ddis/fileadmin/user_upload/kiefer/foaf.rdf#christophkiefer> <http://xmlns.com/foaf/0.1/name> "Christoph Kiefer" <http://bblfish.net/people/henry/card> .
+<http://www.ifi.uzh.ch/ddis/fileadmin/user_upload/avi/#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.ifi.uzh.ch/ddis/fileadmin/user_upload/avi/#me> <http://xmlns.com/foaf/0.1/name> "Abraham Bernstein" <http://bblfish.net/people/henry/card> .
+<http://www.informatik.uni-leipzig.de/~auer/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.informatik.uni-leipzig.de/~auer/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "S\u00F6ren Auer" <http://bblfish.net/people/henry/card> .
+<http://www.semantic-web.at/people/blumauer/card#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.semantic-web.at/people/blumauer/card#me> <http://xmlns.com/foaf/0.1/name> "Andreas Blumauer" <http://bblfish.net/people/henry/card> .
+<http://www.sw-app.org/foaf/mic.rdf#mic> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.sw-app.org/foaf/mic.rdf#mic> <http://xmlns.com/foaf/0.1/homepage> <http://www.sw-app.org/> <http://bblfish.net/people/henry/card> .
+<http://www.sw-app.org/foaf/mic.rdf#mic> <http://xmlns.com/foaf/0.1/name> "Michael G. Hausenblas" <http://bblfish.net/people/henry/card> .
+<http://www.topquadrant.com/people/dallemang/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.topquadrant.com/people/dallemang/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Dean Allemang" <http://bblfish.net/people/henry/card> .
+<http://www.uni-koblenz.de/~sschenk/foaf.rdf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.uni-koblenz.de/~sschenk/foaf.rdf#me> <http://xmlns.com/foaf/0.1/name> "Simon Schenk" <http://bblfish.net/people/henry/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.w3.org/People/Berners-Lee/card#i> <http://xmlns.com/foaf/0.1/name> "Tim Berners Lee" <http://bblfish.net/people/henry/card> .
+<http://www.w3.org/People/Connolly/#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://www.w3.org/People/Connolly/#me> <http://xmlns.com/foaf/0.1/name> "Dan Connolly" <http://bblfish.net/people/henry/card> .
+<http://xircles.codehaus.org/users/evenisse/foaf#me> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://bblfish.net/people/henry/card> .
+<http://xircles.codehaus.org/users/evenisse/foaf#me> <http://xmlns.com/foaf/0.1/name> "Venisse Emmanuel" <http://bblfish.net/people/henry/card> .
+_:genid25http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/auth/rsa#RSAPublicKey> <http://bblfish.net/people/henry/card> .
+_:genid25http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/ns/auth/cert#identity> <http://bblfish.net/people/henry/card#me> <http://bblfish.net/people/henry/card> .
+_:genid26http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/ns/auth/cert#hex> "862d6e0b8c3252a79d6eb82966f14e495c839ec2d57983ec39bfac79f8a99f887a3ca559cfee438e90f73da143cefc0a849509d8d91e7093a94c1a39863a5bed78a0f0234a372f12dce0a9535b14d92d56827b3791352b5817681ad7949aa7831911d51827a57e46bad9190d73a69ce56ada74a59ddc0df2a7a31247bbd67445" <http://bblfish.net/people/henry/card> .
+_:genid25http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/ns/auth/rsa#modulus> _:genid26http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+_:genid27http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/ns/auth/cert#decimal> "65537" <http://bblfish.net/people/henry/card> .
+_:genid25http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://www.w3.org/ns/auth/rsa#public_exponent> _:genid27http-3A-2F-2Fbblfish-2Enet-2Fpeople-2Fhenry-2Fcard <http://bblfish.net/people/henry/card> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Ontology> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://purl.org/dc/elements/1.1/title> "The RDF Vocabulary (RDF)" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://purl.org/dc/elements/1.1/description> "This is the RDF Schema for the RDF vocabulary defined in the RDF namespace." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#label> "type" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#comment> "The subject is an instance of a class." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/2000/01/rdf-schema#label> "Property" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of RDF properties." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/2000/01/rdf-schema#label> "Statement" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of RDF statements." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <http://www.w3.org/2000/01/rdf-schema#label> "subject" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <http://www.w3.org/2000/01/rdf-schema#comment> "The subject of the subject RDF statement." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://www.w3.org/2000/01/rdf-schema#label> "predicate" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://www.w3.org/2000/01/rdf-schema#comment> "The predicate of the subject RDF statement." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <http://www.w3.org/2000/01/rdf-schema#label> "object" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <http://www.w3.org/2000/01/rdf-schema#comment> "The object of the subject RDF statement." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Bag> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Bag> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Bag> <http://www.w3.org/2000/01/rdf-schema#label> "Bag" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Bag> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of unordered containers." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Bag> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Seq> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Seq> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Seq> <http://www.w3.org/2000/01/rdf-schema#label> "Seq" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Seq> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of ordered containers." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Seq> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Alt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Alt> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Alt> <http://www.w3.org/2000/01/rdf-schema#label> "Alt" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Alt> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of containers of alternatives." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#Alt> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#value> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#value> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#value> <http://www.w3.org/2000/01/rdf-schema#label> "value" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#value> <http://www.w3.org/2000/01/rdf-schema#comment> "Idiomatic property used for structured values." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#value> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#value> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/2000/01/rdf-schema#label> "List" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of RDF Lists." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> <http://www.w3.org/2000/01/rdf-schema#label> "nil" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> <http://www.w3.org/2000/01/rdf-schema#comment> "The empty list, with no items in it. If the rest of a list is nil then the list has no more items in it." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://www.w3.org/2000/01/rdf-schema#label> "first" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://www.w3.org/2000/01/rdf-schema#comment> "The first item in the subject RDF list." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/2000/01/rdf-schema#label> "rest" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/2000/01/rdf-schema#comment> "The rest of the subject RDF list after the first item." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral> <http://www.w3.org/2000/01/rdf-schema#label> "XMLLiteral" <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of XML literal values." <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://www.w3.org/1999/02/22-rdf-syntax-ns#> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema-more> <http://www.w3.org/1999/02/22-rdf-syntax-ns> .
+<http://people.w3.org/simon/foaf.rdf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf.rdf> <http://purl.org/dc/elements/1.1/title> "Information about Simon J. Hernandez (s-mon)"^^<http://www.w3.org/2001/XMLSchema#string> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf.rdf> <http://xmlns.com/foaf/0.1/maker> <http://people.w3.org/simon/foaf#s-mon> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf.rdf> <http://xmlns.com/foaf/0.1/primaryTopic> <http://people.w3.org/simon/foaf#s-mon> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/10/swap/pim/contact#Male> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/2000/01/rdf-schema#label> "Simon J. Hernandez" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/2000/10/swap/pim/contact#homePage> <http://people.w3.org/simon/> <http://people.w3.org/simon/foaf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/10/swap/pim/contact#city> "Cambridge" <http://people.w3.org/simon/foaf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/10/swap/pim/contact#country> "USA" <http://people.w3.org/simon/foaf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/10/swap/pim/contact#postalCode> "02139-4309" <http://people.w3.org/simon/foaf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/10/swap/pim/contact#street> "32 Vassar Street" <http://people.w3.org/simon/foaf> .
+_:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/10/swap/pim/contact#street2> "MIT CSAIL Room 32-G504" <http://people.w3.org/simon/foaf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/10/swap/pim/contact#address> _:genid2http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/10/swap/pim/contact#phone> <tel:+1-617-253-2920> <http://people.w3.org/simon/foaf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2003/01/geo/wgs84_pos#lat> "42.361860" <http://people.w3.org/simon/foaf> .
+_:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2003/01/geo/wgs84_pos#long> "-71.091840" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/2000/10/swap/pim/contact#office> _:genid1http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/2000/10/swap/pim/contact#organization> <http://www.w3.org/data#W3C> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://www.w3.org/2000/10/swap/pim/contact#publicHomePage> <http://people.w3.org/simon/> <http://people.w3.org/simon/foaf> .
+_:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2003/01/geo/wgs84_pos#lat> "42.361860" <http://people.w3.org/simon/foaf> .
+_:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2003/01/geo/wgs84_pos#long> "-71.091840" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/based_near> _:genid3http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/family_name> "Hernandez" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/givenname> "Simon J." <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/title> "Sr." <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/homepage> <http://people.w3.org/simon/> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/img> <http://www.w3.org/People/Simon/face.jpg> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/mbox> <mailto:simon@w3.org> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/mbox_sha1sum> "bf74ec571404a2d18a64c9fb7a2c0d4dc3eb7e3a" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/name> "Simon J. Hernandez" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/nick> "s-mon" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/nick> "simon" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/phone> <tel:+1-(617)-253-2920> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/workplaceHomepage> <http://www.w3.org/> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/schoolHomepage> <http://www.sophia.ac.jp/> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/schoolHomepage> <http://www.ischool.berkeley.edu/> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://purl.org/net/inkel/rdf/schemas/lang/1.1#reads> "it" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://purl.org/net/inkel/rdf/schemas/lang/1.1#reads> "es" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://purl.org/net/inkel/rdf/schemas/lang/1.1#masters> "ja" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://purl.org/net/inkel/rdf/schemas/lang/1.1#masters> "en" <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://purl.org/net/inkel/rdf/schemas/lang/1.1#masters> "en-US" <http://people.w3.org/simon/foaf> .
+_:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Lalana Kagal" <http://people.w3.org/simon/foaf> .
+_:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://people.csail.mit.edu/lkagal/foaf#me> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid4http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Amy van der Hiel" <http://people.w3.org/simon/foaf> .
+_:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://people.w3.org/amy/foaf.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid5http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Arthur Barstow" <http://people.w3.org/simon/foaf> .
+_:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Barstow/webwho.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid6http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Charles McCathieNevile" <http://people.w3.org/simon/foaf> .
+_:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Charles/foaf.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid7http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Coralie Mercier" <http://people.w3.org/simon/foaf> .
+_:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.koalie.net/foaf.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid8http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Dave Raggett" <http://people.w3.org/simon/foaf> .
+_:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Raggett/foaf.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid9http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Hugo Haas" <http://people.w3.org/simon/foaf> .
+_:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://larve.net/people/hugo/2002/10/foaf.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid10http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Ivan Herman" <http://people.w3.org/simon/foaf> .
+_:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.ivan-herman.net/foaf.rdf#me> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid11http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid12http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid12http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Tim Berners-Lee" <http://people.w3.org/simon/foaf> .
+_:genid12http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/People/Berners-Lee/card#i> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid12http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid13http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid13http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Martin D\u00FCrst" <http://people.w3.org/simon/foaf> .
+_:genid13http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.sw.it.aoyama.ac.jp/Dürst/foaf.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid13http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+_:genid14http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> <http://people.w3.org/simon/foaf> .
+_:genid14http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://xmlns.com/foaf/0.1/name> "Garrett Wollman" <http://people.w3.org/simon/foaf> .
+_:genid14http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://khavrinen.csail.mit.edu/foaf.rdf> <http://people.w3.org/simon/foaf> .
+<http://people.w3.org/simon/foaf#i> <http://xmlns.com/foaf/0.1/knows> _:genid14http-3A-2F-2Fpeople-2Ew3-2Eorg-2Fsimon-2Ffoaf <http://people.w3.org/simon/foaf> .
+<http://xmlns.com/foaf/0.1/> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Ontology> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/> <http://purl.org/dc/elements/1.1/title> "Friend of a Friend (FOAF) vocabulary" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/> <http://purl.org/dc/elements/1.1/description> "The Friend of a Friend (FOAF) RDF vocabulary, described using W3C RDF Schema and the Web Ontology Language." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/> <http://purl.org/dc/elements/1.1/date> "$Date: 2007-06-16 23:18:26 $" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/> <http://xmlns.com/wot/0.1/assurance> <http://xmlns.com/foaf/foafsig> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/> <http://xmlns.com/wot/0.1/src_assurance> <http://xmlns.com/foaf/htmlfoafsig> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wot/0.1/assurance> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#AnnotationProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wot/0.1/src_assurance> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#AnnotationProperty> <http://xmlns.com/foaf/spec/> .
+<http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#AnnotationProperty> <http://xmlns.com/foaf/spec/> .
+<http://purl.org/dc/elements/1.1/description> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#AnnotationProperty> <http://xmlns.com/foaf/spec/> .
+<http://purl.org/dc/elements/1.1/title> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#AnnotationProperty> <http://xmlns.com/foaf/spec/> .
+<http://purl.org/dc/elements/1.1/date> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#AnnotationProperty> <http://xmlns.com/foaf/spec/> .
+<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#label> "Person" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#comment> "A person." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "stable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wordnet/1.6/Person> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/wordnet/1.6/Person> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wordnet/1.6/Agent> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/wordnet/1.6/Agent> <http://xmlns.com/foaf/spec/> .
+<http://www.w3.org/2000/10/swap/pim/contact#Person> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/10/swap/pim/contact#Person> <http://xmlns.com/foaf/spec/> .
+<http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Organization> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Person> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Project> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2000/01/rdf-schema#label> "Document" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2000/01/rdf-schema#comment> "A document." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/wordnet/1.6/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Organization> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Person> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Document> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Project> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2000/01/rdf-schema#label> "Organization" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2000/01/rdf-schema#comment> "An organization." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "stable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wordnet/1.6/Organization> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/wordnet/1.6/Organization> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Person> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Organization> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Group> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Group> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "stable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Group> <http://www.w3.org/2000/01/rdf-schema#label> "Group" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Group> <http://www.w3.org/2000/01/rdf-schema#comment> "A class of Agents." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Group> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Group> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "stable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/2000/01/rdf-schema#label> "Agent" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/2000/01/rdf-schema#comment> "An agent (eg. person, group, software or physical artifact)." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wordnet/1.6/Agent-3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/wordnet/1.6/Agent-3> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Agent> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/2000/01/rdf-schema#label> "Project" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/2000/01/rdf-schema#comment> "A project (a collective endeavour of some kind)." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wordnet/1.6/Project> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/wordnet/1.6/Project> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Person> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Project> <http://www.w3.org/2002/07/owl#disjointWith> <http://xmlns.com/foaf/0.1/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Image> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Image> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Image> <http://www.w3.org/2000/01/rdf-schema#label> "Image" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Image> <http://www.w3.org/2000/01/rdf-schema#comment> "An image." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Image> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/wordnet/1.6/Document> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Image> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/wordnet/1.6/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/Image> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://www.w3.org/2000/01/rdf-schema#label> "PersonalProfileDocument" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://www.w3.org/2000/01/rdf-schema#comment> "A personal profile RDF document." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/PersonalProfileDocument> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/foaf/0.1/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineAccount> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineAccount> <http://www.w3.org/2000/01/rdf-schema#label> "Online Account" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineAccount> <http://www.w3.org/2000/01/rdf-schema#comment> "An online account." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineAccount> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineAccount> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2002/07/owl#Thing> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineGamingAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineGamingAccount> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineGamingAccount> <http://www.w3.org/2000/01/rdf-schema#label> "Online Gaming Account" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineGamingAccount> <http://www.w3.org/2000/01/rdf-schema#comment> "An online gaming account." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineGamingAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineGamingAccount> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineGamingAccount> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineEcommerceAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineEcommerceAccount> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineEcommerceAccount> <http://www.w3.org/2000/01/rdf-schema#label> "Online E-commerce Account" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineEcommerceAccount> <http://www.w3.org/2000/01/rdf-schema#comment> "An online e-commerce account." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineEcommerceAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineEcommerceAccount> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineEcommerceAccount> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineChatAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineChatAccount> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineChatAccount> <http://www.w3.org/2000/01/rdf-schema#label> "Online Chat Account" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineChatAccount> <http://www.w3.org/2000/01/rdf-schema#comment> "An online chat account." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineChatAccount> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineChatAccount> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://xmlns.com/foaf/0.1/OnlineAccount> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/OnlineChatAccount> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "stable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/2000/01/rdf-schema#label> "personal mailbox" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/2000/01/rdf-schema#comment> "A personal mailbox, ie. an Internet mailbox associated with exactly one owner, the first owner of this mailbox. This is a 'static inverse functional property', in that there is (across time and change) at most one individual that ever has any particular value for foaf:mbox." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#InverseFunctionalProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/2000/01/rdf-schema#domain> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2002/07/owl#Thing> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/2000/01/rdf-schema#label> "sha1sum of a personal mailbox URI name" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/2000/01/rdf-schema#comment> "The sha1sum of the URI of an Internet mailbox associated with exactly one owner, the first owner of the mailbox." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#InverseFunctionalProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/2000/01/rdf-schema#domain> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/mbox_sha1sum> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/2000/01/rdf-schema#label> "gender" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/2000/01/rdf-schema#comment> "The gender of this Agent (typically but not necessarily 'male' or 'female')." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#FunctionalProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/2000/01/rdf-schema#domain> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/gender> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/2000/01/rdf-schema#label> "geekcode" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/2000/01/rdf-schema#comment> "A textual geekcode for this person, see http://www.geekcode.com/geek.html" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/2000/01/rdf-schema#domain> <http://xmlns.com/foaf/0.1/Person> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/geekcode> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/dnaChecksum> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/dnaChecksum> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/dnaChecksum> <http://www.w3.org/2000/01/rdf-schema#label> "DNA checksum" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/dnaChecksum> <http://www.w3.org/2000/01/rdf-schema#comment> "A checksum for the DNA of some thing. Joke." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/dnaChecksum> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/dnaChecksum> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/dnaChecksum> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/sha1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/sha1> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/sha1> <http://www.w3.org/2000/01/rdf-schema#label> "sha1sum (hex)" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/sha1> <http://www.w3.org/2000/01/rdf-schema#comment> "A sha1sum hash, in hex." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/sha1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/sha1> <http://www.w3.org/2000/01/rdf-schema#domain> <http://xmlns.com/foaf/0.1/Document> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/sha1> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "unstable" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/2000/01/rdf-schema#label> "based near" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/2000/01/rdf-schema#comment> "A location that something is based near, for some broadly human notion of near." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/based_near> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/title> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/title> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/title> <http://www.w3.org/2000/01/rdf-schema#label> "title" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/title> <http://www.w3.org/2000/01/rdf-schema#comment> "Title (Mr, Mrs, Ms, Dr. etc)" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/title> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/title> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/nick> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/nick> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/nick> <http://www.w3.org/2000/01/rdf-schema#label> "nickname" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/nick> <http://www.w3.org/2000/01/rdf-schema#comment> "A short informal nickname characterising an agent (includes login identifiers, IRC and other chat nicknames)." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/nick> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/nick> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/2000/01/rdf-schema#label> "jabber ID" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/2000/01/rdf-schema#comment> "A jabber ID for something." <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/2000/01/rdf-schema#domain> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/jabberID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#InverseFunctionalProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/2000/01/rdf-schema#label> "AIM chat ID" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/2000/01/rdf-schema#comment> "An AIM chat ID" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://xmlns.com/foaf/0.1/> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://xmlns.com/foaf/0.1/nick> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/2000/01/rdf-schema#domain> <http://xmlns.com/foaf/0.1/Agent> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/aimChatID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#InverseFunctionalProperty> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/icqChatID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/icqChatID> <http://www.w3.org/2003/06/sw-vocab-status/ns#term_status> "testing" <http://xmlns.com/foaf/spec/> .
+<http://xmlns.com/foaf/0.1/icqChatID> <http://www.w3.org/2000/01/rdf-schema#label> "ICQ chat ID" <http://xmlns.com/foaf/spec/> .

@@ -1,0 +1,14 @@
+# bindings with two variables and two sets of values
+# Note: This is a variant of Federated Query service04 where the SERVICE keyword
+# has been replaced by the GRAPH keyword and the data for the end point is just
+# located in a local named graph by the same name as the end point.
+
+PREFIX : <http://example.org/> 
+PREFIX foaf: <http://xmlns.com/foaf/0.1/> 
+SELECT ?s ?o1 ?o2
+{
+  GRAPH <http://localhost:18080/openrdf/repositories/localGraph> { ?s ?p1 ?o1 } 
+  OPTIONAL { GRAPH <http://localhost:18080/openrdf/repositories/endpoint1> {?s foaf:knows ?o2 }}
+} BINDINGS ?o2 {
+ (:b)
+}

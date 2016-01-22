@@ -1,0 +1,13 @@
+# BSBM Explore Query 11: Get all information about an offer.
+#
+# Use Case Motivation: After deciding on a specific offer, the consumer wants to get all information that is directly related to this offer.
+#
+#    query contains an unbound predicate
+#    uses UNION
+
+SELECT ?property ?hasValue ?isValueOf
+WHERE {
+  { <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer144> ?property ?hasValue }
+  UNION
+  { ?isValueOf ?property <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer144> }
+}

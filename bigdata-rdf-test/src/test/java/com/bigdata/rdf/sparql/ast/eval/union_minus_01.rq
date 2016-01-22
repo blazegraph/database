@@ -1,0 +1,12 @@
+PREFIX :       <http://example/>
+
+SELECT  ?s
+WHERE {
+   { 
+     BIND ( :bob as ?s )
+   } UNION {
+   }
+   MINUS {
+      BIND ( :bob as ?s )
+   }
+} LIMIT 10

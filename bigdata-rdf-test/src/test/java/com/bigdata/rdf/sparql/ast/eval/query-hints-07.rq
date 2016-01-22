@@ -1,0 +1,24 @@
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+SELECT ?x ?o
+WHERE {
+  
+  # Turn off the join order optimizer.
+  hint:Query hint:optimizer "None".
+  
+  # Disable analytic query for the test.
+  hint:Query hint:analytic false.
+  
+  ?x rdfs:label ?o .
+  hint:Prior hint:atOnce true .
+  
+  { 
+     SELECT ?x {
+          ?x rdf:type foaf:Person .
+     	  hint:Prior hint:atOnce false .
+    	 }
+  }
+
+}

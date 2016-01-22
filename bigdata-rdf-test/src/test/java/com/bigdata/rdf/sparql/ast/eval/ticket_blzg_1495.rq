@@ -1,0 +1,4 @@
+SELECT * 
+WHERE {
+  ?s <http://p1> / <http://unknown>? ?o
+}

@@ -1,0 +1,6 @@
+@prefix ex: <http://example.org/>.
+
+ex:Jim ex:hasName "Jim".
+ex:Michael ex:hasName "Michael".
+ex:Dwight ex:hasName "Dwight".
+
