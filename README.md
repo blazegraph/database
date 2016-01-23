@@ -1,5 +1,5 @@
 ## Welcome to the Blazegraph Database
-Blazegraph™ DB is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a enterprise features for High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.  It powers the Wikimedia Foundation's Wiki Data Query Service.  See the latest [Feature Matrix](http://www.blazegraph.com/product/).
+Blazegraph™ DB is a ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a enterprise features for High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.  It powers the Wikimedia Foundation's [Wiki Data Query Service](https://query.wikidata.org/).  See the latest [Feature Matrix](http://www.blazegraph.com/product/).
 
 ![image](http://blog.blazegraph.com/wp-content/uploads/2015/07/blazegraph_by_systap_favicon.png)
 
@@ -26,7 +26,7 @@ Starting with the 2.0.0 release, the Blazegraph Database is available on Maven C
         <artifactId>bigdata-core</artifactId>
         <version>2.0.0</version>
     </dependency>
-    <!-- Use if Tinkerpop 2.5 support is needed -->
+    <!-- Use if Tinkerpop 2.5 support is needed ; See also Tinkerpop3 below. -->
     <dependency>
         <groupId>com.blazegraph</groupId>
         <artifactId>bigdata-blueprints</artifactId>
@@ -59,7 +59,7 @@ Tinkerpop3 supports requires Java 1.8 and is now in a separate repository.  See 
 ```
 
 ###Triple Pattern Fragment (TPF) Server
-There is a [Blazegraph Triple Patter Fragment TPF](https://github.com/blazegraph/BlazegraphBasedTPFServer) server that supports the LDF.
+There is a [Blazegraph Triple Pattern Fragment TPF](https://github.com/blazegraph/BlazegraphBasedTPFServer) server that supports [Linked Data Fragments](http://linkeddatafragments.org/).
 
 ```
     <dependency>
@@ -70,7 +70,7 @@ There is a [Blazegraph Triple Patter Fragment TPF](https://github.com/blazegraph
 ```    
 
 ###Blazegraph Python Client
-There is Blazegraph Python Client [here] (https://github.com/blazegraph/blazegraph-python)
+There is a Blazegraph Python Client [here] (https://github.com/blazegraph/blazegraph-python)
 
 ###Blazegraph Dot Net RDF Client
 There is a Blazegraph Dot Net RDF Client [here](https://github.com/blazegraph/blazegraph-dotnetrdf)
