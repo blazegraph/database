@@ -1858,16 +1858,18 @@ abstract public class TestCase2
 			( userHome+File.separator+"build.properties"
 			  );
 		    
-		    log.info
-			( "Looking for properties file in home directory: "+
-			  file
-			  );
+//See BLZG-1731           
+			if (log.isInfoEnabled()) {
+				log.info("Looking for properties file in home directory: "
+							+ file);
+			}
 		    
 		    if( ! file.exists() ) {
 			
-			log.warn
-			    ( "File does not exist: "+file
-			      );
+//See BLZG-1731           
+//			log.warn
+//			    ( "File does not exist: "+file
+//			      );
 			
 // 			throw new IOException
 // 			    ( "File does not exist: "+file
