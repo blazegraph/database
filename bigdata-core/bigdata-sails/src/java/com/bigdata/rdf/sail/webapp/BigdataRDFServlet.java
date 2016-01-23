@@ -572,8 +572,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
 		if (writerFactory == null) {
 
-			log.warn("No writer for format: format=" + format + ", Accept=\""
-					+ acceptStr + "\"");
+			if (log.isDebugEnabled()) {
+				log.debug("No writer for format: format=" + format
+						+ ", Accept=\"" + acceptStr + "\"");
+			}
 
 			format = RDFFormat.RDFXML;
 			
