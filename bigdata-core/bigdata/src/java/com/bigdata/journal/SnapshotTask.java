@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -57,6 +58,11 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
    private final ISnapshotFactory snapshotFactory;
    
    protected static final Logger log = Logger.getLogger(SnapshotTask.class);
+   
+   /**
+    * See BLZG-1732
+    */
+   private static final int GZIP_BUFFER =  64 * 1024;  /* 64k buffer */
    
    /**
     * The prefix for the temporary files used to generate snapshots.
@@ -144,7 +150,7 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
             osx = new FileOutputStream(tmp);
 
             if (snapshotFactory.getCompress())
-               osx = new GZIPOutputStream(osx);
+               osx = new GZIPOutputStream(osx, GZIP_BUFFER);
 
             os = new DataOutputStream(osx);
 
@@ -245,7 +251,7 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
    static private void copyStream(final InputStream content,
            final OutputStream outstr) throws IOException {
 
-       final byte[] buf = new byte[1024];
+       final byte[] buf = new byte[GZIP_BUFFER];
 
        while (true) {
 
@@ -296,8 +302,9 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
        InputStream is = null;
        OutputStream os = null;
        try {
-           is = new GZIPInputStream(new FileInputStream(src));
-           os = new FileOutputStream(dst);
+    	   //BLZG-1732:   
+           is = new GZIPInputStream(new FileInputStream(src), GZIP_BUFFER);
+           os = new BufferedOutputStream(new FileOutputStream(dst));
            copyStream(is, os);
            os.flush();
        } finally {
