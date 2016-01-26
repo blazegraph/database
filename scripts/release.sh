@@ -4,6 +4,9 @@
 #This assumes the release has passed CI and Benchmarking.
 #You must have you public keys setup for Github and Sourceforge.
 #You must have your ~/.m2/settings.xml configured to push to maven central and PGP signing.
+#
+#TODO:  Look at migrating to the Maven Release Plug-in.  Need to resolve the workflow for multiple GIT locations.
+#
 
 BASE_DIR=`dirname $0`
 
@@ -11,9 +14,12 @@ PARENT_POM="${BASE_DIR}"/../pom.xml
 CURRENT_VERSION=`grep "CURRENT_VERSION" ${BASE_DIR}/version.properties | cut -d= -f2`
 #GIT REPOS to push to.  
 #This must be configured as ${GIT_CMD} remote add sourceforge ssh://beebs@git.code.sf.net/p/bigdata/git
-REMOTE_GITS="origin sourceforge blazegraph"
+#REMOTE_GITS="origin sourceforge blazegraph"
+REMOTE_GITS="origin"
 
-GIT_CMD=echo
+GIT_CMD=`which git`
+#Use for testing
+#GIT_CMD=echo
 
 if [ "$#" -ne 1 ] ; then
 
@@ -42,25 +48,25 @@ ${GIT_CMD} checkout -b $RELEASE_BRANCH
 
 echo "Commiting the POMs with updated versions."
 
-${GIT_CMD} commit -a -m "POM version updates for $RELEASE_BRANCH" 
+${GIT_CMD} commit -a -m \"POM version updates for $RELEASE_BRANCH\" 
 
 echo "Creating Release Tag"
 
-${GIT_CMD} tag -a $RELEASE_BRANCH  -m "Blazegraph Release ${CURRENT_VERSION}"
+${GIT_CMD} tag -a $RELEASE_BRANCH  -m \"Blazegraph Release ${CURRENT_VERSION}\"
 
 #Actually build and publish the release to maven central
 
 echo "Building core artifacts..."
 
-#"${BASE_DIR}"/buildArtifacts.sh
+"${BASE_DIR}"/buildArtifacts.sh
 
 echo "Deploying to Maven Central..."
 
-#"${BASE_DIR}"/mavenCentral.sh
+"${BASE_DIR}"/mavenCentral.sh
 
 echo "Publishing javadoc to https://blazegraph.github.io/database/apidocs/index.html..."
 
-#"${BASE_DIR}"/publishJavadoc.sh
+"${BASE_DIR}"/publishJavadoc.sh
 
 
 for repo in $REMOTE_GITS; do
@@ -90,7 +96,7 @@ ${BASE_DIR}/updateVersions.sh "${NEW_VERSION}-master-SNAPSHOT"
 
 echo "Committing new POM versions"
 
-${GIT_CMD} commit -a -m "Blazegraph release $CURRENT_VERSION reverse merge"
+${GIT_CMD} commit -a -m \"Blazegraph release $CURRENT_VERSION reverse merge\"
 
 echo "Pushing merge branch to origin."
 
