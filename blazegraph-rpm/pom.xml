@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-artifacts</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.0.0</version>
     <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-rpm</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.0.0</version>
   <name>Blazegraph RPM Package</name>
   <description>Blazegraph RPM deployer for the RHEL and CentOS package management systems</description>
   <packaging>rpm</packaging>
@@ -69,10 +69,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             <packager>SYSTAP, LLC DBA Blazegraph</packager>
             <prefix>${rpm.installDir}</prefix>
             <changelogFile>src/changelog</changelogFile>
-            <!-- Note that RPM signing is currently broken on OS-X:  https://github.com/mojohaus/rpm-maven-plugin/issues/11 -->
+            <!-- Note that RPM signing is currently broken on OS-X:  https://github.com/mojohaus/rpm-maven-plugin/issues/11 
             <key>${gpg.keyname}</key>
             <keypath>${gpg.keyring}</keypath>
             <keypassphrase>${gpg.passphrase}</keypassphrase>
+            -->
             <mappings>
               <mapping>
                 <directory>${rpm.installDir}/lib</directory>
