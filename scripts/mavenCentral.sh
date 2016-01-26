@@ -20,8 +20,15 @@
 BASE_DIR=`dirname $0`
 
 #Deploy the core artifacts
-mvn -f "${BASE_DIR}"/../pom.xml clean deploy -DskipTests=true -Pmaven-central
+mvn -f "${BASE_DIR}"/../pom.xml install deploy -DskipTests=true -Pmaven-central
 
 #Deploy the deployment artifacts
-mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml clean deploy -DskipTests=true -Pmaven-central
+#Temporarily disabled for blazegraph-rpm see BLZG-1725
+#mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml clean deploy -DskipTests=true -Pmaven-central
+projects="blazegraph-jar bigdata-jar blazegraph-war bigdata-war blazegraph-deb"
+for project in $projects; do
+	mvn -f "${BASE_DIR}"/../$project/pom.xml install deploy -DskipTests=true -Pmaven-central
+done
+
+
 
