@@ -17,7 +17,7 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
@@ -100,7 +100,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph DSI Utils</h1>]]></doctitle>
           <bottom><![CDATA[ <i> 
-                           Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2012.  All rights reserved.<p>
+                           Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.<p>
 
                            Licensed under the GNU LESSER GENERAL PUBLIC LICENSE Version 2.1 (the "License");
                            you may not use this file except in compliance with the License.

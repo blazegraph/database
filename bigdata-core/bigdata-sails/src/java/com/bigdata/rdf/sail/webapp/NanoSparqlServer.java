@@ -942,8 +942,6 @@ public class NanoSparqlServer {
                      */
                     tmp = ClassLoader.getSystemClassLoader().getResource(
                             src = "war/src/main/webapp/WEB-INF/web.xml");
-                    
-                    
                 }
                 
                 if (tmp != null) {

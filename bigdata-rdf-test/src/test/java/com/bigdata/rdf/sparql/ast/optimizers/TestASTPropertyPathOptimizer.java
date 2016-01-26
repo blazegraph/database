@@ -27,27 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.SUBGROUP_OF_ALP;
 import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.ZERO_OR_MORE;
-
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.RDF;
-
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
-import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.FilterNode;
-import com.bigdata.rdf.sparql.ast.FunctionNode;
-import com.bigdata.rdf.sparql.ast.FunctionRegistry;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.QueryType;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.UnionNode;
-import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
-import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Test suite for {@link ASTUnionFiltersOptimizer}.
@@ -96,7 +77,8 @@ public class TestASTPropertyPathOptimizer extends AbstractOptimizerTestCase {
     					joinGroupNode( 
     						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
     										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar())
+    												statementPatternNode(leftVar(), constantNode(c),  rightVar()),
+    												SUBGROUP_OF_ALP
     												) ) )
     				) );
 		}}.test();
@@ -121,7 +103,8 @@ public class TestASTPropertyPathOptimizer extends AbstractOptimizerTestCase {
     					  joinGroupNode( 
     						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
     										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar())
+    												statementPatternNode(leftVar(), constantNode(c),  rightVar()),
+    												SUBGROUP_OF_ALP
     												) ) ) ) )
     				) );
 		}}.test();
@@ -150,7 +133,8 @@ public class TestASTPropertyPathOptimizer extends AbstractOptimizerTestCase {
     					  joinGroupNode( 
     						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
     										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar())
+    												statementPatternNode(leftVar(), constantNode(c),  rightVar()),
+    												SUBGROUP_OF_ALP
     												) ) ) ) ) )
     				) );
 		}}.test();

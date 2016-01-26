@@ -4,6 +4,7 @@ BASE_DIR=`dirname $0`
 echo "Building dependencies..."
 "$BASE_DIR"/mavenInstall.sh
 echo "Building artifacts..."
+
 #Install the parent pom
 mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml clean
 mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml install -N -DskipTests=true

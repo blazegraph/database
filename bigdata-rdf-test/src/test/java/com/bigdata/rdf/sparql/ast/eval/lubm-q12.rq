@@ -1,0 +1,9 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y
+WHERE{
+	?x a ub:Chair .
+	?y a ub:Department .
+	?x ub:worksFor ?y .
+	?y ub:subOrganizationOf <http://www.University0.edu> .
+}

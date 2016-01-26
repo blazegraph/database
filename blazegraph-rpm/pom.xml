@@ -45,6 +45,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <rpm.user>blzg</rpm.user>
     <rpm.group>blzg</rpm.group>
     <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
+    <rpm.release>SNAPSHOT</rpm.release>
     <app.name>blazegraph</app.name>
   </properties>
   <build>
