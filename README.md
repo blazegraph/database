@@ -44,7 +44,9 @@ If you'd just link the Blazegraph Database dependencies without any of the exter
     </dependency>
 ```
 
-There are also Maven artifacts for WAR deployers (`blazegraph-war`), executable Jar files (`blazegraph-jar`), Debian Package (`blazegraph-deb`), RPM (blazegraph-rpm`), and a Tarball (`blazegraph-tgz`).
+###Deployers
+
+There are also Maven artifacts for WAR deployers (`blazegraph-war`), executable Jar files (`blazegraph-jar`), [Debian Package](blazegraph-deb/) (`blazegraph-deb`), [RPM](blazegraph-rpm/) (`blazegraph-rpm`), and a [Tarball](blazegraph-tzg/) (`blazegraph-tgz`).
 
 ###Tinkerpop3
 Tinkerpop3 supports requires Java 1.8 and is now in a separate repository.  See [Tinkerpop3](https://github.com/blazegraph/tinkerpop3).  It is also available as Maven Central artifact.
