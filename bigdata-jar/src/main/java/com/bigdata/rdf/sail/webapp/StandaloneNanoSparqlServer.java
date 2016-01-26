@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -53,7 +53,6 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
-        String servletContextListenerClass = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
      
         /*
          * Note: This default will locate the jetty.xml resource that is bundled
@@ -74,7 +73,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         
         String portStr = System.getProperty(
         		SystemProperties.JETTY_PORT ,
-        		"9999"
+        		Integer.toString(Config.BLAZEGRAPH_HTTP_PORT)
         		);
         
         port = Integer.parseInt(portStr);
@@ -106,8 +105,6 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
                                 "Read lock must be commit time or -1 (MINUS ONE) to assert a read lock on the last commit time: "
                                         + readLock);
                     }
-                } else if (arg.equals("-servletContextListenerClass")) {
-                    servletContextListenerClass = args[++i];
                 } else if (arg.equals("-jettyXml")) {
                     jettyXml = args[++i];
                 } else {
@@ -141,9 +138,6 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
                     Long.toString(readLock));
         }
         
-        initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-                servletContextListenerClass);
-        
         //Set the resource base to inside of the jar file
 		System.setProperty("jetty.home",
 				jettyXml.getClass().getResource("/war").toExternalForm());
@@ -155,9 +149,9 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
 
         awaitServerStart(server);
 
-        System.out.println("\n\nWelcome to Blazegraph(tm) by SYSTAP.\n");
+        System.out.println("\n\nWelcome to the Blazegraph(tm) Database.\n");
         //BLZG-1377 Included for legacy support.
-        System.out.println("Go to http://localhost:9999/bigdata/ to get started.");
+        System.out.println("Go to http://" + Config.DEFAULT_HOST + ":" + Config.BLAZEGRAPH_HTTP_PORT + "/bigdata/ to get started.");
         
         // Wait for the service to terminate.
         server.join();

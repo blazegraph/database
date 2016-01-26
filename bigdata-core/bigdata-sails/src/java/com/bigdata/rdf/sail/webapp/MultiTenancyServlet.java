@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -25,9 +25,7 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +54,6 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.RelationSchema;
@@ -163,7 +160,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             return;
             
-        }
+        } 
 
         /*
          * Pass through to the SPARQL end point REST API.
@@ -174,7 +171,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
     }
 
-    /**
+   
+
+	/**
      * Delete the KB associated with the effective namespace.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
@@ -491,10 +490,6 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             // Service must be writable.
             return;
         }
-
-        final BigdataRDFContext context = getBigdataRDFContext();
-
-        final IIndexManager indexManager = context.getIndexManager();
 
         /*
          * 1. Read the request entity, which must be some kind of Properties

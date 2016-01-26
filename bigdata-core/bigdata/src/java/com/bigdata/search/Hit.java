@@ -1,12 +1,8 @@
 package com.bigdata.search;
 
-import it.unimi.dsi.bits.LongArrayBitVector;
-
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
-
-import test.it.unimi.dsi.bits.LongArrayBitVectorTest;
 
 /**
  * Metadata about a search result.

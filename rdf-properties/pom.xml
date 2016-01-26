@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <!--
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,17 +28,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>2.0.0-RC1</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <version>2.0.0</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>rdf-properties</artifactId>
-  <version>2.0.0-RC1</version>
+  <version>2.0.0</version>
   <name>Blazegraph RDF Properties</name>
-  <url>http://maven.apache.org</url>
-  <build>
-  </build>
-
+  <description>RDF Property configurations</description>
   <reporting>
     <plugins>
       <plugin>
@@ -49,9 +46,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph RDF Properties</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC DBA Blazegraph. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -68,38 +65,41 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
   </reporting>
-  
   <dependencies>
-     <dependency>
-       <groupId>commons-io</groupId>
-       <artifactId>commons-io</artifactId>
-       <version>${apache.commons_io.version}</version>
-     </dependency>
-     <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-util</artifactId>
-	<version>${sesame.version}</version>
-     </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>${apache.commons_io.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-util</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-rio-rdfxml</artifactId>
       <version>${sesame.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-queryresultio-sparqljson</artifactId>
       <version>${sesame.version}</version>
     </dependency>
+    <!-- Included for RDFa support -->
     <dependency>
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
+       <groupId>org.semarglproject</groupId>
+       <artifactId>semargl-sesame</artifactId>
+       <version>${semargl.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
   </dependencies>
-
-  </project>
+</project>

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -308,7 +308,6 @@ public class NanoSparqlServer {
         int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
-        String servletContextListenerClass = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
         
         /*
          * Note: This default will locate the jetty.xml resource that is bundled
@@ -322,10 +321,22 @@ public class NanoSparqlServer {
 //                SystemProperties.DEFAULT_JETTY_XML
                 );
         
-      //Set the resource base to inside of the jar file if jetty.home is not set
-        if(System.getProperty(SystemProperties.JETTY_HOME) == null)
-        	System.setProperty(SystemProperties.JETTY_HOME,
-      				jettyXml.getClass().getResource("/war").toExternalForm());
+		// Set the resource base to inside of the jar file if jetty.home is not set
+		// This is for running as the executable jar
+		if (System.getProperty(SystemProperties.JETTY_HOME) == null) {
+
+			final URL jettyJarXml = jettyXml.getClass().getResource("/war");
+
+			System.setProperty(SystemProperties.JETTY_HOME,
+					jettyJarXml.toExternalForm());
+
+			// Also set the Jetty Resource Base to this value, if it is not
+			// configured.
+			if (System.getProperty(SystemProperties.JETTY_RESOURCE_BASE) == null) {
+				System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
+						jettyJarXml.toExternalForm());
+			}
+		}
 
         /*
          * Handle all arguments starting with "-". These should appear before
@@ -354,8 +365,6 @@ public class NanoSparqlServer {
                                 "Read lock must be commit time or -1 (MINUS ONE) to assert a read lock on the last commit time: "
                                         + readLock);
                     }
-                } else if (arg.equals("-servletContextListenerClass")) {
-                    servletContextListenerClass = args[++i];
                 } else if (arg.equals("-jettyXml")) {
                     jettyXml = args[++i];
                 } else {
@@ -463,9 +472,6 @@ public class NanoSparqlServer {
                     Long.toString(readLock));
         }
         
-        initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-                servletContextListenerClass);
-
         // Create the service.
         final Server server = NanoSparqlServer.newInstance(port, jettyXml,
                 null/* indexManager */, initParams);
@@ -855,6 +861,16 @@ public class NanoSparqlServer {
         // Check the environment variable.
         String resourceBaseStr = System
                 .getProperty(SystemProperties.JETTY_RESOURCE_BASE);
+        
+        //Try JETTY_HOME if the Resource Base is null
+        if(resourceBaseStr == null ) {
+        	   resourceBaseStr = System
+                       .getProperty(SystemProperties.JETTY_HOME);
+        }
+
+        // Check the environment variable for the override web.
+        final String jettyOverrideWeb = System
+                .getProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML);
 
         // true iff declared as an environment variable.
         final boolean isDeclared = resourceBaseStr != null
@@ -926,6 +942,8 @@ public class NanoSparqlServer {
                      */
                     tmp = ClassLoader.getSystemClassLoader().getResource(
                             src = "war/src/main/webapp/WEB-INF/web.xml");
+                    
+                    
                 }
                 
                 if (tmp != null) {
@@ -940,6 +958,7 @@ public class NanoSparqlServer {
                 isClassPath = resourceBaseURL != null;
 
             }
+
 
             if (resourceBaseURL != null) {
 
@@ -958,20 +977,25 @@ public class NanoSparqlServer {
                  * to jetty itself since it will interpret the jetty.xml file
                  * itself.
                  */
-                final String tmp = resourceBaseURL.toExternalForm();
+                resourceBaseStr = resourceBaseURL.toExternalForm();
 
                 System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
-                        tmp);
-
-                final URL overrideWebXmlURL = new URL(tmp
-                        + (tmp.endsWith("/") ? "" : "/")
-                        + "WEB-INF/override-web.xml");
-
-                System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
-                        overrideWebXmlURL.toExternalForm());
+                        resourceBaseStr);
                 
             }
 
+        }
+
+        //Don't override the value if it is explicitly declared.
+        //If we have a resource base, but not a declared jetty override
+        //use the WEB-INF/override-web.xml as the default.
+		if (resourceBaseStr != null && jettyOverrideWeb == null) {
+					final URL overrideWebXmlURL = new URL(resourceBaseStr
+							+ (resourceBaseStr.endsWith("/") ? "" : "/")
+							+ "WEB-INF/override-web.xml");
+
+					System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
+							overrideWebXmlURL.toExternalForm());
         }
 
         if (log.isInfoEnabled())

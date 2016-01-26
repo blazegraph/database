@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1895,6 +1895,40 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
           "ticket_bg1683b.rq",// queryFileURL
           "ticket_bg1683.trig",// dataFileURL
           "ticket_bg1683.srx"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+
+    * BLZG-852: MINUS and UNION.
+
+    */
+
+   public void test_ticket_852a() throws Exception {
+
+      new TestHelper(
+          "ticket_bg852a",// testURI,
+          "ticket_bg852a.rq",// queryFileURL
+          "empty.trig",// dataFileURL
+          "ticket_bg852a.srx"// resultFileURL
+         ).runTest();   
+   }
+
+
+
+   /**
+
+    * BLZG-852: MINUS and UNION.
+
+    */
+
+   public void test_ticket_852b() throws Exception {
+
+      new TestHelper(
+          "ticket_bg852b",// testURI,
+          "ticket_bg852b.rq",// queryFileURL
+          "empty.trig",// dataFileURL
+          "ticket_bg852b.srx"// resultFileURL
          ).runTest();   
    }
 

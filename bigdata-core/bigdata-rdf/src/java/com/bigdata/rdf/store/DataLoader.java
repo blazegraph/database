@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.net.URL;
@@ -104,6 +105,11 @@ public class DataLoader {
 	 * {@link StatementBuffer}.
 	 */
     private final int queueCapacity;
+    
+    /**
+     * Utility to allow other {@link PrintStream} to be used for status.
+     */
+    private PrintStream output;
     
     /**
      * The target database.
@@ -572,9 +578,14 @@ public class DataLoader {
      */
     public DataLoader(final AbstractTripleStore database) {
         
-        this(database.getProperties(), database );
+        this(database.getProperties(), database , System.out);
         
     }
+    
+	public DataLoader(final Properties properties,
+			final AbstractTripleStore database) {
+		this(properties, database, System.out);
+	}
 
     /**
      * Configure a data loader with overridden properties.
@@ -584,9 +595,15 @@ public class DataLoader {
      * 
      * @param database
      *            The database.
+     *            
+     * @param os
+     * 			  The {@link PrintStream} for output messages              
+     *            
      */
     public DataLoader(final Properties properties,
-            final AbstractTripleStore database) {
+            final AbstractTripleStore database, final PrintStream os) {
+    	
+    	output = os;
 
         if (properties == null)
             throw new IllegalArgumentException();
@@ -727,7 +744,7 @@ public class DataLoader {
 
     }
 
-    private class MyLoadStats extends LoadStats {
+    public class MyLoadStats extends LoadStats {
     	
     	/**
     	 * The set of resources that failed during a load.
@@ -793,7 +810,7 @@ public class DataLoader {
 		 * 
 		 * @see BLZG-1534 (durable queues)
 		 */
-		private void commit() {
+		public void commit() {
 
 			if (durableQueues) {
 
@@ -816,7 +833,7 @@ public class DataLoader {
     /**
      * Factory for {@link DataLoader} specific {@link LoadStats} extension.
      */
-    private MyLoadStats newLoadStats() {
+    public MyLoadStats newLoadStats() {
 		
     	return new MyLoadStats();
     	
@@ -1233,7 +1250,7 @@ public class DataLoader {
 	 * @param endOfBatch
 	 * @throws IOException
 	 */
-    private void loadFiles(final MyLoadStats totals, final int depth,
+    public void loadFiles(final MyLoadStats totals, final int depth,
             final File file, final String baseURI, final RDFFormat rdfFormat,
             final String defaultGraph, final FilenameFilter filter,
             final boolean endOfBatch)
@@ -1522,18 +1539,20 @@ public class DataLoader {
 							+ (e.getStatementsProcessed()//
 							+ totals.toldTriples.get())//
 							);//
+
 					if (log.isInfoEnabled())
 						log.info(msg);
-					else if (verbose > 1)
-						System.out.println(msg);
+
+					if (verbose > 1)
+						output.println(msg);
 				}
 
 				if (verbose > 2) {
 					// Show more details, especially about the assertion buffers.
 					final StatementBuffer<?> tmp = buffer;
 					if (tmp != null) {
-						System.out.println(tmp.toString());
-						System.out.println(tmp.getCounters().toString());
+						output.println(tmp.toString());
+						output.println(tmp.getCounters().toString());
 					}
 				}
                 
@@ -1703,7 +1722,7 @@ public class DataLoader {
 	 * 
 	 * @see Options#VERBOSE
 	 */
-    private void logCounters(final AbstractTripleStore database) {
+    public void logCounters(final AbstractTripleStore database) {
 
 		final IIndexManager store = database.getIndexManager();
 		
@@ -1716,7 +1735,7 @@ public class DataLoader {
 			}
 		}
 
-		System.out.println(counters.toString());
+		output.println(counters.toString());
 
 		/*
 		 * This provides total page bytes written per index and average page
@@ -1956,8 +1975,139 @@ public class DataLoader {
             usage();
 
         }
+        
+        final String propertyFileName = args[i++];
+        
+        final List<File> files = new LinkedList<File>();
+		
+		final Properties properties = processProperties(propertyFileName, quiet, verbose, durableQueues);
+        
+		while (i < args.length) {
 
-        final File propertyFile = new File(args[i++]);
+            final File fileOrDir = new File(args[i++]);
+            
+            if(!fileOrDir.exists()) {
+                
+                throw new FileNotFoundException(fileOrDir.toString());
+                
+            }
+            
+            files.add(fileOrDir);
+            
+            if(!quiet)
+                System.out.println("Will load from: " + fileOrDir);
+
+        }
+            
+        Journal jnl = null;
+        try {
+
+        	final long begin = System.currentTimeMillis();
+        	
+            jnl = new Journal(properties);
+            
+//            // #of bytes on the journal before (user extent).
+////            final long firstOffset = jnl.getRootBlockView().getNextOffset();
+//            final long userData0 = jnl.getBufferStrategy().size();
+
+			if (!quiet)
+                System.out.println("Journal file: "+jnl.getFile());
+
+            AbstractTripleStore kb = (AbstractTripleStore) jnl
+                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (kb == null) {
+
+                kb = new LocalTripleStore(jnl, namespace, Long
+                        .valueOf(ITx.UNISOLATED), properties);
+
+                kb.create();
+                
+            }
+
+            final DataLoader dataLoader = //kb.getDataLoader();
+            	new DataLoader(properties,kb, System.out); // use the override properties.
+            
+            final MyLoadStats totals = dataLoader.newLoadStats();
+            
+            for (File fileOrDir : files) {
+
+//                dataLoader.loadFiles(fileOrDir, null/* baseURI */,
+//                        rdfFormat, filter);
+
+                dataLoader.loadFiles(totals, 0/* depth */, fileOrDir, baseURI,
+                        rdfFormat, defaultGraph, filter, true/* endOfBatch */
+                );
+
+            }
+            
+            dataLoader.endSource();
+
+			if(!quiet)
+			    System.out.println("Load: " + totals);
+			
+        	if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
+
+				if (verbose > 0)
+					dataLoader.logCounters(dataLoader.database);
+
+				if (!quiet)
+					System.out.println("Computing closure.");
+				log.info("Computing closure.");
+
+				final ClosureStats stats = dataLoader.doClosure();
+
+				if (!quiet)
+					System.out.println("Closure: " + stats.toString());
+
+				if (log.isInfoEnabled())
+					log.info("Closure: " + stats.toString());
+
+			}
+
+            jnl.commit(); // database commit.
+
+            totals.commit(); // Note: durable queues pattern.
+			
+			if (verbose > 1)
+				dataLoader.logCounters(dataLoader.database);
+
+			/*
+			 * Note: This value is not correct for the RWStore. It is the
+			 * difference in the extents, not the bytes actually written.
+			 */
+			//            // #of bytes on the journal (user data only).
+//            final long userData1 = jnl.getBufferStrategy().size();
+//            
+//            // #of bytes written (user data only)
+//            final long bytesWritten = (userData1 - userData0);
+//
+//            if (!quiet)
+//                System.out.println("Wrote: " + bytesWritten + " bytes.");
+
+            final long elapsedTotal = System.currentTimeMillis() - begin;
+
+            if (!quiet)
+                System.out.println("Total elapsed=" + elapsedTotal + "ms");
+            if (log.isInfoEnabled())
+                log.info("Total elapsed=" + elapsedTotal + "ms");
+
+        } finally {
+
+            if (jnl != null) {
+
+                jnl.close();
+
+            }
+            
+        }
+
+    }
+
+   public static Properties processProperties(final String propertyFileName, final boolean quiet, 
+		   final int verbose, final boolean durableQueues ) throws IOException {
+
+        final File propertyFile = new File(propertyFileName);
 
         if (!propertyFile.exists()) {
 
@@ -2044,129 +2194,8 @@ public class DataLoader {
             }
         }
         
-		final List<File> files = new LinkedList<File>();
-		
-		while (i < args.length) {
-
-            final File fileOrDir = new File(args[i++]);
-            
-            if(!fileOrDir.exists()) {
-                
-                throw new FileNotFoundException(fileOrDir.toString());
-                
-            }
-            
-            files.add(fileOrDir);
-            
-            if(!quiet)
-                System.out.println("Will load from: " + fileOrDir);
-
-        }
-            
-        Journal jnl = null;
-        try {
-
-        	final long begin = System.currentTimeMillis();
-        	
-            jnl = new Journal(properties);
-            
-//            // #of bytes on the journal before (user extent).
-////            final long firstOffset = jnl.getRootBlockView().getNextOffset();
-//            final long userData0 = jnl.getBufferStrategy().size();
-
-			if (!quiet)
-                System.out.println("Journal file: "+jnl.getFile());
-
-            AbstractTripleStore kb = (AbstractTripleStore) jnl
-                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-            if (kb == null) {
-
-                kb = new LocalTripleStore(jnl, namespace, Long
-                        .valueOf(ITx.UNISOLATED), properties);
-
-                kb.create();
-                
-            }
-
-            final DataLoader dataLoader = //kb.getDataLoader();
-            	new DataLoader(properties,kb); // use the override properties.
-            
-            final MyLoadStats totals = dataLoader.newLoadStats();
-            
-            for (File fileOrDir : files) {
-
-//                dataLoader.loadFiles(fileOrDir, null/* baseURI */,
-//                        rdfFormat, filter);
-
-                dataLoader.loadFiles(totals, 0/* depth */, fileOrDir, baseURI,
-                        rdfFormat, defaultGraph, filter, true/* endOfBatch */
-                );
-
-            }
-            
-            dataLoader.endSource();
-
-			if(!quiet)
-			    System.out.println("Load: " + totals);
-			
-        	if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
-
-				if (verbose > 0)
-					dataLoader.logCounters(dataLoader.database);
-
-				if (!quiet)
-					System.out.println("Computing closure.");
-				log.info("Computing closure.");
-
-				final ClosureStats stats = dataLoader.doClosure();
-
-				if (!quiet)
-					System.out.println("Closure: " + stats.toString());
-
-				if (log.isInfoEnabled())
-					log.info("Closure: " + stats.toString());
-
-			}
-
-            jnl.commit(); // database commit.
-
-            totals.commit(); // Note: durable queues pattern.
-			
-			if (verbose > 1)
-				dataLoader.logCounters(dataLoader.database);
-
-			/*
-			 * Note: This value is not correct for the RWStore. It is the
-			 * difference in the extents, not the bytes actually written.
-			 */
-			//            // #of bytes on the journal (user data only).
-//            final long userData1 = jnl.getBufferStrategy().size();
-//            
-//            // #of bytes written (user data only)
-//            final long bytesWritten = (userData1 - userData0);
-//
-//            if (!quiet)
-//                System.out.println("Wrote: " + bytesWritten + " bytes.");
-
-            final long elapsedTotal = System.currentTimeMillis() - begin;
-
-            if (!quiet)
-                System.out.println("Total elapsed=" + elapsedTotal + "ms");
-            if (log.isInfoEnabled())
-                log.info("Total elapsed=" + elapsedTotal + "ms");
-
-        } finally {
-
-            if (jnl != null) {
-
-                jnl.close();
-
-            }
-            
-        }
-
-    }
+        return properties;
+   } 
 
     private static void usage() {
         
@@ -2175,6 +2204,11 @@ public class DataLoader {
         System.exit(1);
         
     }
+    
+    public static FilenameFilter getFilenameFilter() {
+    	return filter;
+    }
+    
 
     /**
      * Note: The filter is chosen to select RDF data files and to allow the data

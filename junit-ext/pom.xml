@@ -1,11 +1,12 @@
+<?xml version="1.0"?>
 <!--
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,20 +25,24 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>2.0.0-RC1</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <version>2.0.0</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
-<!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>junit-ext</artifactId>
-  <version>2.0.0-RC1</version>
+  <version>2.0.0</version>
   <name>Blazegraph Junit Extensions</name>
+  <description>Blazegraph JUnit Extensions</description>
   <packaging>jar</packaging>
-
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
   <reporting>
     <plugins>
       <plugin>
@@ -48,10 +53,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Junit Extensions</h1>]]></doctitle>
-          <bottom> <![CDATA[ <i> 
-                           Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.<p>
+          <bottom><![CDATA[ <i> 
+                           Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2012.  All rights reserved.<p>
 
                            Licensed under the Apache License, Version 2.0 (the "License");
                            you may not use this file except in compliance with the License.
@@ -68,19 +73,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                                                         <hr>
                         This product includes software developed by The Apache Software Foundation (http://www.apache.org/).
                         License: http://www.apache.org/licenses/LICENSE-2.0 </i>]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
-
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -88,10 +84,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       <version>${junit3.version}</version>
     </dependency>
     <dependency>
-       <!-- log4j is the primary logger for bigdata. -->
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
+      <!-- log4j is the primary logger for bigdata. -->
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
   </dependencies>
 </project>

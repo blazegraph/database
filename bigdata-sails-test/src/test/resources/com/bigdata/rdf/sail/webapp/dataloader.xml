@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd"> 
+<properties>
+      <entry key="defaultGraph">http://systap.com/</entry> 
+      <!-- -->
+      <!-- Suppress all stdout messages (Optional) --> 
+      <!-- --> 
+      <entry key="quiet">false</entry> 
+      <!-- --> 
+      <!-- Show additional messages detailing the load performance. (Optional) --> 
+      <!-- --> 
+      <entry key="verbose">10</entry> 
+      <!-- --> 
+      <!-- Compute the RDF(S)+ closure. (Optional) --> 
+      <!-- --> 
+      <entry key="closure">false</entry> 
+      <!-- --> 
+      <!-- Files will be renamed to either <code>.good</code> or <code>.fail</code>
+      as they are processed. The files will remain in the same directory. -->
+      <!-- --> 
+      <entry key="durableQueues">false</entry> 
+      <!-- --> 
+      <!-- The
+      namespace of the KB instance. Defaults to kb. --> 
+      <!-- --> 
+      <entry key="namespace">kb</entry> 
+      <!-- --> 
+      <!-- The configuration file for the database instance. It must be readable by the web application. --> 
+      <!-- --> 
+      <entry key="propertyFile">/Users/beebs/Documents/systap/github/bigdata/dataloader.props</entry> 
+      <!-- --> 
+      <!-- Zero or more files or directories containing the data to be loaded. This should be a comma
+      delimited list. The files must be readable by the web application. -->
+      <!-- --> 
+      <!-- <entry key="fileOrDirs">file1,dir1,file2,dir2</entry> -->
+      <entry key="fileOrDirs">/Users/beebs/Documents/systap/github/bigdata/bigdata-rdf-test/src/test/resources/data/lehigh/U1,/Users/beebs/Documents/systap/github/bigdata/bigdata-rdf-test/src/test/resources/data/lehigh/U1</entry>
+</properties>

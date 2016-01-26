@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -64,8 +64,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     final TermNode context;
     final PointLatLon spatialCircleCenter;
     final Double spatialCircleRadius;
-    final PointLatLon spatialRectangleUpperLeft;
-    final PointLatLon spatialRectangleLowerRight;
+    final PointLatLon spatialRectangleSouthWest;
+    final PointLatLon spatialRectangleNorthEast;
     final UNITS spatialUnit;
     final Long timeStart;
     final Long timeEnd;
@@ -75,8 +75,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     final IBindingSet incomingBindings;
 
     // derived properties
-    final PointLatLonTime boundingBoxUpperLeftWithTime;
-    final PointLatLonTime boundingBoxLowerRightWithTime;
+    final PointLatLonTime boundingBoxSouthWestWithTime;
+    final PointLatLonTime boundingBoxNorthEastWithTime;
     
     /**
      * Constructor
@@ -85,8 +85,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final IConstant<?> subject, final TermNode predicate,
             final TermNode context, final PointLatLon spatialCircleCenter,
             final Double spatialCircleRadius,
-            final PointLatLon spatialRectangleUpperLeft,
-            final PointLatLon spatialRectangleLowerRight, 
+            final PointLatLon spatialRectangleSouthWest,
+            final PointLatLon spatialRectangleNorthEast, 
             final UNITS spatialUnit,
             final Long timeStart, final Long timeEnd,
             final IVariable<?> locationVar, final IVariable<?> timeVar,
@@ -99,8 +99,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.context = context;
         this.spatialCircleCenter = spatialCircleCenter;
         this.spatialCircleRadius = spatialCircleRadius;
-        this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
-        this.spatialRectangleLowerRight = spatialRectangleLowerRight;
+        this.spatialRectangleSouthWest = spatialRectangleSouthWest;
+        this.spatialRectangleNorthEast = spatialRectangleNorthEast;
         this.spatialUnit = spatialUnit;
         this.timeStart = timeStart;
         this.timeEnd = timeEnd;
@@ -110,7 +110,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.incomingBindings = incomingBindings;
 
         /** 
-         * Initialize boundingBoxUpperLeftWithTime and boundingBoxLowerRightWithTime
+         * Initialize boundingBoxSouthWestWithTime and boundingBoxNorthEastWithTime
          * with the bounding box for circle queries.
          */
         switch (searchFunction) {
@@ -120,27 +120,27 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                 
                 final CoordinateDD centerPointDD = spatialCircleCenter.asCoordinateDD();
     
-                final CoordinateDD upperLeft = 
-                        CoordinateUtility.boundingBoxUpperLeft(
+                final CoordinateDD southWest = 
+                        CoordinateUtility.boundingBoxSouthWest(
                            centerPointDD, spatialCircleRadius, spatialUnit);
                 
-                final CoordinateDD lowerRight = 
-                        CoordinateUtility.boundingBoxLowerRight(
+                final CoordinateDD northEast = 
+                        CoordinateUtility.boundingBoxNorthEast(
                            centerPointDD, spatialCircleRadius, spatialUnit);
                 
-                boundingBoxUpperLeftWithTime = new PointLatLonTime(upperLeft, timeStart);
-                boundingBoxLowerRightWithTime = new PointLatLonTime(lowerRight, timeEnd);
+                boundingBoxSouthWestWithTime = new PointLatLonTime(southWest, timeStart);
+                boundingBoxNorthEastWithTime = new PointLatLonTime(northEast, timeEnd);
     
                 break;
             }
 
             case IN_RECTANGLE:
             {
-                boundingBoxUpperLeftWithTime = 
-                    new PointLatLonTime(spatialRectangleUpperLeft, timeStart);
+                boundingBoxSouthWestWithTime = 
+                    new PointLatLonTime(spatialRectangleSouthWest, timeStart);
                 
-                boundingBoxLowerRightWithTime = 
-                    new PointLatLonTime(spatialRectangleLowerRight, timeEnd);
+                boundingBoxNorthEastWithTime = 
+                    new PointLatLonTime(spatialRectangleNorthEast, timeEnd);
                 
                 break;
             }
@@ -154,23 +154,23 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     /**
      * Private constructor, used for implementing the cloning logics.
      * It is not safe to expose this constructor to the outside: it does
-     * not calculate the boundingBoxUpperLeftWithTime and 
-     * boundingBoxLowerRightWithTime, but expects appropriate values here
+     * not calculate the boundingBoxNorthWestWithTime and 
+     * boundingBoxSouthEastWithTime, but expects appropriate values here
      * as input.
      */
     private GeoSpatialQuery(final GeoFunction searchFunction,
             final IConstant<?> subject, final TermNode predicate,
             final TermNode context, final PointLatLon spatialCircleCenter,
             final Double spatialCircleRadius,
-            final PointLatLon spatialRectangleUpperLeft,
-            final PointLatLon spatialRectangleLowerRight, 
+            final PointLatLon spatialRectangleSouthWest,
+            final PointLatLon spatialRectangleNorthEast, 
             final UNITS spatialUnit,
             final Long timeStart, final Long timeEnd,
             final IVariable<?> locationVar, final IVariable<?> timeVar,
             final IVariable<?> locationAndTimeVar,
             final IBindingSet incomingBindings,
-            final PointLatLonTime boundingBoxUpperLeftWithTime,
-            final PointLatLonTime boundingBoxLowerRightWithTime) {
+            final PointLatLonTime boundingBoxSouthWestWithTime,
+            final PointLatLonTime boundingBoxNorthEastWithTime) {
 
         this.searchFunction = searchFunction;
         this.subject = subject;
@@ -178,8 +178,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.context = context;
         this.spatialCircleCenter = spatialCircleCenter;
         this.spatialCircleRadius = spatialCircleRadius;
-        this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
-        this.spatialRectangleLowerRight = spatialRectangleLowerRight;
+        this.spatialRectangleSouthWest = spatialRectangleSouthWest;
+        this.spatialRectangleNorthEast = spatialRectangleNorthEast;
         this.spatialUnit = spatialUnit;
         this.timeStart = timeStart;
         this.timeEnd = timeEnd;
@@ -188,8 +188,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.locationAndTimeVar = locationAndTimeVar;
         this.incomingBindings = incomingBindings;
         
-        this.boundingBoxUpperLeftWithTime = boundingBoxUpperLeftWithTime;
-        this.boundingBoxLowerRightWithTime = boundingBoxLowerRightWithTime;
+        this.boundingBoxSouthWestWithTime = boundingBoxSouthWestWithTime;
+        this.boundingBoxNorthEastWithTime = boundingBoxNorthEastWithTime;
     }
 
     @Override
@@ -223,13 +223,13 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     }
 
     @Override
-    public PointLatLon getSpatialRectangleUpperLeft() {
-        return spatialRectangleUpperLeft;
+    public PointLatLon getSpatialRectangleSouthWest() {
+        return spatialRectangleSouthWest;
     }
 
     @Override
-    public PointLatLon getSpatialRectangleLowerRight() {
-        return spatialRectangleLowerRight;
+    public PointLatLon getSpatialRectangleNorthEast() {
+        return spatialRectangleNorthEast;
     }
 
     @Override
@@ -268,32 +268,32 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     }
 
     @Override
-    public PointLatLonTime getBoundingBoxUpperLeftWithTime() {
-        return boundingBoxUpperLeftWithTime;
+    public PointLatLonTime getBoundingBoxSouthWestWithTime() {
+        return boundingBoxSouthWestWithTime;
     }
     
     @Override
-    public PointLatLonTime getBoundingBoxLowerRightWithTime() {
-        return boundingBoxLowerRightWithTime;      
+    public PointLatLonTime getBoundingBoxNorthEastWithTime() {
+        return boundingBoxNorthEastWithTime;      
     }
     
     @Override
     public List<IGeoSpatialQuery> normalize() {
         
-        if (boundingBoxUpperLeftWithTime.getLat()>boundingBoxLowerRightWithTime.getLat()) {
+        if (boundingBoxSouthWestWithTime.getLat()>boundingBoxNorthEastWithTime.getLat()) {
             if (log.isInfoEnabled()) {
-               log.info("Search rectangle upper left latitude (" + boundingBoxUpperLeftWithTime.getLat() + 
-                  ") is larger than rectangle lower righ latitude (" + boundingBoxLowerRightWithTime.getLat() + 
+               log.info("Search rectangle upper left latitude (" + boundingBoxSouthWestWithTime.getLat() + 
+                  ") is larger than rectangle lower righ latitude (" + boundingBoxNorthEastWithTime.getLat() + 
                   ". Search request will give no results.");
             }
             
             return new LinkedList<IGeoSpatialQuery>(); // empty list -> no results
          }
         
-         if (boundingBoxUpperLeftWithTime.getTimestamp()>boundingBoxLowerRightWithTime.getTimestamp()) {
+         if (boundingBoxSouthWestWithTime.getTimestamp()>boundingBoxNorthEastWithTime.getTimestamp()) {
             if (log.isInfoEnabled()) {
-               log.info("Search rectangle upper left timestamp (" + boundingBoxUpperLeftWithTime.getTimestamp() + 
-                  ") is larger than rectangle lower right timestamp (" + boundingBoxLowerRightWithTime.getTimestamp() + 
+               log.info("Search rectangle upper left timestamp (" + boundingBoxSouthWestWithTime.getTimestamp() + 
+                  ") is larger than rectangle lower right timestamp (" + boundingBoxNorthEastWithTime.getTimestamp() + 
                   ". Search request will give no results.");
             }
             
@@ -306,15 +306,15 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
           */
          
          
-         if (boundingBoxUpperLeftWithTime.getLon()>boundingBoxLowerRightWithTime.getLon()) {
+         if (boundingBoxSouthWestWithTime.getLon()>boundingBoxNorthEastWithTime.getLon()) {
 
             /**
              * This case is actually valid. For instance, we may have a search range from 160 to -160,
              * which we interpret as two search ranges, namely from ]-180;-160] and [160;180].
              */
             if (log.isInfoEnabled()) {
-               log.info("Search rectangle upper left latitude (" + boundingBoxUpperLeftWithTime.getLat() + 
-                  ") is larger than rectangle lower righ latitude (" + boundingBoxLowerRightWithTime.getLat() + 
+               log.info("Search rectangle upper left latitude (" + boundingBoxSouthWestWithTime.getLat() + 
+                  ") is larger than rectangle lower righ latitude (" + boundingBoxNorthEastWithTime.getLat() + 
                   ". Search will be split into two search windows.");
             }
 
@@ -323,26 +323,26 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final GeoSpatialQuery query1 = 
                 cloneWithAdjustedBoundingBox(
                     new PointLatLonTime(
-                        boundingBoxUpperLeftWithTime.getLat(), 
+                        boundingBoxSouthWestWithTime.getLat(), 
                         Math.nextAfter(-180.0,0) /** 179.999... */, 
-                        boundingBoxUpperLeftWithTime.getTimestamp()),
+                        boundingBoxSouthWestWithTime.getTimestamp()),
                     new PointLatLonTime(
-                        boundingBoxLowerRightWithTime.getLat(), 
-                        boundingBoxLowerRightWithTime.getLon(), 
-                        boundingBoxLowerRightWithTime.getTimestamp()));
+                        boundingBoxNorthEastWithTime.getLat(), 
+                        boundingBoxNorthEastWithTime.getLon(), 
+                        boundingBoxNorthEastWithTime.getTimestamp()));
             normalizedQueries.add(query1);
             
             
             final GeoSpatialQuery query2 =
                 cloneWithAdjustedBoundingBox(
                     new PointLatLonTime(
-                        boundingBoxUpperLeftWithTime.getLat(), 
-                        boundingBoxUpperLeftWithTime.getLon(), 
-                        boundingBoxUpperLeftWithTime.getTimestamp()),
+                        boundingBoxSouthWestWithTime.getLat(), 
+                        boundingBoxSouthWestWithTime.getLon(), 
+                        boundingBoxSouthWestWithTime.getTimestamp()),
                     new PointLatLonTime(
-                        boundingBoxLowerRightWithTime.getLat(), 
+                        boundingBoxNorthEastWithTime.getLat(), 
                         180.0, 
-                        boundingBoxLowerRightWithTime.getTimestamp()));            
+                        boundingBoxNorthEastWithTime.getTimestamp()));            
             normalizedQueries.add(query2);
 
             return normalizedQueries;
@@ -358,15 +358,15 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     @Override
     public boolean isNormalized() {
 
-        if (boundingBoxUpperLeftWithTime.getLat()>boundingBoxLowerRightWithTime.getLat()) {
+        if (boundingBoxSouthWestWithTime.getLat()>boundingBoxNorthEastWithTime.getLat()) {
            return false; // not normalized (actually unsatisfiable)
         }
         
-        if (boundingBoxUpperLeftWithTime.getTimestamp()>boundingBoxLowerRightWithTime.getTimestamp()) {
+        if (boundingBoxSouthWestWithTime.getTimestamp()>boundingBoxNorthEastWithTime.getTimestamp()) {
            return false; // not normalized (actually unsatisfiable)
         }
         
-        if (boundingBoxUpperLeftWithTime.getLon()>boundingBoxLowerRightWithTime.getLon()) {
+        if (boundingBoxSouthWestWithTime.getLon()>boundingBoxNorthEastWithTime.getLon()) {
            return false; // not normalized (but normalizable)
         }
         
@@ -378,19 +378,19 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
      * Clones the current query and, as only modification, adjusts the upper left
      * and lower right bounding boxes to the given parameters.
      * 
-     * @param boundingBoxUpperLeftWithTime
-     * @param boundingBoxLowerRightWithTime
+     * @param boundingBoxSouthWestWithTime
+     * @param boundingBoxNorthEastWithTime
      */
     public GeoSpatialQuery cloneWithAdjustedBoundingBox(
-        final PointLatLonTime boundingBoxUpperLeftWithTime,
-        final PointLatLonTime boundingBoxLowerRightWithTime) {
+        final PointLatLonTime boundingBoxSouthWestWithTime,
+        final PointLatLonTime boundingBoxNorthEastWithTime) {
         
         return new GeoSpatialQuery(
             searchFunction, subject, predicate, context, spatialCircleCenter,
-            spatialCircleRadius, spatialRectangleUpperLeft, spatialRectangleLowerRight, 
+            spatialCircleRadius, spatialRectangleSouthWest, spatialRectangleNorthEast, 
             spatialUnit, timeStart, timeEnd, locationVar, timeVar,
-            locationAndTimeVar, incomingBindings, boundingBoxUpperLeftWithTime,
-            boundingBoxLowerRightWithTime);
+            locationAndTimeVar, incomingBindings, boundingBoxSouthWestWithTime,
+            boundingBoxNorthEastWithTime);
         
     }
 

@@ -1,11 +1,12 @@
+<?xml version="1.0"?>
 <!--
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,22 +25,22 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>2.0.0-RC1</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    <version>2.0.0</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
-<!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-gas</artifactId>
-  <version>2.0.0-RC1</version>
+  <version>2.0.0</version>
   <name>Blazegraph Gather Apply Scatter (GAS) API</name>
+  <description>Blazegraph DB Gather Apply Scatter API for graph analytics</description>
+  <url>https://wiki.blazegraph.com/wiki/index.php/RDF_GAS_API</url>
   <packaging>jar</packaging>
   <build>
-   <plugins>
-    <plugin>
+    <plugins>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>2.6</version>
@@ -51,9 +52,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           </execution>
         </executions>
       </plugin>
-   </plugins>
+    </plugins>
   </build>
-
   <reporting>
     <plugins>
       <plugin>
@@ -64,9 +64,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	  <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Gather Apply Scatter (GAS) API</h1>]]></doctitle>
-	  <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC DBA Blazegraph. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -82,18 +82,11 @@ m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
-]]></bottom> 
+]]></bottom>
         </configuration>
       </plugin>
     </plugins>
   </reporting>
-
-  <repositories>
-    <repository>
-      <id>bigdata.releases</id>
-      <url>http://www.systap.com/maven/releases/</url>
-    </repository>
-  </repositories>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -117,10 +110,10 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
     <dependency>
-       <!-- log4j is the primary logger for bigdata. -->
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
+      <!-- log4j is the primary logger for bigdata. -->
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
   </dependencies>
 </project>

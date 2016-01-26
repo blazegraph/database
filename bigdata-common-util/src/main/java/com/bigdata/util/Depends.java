@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -241,6 +241,10 @@ public class Depends {
     private final static Dep sesame = new Dep("sesame",
             "http://www.openrdf.org/", "http://www.openrdf.org/download.jsp");
     
+    //Used for RDFa support.  Apache2 License
+    private final static Dep semargl = new Dep("semargl",
+            "http://semarglproject.org", "https://github.com/levkhomich/semargl/blob/master/LICENSE");
+    
     private final static Dep icu = new Dep("ICU",
             "http://site.icu-project.org/",
             "http://source.icu-project.org/repos/icu/icu/trunk/license.html");
@@ -310,6 +314,7 @@ public class Depends {
 //            cweb,//
             slf4j,//
             sesame,//
+            semargl,//
             icu,//
 //            nxparser,//
             nanohttp,//

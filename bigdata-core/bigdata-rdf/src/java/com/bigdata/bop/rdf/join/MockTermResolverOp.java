@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,6 +48,8 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.LexiconConfiguration;
+import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
@@ -304,7 +306,8 @@ public class MockTermResolverOp extends PipelineOp {
                 * BigdataValue that is mocked. As a side effect, the internal
                 * cache of the mocked value is cleared.
                 */
-               collectIfValueMocked(iv, ivMap);
+               
+               collectIVsToResolve(iv, ivMap, lex);
 
             }
 
@@ -333,7 +336,7 @@ public class MockTermResolverOp extends PipelineOp {
                 * BigdataValue that is mocked. As a side effect, the internal
                 * cache of the mocked value is cleared.
                 */
-               collectIfValueMocked(iv, ivMap);
+               collectIVsToResolve(iv, ivMap, lex);
 
             }
 
@@ -355,10 +358,17 @@ public class MockTermResolverOp extends PipelineOp {
          ivVals.toArray(new BigdataValue[ivVals.size()]);
 
       for (BigdataValue ivVal : ivValsArr) {
+          
+         // case 1: null IVs need to be resolved
          if (ivVal.getIV()!=null && ivVal.getIV().isNullIV()) {
             ivVal.clearInternalValue();
          }
-      }
+         
+         // case 2: literals that have not been inlined need to be resolved
+         if (!lex.isInlineLiterals() && ivVal.getIV()!=null && ivVal.getIV().isLiteral()) {
+             ivVal.clearInternalValue();
+         }
+      }      
       
       /**
        * Join with the dictionary and cache the resolved BigdataValues on IVs
@@ -385,17 +395,24 @@ public class MockTermResolverOp extends PipelineOp {
 
 
    /**
-    * Adds the iv to the collection of IVs in case its value is resolved and
-    * maps to a mocked {@link BigdataValue}. In that case, the mocked 
-    * {@link BigdataValue} is in addition stored in the ivVals variable.
+    * Collect IVs that need to be resolved against the dictionary. There
+    * are actually two cases that we need to consider here:
+    * 
+    * (i) MockedIVs representing (thus far) unresolved URIs need to 
+    *     be resolved against the dictionary.
+    * (ii) If inlining of literals is disabled (which is, for instance, the
+    *      case for the GPU), we also need to make sure that literals 
+    *      that have been created (by default, the math engine creates inlined
+    *      literals when adding up values) are resolved properly.
+    * 
+    * The method fills the ivMap, mapping the original iv to its BigdataValue.
     * 
     * @param iv the iv to process
-    * @param ivs array to store ivs satisfying the condition
-    * @param ivVals array to store {@link BigdataValue}s of ivs satisfying the
-    *          condition
+    * @param ivMap mapping from IVs to be resolved to their {@link BigdataValue}
+    * @param lex the {@link LexiconConfiguration}
     */
-   private static void collectIfValueMocked(final IV<?, ?> iv,
-         final Map<IV<?, ?>, BigdataValue> ivMap) {
+   private static void collectIVsToResolve(final IV<?, ?> iv,
+         final Map<IV<?, ?>, BigdataValue> ivMap, final LexiconRelation lex) {
       
       if (iv.isNullIV() && iv.hasValue() && !iv.isInline()) {
          
@@ -406,7 +423,11 @@ public class MockTermResolverOp extends PipelineOp {
                ivMap.put(iv, bdVal);
             }
          }
-         
+        
+      // if literals are not inlined, we need to resolve them
+      } else if (!lex.isInlineLiterals() && iv.isLiteral()) {
+          
+          ivMap.put(iv, ((NumericIV<?,?>)iv).asValue(lex));
       }
    }
 
