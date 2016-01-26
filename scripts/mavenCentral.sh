@@ -19,6 +19,9 @@
 
 BASE_DIR=`dirname $0`
 
+#Deploy the parent pom artifacts
+mvn -f "${BASE_DIR}"/../pom.xml install deploy -N -DskipTests=true -Pmaven-central
+
 #Deploy the core artifacts
 mvn -f "${BASE_DIR}"/../pom.xml install deploy --projects junit-ext,ctc-striterators,lgpl-utils,dsi-utils,system-utils,rdf-properties,sparql-grammar,bigdata-util,bigdata-common-util,bigdata-statics,bigdata-cache,bigdata-client,bigdata-ganglia,bigdata-gas,bigdata-core/,bigdata-war-html,bigdata-blueprints,bigdata-core-test,bigdata-rdf-test,bigdata-sails-test,bigdata-runtime -DskipTests=true -Pmaven-central
 
