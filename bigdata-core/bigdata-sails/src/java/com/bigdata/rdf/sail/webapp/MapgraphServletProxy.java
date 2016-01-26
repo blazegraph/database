@@ -64,7 +64,7 @@ public class MapgraphServletProxy extends BigdataRDFServlet {
 		//The workbench makes this call even in non-GPU mode. 
 		//throw new RuntimeException("Running without the Mapgraph package.");
 		if( !hasWarnedGpu ) {
-			log.warn("Running with GPU Acceleration.   See https://www.blazegraph.com/product/gpu-accelerated/.");
+			log.warn("Running without GPU Acceleration.   See https://www.blazegraph.com/product/gpu-accelerated/.");
 			hasWarnedGpu = true;
 		}
 	}
