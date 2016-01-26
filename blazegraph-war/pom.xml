@@ -349,5 +349,11 @@ ga('send', 'pageview');
       <artifactId>fastutil</artifactId>
       <version>${fastutil.version}</version>
     </dependency>
+    <!-- Included for RDFa support -->
+    <dependency>
+       <groupId>org.semarglproject</groupId>
+       <artifactId>semargl-sesame</artifactId>
+       <version>${semargl.version}</version>
+    </dependency>
   </dependencies>
 </project>

@@ -37,11 +37,14 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <name>Blazegraph RPM Package</name>
   <description>Blazegraph RPM deployer for the RHEL and CentOS package management systems</description>
   <packaging>rpm</packaging>
+  <!--
+       Due to https://jira.blazegraph.com/browse/BLZG-1725, you must build with the -P \!signing
+       i.e. mvn package -P \!code-signing
+  -->
   <properties>
     <rpm.user>blzg</rpm.user>
     <rpm.group>blzg</rpm.group>
     <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
-    <rpm.release>SNAPSHOT</rpm.release>
     <app.name>blazegraph</app.name>
   </properties>
   <build>
@@ -67,9 +70,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             <prefix>${rpm.installDir}</prefix>
             <changelogFile>src/changelog</changelogFile>
             <!-- Note that RPM signing is currently broken on OS-X:  https://github.com/mojohaus/rpm-maven-plugin/issues/11 -->
-            <!--
-              <key>${gpg.keyname}</key>
-            -->
+            <key>${gpg.keyname}</key>
+            <keypath>${gpg.keyring}</keypath>
+            <keypassphrase>${gpg.passphrase}</keypassphrase>
             <mappings>
               <mapping>
                 <directory>${rpm.installDir}/lib</directory>
@@ -527,6 +530,12 @@ ga('send', 'pageview');
       <groupId>it.unimi.dsi</groupId>
       <artifactId>fastutil</artifactId>
       <version>${fastutil.version}</version>
+    </dependency>
+    <!-- Included for RDFa support -->
+    <dependency>
+       <groupId>org.semarglproject</groupId>
+       <artifactId>semargl-sesame</artifactId>
+       <version>${semargl.version}</version>
     </dependency>
   </dependencies>
 </project>
