@@ -16,7 +16,7 @@ You can then:
 
 ```
 cd blazegraph-tgz-2.0.0
-./bin/blazegraph.sh start # also support start|stop|restart|status
+./bin/blazegraph.sh start # also supports start|stop|restart|status
 ```
 
 The general layout is:
