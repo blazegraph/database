@@ -11,11 +11,14 @@ Please also visit us at our: [website](https://www.blazegraph.com), [wiki](https
 
 Find an issue?   Need help?  See [JIRA](https://jira.blazegraph.com) or purchase [Support](https://www.blazegraph.com/buy).
 
-###Javadocs
-[API Javadocs](https://blazegraph.github.io/database/apidocs/index.html)
+###Quick Start with the Executable Jar
+Up and running with Blazegraph in under 30 seconds:  [Quick Start](https://wiki.blazegraph.com/wiki/index.php/Quick_Start).
 
 ###Samples and Examples
 There are code samples and examples to get started with the Blazegraph Database [here] (https://github.com/blazegraph/blazegraph-samples).  Tinkerpop3 examples are included directly within the Tinkerpop3 repository per below.
+
+###Javadocs
+Click here to view the lastest [API Javadocs](https://blazegraph.github.io/database/apidocs/index.html).
 
 ###Maven Central
 Starting with the 2.0.0 release, the Blazegraph Database is available on Maven Central.  To include the core platform and dependencies, include the artifact below in your dependencies.   [Developing with Maven](https://wiki.blazegraph.com/wiki/index.php/MavenNotes) has notes on developing with Blazegraph Database source code and Maven.
@@ -46,7 +49,9 @@ If you'd just link the Blazegraph Database dependencies without any of the exter
 
 ###Deployers
 
-There are also Maven artifacts for WAR deployers (`blazegraph-war`), executable Jar files (`blazegraph-jar`), [Debian Package](blazegraph-deb/) (`blazegraph-deb`), [RPM](blazegraph-rpm/) (`blazegraph-rpm`), and a [Tarball](blazegraph-tzg/) (`blazegraph-tgz`).
+There are also Maven artifacts for WAR deployers (`blazegraph-war`), executable Jar files (`blazegraph-jar`), [Debian Package](blazegraph-deb/) (`blazegraph-deb`), [RPM](blazegraph-rpm/) (`blazegraph-rpm`), and a [Tarball](blazegraph-tgz/) (`blazegraph-tgz`).
+
+The `bigdata-war` and `bigdata-jar` artifacts are included for legacy purposes and use the `/bigdata/` context path.
 
 ###Tinkerpop3
 Tinkerpop3 supports requires Java 1.8 and is now in a separate repository.  See [Tinkerpop3](https://github.com/blazegraph/tinkerpop3).  It is also available as Maven Central artifact.

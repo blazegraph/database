@@ -10,16 +10,13 @@ mvn package assembly:single
 ```
 
 ## Running ##
-Unpack the distribution to your location of choice.  It will typically unpack into a directory such as `blazegraph-tgz-1.6.1-master-SNAPSHOT`.
+Unpack the distribution to your location of choice.  It will typically unpack into a directory such as `blazegraph-tgz-2.0.0`.
 
 You can then:
 
 ```
-cd blazegraph-tgz-1.6.1-master-SNAPSHOT
-./bin/start #start Blazegraph
-./bin/stop #stop Blazegraph
-./bin/status #running status
-./bin/restart #restart Blazegraph
+cd blazegraph-tgz-2.0.0
+./bin/blazegraph.sh start # also support start|stop|restart|status
 ```
 
 The general layout is:
@@ -34,11 +31,3 @@ pid/    #pid file
 war/    #web application sources for the Blazegraph Workbench
 ```
 
-## Configuring the init.d script ##
-
-TODO
-
-
-### Configuring to run as a non-root user ###
-
-TODO
