@@ -49,7 +49,7 @@ If you'd just link the Blazegraph Database dependencies without any of the exter
 
 ###Deployers
 
-There are also Maven artifacts for WAR deployers (`blazegraph-war`), executable Jar files (`blazegraph-jar`), [Debian Package](blazegraph-deb/) (`blazegraph-deb`), [RPM](blazegraph-rpm/) (`blazegraph-rpm`), and a [Tarball](blazegraph-tgz/) (`blazegraph-tgz`).
+Starting with 2.0.0, the default context path for deployment is `http://localhost:9999/blazegraph/`.  There are also Maven artifacts for WAR deployers (`blazegraph-war`), executable Jar files (`blazegraph-jar`), [Debian Package](blazegraph-deb/) (`blazegraph-deb`), [RPM](blazegraph-rpm/) (`blazegraph-rpm`), and a [Tarball](blazegraph-tgz/) (`blazegraph-tgz`).
 
 The `bigdata-war` and `bigdata-jar` artifacts are included for legacy purposes and use the `/bigdata/` context path.
 
