@@ -48,7 +48,7 @@ export JAVA_OPTS="\
  ${JETTY_OPTS}\
 "
 
-cmd="java ${JAVA_OPTS} \
+cmd="${JAVA_HOME}/bin/java ${JAVA_OPTS} \
     -cp ${JETTY_CLASSPATH} \
     $NSS \
     -jettyXml ${JETTY_XML} \
