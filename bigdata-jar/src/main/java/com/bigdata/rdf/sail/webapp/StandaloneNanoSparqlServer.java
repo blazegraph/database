@@ -149,7 +149,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
 
         awaitServerStart(server);
 
-        System.out.println("\n\nWelcome to Blazegraph(tm) by SYSTAP.\n");
+        System.out.println("\n\nWelcome to the Blazegraph(tm) Database.\n");
         //BLZG-1377 Included for legacy support.
         System.out.println("Go to http://" + Config.DEFAULT_HOST + ":" + Config.BLAZEGRAPH_HTTP_PORT + "/bigdata/ to get started.");
         
