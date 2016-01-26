@@ -123,6 +123,7 @@ ga('send', 'pageview');
       <artifactId>bigdata-util</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <!-- log4j is the primary logger for bigdata. -->
