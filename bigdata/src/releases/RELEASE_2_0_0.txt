@@ -4,7 +4,7 @@ This is a major release of Blazegraph™.  The official release is now made into
 
 Blazegraph Features (http://www.blazegraph.com/product/)
 
-2.0.0 has significant performance improvements for query optimization, geo spatial searching, load improvments and many new features.  The artifacts now include a Debian Deployer and RPM.  See https://blog.blazegraph.com/?p=977.
+2.0.0 has significant performance improvements for query optimization, geo-spatial searching, bulk load improvements and many new features.  The artifacts now include a Debian Deployer and RPM.  See https://blog.blazegraph.com/?p=977.
 
 Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
 
