@@ -233,7 +233,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <striterator.version>1.0</striterator.version>
     <junit-ext.version>${project.version}</junit-ext.version>
     <junit4.version>4.11</junit4.version>
-    <junit3.version>3.8.1</junit3.version>
     <servlet.version>3.1.0</servlet.version>
     <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
