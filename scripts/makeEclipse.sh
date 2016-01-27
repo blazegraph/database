@@ -11,10 +11,9 @@ ${BASE_DIR}/clean.sh
 if [ -z "${ECLIPSE_WORKSPACE}" ] ; then
 
  	mvn -f "${BASE_DIR}"/../pom.xml eclipse:eclipse $*
- 	mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml eclipse:eclipse $*
 
 else 
+
 	mvn -f "${BASE_DIR}"/../pom.xml eclipse:eclipse -Declipse.workspace="${ECLIPSE_WORKSPACE}" $*
-	mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml eclipse:eclipse -Declipse.workspace="${ECLIPSE_WORKSPACE}" $*
 
 fi

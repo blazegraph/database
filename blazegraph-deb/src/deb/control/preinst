@@ -3,6 +3,7 @@ addgroup --system --quiet blzg
 #Add the blazegraph user with the home directory
 #Allow the home directory to be created later by the installer
 adduser --system --no-create-home --home /usr/local/blazegraph --quiet blzg
+usermod -g blzg blzg
 echo ""
 echo "***********************************************************"
 echo "* The following kernel tuning parameters are recommended. *"

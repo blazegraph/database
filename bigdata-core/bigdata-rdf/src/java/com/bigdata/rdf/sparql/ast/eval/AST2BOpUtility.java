@@ -3045,8 +3045,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         	left = ctx.gpuEvaluation.convertJoinGroup(left, joinGroup, doneSet, start, ctx);
         	
         }
-        else
-        if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
+        else if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
                 ctx.mergeJoin)) {
 
             /*
