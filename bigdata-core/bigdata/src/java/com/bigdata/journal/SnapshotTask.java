@@ -59,10 +59,43 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
    
    protected static final Logger log = Logger.getLogger(SnapshotTask.class);
    
+   public interface Options {
+	   
+	  /**
+	   * 
+	   * Java property to override the default GZIP buffer size used for {@link GZipInputStream} and {@link GZipOutputStream}. 
+	   * 
+	   * This specifies the size in Bytes to use.  The default is 512k.
+	   * 
+	   * -Dcom.bigdata.journal.SnapshotTask.gzipBufferSize=512
+	   * 
+	   * A larger value such as below is recommended for larger files.
+	   * 
+	   * -Dcom.bigdata.journal.SnapshotTask.gzipBufferSize=65535
+	   *  
+	   */
+	   
+	   public static final String GZIP_BUFFER_SIZE = SnapshotTask.class.getClass().getName()+".gzipBufferSize"; 
+	   
+   }
+   
+   private static int getGzipBuffer() {
+	   
+	   final String s = System.getProperty(Options.GZIP_BUFFER_SIZE);
+	   
+	   if(s == null || s.isEmpty()) {
+		   return DEFAULT_BUFFER;
+	   } else {
+		   return Integer.parseInt(s);
+	   }
+	   
+   }
+   
    /**
     * See BLZG-1732
     */
-   private static final int GZIP_BUFFER =  64 * 1024;  /* 64k buffer */
+   private static final int GZIP_BUFFER =  getGzipBuffer();
+   private static final int DEFAULT_BUFFER = 512;
    
    /**
     * The prefix for the temporary files used to generate snapshots.
