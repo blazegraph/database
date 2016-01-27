@@ -113,11 +113,6 @@ ga('send', 'pageview');
       <artifactId>bigdata-statics</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!--dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-util</artifactId>
-      <version>${project.version}</version>
-    </dependency-->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-util</artifactId>
