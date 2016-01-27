@@ -35,7 +35,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>bigdata-war</artifactId>
   <version>2.1.0-master-SNAPSHOT</version>
   <name>Blazegraph WAR (bigdata legacy context path)</name>
-  <description>Blazegraph Web Application Archive with legancy /bigdata deployment path</description>
+  <description>Blazegraph Web Application Archive with legacy /bigdata deployment path</description>
   <packaging>war</packaging>
   <build>
     <plugins>
@@ -349,10 +349,11 @@ ga('send', 'pageview');
       <artifactId>fastutil</artifactId>
       <version>${fastutil.version}</version>
     </dependency>
+     <!-- Included for RDFa support -->
     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>dsiutils</artifactId>
-      <version>1.0.10</version>
+       <groupId>org.semarglproject</groupId>
+       <artifactId>semargl-sesame</artifactId>
+       <version>${semargl.version}</version>
     </dependency>
   </dependencies>
 </project>

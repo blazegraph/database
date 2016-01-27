@@ -1867,6 +1867,12 @@ abstract public class TestCase2
 		    if( ! file.exists() ) {
 			
 //See BLZG-1731           
+			if (log.isInfoEnabled()) {
+				log.info("Looking for properties file in home directory: "
+							+ file);
+			}
+		    
+//See BLZG-1731           
 //			log.warn
 //			    ( "File does not exist: "+file
 //			      );

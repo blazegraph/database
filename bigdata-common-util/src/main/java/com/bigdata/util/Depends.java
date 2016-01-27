@@ -241,6 +241,10 @@ public class Depends {
     private final static Dep sesame = new Dep("sesame",
             "http://www.openrdf.org/", "http://www.openrdf.org/download.jsp");
     
+    //Used for RDFa support.  Apache2 License
+    private final static Dep semargl = new Dep("semargl",
+            "http://semarglproject.org", "https://github.com/levkhomich/semargl/blob/master/LICENSE");
+    
     private final static Dep icu = new Dep("ICU",
             "http://site.icu-project.org/",
             "http://source.icu-project.org/repos/icu/icu/trunk/license.html");
@@ -310,6 +314,7 @@ public class Depends {
 //            cweb,//
             slf4j,//
             sesame,//
+            semargl,//
             icu,//
 //            nxparser,//
             nanohttp,//

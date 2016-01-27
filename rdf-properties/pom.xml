@@ -90,6 +90,12 @@ ga('send', 'pageview');
       <artifactId>sesame-queryresultio-sparqljson</artifactId>
       <version>${sesame.version}</version>
     </dependency>
+    <!-- Included for RDFa support -->
+    <dependency>
+       <groupId>org.semarglproject</groupId>
+       <artifactId>semargl-sesame</artifactId>
+       <version>${semargl.version}</version>
+    </dependency>
     <dependency>
       <groupId>log4j</groupId>
       <artifactId>log4j</artifactId>

@@ -164,5 +164,4 @@ public class NumericBOp extends IVValueExpression<IV> implements INeedsMateriali
     	return INeedsMaterialization.Requirement.SOMETIMES;
     }
 
-
 }

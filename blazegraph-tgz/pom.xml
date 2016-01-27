@@ -418,10 +418,11 @@ ga('send', 'pageview');
       <artifactId>fastutil</artifactId>
       <version>${fastutil.version}</version>
     </dependency>
+    <!-- Included for RDFa support -->
     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>dsiutils</artifactId>
-      <version>1.0.10</version>
+       <groupId>org.semarglproject</groupId>
+       <artifactId>semargl-sesame</artifactId>
+       <version>${semargl.version}</version>
     </dependency>
   </dependencies>
 </project>

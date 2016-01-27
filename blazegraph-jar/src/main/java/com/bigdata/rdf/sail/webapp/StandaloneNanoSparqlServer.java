@@ -53,7 +53,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
-
+     
         /*
          * Note: This default will locate the jetty.xml resource that is bundled
          * with the JAR. This preserves the historical behavior. If you want to
@@ -73,7 +73,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         
         String portStr = System.getProperty(
         		SystemProperties.JETTY_PORT ,
-        		"9999"
+        		Integer.toString(Config.BLAZEGRAPH_HTTP_PORT)
         		);
         
         port = Integer.parseInt(portStr);
@@ -149,7 +149,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
 
         awaitServerStart(server);
 
-        System.out.println("\n\nWelcome to Blazegraph(tm) by SYSTAP.\n");
+        System.out.println("\n\nWelcome to the Blazegraph(tm) Database.\n");
         System.out.println("Go to " + Config.DEFAULT_ENDPOINT + "/ to get started.");
         
         // Wait for the service to terminate.

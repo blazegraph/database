@@ -2,7 +2,7 @@
 BASE_DIR=`dirname $0`
 
 PARENT_POM="${BASE_DIR}"/../pom.xml
-CURRENT_VERSION=1.6.0
+CURRENT_VERSION=`grep "CURRENT_VERSION" ${BASE_DIR}/version.properties | cut -d= -f2`
 BRANCH=`git rev-parse --abbrev-ref HEAD`
 YYMMDD=`date +%Y%m%d`
 SNAPSHOT="SNAPSHOT"
