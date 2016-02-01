@@ -313,23 +313,18 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <profile>
       <id>local-deploy</id>
       <distributionManagement>
+        <repository>
+            <id>blazegraph-releases</id>
+            <name>blazegraph(R) releases</name>
+            <url>s3://blazegraph-releases/release</url>
+        </repository>
         <snapshotRepository>
-          <id>bigdata.snapshots</id>
-          <name>bigdata(R) snapshots</name>
-          <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/snapshots</url>
-          <uniqueVersion>true</uniqueVersion>
+            <id>blazegraph-snapshots</id>
+            <name>blazegraph(R) snapshots</name>
+            <url>s3://blazegraph-snapshots/snapshots</url>
+            <uniqueVersion>false</uniqueVersion>
         </snapshotRepository>
       </distributionManagement>
-      <repositories>
-        <repository>
-          <id>bigdata.releases</id>
-          <url>http://www.systap.com/maven/releases/</url>
-        </repository>
-        <repository>
-          <id>bigdata.snapshots</id>
-          <url>http://www.systap.com/maven/snapshots/</url>
-        </repository>
-      </repositories>
     </profile>
   </profiles>
   <build>
@@ -374,12 +369,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         </configuration>
       </plugin>
     </plugins>
-    <!-- Used for Legacy deployments to Blazegraph-hosted maven -->
+    <!-- Used for Support and Pre-release artifacts -->
     <extensions>
       <extension>
-        <groupId>org.apache.maven.wagon</groupId>
-        <artifactId>wagon-ssh-external</artifactId>
-        <version>1.0-beta-6</version>
+        <groupId>org.springframework.build</groupId>
+        <artifactId>aws-maven</artifactId>
+        <version>5.0.0.RELEASE</version>
       </extension>
     </extensions>
   </build>
