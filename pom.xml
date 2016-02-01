@@ -314,15 +314,15 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       <id>local-deploy</id>
       <distributionManagement>
         <repository>
-            <id>blazegraph-releases</id>
-            <name>blazegraph(R) releases</name>
-            <url>s3://blazegraph-releases/release</url>
+          <id>blazegraph-releases</id>
+          <name>blazegraph(R) releases</name>
+          <url>s3://blazegraph-releases/release</url>
         </repository>
         <snapshotRepository>
-            <id>blazegraph-snapshots</id>
-            <name>blazegraph(R) snapshots</name>
-            <url>s3://blazegraph-snapshots/snapshots</url>
-            <uniqueVersion>false</uniqueVersion>
+          <id>blazegraph-snapshots</id>
+          <name>blazegraph(R) snapshots</name>
+          <url>s3://blazegraph-snapshots/snapshots</url>
+          <uniqueVersion>false</uniqueVersion>
         </snapshotRepository>
       </distributionManagement>
     </profile>

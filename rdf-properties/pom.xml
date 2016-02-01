@@ -92,9 +92,9 @@ ga('send', 'pageview');
     </dependency>
     <!-- Included for RDFa support -->
     <dependency>
-       <groupId>org.semarglproject</groupId>
-       <artifactId>semargl-sesame</artifactId>
-       <version>${semargl.version}</version>
+      <groupId>org.semarglproject</groupId>
+      <artifactId>semargl-sesame</artifactId>
+      <version>${semargl.version}</version>
     </dependency>
     <dependency>
       <groupId>log4j</groupId>
