@@ -289,6 +289,11 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
         
         boolean DEFAULT_CONTROLLER = false;
         
+        /**
+         * The namespace over which a query is executed. This is used by the MapGraph engine.
+         */
+        String NAMESPACE = BOp.class.getName() + ".namespace";
+
     }
 
 }
