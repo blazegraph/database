@@ -369,7 +369,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         </configuration>
       </plugin>
     </plugins>
-    <!-- Used for Support and Pre-release artifacts -->
+    <!-- Used for non-Maven Central releases and Blazegraph Support -->
     <extensions>
       <extension>
         <groupId>org.springframework.build</groupId>
