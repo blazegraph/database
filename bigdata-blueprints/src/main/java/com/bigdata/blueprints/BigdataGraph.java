@@ -1489,6 +1489,12 @@ public abstract class BigdataGraph implements Graph {
             result = query.evaluate();
 
         } catch (Exception ex) {
+            if (queryId != null) {
+                /*
+                 * In case the exception happens during evaluate().
+                 */
+                finalizeQuery(queryId);
+            }
             if (!readFromWriteConnection) {
                 cxn.close();
             }
@@ -1657,6 +1663,12 @@ public abstract class BigdataGraph implements Graph {
             result = query.evaluate();
         
         } catch (Exception ex) {
+            if (queryId != null) {
+                /*
+                 * In case the exception happens during evaluate().
+                 */
+                finalizeQuery(queryId);
+            }
             if (!readFromWriteConnection) {
                 cxn.close();
             }
@@ -1743,16 +1755,20 @@ public abstract class BigdataGraph implements Graph {
             
             final boolean result = query.evaluate();
             
-            finalizeQuery(queryId);
+//            finalizeQuery(queryId);
             
             return result;
             
         } finally {
-        
+            if (queryId != null) {
+                /*
+                 * In case the exception happens during evaluate().
+                 */
+                finalizeQuery(queryId);
+            }
             if (!readFromWriteConnection) {
                 cxn.close();
             }
-            
         }
             
     }
@@ -1821,19 +1837,12 @@ public abstract class BigdataGraph implements Graph {
 
     @SuppressWarnings("unchecked")
 	public ICloseableIterator<BigdataGraphEdit> history(final List<URI> ids,
-			final String extQueryId)            throws Exception {
+			final String extQueryId) throws Exception {
         
-//        final List<URI> ids = new LinkedList<URI>();
-//        for (Object id : vertexIds) {
-//            ids.add(factory.toVertexURI(id));
-//        }
-//        for (Object id : edgeIds) {
-//            ids.add(factory.toEdgeURI(id));
-//        }
+        final RepositoryConnection cxn = readFromWriteConnection ? 
+                getWriteConnection() : getReadConnection();
         
         final StringBuilder sb = new StringBuilder(HISTORY_TEMPLATE);
-        
-        UUID queryId = null;
         
         if (ids.size() > 0) {
             final StringBuilder vc = new StringBuilder();
@@ -1852,30 +1861,45 @@ public abstract class BigdataGraph implements Graph {
                     ? queryStr : queryStr.substring(0, SPARQL_LOG_MAX)+" ..."));
         }
         
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
+        final TupleQueryResult result;
+        UUID queryId = null;
         
-        final TupleQuery query = (TupleQuery) 
-                cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
-        
-        if (query instanceof BigdataSailTupleQuery
-				&& cxn instanceof BigdataSailRepositoryConnection) {
-
-			final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
-			queryId = setupQuery((BigdataSailRepositoryConnection) cxn,
-					bdtq.getASTContainer(), QueryType.SELECT,
-					extQueryId);
-		}
-        
-        if (sparqlLog.isTraceEnabled()) {
-            if (query instanceof BigdataSailTupleQuery) {
-                final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
-                sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
+        try {
+            
+            final TupleQuery query = (TupleQuery) 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+            
+            if (query instanceof BigdataSailTupleQuery
+    				&& cxn instanceof BigdataSailRepositoryConnection) {
+    
+    			final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+    			queryId = setupQuery((BigdataSailRepositoryConnection) cxn,
+    					bdtq.getASTContainer(), QueryType.SELECT,
+    					extQueryId);
+    		}
+            
+            if (sparqlLog.isTraceEnabled()) {
+                if (query instanceof BigdataSailTupleQuery) {
+                    final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+                    sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
+                }
             }
+        
+            result = query.evaluate();
+            
+        } catch (Exception ex) {
+            if (queryId != null) {
+                /*
+                 * In case the exception happens during evaluate().
+                 */
+                finalizeQuery(queryId);
+            }
+            if (!readFromWriteConnection) {
+                cxn.close();
+            }
+            throw ex;
         }
-        
-        final TupleQueryResult result = query.evaluate();
-        
+            
         final IStriterator sitr = new Striterator(new WrappedResult<BindingSet>(
                 result, readFromWriteConnection ? null : cxn, queryId
                 ));
