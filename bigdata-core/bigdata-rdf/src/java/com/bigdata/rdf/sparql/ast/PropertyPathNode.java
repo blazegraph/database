@@ -1,12 +1,14 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
@@ -18,7 +20,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
  * after StatementPatternNode.
  */
 public class PropertyPathNode extends
-        GroupMemberNodeBase<PropertyPathNode> {
+        GroupMemberNodeBase<PropertyPathNode> implements IBindingProducerNode {
 
     /**
 	 * 
@@ -244,6 +246,53 @@ public class PropertyPathNode extends
         return sb.toString();
     }
 
+    /**
+     * Return the variables used by the predicate - i.e. what this node will
+     * attempt to bind when run.
+     */
+    public Set<IVariable<?>> getProducedBindings() {
+
+        final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
+
+        final TermNode s = s();
+        final TermNode o = o();
+        final TermNode c = c();
+
+        addProducedBindings(s, producedBindings);
+        addProducedBindings(o, producedBindings);
+        addProducedBindings(c, producedBindings);
+        
+        return producedBindings;
+
+    }
+    
+    /**
+     * This handles the special case where we've wrapped a Var with a Constant
+     * because we know it's bound, perhaps by the exogenous bindings. If we
+     * don't handle this case then we get the join vars wrong.
+     * 
+     * @see StaticAnalysis._getJoinVars
+     */
+    private void addProducedBindings(final TermNode t,
+            final Set<IVariable<?>> producedBindings) {
+
+        if (t instanceof VarNode) {
+
+            producedBindings.add(((VarNode) t).getValueExpression());
+
+        } else if (t instanceof ConstantNode) {
+
+            final ConstantNode cNode = (ConstantNode) t;
+            final Constant<?> c = (Constant<?>) cNode.getValueExpression();
+            final IVariable<?> var = c.getVar();
+            if (var != null) {
+                producedBindings.add(var);
+            }
+
+        }
+
+    }
+	
     @Override
     public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
         return new HashSet<IVariable<?>>();

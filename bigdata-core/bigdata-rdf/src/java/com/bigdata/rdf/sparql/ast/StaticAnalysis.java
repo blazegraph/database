@@ -919,7 +919,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 vars.addAll(sp.getProducedBindings());
 //                
 //            }
-
+        } else if (node instanceof PropertyPathNode) {
+            
+            final PropertyPathNode ppn = (PropertyPathNode) node;
+            vars.addAll(ppn.getProducedBindings());
+            
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
         	vars.addAll(((ArbitraryLengthPathNode) node).getDefinitelyProducedBindings());
@@ -1084,6 +1088,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //                
 //            }
 
+        } else if (node instanceof PropertyPathNode) {
+            
+            final PropertyPathNode ppn = (PropertyPathNode) node;
+            vars.addAll(ppn.getProducedBindings());
+            
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
         	vars.addAll(((ArbitraryLengthPathNode) node).getMaybeProducedBindings());
@@ -1195,7 +1204,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                     getDefinitelyProducedBindings(sp, vars, recursive);
 
                 }
-
+                
             } else if (child instanceof ArbitraryLengthPathNode) {
             	
             	vars.addAll(((ArbitraryLengthPathNode) child).getDefinitelyProducedBindings());
@@ -1257,6 +1266,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 final BindingsClause bc = (BindingsClause) child;
                 
                 vars.addAll(bc.getDeclaredVariables());
+
+            } else if (child instanceof PropertyPathNode) {
+                
+                getDefinitelyProducedBindings((PropertyPathNode)child, vars, recursive);
 
             } else {
 
