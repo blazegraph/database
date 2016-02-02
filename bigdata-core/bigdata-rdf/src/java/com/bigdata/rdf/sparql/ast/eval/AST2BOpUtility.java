@@ -381,6 +381,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         // Add any variables known to be materialized into this scope.
         doneSet.addAll(tmp);
 
+        if( left != null) {
+        	left = (PipelineOp) left.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+        }
+
         return left;
 
     }
@@ -729,6 +733,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (log.isInfoEnabled())
             log.info("\nqueryOrSubquery:\n" + queryBase + "\nplan:\n"
                     + BOpUtility.toString(left));
+        
+        if (left != null) {
+        	left = (PipelineOp) left.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+        }
 
         return left;
 
