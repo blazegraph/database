@@ -325,6 +325,16 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <uniqueVersion>false</uniqueVersion>
         </snapshotRepository>
       </distributionManagement>
+      <repositories>
+        <repository>
+          <id>blazegraph.releases</id>
+          <url>s3://blazegraph-releases/release</url>
+        </repository>
+        <repository>
+          <id>blazegraph.snapshots</id>
+          <url>s3://blazegraph-snapshots/snapshots</url>
+        </repository>
+      </repositories>
     </profile>
   </profiles>
   <build>
