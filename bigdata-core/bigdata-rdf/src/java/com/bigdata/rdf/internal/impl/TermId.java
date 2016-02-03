@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,7 +34,10 @@ import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.literal.NumericIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.util.Bytes;
 
@@ -293,6 +296,20 @@ public class TermId<V extends BigdataValue>
 
         return Long.toString(termId);
 
+    }
+    
+    @Override
+    public boolean isNumeric() {
+        
+        V value = getValue();
+        if (value==null)
+            throw new NotMaterializedException();
+        
+        if (!(value instanceof BigdataLiteral))
+            return false;
+
+        return NumericIV.numericalDatatypes.contains(((BigdataLiteral)value).getDatatype());
+        
     }
 
 //    /**

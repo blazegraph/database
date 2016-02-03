@@ -1,13 +1,13 @@
 
 /**
 
- Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+ Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
  Contact:
- SYSTAP, LLC
+ SYSTAP, LLC DBA Blazegraph
  2501 Calvert ST NW #106
  Washington, DC 20008
- licenses@systap.com
+ licenses@blazegraph.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -580,6 +580,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
                     AbstractTripleStore.Options.DEFAULT_REJECT_INVALID_XSD_VALUES));
             
+            geoSpatial = Boolean.parseBoolean(getProperty(
+                  AbstractTripleStore.Options.GEO_SPATIAL,
+                  AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
+
+            geoSpatialConfig = getProperty(
+                  AbstractTripleStore.Options.GEO_SPATIAL_CONFIG,
+                  AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_CONFIG);
+
+            
             // Resolve the vocabulary.
             vocab = getContainer().getVocabulary();
             
@@ -632,7 +641,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
                     rejectInvalidXSDValues, xFactory, vocab, valueFactory,
-                    uriFactory);
+                    uriFactory, geoSpatial, geoSpatialConfig);
 
         }
         
@@ -922,6 +931,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final private TimeZone inlineDateTimesTimeZone;
     
     /**
+     * When <code>true</code>, support for GeoSpatial features is turned on.
+     */
+    final private boolean geoSpatial;
+
+    /**
+     * Configuration string for the GeoSpatial search facilities
+     */
+    final private String geoSpatialConfig;
+
+    /**
      * Return <code>true</code> if datatype literals are being inlined into
      * the statement indices.
      */
@@ -949,6 +968,23 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         return inlineDateTimes;
         
+    }
+    
+    /**
+     * Return <code>true</code> if GeoSpatial support is enabled.
+     */
+    final public boolean isGeoSpatial() {
+       
+       return geoSpatial;
+       
+    }
+    
+    /**
+     * Return the configuration string for the GeoSpatial service.
+     */
+    final public String getGeoSpatialConfig() {
+       
+       return geoSpatialConfig;
     }
 
     /**
@@ -1721,6 +1757,30 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (log.isDebugEnabled())
             log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
 
+        /*
+         * Ensure that BigdataValue objects belong to the correct ValueFactory
+         * for this LexiconRelation.
+         * 
+         * @see BLZG-1593 (LexiconRelation.addTerms() does not reject
+         * BigdataValue objects from another namespace nor call asValue() on
+         * them to put them in the correct namespace)
+         */
+        {
+            final BigdataValueFactory vf = getValueFactory();
+            for (int i = 0; i < numTerms; i++) {
+                final BigdataValue tmp = vf.asValue(values[i]);
+                if (tmp != values[i]) {
+                    /*
+                     * Note: When the BigdataValue does not belong to this
+                     * namespace the IV can not be set on the BigdataValue as a
+                     * side-effect.
+                     */
+                    throw new RuntimeException("Value does not belong to this namespace: value=" + values[i]);
+                }
+                values[i] = tmp;
+            }
+        }
+        
         /*
          * Filter out inline terms from the supplied terms array and create a
          * collections of Values which will be resolved against the

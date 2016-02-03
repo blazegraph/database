@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1665,6 +1665,23 @@ public class BytesUtil {
 
         return a;
 
+    }
+    
+
+    /**
+     * Converts a byte array into a binary string. Useful for debugging.
+     * 
+     * @param zOrderByteArray
+     * @return
+     */
+    public static String byteArrToBinaryStr(byte[] zOrderByteArray) {
+       
+       final StringBuffer buf = new StringBuffer();
+       for (int i=0; i<zOrderByteArray.length*8; i++) {
+          buf.append(BytesUtil.getBit(zOrderByteArray, i) ? "1" : "0");
+       }
+       
+       return buf.toString();
     }
 
 }

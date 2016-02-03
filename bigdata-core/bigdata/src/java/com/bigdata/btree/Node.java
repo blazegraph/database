@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -629,7 +629,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         btree.getBtreeCounters().rootsSplit++;
 
-        if (BTree.log.isInfoEnabled() || BigdataStatics.debug) {
+        if (BTree.INFO || BigdataStatics.debug) {
 
             // Note: nnodes and nleaves might not reflect rightSibling yet.
 
@@ -638,7 +638,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                     + ", m=" + btree.getBranchingFactor() + ", nentries="
                     + btree.nentries;
 
-            if (BTree.log.isInfoEnabled())
+            if (BTree.INFO)
                 BTree.log.info(msg);
 
             if (BigdataStatics.debug)
@@ -1296,8 +1296,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final MutableKeyBuffer keys = data.keys;
         final MutableKeyBuffer skeys = sdata.keys;
 
-        if (INFO) {
-            log.info("this=" + this + ", nkeys=" + getKeyCount()
+        if (DEBUG) {
+            log.debug("this=" + this + ", nkeys=" + getKeyCount()
                     + ", splitIndex=" + splitIndex + ", separatorKey="
                     + keyAsString(separatorKey));
             // if(DEBUG) dump(Level.DEBUG,System.err);
@@ -1476,8 +1476,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // children of the same node.
         assert s.getParent() == p;
 
-        if (INFO) {
-            log.info("this=" + this + ", sibling=" + sibling
+        if (DEBUG) {
+            log.debug("this=" + this + ", sibling=" + sibling
                     + ", rightSibling=" + isRightSibling);
             // if(DEBUG) {
             // System.err.println("this"); dump(Level.DEBUG,System.err);
@@ -1681,8 +1681,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // children of the same node.
         assert s.getParent() == p;
 
-        if (INFO) {
-            log.info("this=" + this + ", sibling=" + sibling
+        if (DEBUG) {
+            log.debug("this=" + this + ", sibling=" + sibling
                     + ", rightSibling=" + isRightSibling);
             // if(DEBUG) {
             // System.err.println("this"); dump(Level.DEBUG,System.err);
@@ -2245,8 +2245,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         if (btree.debug)
             assertInvariants();
 
-        if (INFO) {
-            log.info("this=" + this + ", child=" + child);
+        if (DEBUG) {
+            log.debug("this=" + this + ", child=" + child);
             /*
              * Note: dumping [this] or the [child] will throw false exceptions
              * at this point - they are in an intermediate state.
@@ -2381,8 +2381,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 if (btree.debug)
                     lastChild.assertInvariants();
 
-				if (log.isInfoEnabled()) {
-                    log.info("replacing root: root=" + btree.root + ", node="
+				if (DEBUG) {
+                    log.debug("replacing root: root=" + btree.root + ", node="
                             + this + ", lastChild=" + lastChild);
                     // System.err.println("root");
                     // btree.root.dump(Level.DEBUG,System.err);
@@ -2543,6 +2543,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     final public AbstractNode getChild(final int index) {
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheTests.increment();
+        
         /*
          * I've take out this test since it turns out to be relatively
          * expensive!?! The interrupt status of the thread is now checked
@@ -2583,6 +2586,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * for this case.
              */
 
+            // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss).
+            btree.getBtreeCounters().cacheMisses.increment();
+            
             return _getChild(index, null/* req */);
 
         }
@@ -2625,6 +2631,16 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * the Memoizer and then return the new value of childRefs[index].
          */
 
+        /*
+         * See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+         * 
+         * Note: This is done in the caller rather than _getChild() since the
+         * latter may be called from the memoizer, in which case only one thread
+         * will actually invoke _getChild() while the others will just obtain
+         * the child through the memoized Future.
+         */
+        btree.getBtreeCounters().cacheMisses.increment();
+        
         return btree.loadChild(this, index);
 
     }
@@ -2692,6 +2708,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * The child needs to be read from the backing store.
          */
 
+        // See BLZG-1657 (Add BTreeCounters for cache hit and cache miss)
+        btree.getBtreeCounters().cacheMisses.increment();
+        
         final long addr = data.getChildAddr(index);
 
         if (addr == IRawStore.NULL) {

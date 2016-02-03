@@ -1,10 +1,10 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; version 2 of the License.
@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal.impl.literal;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -197,23 +199,68 @@ public class PackedLongIV<V extends BigdataLiteral>
 
     }
     
-//    /**
-//     * Encode this internal value into the supplied key builder.  Emits the
-//     * flags, following by the encoded byte[] representing the packed long.
-//     * <p>
-//     * {@inheritDoc}
-//     */
-//    @Override
-//    public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
-//
-//        // First emit the flags byte.
-//        keyBuilder.appendSigned(flags());
-//        
-//        // Third, emit the packed long's byte value
-//        ((KeyBuilder)keyBuilder).pack(value);
-//        
-//        return keyBuilder;
-//            
-//    }
+    /**
+     * Implement {@link Literal#booleanValue()}.
+     */
+    @Override
+    public boolean booleanValue() {
+        return value>0;
+    }
+
+    /**
+     * Implement {@link Literal#shortValue()}.
+     */
+    @Override
+    public short shortValue() {
+        return (short)value;
+    }
+
+    /**
+     * Implement {@link Literal#intValue()}.
+     */
+    @Override
+    public int intValue() {
+        return (int)value;
+    }
+
+    /**
+     * Implement {@link Literal#longValue()}.
+     */
+    @Override
+    public long longValue() {
+        return value;
+    }
+
+    /**
+     * Implement {@link Literal#floatValue()}.
+     */
+    @Override
+    public float floatValue() {
+        return (float)value;
+    }
+
+    /**
+     * Implement {@link Literal#doubleValue()}.
+     */
+    @Override
+    public double doubleValue() {
+        return (double)value;
+    }
+
+    /**
+     * Implement {@link Literal#integerValue()}.
+     */
+    @Override
+    public BigInteger integerValue() {
+        return BigInteger.valueOf(value);
+    }
+
+    /**
+     * Implement {@link Literal#decimalValue()}.
+     */
+    @Override
+    public BigDecimal decimalValue() {
+        return BigDecimal.valueOf(value);
+    }
 
 }

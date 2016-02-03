@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -667,8 +667,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
                   .getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
 
-            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                  tripleStore).parseQuery2(queryString, baseURI);
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                  .parseQuery2(queryString, baseURI);
 
             queryType = astContainer.getOriginalAST().getQueryType();
          }

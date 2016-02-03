@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -56,7 +56,6 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
@@ -104,7 +103,6 @@ import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
-import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -297,35 +295,6 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         if (node.isSilent())
             op.setSilent(true);
 
-        final RDFParserOptions options = new RDFParserOptions(
-                context.tripleStore.getProperties());
-
-        if (node.verifyData != null) {
-
-            options.setVerifyData(node.verifyData);
-
-        }
-
-        if (node.stopAtFirstError != null) {
-
-            options.setStopAtFirstError(node.stopAtFirstError);
-
-        }
-
-        if (node.preserveBNodeIDs != null) {
-
-            options.setPreserveBNodeIDs(node.preserveBNodeIDs);
-
-        }
-
-        if (node.datatypeHandling != null) {
-
-            options.setDatatypeHandling(node.datatypeHandling);
-
-        }
-
-        op.setRDFParserOptions(options);
-        
         if (node.jjtGetNumChildren() > 1) {
 
             final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(1)
@@ -642,12 +611,14 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             final ASTIRI withNode = node.getWithClause();
             
             if (withNode != null) {
-                
-                if (!context.tripleStore.isQuads()) {
-                    throw new QuadsOperationInTriplesModeException(
-                         "Using named graph referenced through WITH clause " +
-                         "is not supported in triples mode.");
-                }
+
+                // @see https://jira.blazegraph.com/browse/BLZG-1176
+                // moved to com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
+//                if (!context.tripleStore.isQuads()) {
+//                    throw new QuadsOperationInTriplesModeException(
+//                         "Using named graph referenced through WITH clause " +
+//                         "is not supported in triples mode.");
+//                }
                 
                 with = (ConstantNode) withNode.jjtAccept(this, data);
 
@@ -787,15 +758,17 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         /**
          * Reject real quads in triple mode
          */
-        if (!context.tripleStore.isQuads()) {
-           for (Statement stmt : stmts) {
-              if (stmt!=null && stmt.getContext()!=null) {
-                 throw new QuadsOperationInTriplesModeException(
-                    "Quads in SPARQL update data block are not supported " +
-                    "in triples mode.");
-              }
-           }
-        }
+        // @see https://jira.blazegraph.com/browse/BLZG-1176
+        // moved to com.bigdata.rdf.sail.sparql.ASTDeferredIVResolution.fillInIV(AST2BOpContext, BOp)
+//        if (!context.tripleStore.isQuads()) {
+//           for (Statement stmt : stmts) {
+//              if (stmt!=null && stmt.getContext()!=null) {
+//                 throw new QuadsOperationInTriplesModeException(
+//                    "Quads in SPARQL update data block are not supported " +
+//                    "in triples mode.");
+//              }
+//           }
+//        }
 
          if (!allowBlankNodes) {
    

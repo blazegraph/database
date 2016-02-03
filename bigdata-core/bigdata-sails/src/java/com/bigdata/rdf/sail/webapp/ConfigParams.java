@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -167,34 +167,21 @@ public interface ConfigParams {
     String DEFAULT_WARMUP_NAMESPACE_LIST = "";
     
     /**
-     * A class that extends {@link BigdataRDFServletContextListener}. This
-     * offers applications a means to hook the {@link ServletContextListener}
-     * methods.
-     * <p>
-     * Note:
-     *
-     * @see BigdataRDFServletContextListener#contextInitialized(ServletContextEvent)
-     * @see BigdataRDFServletContextListener#contextDestroyed(ServletContextEvent)
-     * @see #DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS
-     *
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/667" >
-     *      Provide NanoSparqlServer initialization hook </a>
-     */
-    final String SERVLET_CONTEXT_LISTENER_CLASS = "servletContextListenerClass";
-
-    String DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS = BigdataRDFServletContextListener.class
-            .getName();
-    
-    /**
-     * A class the implements the {@link BlueprintsServletProxy}.
+     * A class that implements the {@link BlueprintsServletProxy}.
      * 
      * @see <a href="https://jira.blazegraph.com/browse/BLZG-1295"> Refactor Blueprints </a>
      * 
      */
-    
     final String BLUEPRINTS_SERVLET_PROVIDER = "blueprintsServletProvider";
     
     final static String DEFAULT_BLUEPRINTS_SERVLET_PROVIDER = BlueprintsServletProxy.getDefaultProvider();
+
+    /**
+     * A class that implements the {@link MapgraphServletProxy}.
+     */
+    final String MAPGRAPH_SERVLET_PROVIDER = "mapgraphServletProvider";
+    
+    final static String DEFAULT_MAPGRAPH_SERVLET_PROVIDER = MapgraphServletProxy.getDefaultProvider();
 
     /**
      * List of the services this instance is allowed to call out to.

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.openrdf.query.Dataset;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.sail.SailException;
 
@@ -61,6 +62,8 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
     private QueryBindingSet qbs;
     
     private IBindingSet[] bindingSets;
+
+    private Dataset dataset;
 
     /**
      * The timestamp associated with the commit point for the update and
@@ -177,4 +180,11 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
 
     private BigdataURI nullGraph = null;
 
+    public void setDataset(Dataset dataset) {
+        this.dataset = dataset;
+    }
+
+    public Dataset getDataset() {
+        return dataset;
+    }
 }

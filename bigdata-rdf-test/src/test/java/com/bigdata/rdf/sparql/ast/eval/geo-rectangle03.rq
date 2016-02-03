@@ -1,0 +1,12 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?res WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inRectangle" .
+    ?res geo:predicate <http://p> .
+    ?res geo:spatialRectangleSouthWest "-1#9" .
+    ?res geo:spatialRectangleNorthEast "1#12" .
+    ?res geo:timeStart "7" .
+    ?res geo:timeEnd "12" .
+  }
+} 

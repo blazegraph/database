@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -87,7 +87,24 @@ public class TestParsing extends TestCase2 {
         assertEquals(new String[] {"06:35:15", "501", "0.00", "0.01", "0.00", "1", "kjournald"}, fields);
         
     }
-    
+
+    /**
+     * Test for {@link SysstatUtil#splitDataLine(String)}.
+     */
+    public void test_splitDataLineLeadingSpaces(){
+
+        final String header = " 06:35:15        PID   %user %system    %CPU   CPU  Command";
+
+        final String[] fields = SysstatUtil.splitDataLine(header);
+
+        if (log.isInfoEnabled())
+            log.info(Arrays.toString(fields));
+
+        System.out.println(Arrays.toString(fields));
+        assertEquals(new String[] { "06:35:15", "PID", "%user", "%system",
+                "%CPU", "CPU", "Command" }, fields);
+
+    }
     /**
      * Test parse of the sysstat ISO date format.
      * 

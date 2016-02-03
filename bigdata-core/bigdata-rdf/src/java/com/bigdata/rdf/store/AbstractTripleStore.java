@@ -1,12 +1,12 @@
 /**
 
- Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+ Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
  Contact:
- SYSTAP, LLC
+ SYSTAP, LLC DBA Blazegraph
  2501 Calvert ST NW #106
  Washington, DC 20008
- licenses@systap.com
+ licenses@blazegraph.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -139,11 +139,10 @@ import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.spo.XXXCShardSplitHandler;
 import com.bigdata.rdf.vocab.BaseVocabulary;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
-import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151106;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151210;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -686,7 +685,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151106.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151210.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -1298,6 +1297,20 @@ abstract public class AbstractTripleStore extends
         String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".rdrHistoryClass";
 
+        /**
+         * Enable GeoSpatial support. See https://jira.blazegraph.com/browse/BLZG-249.
+         */
+        String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
+      
+        String DEFAULT_GEO_SPATIAL = "false";
+
+        /**
+         * GeoSpatial configuration. See https://jira.blazegraph.com/browse/BLZG-249.
+         */
+        String GEO_SPATIAL_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialConfig";
+      
+        String DEFAULT_GEO_SPATIAL_CONFIG = null;
+        
         /**
          * If this option is set to false, do not compute closure for sids.
          */
@@ -2360,7 +2373,14 @@ abstract public class AbstractTripleStore extends
 
         rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount();
 
-        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
+        IIndex blobsIndex = null;
+        try {
+            blobsIndex = getLexiconRelation().getBlobsIndex();
+            rangeCount += blobsIndex.rangeCount();
+        } catch(IllegalStateException ex) {
+            // No blobs index.  fall through
+        }
+//        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
 
         return rangeCount;
 
@@ -2396,8 +2416,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
 
         }
 
@@ -2405,6 +2430,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getLiteralCount() {
 
         long rangeCount = 0L;
@@ -2434,8 +2460,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
         }
  
         return rangeCount;
@@ -2448,6 +2479,7 @@ abstract public class AbstractTripleStore extends
      * Note: Will always return zero (0) if {@value Options#STORE_BLANK_NODES}
      * is <code>false</code>.
      */
+    @Override
     final public long getBNodeCount() {
 
         if (!getLexiconRelation().isStoreBlankNodes())
@@ -2480,8 +2512,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
 
         }
 

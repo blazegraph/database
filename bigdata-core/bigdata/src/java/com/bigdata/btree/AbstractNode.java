@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -79,9 +79,9 @@ public abstract class AbstractNode<T extends AbstractNode
     protected static final Logger log = Logger.getLogger(AbstractNode.class);
     
     /**
-     * True iff the {@link #log} level is INFO or less.
+     * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean INFO = log.isInfoEnabled();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The BTree.
@@ -463,8 +463,8 @@ public abstract class AbstractNode<T extends AbstractNode
 
         }
 
-        if (INFO) {
-            log.info("this=" + this + ", trigger=" + triggeredByChildId);
+        if (DEBUG) {
+            log.debug("this=" + this + ", trigger=" + triggeredByChildId);
 //                if( DEBUG ) {
 //                    System.err.println("this"); dump(Level.DEBUG,System.err);
 //                }
@@ -504,8 +504,8 @@ public abstract class AbstractNode<T extends AbstractNode
             assert parent == null;
 
             // Update the root node on the btree.
-            if(log.isInfoEnabled())
-                log.info("Copy-on-write : replaced root node on btree.");
+            if(DEBUG)
+                log.debug("Copy-on-write : replaced root node on btree.");
 
             final boolean wasDirty = btree.root.dirty;
             
@@ -915,8 +915,8 @@ public abstract class AbstractNode<T extends AbstractNode
         
         final Node parent = getParent();
 
-        if (INFO) {
-            log.info("this="+this);
+        if (DEBUG) {
+            log.debug("this="+this);
 //            if(DEBUG) {
 //                System.err.println("this"); dump(Level.DEBUG,System.err);
 //            }

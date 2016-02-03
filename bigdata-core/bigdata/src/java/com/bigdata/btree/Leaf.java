@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1077,8 +1077,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
         // increment #of leaves in the tree.
         btree.nleaves++;
 
-        if (INFO) {
-            log.info("this=" + this + ", nkeys=" + getKeyCount() + ", splitIndex="
+        if (DEBUG) {
+            log.debug("this=" + this + ", nkeys=" + getKeyCount() + ", splitIndex="
                     + splitIndex + ", separatorKey="
                     + keyAsString(separatorKey)
                     );
@@ -1269,8 +1269,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
         // children of the same node.
         assert s.getParent() == p;
 
-        if (INFO) {
-            log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
+        if (DEBUG) {
+            log.debug("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
 //            if(DEBUG) {
 //                System.err.println("this"); dump(Level.DEBUG,System.err);
 //                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
@@ -1489,8 +1489,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
                 + " != s.parent="
                 + (s.getParent() == null ? null : s.getParent());
 
-        if (INFO) {
-            log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
+        if (DEBUG) {
+            log.debug("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
 //            if(DEBUG) {
 //                System.err.println("this"); dump(Level.DEBUG,System.err);
 //                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);

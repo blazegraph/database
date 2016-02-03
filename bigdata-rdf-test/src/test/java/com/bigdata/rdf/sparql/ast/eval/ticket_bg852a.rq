@@ -1,0 +1,5 @@
+select *
+{ { { BIND(1 as $x) } UNION { BIND(2 as $y ) } }
+  MINUS
+ { { BIND(1 as $x) } UNION { BIND(2 as $y ) } }
+}
