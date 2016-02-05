@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.Collections;
+import java.util.Iterator;
+
 import com.bigdata.rdf.model.BigdataValue;
 
 
@@ -45,8 +48,8 @@ public class NoExtensionFactory implements IExtensionFactory {
     }
 
     @Override
-    public IExtension[] getExtensions() {
-        return new IExtension[]{};
+    public Iterator<IExtension<? extends BigdataValue>> getExtensions() {
+        return Collections.emptyIterator();
     }
 
 }
