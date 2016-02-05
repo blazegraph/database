@@ -635,6 +635,10 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
         	
             return createURI(((URI) v).stringValue());
             
+        } else if (v instanceof BigdataBNode && ((BigdataBNode)v).isStatementIdentifier()) {
+
+       		return createBNode(((BigdataBNode) v).getStatement());
+
         } else if (v instanceof BNode) {
 
             return createBNode(((BNode) v).stringValue());
