@@ -150,8 +150,10 @@ public class URIExtensionIV<V extends BigdataURI>
      */
     @Override
     public String toString() {
-//        return this.namespaceIV.toString() + ":" + this.delegateIV.toString();
-        return getValue().stringValue();
+    	if (this.namespaceIV != null && this.delegateIV != null )
+    		return this.namespaceIV.toString() + ":" + this.delegateIV.toString();
+    	else 
+    		return getValue().stringValue();
     }
     
     @Override
