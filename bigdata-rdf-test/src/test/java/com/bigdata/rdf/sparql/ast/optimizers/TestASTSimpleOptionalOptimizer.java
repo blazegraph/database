@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -57,6 +57,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 
 /**
  * Test suite for {@link ASTSimpleOptionalOptimizer}.
@@ -103,7 +104,7 @@ public class TestASTSimpleOptionalOptimizer extends
                 "  } \n" + //
                 "}";
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer,store);
@@ -199,8 +200,10 @@ public class TestASTSimpleOptionalOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
@@ -284,8 +287,10 @@ public class TestASTSimpleOptionalOptimizer extends
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
+
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -401,7 +406,7 @@ public class TestASTSimpleOptionalOptimizer extends
 //        store.getLexiconRelation()
 //                .addTerms(values, values.length, false/* readOnly */);
 //
-//        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+//        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
 //                .parseQuery2(queryStr, baseURI);
 //
 //        final AST2BOpContext context = new AST2BOpContext(astContainer, store);

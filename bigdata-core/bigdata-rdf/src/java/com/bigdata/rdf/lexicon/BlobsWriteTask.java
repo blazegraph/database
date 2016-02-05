@@ -22,7 +22,6 @@ import com.bigdata.service.ndx.pipeline.KVOList;
  * Synchronous RPC write on the TERMS index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
  */
 public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
@@ -259,7 +258,6 @@ public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
      * {@link #a} is given by {@link Split#fromIndex}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
      */
 	static class BlobsWriteProcResultHandler implements
 			IResultHandler<BlobsWriteProc.Result, Void> {
@@ -304,6 +302,7 @@ public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
          * Copy the assigned / discovered term identifiers onto the
          * corresponding elements of the terms[].
          */
+		@Override
         public void aggregate(final BlobsWriteProc.Result result,
                 final Split split) {
 
@@ -370,6 +369,7 @@ public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
         }
 
+		@Override
         public Void getResult() {
 
             return null;

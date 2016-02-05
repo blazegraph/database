@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ import junit.framework.TestCase;
 
 import org.junit.Test;
 
-import com.bigdata.rdf.sail.remote.BigdataSailFactory;
+import com.bigdata.util.httpd.Config;
 
 /**
  * Test suite for the {@link BigdataSailFactory}.
@@ -35,16 +35,16 @@ import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 public class BigdataSailFactoryTest extends TestCase {
 
 	//The correctly normalized value for the remote repository
-	protected static final String remoteRepositoryUrl = "http://localhost:9999/bigdata";
+	protected static final String remoteRepositoryUrl = Config.DEFAULT_ENDPOINT;
 	
 	//The correctly normalized value for the remote repository
-	protected static final String remoteRepositoryNamespaceUrl = "http://localhost:9999/bigdata/namespace/NAMESPACE";
-
+	protected static final String remoteRepositoryNamespaceUrl = Config.DEFAULT_ENDPOINT
+			+ "/namespace/NAMESPACE";
 
 	@Test
 	public void testWithSparql() {
 		
-		String serviceEndpoint = "http://localhost:9999/bigdata/sparql";
+		String serviceEndpoint = Config.DEFAULT_ENDPOINT + "/sparql";
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -54,7 +54,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testWithoutSparql() {
 		
-		String serviceEndpoint = "http://localhost:9999/bigdata/";
+		String serviceEndpoint = Config.DEFAULT_ENDPOINT + "/";
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -64,7 +64,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testWithoutSparqlAndNoTrailingSlash() {
 		
-		String serviceEndpoint = "http://localhost:9999/bigdata";
+		String serviceEndpoint =  Config.DEFAULT_ENDPOINT;
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -74,7 +74,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testHostOnly() {
 		
-		String serviceEndpoint = "http://localhost:9999/";
+		String serviceEndpoint = "http://" + Config.DEFAULT_HOST + ":" + Config.BLAZEGRAPH_HTTP_PORT + "/";
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -84,7 +84,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testHostOnlyNoTrailingSlash() {
 		
-		String serviceEndpoint = "http://localhost:9999";
+		String serviceEndpoint = "http://" + Config.DEFAULT_HOST + ":" + Config.BLAZEGRAPH_HTTP_PORT;
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -94,7 +94,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testWithNamespaceNoSparql() {
 		
-		String serviceEndpoint = "http://localhost:9999/bigdata/namespace/NAMESPACE";
+		String serviceEndpoint = Config.DEFAULT_ENDPOINT + "/namespace/NAMESPACE";
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -104,7 +104,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testWithNamespaceNoSparqlWithTrailingSlash() {
 		
-		String serviceEndpoint = "http://localhost:9999/bigdata/namespace/NAMESPACE/";
+		String serviceEndpoint = Config.DEFAULT_ENDPOINT + "/namespace/NAMESPACE/";
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -114,7 +114,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testWithNamespaceSparql() {
 		
-		String serviceEndpoint = "http://localhost:9999/bigdata/namespace/NAMESPACE/sparql";
+		String serviceEndpoint = Config.DEFAULT_ENDPOINT + "/namespace/NAMESPACE/sparql";
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
@@ -124,7 +124,7 @@ public class BigdataSailFactoryTest extends TestCase {
 	@Test
 	public void testWithNamespaceSparqlTrailingSlash() {
 		
-		String serviceEndpoint = "http://localhost:9999/bigdata/namespace/NAMESPACE/sparql/";
+		String serviceEndpoint = Config.DEFAULT_ENDPOINT + "/namespace/NAMESPACE/sparql/";
 		String normalizedServiceURL = 
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Collections;
+
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.Constant;
@@ -42,18 +45,18 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IPrefixDecls.Annotations;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 
 /**
- * Test suite for {@link ASTBatchResolveTermsOptimizer}.
+ * Test suite for {@link ASTDeferredIVResolution}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestASTServiceNodeOptimizer.java 6080 2012-03-07 18:38:55Z thompsonbry $
@@ -90,8 +93,9 @@ public class TestASTBatchResolveTermsOptimizer extends AbstractASTEvaluationTest
 	 * where the unknown term is <code>http://example/out</code> and IS in fact
 	 * in the lexicon, the {@link IValueExpression} for the {@link ConstantNode}
 	 * associated with that mock IV is rewritten to the resolved IV.
+     * @throws MalformedQueryException 
 	 */
-    public void test_batchResolveTerms_01() {
+    public void test_batchResolveTerms_01() throws MalformedQueryException {
 
         /*
 		 * Note: DO NOT share structures in this test!!!!
@@ -161,6 +165,7 @@ public class TestASTBatchResolveTermsOptimizer extends AbstractASTEvaluationTest
 
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
+            expected.setProperty(Annotations.PREFIX_DECLS, Collections.emptyMap());
 
             projection.addProjectionVar(new VarNode("s"));
             projection.addProjectionVar(new VarNode("p"));
@@ -168,7 +173,7 @@ public class TestASTBatchResolveTermsOptimizer extends AbstractASTEvaluationTest
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             expected.setWhereClause(whereClause);
-
+            expected.setProperty(Annotations.PREFIX_DECLS, Collections.emptyMap());
             {
 
 				final JoinGroupNode graphPattern = new JoinGroupNode();
@@ -188,14 +193,12 @@ public class TestASTBatchResolveTermsOptimizer extends AbstractASTEvaluationTest
 
         }
 
-        final IASTOptimizer rewriter = new ASTBatchResolveTermsOptimizer();
+        ASTContainer astContainer = new ASTContainer(given);
 
-        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
-                given), store);
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
-        final IQueryNode actual = rewriter.optimize(context,
-              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
-
+        QueryRoot actual = astContainer.getOriginalAST();
+        
         assertSameAST(expected, actual);
 
     }
@@ -203,8 +206,9 @@ public class TestASTBatchResolveTermsOptimizer extends AbstractASTEvaluationTest
     /**
 	 * A variant of the test above where the Constant/2 constructor was used and
 	 * we need to propagate the variable associated with that constant.
+     * @throws MalformedQueryException 
 	 */
-	public void test_batchResolveTerms_02() {
+	public void test_batchResolveTerms_02() throws MalformedQueryException {
 
         /*
 		 * Note: DO NOT share structures in this test!!!!
@@ -274,6 +278,7 @@ public class TestASTBatchResolveTermsOptimizer extends AbstractASTEvaluationTest
 
 			final ProjectionNode projection = new ProjectionNode();
 			expected.setProjection(projection);
+            expected.setProperty(Annotations.PREFIX_DECLS, Collections.emptyMap());
 
 			projection.addProjectionVar(new VarNode("s"));
 			projection.addProjectionVar(new VarNode("p"));
@@ -301,13 +306,12 @@ public class TestASTBatchResolveTermsOptimizer extends AbstractASTEvaluationTest
 
         }
 
-        final IASTOptimizer rewriter = new ASTBatchResolveTermsOptimizer();
+        ASTContainer astContainer = new ASTContainer(given);
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
-        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
-                given), store);
+        ASTDeferredIVResolution.resolveQuery(store, astContainer);
 
-        final IQueryNode actual = rewriter.optimize(context,
-               new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
+        QueryRoot actual = astContainer.getOriginalAST();
 
         assertSameAST(expected, actual);
 

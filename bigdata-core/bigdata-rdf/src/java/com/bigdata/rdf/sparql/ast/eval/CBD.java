@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.iterator.CollectionIteration;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -465,7 +466,7 @@ public class CBD {
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
         final IBindingSet[] bindingSets = 
-              new IBindingSet[] { ASTEvalHelper.batchResolveIVs(store, null) };
+              new IBindingSet[] { new ListBindingSet() };
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);

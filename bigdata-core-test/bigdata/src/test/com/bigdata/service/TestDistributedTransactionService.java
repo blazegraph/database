@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -135,9 +135,12 @@ public class TestDistributedTransactionService extends
         final long tx = fed.getTransactionService().newTx(ITx.UNISOLATED);
         
         // submit write operation to the ds.
-        dataService1.submit(tx, name1, new IIndexProcedure(){
+        dataService1.submit(tx, name1, new IIndexProcedure<Void>(){
 
-            public Object apply(IIndex ndx) {
+			private static final long serialVersionUID = 1L;
+
+			@Override
+            public Void apply(final IIndex ndx) {
                 
                 // write on the index.
                 ndx.insert(new byte[]{1}, new byte[]{1});
@@ -150,10 +153,13 @@ public class TestDistributedTransactionService extends
             }}).get();
         
         // verify write not visible to unisolated operation.
-        dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure(){
+        dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure<Void>(){
 
-            public Object apply(IIndex ndx) {
-                
+			private static final long serialVersionUID = 1L;
+
+			@Override
+            public Void apply(final IIndex ndx) {
+
                 // verify not in the index.
                 assertFalse(ndx.contains(new byte[]{1}));
                 
@@ -168,10 +174,13 @@ public class TestDistributedTransactionService extends
         fed.getTransactionService().abort(tx);
 
         // verify write still not visible.
-        dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure(){
+        dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure<Void>(){
 
-            public Object apply(IIndex ndx) {
-                
+			private static final long serialVersionUID = 1L;
+
+			@Override
+            public Void apply(final IIndex ndx) {
+
                 // verify not in the index.
                 assertFalse(ndx.contains(new byte[]{1}));
                 
@@ -184,21 +193,31 @@ public class TestDistributedTransactionService extends
 
         // verify operation rejected for aborted read-write tx.
         try {
-        dataService1.submit(tx, name1, new IIndexProcedure(){
 
-            public Object apply(IIndex ndx) {
-                // NOP
-                return null;
-            }
+			dataService1.submit(tx, name1, new IIndexProcedure<Void>() {
 
-            public boolean isReadOnly() {
-                return false;// read-write.
-            }}).get();
-        fail("Expecting exception");
-        } catch(Throwable t) {
-            log.info("Ignoring expected error: "+t);
-        }
-        
+				private static final long serialVersionUID = 1L;
+
+				@Override
+	            public Void apply(final IIndex ndx) {
+
+	        		// NOP
+					return null;
+				}
+
+				public boolean isReadOnly() {
+					return false;// read-write.
+				}
+			}).get();
+
+			fail("Expecting exception");
+			
+		} catch (Throwable t) {
+			
+			log.info("Ignoring expected error: " + t);
+			
+		}
+
     }
 
 // FIXME full distributed read-write tx support is not finished yet so these

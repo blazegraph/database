@@ -1,0 +1,11 @@
+rm -f /etc/init.d/blazegraph
+rm -f /etc/logrotate.d/blazegraph
+rm -f /etc/blazegraph
+
+rm -rf /usr/local/blazegraph/conf
+rm -rf /usr/local/blazegraph/bin
+rm -rf /usr/local/blazegraph/war
+rm -rf /usr/local/blazegraph/lib
+
+#Leave the data dir
+rm -f /usr/local/blazegraph

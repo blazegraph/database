@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -113,7 +113,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n"+
                 "select ?x where { ?x rdf:type foaf:Person }";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -148,7 +148,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n"+
                 "select ?x (12 as ?y) where { ?x rdf:type foaf:Person }";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -196,7 +196,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "  include %namedSet1\n" +
                 "}";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -244,7 +244,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "  }\n" +
                 "}";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -290,7 +290,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "    }\n" +
                 "}";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -358,7 +358,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "   INCLUDE %namedSet1 \n"+
                 "}";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI).getOriginalAST();
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -445,7 +445,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "SELECT ?v \n" +//
                 "{ :x :p ?v . FILTER(?v = 1) }";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI).getOriginalAST();
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -496,7 +496,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "SELECT ?v \n" +//
                 "{ :x :p ?v . { FILTER(?v = 1) } }";
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(
                 queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -651,7 +651,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "}"//
         ;
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -854,7 +854,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "}"//
         ;
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -1019,7 +1019,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "   ?subj ?p ?lit .\n" + //
                 "}";
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -1113,7 +1113,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 + "  }\n"//
                 + "}";
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -1332,7 +1332,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         "   "+//
         "}";
         
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
                 .parseQuery2(queryStr, baseURI);
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);

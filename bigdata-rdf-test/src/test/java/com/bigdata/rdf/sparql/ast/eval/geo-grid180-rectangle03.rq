@@ -1,0 +1,15 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?res WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inRectangle" .
+    ?res geo:predicate <http://p> .
+    ?res geo:spatialRectangleSouthWest "0#-178" .
+    ?res geo:spatialRectangleNorthEast "0#178" .
+    ?res geo:timeStart "0" .
+    ?res geo:timeEnd "0" .
+  }
+  # when filtering for URIs starting with -17 or 17, -178..-171, 171..178,
+  # but not -179 and 179 (which is not included in the result)
+  FILTER(STRSTARTS(STR(?res),"http://s.0#17") || STRSTARTS(STR(?res),"http://s.0#-17")) 
+}

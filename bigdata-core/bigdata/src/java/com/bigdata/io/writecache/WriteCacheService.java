@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -530,7 +530,7 @@ abstract public class WriteCacheService implements IWriteCache {
 the clear/dirty list threshold)
              */
             
-            minCleanListSize = Math.max(4, (int) (nwriteBuffers*.05));
+            minCleanListSize = Math.max(4, (int) (nwriteBuffers*.003));
 
         }
         
@@ -1764,6 +1764,28 @@ the clear/dirty list threshold)
         } finally {
             writeLock.unlock();
         }
+    }
+
+    public void resetAndClear() throws InterruptedException {
+        final WriteLock writeLock = lock.writeLock();
+        writeLock.lockInterruptibly();
+        try {
+	    	reset();
+	        /*
+	         * Note: DO NOT clear the service record map. This still has valid
+	         * cache entries (the read cache).
+	         */
+	        // clear the service record map.
+	        serviceMap.clear();
+	
+	        // reset each buffer.
+	        for (WriteCache t : writeBuffers) {
+	            t.reset();
+	        }
+        } finally {
+        	writeLock.unlock();
+        }
+
     }
 
     /**
@@ -3253,12 +3275,12 @@ the clear/dirty list threshold)
         }
 
     }
-
+    
     /**
      * Attempt to read record from cache (either write cache or read cache
      * depending on the service map state).
      */
-    private ByteBuffer _readFromCache(final long offset, final int nbytes)
+    public ByteBuffer _readFromCache(final long offset, final int nbytes)
             throws ChecksumError, InterruptedException {
     
         if (nbytes > capacity) {

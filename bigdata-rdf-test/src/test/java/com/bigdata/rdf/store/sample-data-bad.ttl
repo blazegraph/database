@@ -1,0 +1,20 @@
+# Note: This file is not legal RDF. There is a Literal in the subject position.
+@prefix bd: <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+#: {
+   "Mike" rdf:type foaf:Person .
+   bd:Bryan rdf:type foaf:Person .
+   bd:Martyn rdf:type foaf:Person .
+
+   bd:Mike rdfs:label "Mike" .
+   bd:Bryan rdfs:label "Bryan" .
+   bd:DC rdfs:label "DC" .
+
+   bd:Mike foaf:knows bd:Bryan .
+   bd:Bryan foaf:knows bd:Mike .
+   bd:Bryan foaf:knows bd:Martyn .
+   bd:Martyn foaf:knows bd:Bryan .
+#}

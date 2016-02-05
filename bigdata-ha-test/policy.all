@@ -1,9 +1,0 @@
-/*# Grant all permissions.  Used by some test cases.  The policy must
-# be explicitly named on the command line using:
-#
-#    -Djava.security.policy="policy.all"
-# 
-*/
-grant {
-    permission java.security.AllPermission "", "";
-};

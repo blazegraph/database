@@ -1,0 +1,17 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?res WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inRectangle" .
+    ?res geo:predicate <http://p> .
+    ?res geo:spatialRectangleSouthWest "4#4" .
+    ?res geo:spatialRectangleNorthEast "5#5" .
+    ?res geo:timeStart "1" .
+    ?res geo:timeEnd "10" .
+  }
+  hint:Prior <http://www.bigdata.com/queryHints#maxParallel> "10" .
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity> "1" .
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.relation.accesspath.IBuffer.chunkCapacity> "1" .
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.numTasksPerThread> "2" .
+  hint:Prior <http://www.bigdata.com/queryHints#com.bigdata.bop.join.PipelineJoin.minDatapointsPerTask> "1" .  
+} 

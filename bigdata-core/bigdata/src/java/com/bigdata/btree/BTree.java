@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -755,7 +755,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
 
             writeNodeRecursive(root);
             
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info("flushed root: addr=" + root.identity);
             
             return true;
@@ -1039,14 +1039,14 @@ public class BTree extends AbstractBTree implements //ICommitter,
         // write it on the store.
         checkpoint.write(store);
         
-        if (BigdataStatics.debug||log.isInfoEnabled()) {
+        if (BigdataStatics.debug||INFO) {
             final String msg = "name=" + metadata.getName()
                     + ", writeQueue{size=" + writeRetentionQueue.size()
                     + ",distinct=" + ndistinctOnWriteRetentionQueue + "} : "
                     + checkpoint;
             if (BigdataStatics.debug)
                 System.err.println(msg);
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(msg);
         }
         
@@ -1853,7 +1853,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
 					+ store + ", checkpoint=" + checkpoint, t);
 		}
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             // Note: this is the scale-out index name for a partitioned index.
             final String name = metadata.getName();

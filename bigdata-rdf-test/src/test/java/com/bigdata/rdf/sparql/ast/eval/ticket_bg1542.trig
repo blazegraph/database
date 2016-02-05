@@ -1,0 +1,6 @@
+<http://example.org/graph> {
+   <http://s1> <http://p1> <http://o1> .
+   <http://s1> <http://p2> <http://o2> .
+
+   <http://s2> <http://p1> <http://o1> .
+}

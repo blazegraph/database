@@ -1,0 +1,5 @@
+<http://default> {
+  <http://s1a> <http://p> <http://o1> .
+  <http://s1b> <http://p> <http://o1> .
+  <http://s2> <http://p> <http://o2> .
+}

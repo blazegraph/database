@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="res"/>
+    <variable name="o"/>
+  </head>
+  <results>
+     <result>
+      <binding name="res"><uri>http://s1</uri></binding>
+      <binding name="o"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">1.1#1.1#0</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s2</uri></binding>
+      <binding name="o"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.22#2.22#0</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s3</uri></binding>
+      <binding name="o"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.333#3.333#0</literal></binding>      
+     </result>
+     <result>
+      <binding name="res"><uri>http://s4</uri></binding>
+      <binding name="o"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">4.4444#4.4444#0</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s5</uri></binding>
+      <binding name="o"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">5.55555#5.55555#0</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s6</uri></binding>
+      <binding name="o"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">6.66666#6.66666#0</literal></binding>
+     </result>
+     <result>
+      <binding name="res"><uri>http://s6c</uri></binding>
+      <binding name="o"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">6.66666#6.66667#0</literal></binding>
+     </result>
+     
+  </results>
+</sparql>

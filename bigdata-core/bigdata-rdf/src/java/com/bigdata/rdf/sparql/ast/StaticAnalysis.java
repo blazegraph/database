@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -919,7 +919,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 vars.addAll(sp.getProducedBindings());
 //                
 //            }
-
+        } else if (node instanceof PropertyPathNode) {
+            
+            final PropertyPathNode ppn = (PropertyPathNode) node;
+            vars.addAll(ppn.getProducedBindings());
+            
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
         	vars.addAll(((ArbitraryLengthPathNode) node).getDefinitelyProducedBindings());
@@ -1084,6 +1088,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //                
 //            }
 
+        } else if (node instanceof PropertyPathNode) {
+            
+            final PropertyPathNode ppn = (PropertyPathNode) node;
+            vars.addAll(ppn.getProducedBindings());
+            
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
         	vars.addAll(((ArbitraryLengthPathNode) node).getMaybeProducedBindings());
@@ -1195,7 +1204,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                     getDefinitelyProducedBindings(sp, vars, recursive);
 
                 }
-
+                
             } else if (child instanceof ArbitraryLengthPathNode) {
             	
             	vars.addAll(((ArbitraryLengthPathNode) child).getDefinitelyProducedBindings());
@@ -1257,6 +1266,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 final BindingsClause bc = (BindingsClause) child;
                 
                 vars.addAll(bc.getDeclaredVariables());
+
+            } else if (child instanceof PropertyPathNode) {
+                
+                getDefinitelyProducedBindings((PropertyPathNode)child, vars, recursive);
 
             } else {
 
@@ -2488,6 +2501,29 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             for (IValueExpressionNode exprNode : projection) {
 
+                if (isAggregateExpressionNode(exprNode)) {
+                    return true;
+                }
+
+            }
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Checks if given expression node is or contains any aggregates
+     * <br><br>
+     * After refactoring of SPARQL parser (https://jira.blazegraph.com/browse/BLZG-1176),
+     * AggregationNode needs to be checked recuresively, as its value expression is not completely parsed, but could be an aggregate, that should result in failing checks while preparing queries.
+     * For example, following test is failing without this check: com.bigdata.rdf.sail.sparql.BigdataSPARQL2ASTParserTest.test_agg10() 
+     * 
+     * @param exprNode - expression node to be checked
+     */
+    private static boolean isAggregateExpressionNode(IValueExpressionNode exprNode) {
+        
                 final IValueExpression<?> expr = exprNode.getValueExpression();
 
                 if (expr == null) {
@@ -2496,6 +2532,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                      * The value expression is not cached....
                      */
                     
+                    if (exprNode instanceof AssignmentNode) {
+                        return isAggregateExpressionNode(((AssignmentNode) exprNode).getValueExpressionNode());
+                    }
+
                     if (exprNode instanceof FunctionNode) {
 
                         /*
@@ -2523,13 +2563,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                     return true;
 
                 }
-
-            }
-
-        }
-
-        return false;
-
+                return false;
     }
 
     /**

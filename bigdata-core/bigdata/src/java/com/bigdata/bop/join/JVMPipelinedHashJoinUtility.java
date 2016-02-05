@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -60,13 +60,13 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Utility class supporting a pipelined hash join. This is a variant of the
- * JVMHashJoinUtility. See {@link PipelinedHashIndexAndSolutionSetOp} for a
+ * JVMHashJoinUtility. See {@link PipelinedHashIndexAndSolutionSetJoinOp} for a
  * documentation of this functionality.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
+public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements PipelinedHashJoinUtility {
 
    private static final Logger log = Logger.getLogger(JVMPipelinedHashJoinUtility.class);
 
@@ -92,17 +92,17 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
   
 
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionBuffer}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionBuffer}
     */
    final Set<IBindingSet> distinctProjectionBuffer = new HashSet<IBindingSet>();
    
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#incomingBindingsBuffer}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#incomingBindingsBuffer}
     */
    final List<IBindingSet> incomingBindingsBuffer = new LinkedList<IBindingSet>();
  
    /**
-    * See {@link PipelinedHashIndexAndSolutionSetOp#distinctProjectionsWithoutSubqueryResult}
+    * See {@link PipelinedHashIndexAndSolutionSetJoinOp#distinctProjectionsWithoutSubqueryResult}
     */
    final Set<IBindingSet> distinctProjectionsWithoutSubqueryResult = new HashSet<IBindingSet>();
    
@@ -119,7 +119,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
       
       super(op, joinType);
       
-      if (!(op instanceof PipelinedHashIndexAndSolutionSetOp)) {
+      if (!(op instanceof PipelinedHashIndexAndSolutionSetJoinOp)) {
          throw new IllegalArgumentException();
       }
       
@@ -148,11 +148,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility {
         
     };
     
-    /**
-     * AcceptAndOutputSolutions is a special method for building the hash index
-     * of the {@link JVMPipelinedHashIndex}, which accepts and immediately
-     * forwards relevant solutions (non-blocking index).
-     */
+    @Override
     public long acceptAndOutputSolutions(
           final UnsyncLocalOutputBuffer<IBindingSet> out,
           final ICloseableIterator<IBindingSet[]> itr, final NamedSolutionSetStats stats,

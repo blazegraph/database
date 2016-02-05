@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -71,6 +71,7 @@ import com.bigdata.journal.VerifyCommitRecordIndex;
 import com.bigdata.util.Bytes;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PseudoRandom;
@@ -1838,6 +1839,76 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		/**
+		 * Test to determine that allocation performance does not degrade at scale.
+		 * 
+		 * The idea is to first create 128K  allocations, and measure recycling
+		 * performance.
+		 * 
+		 * Then to add an additional 128K allocations and re-measure recycling to
+		 * observe if performance degrades.
+		 * 
+		 * The test is "observational" and console output should be monitored.
+		 * 
+		 * Should be disabled for CI.
+		 */
+		public void notest_stress_alloc_performance() {
+            final Properties properties = new Properties(getProperties());
+
+            // we want lots of allocators, but avoid a large file
+            properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,4,5,6,7,8"); // 512 max
+
+			final Journal store = (Journal) getStore(properties);
+
+			try {
+
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				
+				System.out.println("File: " + rw.getStoreFile().getAbsolutePath());
+
+				final ArrayList<Integer> addrs = new ArrayList<Integer>();
+				
+				final Random r = new Random();
+				
+				for (int i = 0; i < 2048*64; i++) {
+					addrs.add(rw.alloc(1+r.nextInt(500), null));
+				}
+				
+				final long s1 = System.nanoTime();
+				for (int t = 0; t < 1024 * 1024; t++) {
+					final int i = r.nextInt(addrs.size());
+				}
+				final long s2 = System.nanoTime();
+				System.out.println("Random iter: " + (s2-s1) + "ns");
+
+				System.out.println("File size: " + rw.getStoreFile().length());
+				
+				for (int run = 0; run < 20; run++) {
+					for (int i = 0; i < 2048*64; i++) {
+						addrs.add(rw.alloc(1+r.nextInt(500), null));
+					}
+					final long s3 = System.nanoTime();
+					for (int t = 0; t < 1024 * 1024; t++) {
+						final int i = r.nextInt(addrs.size());
+						rw.free(addrs.get(i), 1);
+						addrs.set(i, rw.alloc(1+r.nextInt(500), null));
+					}
+					final long s4 = System.nanoTime();
+					System.out.println("Test1 Alloc: " + (s4-s3) + "ns");
+					System.out.println("File size: " + rw.getStoreFile().length());
+				}
+				
+
+			} finally {
+
+				store.destroy();
+
+			}
+
+		}
+
+		/**
 		 * Test of blob allocation, does not check on read back, just the
 		 * allocation
 		 */
@@ -1875,6 +1946,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		/**
 		 * Test of blob allocation and read-back, firstly from cache and then
 		 * from disk.
+		 * @throws InterruptedException 
 		 */
 		public void test_blob_readBack() {
 
@@ -1907,10 +1979,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				// Now reset - clears writeCache and reinits from disk
 				rw.reset();
+				
+				// RWStore.reset() no longer resets the write cache, we need to do that explicitly!
+				rw.getWriteCacheService().resetAndClear();
 
 				rdBuf = bs.read(faddr);
 				assertEquals(bb, rdBuf);
 
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
 			} finally {
 
 				store.destroy();
@@ -1919,7 +1996,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 		
-		public void notest_stressBlobReadBack() {
+		public void test_stressBlobReadBack() {
 			for (int i = 0; i < 100; i++) {
 				test_blob_readBack();
 			}
@@ -1972,6 +2049,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				// Now reset - clears writeCache and reinits from disk
 				rw.reset();
+
+				// RWStore.reset() no longer resets the write cache, we need to do that explicitly!
+				rw.getWriteCacheService().resetAndClear();
+				rw.getWriteCacheService().setExtent(rw.getStoreFile().length());
 
 				rdBuf = bs.read(faddr);
 				assertEquals(bb, rdBuf);
@@ -2382,16 +2463,20 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		/**
-		 * To stress tthe session protection, we will allocate a batch of
+		 * To stress the session protection, we will allocate a batch of
 		 * addresses, then free half with protection.  Then reallocate half
 		 * again after releasing the session.
 		 * This should result in all the original batch being allocated,
 		 * exercising both session protection and write cache clearing
 		 */
 		public void test_stressSessionProtection() {
-			// Sequential logic
+			stressSessionProtection(0); // no small slots
+			stressSessionProtection(1024); // standard small slots
+		}
 
-			final Journal store = (Journal) getStore();
+		void stressSessionProtection(final int smallSlotSize) {
+			// ensure smallslots WILL recycle "high-waste" immediately for even single allocator
+			final Journal store = (Journal) getSmallSlotStore(smallSlotSize, 1, 0.2f);
 			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 			final RWStore rw = bs.getStore();
@@ -2407,42 +2492,101 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// We just want to stress a single allocator, so make 5000
 			// allocations to force multiple allocBlocks.
 			
-			for (int i = 0; i < 5000; i++) {
+			for (int i = 0; i < 10000; i++) {
 				addrs.add(bs.write(bb));
 				bb.flip();
 			}
+			
+			final Bucket bucket =  findBucket(rw, buf.length+4); // allow for checksum
+			
+			store.commit();
 
-			for (int i = 0; i < 5000; i+=2) {
+			for (int i = 0; i < addrs.size(); i+=2) {
 				bs.delete(addrs.get(i));
+			}
+
+			store.commit();
+
+			for (int i = 0; i < addrs.size(); i++) {
+				bs.write(bb);
+				bb.flip();
+			}
+
+			
+			{
+				long used = bucket.usedSlots();
+				long reserved = bucket.reservedSlots();
+	
+				assertTrue(reserved > used);
+				assertTrue(reserved-used > (addrs.size()/2)); // must not have reclaimed recycled slots
 			}
 
 			// now release session to make addrs reavailable
 			tx.close();
-
-
-			for (int i = 0; i < 5000; i+=2) {
+			
+			store.commit();
+			
+			for (int i = 0; i < addrs.size(); i++) {
 				bs.write(bb);
 				bb.flip();
 			}
 
 			store.commit();
+			
+			{
+				long used = bucket.usedSlots();
+				long reserved = bucket.reservedSlots();
+	
+				assertTrue(reserved > used);
 
-			// FIXME: The test assumptions are not valid under small slot conditions			
-//			bb.position(0);
-//
-//			for (int i = 0; i < 3000; i++) {
-//				bb.position(0);
-//				
-//				ByteBuffer rdBuf = bs.read(addrs.get(i));
-//
-//				// should be able to
-//				assertEquals(bb, rdBuf);
-//			}
-//
-//			store.commit();
+				// check should be okay for small slots if high waste check is always triggered!
+				assertTrue(reserved-used < (addrs.size()/2)); // must have reclaimed recycled slots
+			}
+
 			} finally {
 			    store.destroy();
 			}
+		}
+		
+		private Bucket findBucket(RWStore rws, final int dataSize) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			while (buckets.hasNext()) {
+				final Bucket bucket = buckets.next();
+				
+				if (bucket.m_size > dataSize) {
+					return bucket;
+				}
+			}
+			
+			return null;
+		}
+		
+		private int getTotalAllocatedSlots(RWStore rws) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			
+			int allocated = 0;
+			while (buckets.hasNext()) {
+				allocated += buckets.next().usedSlots();
+			}
+			
+			return allocated;
+		}
+		
+		private int getTotalReservedSlots(RWStore rws) {
+			final StorageStats stats = rws.getStorageStats();
+			
+			final Iterator<Bucket> buckets = stats.getBuckets();
+			
+			int reserved = 0;
+			while (buckets.hasNext()) {
+				reserved += buckets.next().reservedSlots();
+			}
+			
+			return reserved;
 		}
 		
 		/**
@@ -2891,6 +3035,70 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	// modify store but do not allocate similar size block
             	// as that we want to see has been removed
                	final long addr2 = bs.write(randomData(220)); // modify store
+            	
+            	store.commit();
+            	bs.delete(addr2); // modify store
+               	store.commit();
+            	
+               	// delete is actioned
+            	for (int i = 0; i < nallocs; i++) {
+                   	assertFalse(bs.isCommitted(addrs.get(i)));
+            	}
+              } catch (InterruptedException e) {
+			} finally {
+            	store.destroy();
+            }
+		}
+		
+		/**
+		 * Repeats the BlobBlobHeader of deferred frees, but also with blob data.
+		 */
+		public void test_stressBlobBlobHeaderBlobDataDeferredFrees() {
+
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "4000");
+
+            final int maxFixed = 3; // 192 bytes (3 * 64)
+            properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
+            		"1,2," + maxFixed);
+            
+            final int maxAlloc = maxFixed * 64;
+            final int leafEntries = maxAlloc / 8;
+            final int headerEntries = maxAlloc / 4;
+            final int threshold = headerEntries * leafEntries;
+            
+            final int nallocs = threshold << 3; // 8 times greater than allocation threshold
+
+			Journal store = (Journal) getStore(properties);
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	ArrayList<Long> addrs = new ArrayList<Long>();
+            	for (int i = 0; i < nallocs; i++) {
+            		addrs.add(bs.write(randomData(1024))); // mostly blob data
+            	}
+            	store.commit();
+
+            	for (long addr : addrs) {
+            		bs.delete(addr);
+            	}
+                for (int i = 0; i < nallocs; i++) {
+                    if(!bs.isCommitted(addrs.get(i))) {
+                        fail("i="+i+", addr="+addrs.get(i));
+                    }
+                }
+
+               	store.commit();
+               	
+            	// Age the history (of the deletes!)
+            	Thread.currentThread().sleep(6000);
+            	
+            	// modify store but do not allocate similar size block
+            	// as that we want to see has been removed
+               	final long addr2 = bs.write(randomData(1024)); // modify store
             	
             	store.commit();
             	bs.delete(addr2); // modify store

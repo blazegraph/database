@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -134,9 +134,9 @@ public class TestIsolatedFusedView extends AbstractBTreeTestCase {
          */
         final BTree unisolatedIndex = BTree.create(journal, md);
         
-        unisolatedIndex.insert(k3, v3a, false/* deleted */, t1, null/* tuple */);
+        unisolatedIndex.insert(k3, v3a, false/* deleted */, false/*putIfAbsent*/, t1, null/* tuple */);
 
-        unisolatedIndex.insert(k7, null, true/* deleted */, t2, null/* tuple */);
+        unisolatedIndex.insert(k7, null, true/* deleted */, false/*putIfAbsent*/, t2, null/* tuple */);
 
         // checkpoint the unisolated index.
         final long addrCheckpoint1 = unisolatedIndex.writeCheckpoint();

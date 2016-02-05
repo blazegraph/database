@@ -128,13 +128,13 @@
              <New id="Contexts" class="org.eclipse.jetty.server.handler.ContextHandlerCollection">
                    <Call name="addHandler">
                       <Arg>
-                        <!-- This is the redirect from root to /bigdata -->
                         <New id="moved" class="org.eclipse.jetty.server.handler.MovedContextHandler">
-              <Set name="contextPath">/</Set>
-              <Set name="newContextURL">/bigdata</Set>
-              <Set name="permanent">true</Set>
-              <Set name="discardPathInfo">false</Set>
-              <Set name="discardQuery">false</Set>
+                        <!-- This is the redirect from root to /bigdata -->
+                           <Set name="contextPath">/</Set>
+                           <Set name="newContextURL">/bigdata</Set>
+                           <Set name="permanent">true</Set>
+                           <Set name="discardPathInfo">false</Set>
+                           <Set name="discardQuery">false</Set>
                         </New>
                     </Arg>
                   </Call>
@@ -142,13 +142,13 @@
                     <Arg>
                         <!-- This is the bigdata web application. -->
                         <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
-			 <!-- <Set name="war"><SystemProperty name="jetty.home" default="."/>/src/main/webapp/</Set> -->
-			 <Set name="war"><SystemProperty name="jetty.home" default="."/></Set>
+			             <Set name="war"><SystemProperty name="jetty.home" default="."/></Set>
                          <Set name="contextPath">/bigdata</Set>
                          <Set name="descriptor">WEB-INF/web.xml</Set>
                          <Set name="parentLoaderPriority">true</Set>
                          <Set name="extractWAR">false</Set>
                          <Set name="maxFormContentSize">10485760</Set>
+                         <Set name="overrideDescriptor"><SystemProperty name="jetty.overrideWebXml" default="./override-web.xml"/></Set>
                         </New>
                     </Arg>
                   </Call>

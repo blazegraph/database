@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+ Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
  Contact:
- SYSTAP, LLC
+ SYSTAP, LLC DBA Blazegraph
  2501 Calvert ST NW #106
  Washington, DC 20008
- licenses@systap.com
+ licenses@blazegraph.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -43,49 +43,18 @@ import com.bigdata.service.ndx.ClientIndexView;
 public interface IKeyArrayIndexProcedure<T> extends IIndexProcedure<T> {
 
     /**
-     * The #of keys/tuples
-     * 
-     * @deprecated by {@link #getKeys()}
-     */
-    public int getKeyCount();
-    
-    /**
-     * Return the key at the given index.
-     * 
-     * @param i
-     *            The index (origin zero).
-     * 
-     * @return The key at that index.
-     * 
-     * @deprecated by {@link #getKeys()}
-     */
-    public byte[] getKey(int i);
-    
-    /**
-     * Return the value at the given index.
-     * 
-     * @param i
-     *            The index (origin zero).
-     * 
-     * @return The value at that index.
-     * 
-     * @deprecated by {@link #getValues()}
-     */
-    public byte[] getValue(int i);
-
-    /**
      * The keys.
      * 
      * @return The keys and never <code>null</code>.
      */
-    public IRaba getKeys();
+	public IRaba getKeys();
 
-    /**
-     * The values.
-     * 
-     * @return The values -or- <code>null</code> if no values were associated
-     *         with the {@link IIndexProcedure}.
-     */
-    public IRaba getValues();
+	/**
+	 * The values.
+	 * 
+	 * @return The values -or- <code>null</code> if no values were associated
+	 *         with the {@link IIndexProcedure}.
+	 */
+	public IRaba getValues();
 
 }

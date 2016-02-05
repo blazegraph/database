@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+	<head>
+		<variable name='x'/>
+	</head>
+	<results>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/GraduateStudent101</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/GraduateStudent124</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/GraduateStudent142</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/GraduateStudent44</uri>
+			</binding>
+		</result>
+	</results>
+</sparql>

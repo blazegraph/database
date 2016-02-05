@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -36,10 +36,12 @@ import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.sail.RDRHistoryServiceFactory;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.GeoSpatialServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
@@ -51,6 +53,7 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.service.fts.FTS;
 import com.bigdata.service.fts.FulltextSearchServiceFactory;
+import com.bigdata.service.geospatial.GeoSpatial;
 
 import cutthecrap.utils.striterators.ReadOnlyIterator;
 
@@ -115,17 +118,20 @@ public class ServiceRegistry {
         aliases = new ConcurrentHashMap<URI, URI>();
 
         defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
-                new RemoteServiceFactoryImpl(true/* isSparql11 */));
+                new RemoteServiceFactoryImpl(SPARQLVersion.SPARQL_11));
 
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
         
+        // Add the Geospatial search service.
+        add(GeoSpatial.SEARCH, new GeoSpatialServiceFactory());
+
         // Add the external Solr search service
         add(FTS.SEARCH, new FulltextSearchServiceFactory());
 
         // Add the Bigdata search in search service.
         add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());
-
+        
         // Add the sample index service.
         add(SampleServiceFactory.SERVICE_KEY, new SampleServiceFactory());
 
@@ -398,7 +404,7 @@ public class ServiceRegistry {
         if (serviceURI == null)
             throw new IllegalArgumentException();
 
-        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI)) {
+        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
             throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
         }
         
@@ -435,7 +441,7 @@ public class ServiceRegistry {
      */
     public final ServiceCall<? extends Object> toServiceCall(
             final AbstractTripleStore store, final HttpClient cm,
-            URI serviceURI, final ServiceNode serviceNode) {
+            URI serviceURI, final ServiceNode serviceNode, final BaseJoinStats stats) {
 
         if (serviceURI == null)
             throw new IllegalArgumentException();
@@ -450,7 +456,7 @@ public class ServiceRegistry {
 
         }
 
-        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI)) {
+        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
             throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
         }
 
@@ -470,8 +476,7 @@ public class ServiceRegistry {
         }
 
         final ServiceCallCreateParams params = new ServiceCallCreateParamsImpl(
-                serviceURI, store, serviceNode, cm, f.getServiceOptions()
-        );
+                serviceURI, store, serviceNode, cm, f.getServiceOptions(), stats);
 
         return f.create(params);
 
@@ -489,7 +494,7 @@ public class ServiceRegistry {
      */
     public ServiceFactory getServiceFactoryByServiceURI(URI serviceUri) {
        
-       if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceUri)) {
+       if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceUri.stringValue())) {
           throw new IllegalArgumentException("Service URI " + serviceUri + " is not allowed");
        }
        
@@ -508,11 +513,13 @@ public class ServiceRegistry {
         private final ServiceNode serviceNode;
         private final HttpClient cm;
         private final IServiceOptions serviceOptions;
+        private final BaseJoinStats stats;
 
         public ServiceCallCreateParamsImpl(final URI serviceURI,
                 final AbstractTripleStore store, final ServiceNode serviceNode,
                 final HttpClient cm,
-                final IServiceOptions serviceOptions) {
+                final IServiceOptions serviceOptions,
+                final BaseJoinStats stats) {
 
             this.serviceURI = serviceURI;
 
@@ -523,6 +530,8 @@ public class ServiceRegistry {
             this.cm = cm;
 
             this.serviceOptions = serviceOptions;
+            
+            this.stats = stats;
 
         }
 
@@ -549,6 +558,11 @@ public class ServiceRegistry {
         @Override
         public IServiceOptions getServiceOptions() {
             return serviceOptions;
+        }
+        
+        @Override
+        public BaseJoinStats getStats() {
+           return stats;
         }
 
         @Override

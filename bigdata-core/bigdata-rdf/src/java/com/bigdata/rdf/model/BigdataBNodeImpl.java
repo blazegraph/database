@@ -154,6 +154,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
     	return super.iv;
     }
     
+    @Override
     public String toString() {
 
     	if (sid != null) {
@@ -163,12 +164,14 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
         
     }
     
+    @Override
     public String stringValue() {
 
         return id;
 
     }
 
+    @Override
     final public boolean equals(final Object o) {
 
         if (!(o instanceof BNode))
@@ -198,24 +201,28 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 
     }
 
+    @Override
     final public int hashCode() {
 
         return id.hashCode();
 
     }
 
+    @Override
     final public String getID() {
 
         return id;
         
     }
 
+    @Override
     final public void setStatementIdentifier(final boolean isStmtIdentifier) {
 
         this.statementIdentifier = isStmtIdentifier;
         
     }
 
+    @Override
     final public boolean isStatementIdentifier() {
         
         return this.statementIdentifier;
@@ -234,6 +241,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 	 * @param sid
 	 *            The statement.
 	 */
+    @Override
 	final public void setStatement(final BigdataStatement sid) {
 		this.statementIdentifier = true;
 		this.sid = sid;
@@ -242,6 +250,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 	/**
 	 * Return the statement modeled by this blank node.
 	 */
+    @Override
 	final public BigdataStatement getStatement() {
 		return sid;
 	}

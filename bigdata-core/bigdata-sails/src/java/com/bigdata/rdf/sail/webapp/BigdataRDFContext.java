@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1801,6 +1801,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public final AtomicLong commitTime = new AtomicLong(-1);
         
         private boolean echoBack = false;
+        private final CAT mutationCount = new CAT();
         
         public UpdateTask(final BigdataSailRepositoryConnection cxn, 
         		final String namespace, final long timestamp,
@@ -1816,22 +1817,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     resp,//
                     os//
                     );
-
-        }
-
-        /**
-         * {@inheritDoc}
-         * <p>
-         * This executes the SPARQL UPDATE and formats the HTTP response.
-         */
-        @Override
-        protected void doQuery(final BigdataSailRepositoryConnection cxn,
-                final OutputStream os) throws Exception {
-            
             /*
              * Setup a change listener. It will notice the #of mutations.
              */
-            final CAT mutationCount = new CAT();
 
             cxn.addChangeLog(new IChangeLog(){
             
@@ -1861,6 +1849,19 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 }
 
             });
+
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This executes the SPARQL UPDATE and formats the HTTP response.
+         */
+        @Override
+        protected void doQuery(final BigdataSailRepositoryConnection cxn,
+                final OutputStream os) throws Exception {
+            
+          
 
             // Prepare the UPDATE request.
             final BigdataSailUpdate update = setupUpdate(cxn);
@@ -2010,6 +2011,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
 
         }
+
+		public long getMutationCount() {
+			return this.mutationCount.get();
+		}
 
     }
 
@@ -2390,9 +2395,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query exactly once in order to minimize the resources associated with
          * the query parser.
          */
-        final AbstractTripleStore tripleStore = cxn.getTripleStore();
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                tripleStore).parseQuery2(queryStr, baseURI);
+//        final AbstractTripleStore tripleStore = cxn.getTripleStore();
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                .parseQuery2(queryStr, baseURI);
 
         if (log.isDebugEnabled())
             log.debug(astContainer.toString());
@@ -2709,7 +2714,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
 
-	/*package*/ List<String> getNamespacesTx(long tx) {
+	public List<String> getNamespacesTx(long tx) {
 
 		final IIndexManager indexManager = getIndexManager();
 		

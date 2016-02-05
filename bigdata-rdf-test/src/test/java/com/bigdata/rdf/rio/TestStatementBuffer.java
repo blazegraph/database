@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -76,20 +76,53 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         super(name);
     }
 
-    public void test_ctor() {
+    public void test_ctor01() {
         
-        final int capacity = 27;
+    	final int capacity = 27;
+    	
+    	final int queueCapacity = 0;
         
         final AbstractTripleStore store = getStore();
         
         try {
 
 			final StatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
-					store, capacity);
+					store, capacity, queueCapacity);
 
             assertEquals(store, buffer.getDatabase());
 //            assertTrue(buffer.distinct);
-            assertEquals(capacity, buffer.capacity);
+            assertEquals(capacity, buffer.getCapacity());
+            assertEquals(capacity * store.getSPOKeyArity() + 5, buffer.values.length);
+            assertEquals(capacity, buffer.stmts.length);
+            assertEquals(5, buffer.numURIs);
+            assertEquals(0, buffer.numLiterals);
+            assertEquals(0, buffer.numBNodes);
+            assertEquals(0, buffer.numStmts);
+
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
+
+    }
+
+    public void test_ctor02() {
+        
+    	final int capacity = 27;
+    	
+    	final int queueCapacity = 10;
+        
+        final AbstractTripleStore store = getStore();
+        
+        try {
+
+			final StatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
+					store, capacity, queueCapacity);
+
+            assertEquals(store, buffer.getDatabase());
+//            assertTrue(buffer.distinct);
+            assertEquals(capacity, buffer.getCapacity());
             assertEquals(capacity * store.getSPOKeyArity() + 5, buffer.values.length);
             assertEquals(capacity, buffer.stmts.length);
             assertEquals(5, buffer.numURIs);

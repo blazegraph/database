@@ -421,3 +421,48 @@ iframe {
   border: 0px;
   padding: 0px;
 }
+
+
+
+
+
+section.center {
+        max-width: 80%;
+        margin: 100px auto;
+    }
+    span.clickMe {
+        font-size: 30px;
+    }
+    span.clickMe:hover {
+        cursor: pointer;
+        color: green;
+    }
+    section.hidden {
+        display: none;
+        position: fixed;
+        text-align: center;
+    }
+    section article.popup {
+        position: relative;
+        display: inline-block;
+        background: #e3e3e3;
+        color: #222;
+        border: 1px solid #333;
+        border-radius: 3px;
+        padding: 5px 7px;
+        margin: 5% auto;
+    }
+    section article.popup textarea {
+        position: relative;
+        display: block;
+        background: #ffffff;
+		height: auto;
+    }
+    span.close {
+        text-transform: uppercase;
+        color: #222;
+    }
+    span.close:hover{
+        color: red;
+        cursor: pointer;
+    }

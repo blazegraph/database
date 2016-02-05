@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -58,6 +58,12 @@ public enum DTEExtension {
      */
     ARRAY((byte) 2, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS),
 
+    /**
+     * An mocked IV (used internally).
+     */
+    MOCKED_IV((byte) 3, 0/* len */, Void.class, null/*datatypeURI*/, DTEFlags.NOFLAGS),
+
+    
 	/**
 	 * This is a place holder for extension of the intrinsic data types. Its
 	 * code corresponds to 0xff, which is to say all four bits are on. When this
@@ -116,6 +122,8 @@ public enum DTEExtension {
             return PACKED_LONG;            
         case 2:
             return ARRAY;
+        case 3:
+            return MOCKED_IV;
          default:
             throw new IllegalArgumentException(Byte.toString(b));
         }
