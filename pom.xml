@@ -404,6 +404,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <module>bigdata-ganglia</module>
     <module>bigdata-gas</module>
     <module>bigdata-core/</module>
+    <module>vocabularies</module>
     <module>bigdata-war-html</module>
     <module>bigdata-blueprints</module>
     <module>bigdata-runtime</module>
