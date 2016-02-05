@@ -18,8 +18,11 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
@@ -48,17 +51,15 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 
 	private String baseURI;
 
+	/**
+	 * Namespaces mapping, collected from PREFIX statements, should be passed in to recursive SPARQL* parsing.
+	 * Original namespaceTable variable is private to {@link RDFParserBase} and could not be accessed from this class.
+	 */
+	private Map<String, String> namespaceTable;
+
 	/*--------------*
 	 * Constructors *
 	 *--------------*/
-
-	/**
-	 * Creates a new parser that will use a {@link ValueFactoryImpl} to create
-	 * RDF model objects.
-	 */
-	public SPARQLStarUpdateDataBlockParser() {
-		super();
-	}
 
 	/**
 	 * Creates a new parser that will use the supplied ValueFactory to create RDF
@@ -69,6 +70,25 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 	 */
 	public SPARQLStarUpdateDataBlockParser(ValueFactory valueFactory) {
 		super(valueFactory);
+		this.namespaceTable = new HashMap<>();
+	}
+
+	/**
+	 * Creates a new parser that will use the supplied ValueFactory and prefix mapping to create RDF
+	 * model objects.
+	 * 
+	 * @param valueFactory
+	 *        A ValueFactory.
+	 * @param namespaces
+	 *        Namespaces prefix mapping.
+	 */
+	public SPARQLStarUpdateDataBlockParser(ValueFactory valueFactory, Map<String, String> namespaces) {
+		super(valueFactory);
+		this.namespaceTable = namespaces;
+		// fill in original {@link RDFParserBase}.namespaceTable to be used while parsing
+		for (Entry<String, String> entry: namespaceTable.entrySet()) {
+			super.setNamespace(entry.getKey(), entry.getValue());
+		}
 	}
 
 	/*---------*
@@ -138,7 +158,7 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 		}
 
 		// Use our own class in recursion.
-		SPARQLStarUpdateDataBlockParser p = new SPARQLStarUpdateDataBlockParser(valueFactory);
+		SPARQLStarUpdateDataBlockParser p = new SPARQLStarUpdateDataBlockParser(valueFactory, namespaceTable);
         final List<Statement> stmts = new LinkedList<Statement>();
         final StatementCollector sc = new StatementCollector(stmts);
 		p.setRDFHandler(sc);
@@ -167,6 +187,12 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 	protected void setBaseURI(String uri) {
 		baseURI = uri;
 		super.setBaseURI(uri);
+	}
+
+	@Override
+	public void setNamespace(String prefix, String namespace) {
+		namespaceTable.put(prefix, namespace);
+		super.setNamespace(prefix, namespace);
 	}
 
 }
