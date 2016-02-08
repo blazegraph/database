@@ -37,9 +37,9 @@ public class TestInlineURIHandlers extends TestCase2 {
 			log.debug(iv.getDTE().name());
 		}
 		
-		assert (intValue == iv.getInlineValue().intValue());
+		assertTrue (intValue == iv.getInlineValue().intValue());
 		
-		assert (localName.equals(handler.getLocalNameFromDelegate(iv)));
+		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
 		
 	}
 	
@@ -60,9 +60,9 @@ public class TestInlineURIHandlers extends TestCase2 {
 			log.debug(iv.getDTE().name());
 		}
 		
-		assert (intValue == iv.getInlineValue().intValue());
+		assertTrue (intValue == iv.getInlineValue().intValue());
 		
-		assert (localName.equals(handler.getLocalNameFromDelegate(iv)));
+		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
 		
 	}
 	
@@ -83,9 +83,9 @@ public class TestInlineURIHandlers extends TestCase2 {
 			log.debug(iv.getDTE().name());
 		}
 		
-		assert (intValue == iv.getInlineValue().intValue());
+		assertTrue (intValue == iv.getInlineValue().intValue());
 		
-		assert (localName.equals(handler.getLocalNameFromDelegate(iv)));
+		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
 		
 	}
 
@@ -106,12 +106,17 @@ public class TestInlineURIHandlers extends TestCase2 {
 			log.debug(iv.getDTE().name());
 		}
 		
-		assert (intValue == iv.getInlineValue().intValue());
+		assertTrue (intValue == iv.getInlineValue().intValue());
 		
 		//These should be equal as the width is 7
-		assert (!localName.equals(handler.getLocalNameFromDelegate(iv)));
+		assertTrue (!localName.equals(handler.getLocalNameFromDelegate(iv)));
 
-		assert (String.format("%"+width+"d",intValue).equals(handler.getLocalNameFromDelegate(iv)));
+		//FIXME:  CI Debugging
+		System.err.println("Format:  " + String.format("%"+width+"d",intValue));
+		System.err.println("Handler:  " + handler.getLocalNameFromDelegate(iv));
+		
+		
+		assertTrue (String.format("%"+width+"d",intValue).equals(handler.getLocalNameFromDelegate(iv)));
 	}		
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -132,9 +137,9 @@ public class TestInlineURIHandlers extends TestCase2 {
 			log.debug(iv.getDTE().name());
 		}
 		
-		assert (intValue == iv.getInlineValue().intValue());
+		assertTrue (intValue == iv.getInlineValue().intValue());
 		
-		assert (localName.equals(handler.getLocalNameFromDelegate(iv)));
+		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
 		
 	}
 	
@@ -156,9 +161,14 @@ public class TestInlineURIHandlers extends TestCase2 {
 			log.debug(iv.getDTE().name());
 		}
 		
-		assert (intValue == iv.getInlineValue().intValue());
+		//FIXME:  CI Debugging
+		System.err.println(iv.getDTE().name());
 		
-		assert (localName.equals(handler.getLocalNameFromDelegate(iv)));
+		assertTrue (iv != null);
+		
+		assertTrue (intValue == iv.getInlineValue().intValue());
+		
+		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
 		
 	}
 
