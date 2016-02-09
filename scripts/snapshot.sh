@@ -13,4 +13,4 @@ mvn versions:set -DnewVersion=${CURRENT_VERSION}-${BRANCH}-${YYMMDD} versions:up
 
 mvn -f ${PARENT_POM} -N clean install -Dmaven.test.skip=true
 
-mvn -f ${PARENT_POM} clean install -DskipTests=true
+mvn -f ${PARENT_POM} clean install --projects junit-ext,ctc-striterators,lgpl-utils,dsi-utils,system-utils,rdf-properties,sparql-grammar,bigdata-util,bigdata-common-util,bigdata-statics,bigdata-cache,bigdata-client,bigdata-ganglia,bigdata-gas,bigdata-core/,bigdata-war-html,bigdata-blueprints,bigdata-runtime,bigdata-core-test,bigdata-rdf-test,bigdata-sails-test -DskipTests=true
