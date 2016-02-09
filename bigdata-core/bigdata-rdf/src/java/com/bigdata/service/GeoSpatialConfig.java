@@ -29,9 +29,16 @@ package com.bigdata.service;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.log4j.Logger;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaDescription;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription.Datatype;
+import com.bigdata.rdf.sail.webapp.client.StringUtil;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Singleton class providing access to the GeoSpatial index configuration.
@@ -43,16 +50,19 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.Schem
  */
 public class GeoSpatialConfig {
 
+   final static private Logger log = Logger.getLogger(GeoSpatialConfig.class);
+    
    private static GeoSpatialConfig instance;
    
    private static final String COMPONENT_SEPARATOR = ";";
    private static final String FIELD_SEPARATOR = "#";
    
    private SchemaDescription schemaDescription;
+
+   private List<GeoSpatialDatatypeConfig> datatypeConfigs;
    
    private GeoSpatialConfig() {
-      
-      init(null);
+      init(null, null);
    }
    
    public static GeoSpatialConfig getInstance() {
@@ -64,14 +74,57 @@ public class GeoSpatialConfig {
       return instance;
    }
    
-   public void init(String initStringSchemaDescription) {
+   public void init(String initStringSchemaDescription, List<String> geoSpatialDatatypeConfigs) {
       
       initSchemaDescription(initStringSchemaDescription);
+      initDatatypes(geoSpatialDatatypeConfigs);
    }
    
-   public SchemaDescription getSchemaDescription() {
-      return schemaDescription;
+   private void initDatatypes(List<String> geoSpatialDatatypeConfigs) {
+       
+       datatypeConfigs = new ArrayList<GeoSpatialDatatypeConfig>();
+       
+       if (geoSpatialDatatypeConfigs==null)
+           return; // nothing to be done
+       
+       for (final String configStr : geoSpatialDatatypeConfigs) {
+           
+           if (configStr==null || configStr.isEmpty())
+               continue; // skip
+
+           try {
+
+                JSONObject json = new JSONObject(configStr);
+                JSONObject topLevelNode = (JSONObject)json.get("config");
+                String uri = (String)topLevelNode.get("uri");
+                JSONArray fields = (JSONArray)topLevelNode.get("fields");
+                
+                final GeoSpatialDatatypeConfig dc = new GeoSpatialDatatypeConfig(uri, fields);
+                datatypeConfigs.add(dc);
+
+                
+                // {"config": { 
+                //   "uri": "<http://my.custom.datatype2.uri>", 
+                //   "fields": [ 
+                //     { "valueType": "double", "multiplier": "100000", "serviceMapping": "latitude" }, 
+                //     { "valueType": "double", "multiplier": "100000", "serviceMapping": "longitude" }, 
+                //     { "valueType": "long", "multiplier": "1", "minVal" : "0" , "serviceMapping": "time"  }, 
+                //     { "valueType": "long", "multiplier": "1", "minVal" : "0" , "serviceMapping" : "coordSystem"  } 
+                //   ] 
+                // }}
+                
+            } catch (JSONException e) {
+                
+                log.warn("Problem parsing JSON for geoSpatialDatatypeConfig:" + e.getMessage(), e);
+            }
+           
+       }
+       
    }
+
+    public SchemaDescription getSchemaDescription() {
+          return schemaDescription;
+       }
 
    /**
     * Initializes the schema description based on an init string.

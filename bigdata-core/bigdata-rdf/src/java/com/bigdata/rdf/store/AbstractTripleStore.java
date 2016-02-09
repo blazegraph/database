@@ -1312,6 +1312,12 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_GEO_SPATIAL_CONFIG = null;
         
         /**
+         * GeoSpatial datatype configuration.        
+         */
+        String GEO_SPATIAL_DATATYPE_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialDatatypeConfig";
+
+        
+        /**
          * If this option is set to false, do not compute closure for sids.
          */
         public static String COMPUTE_CLOSURE_FOR_SIDS = AbstractTripleStore.class

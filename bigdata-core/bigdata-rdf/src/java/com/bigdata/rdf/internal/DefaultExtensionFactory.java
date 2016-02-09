@@ -47,8 +47,8 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	if (config.isGeoSpatial()) {
     	   
     	   // initialize the GeoSpatialConfig object
-    	   GeoSpatialConfig.getInstance().init(config.getGeoSpatialConfig());
-         extensions.add(new GeoSpatialLiteralExtension<BigdataLiteral>(resolver));    	
+    	   GeoSpatialConfig.getInstance().init(config.getGeoSpatialConfig(), config.getGeoSpatialDatatypeConfigs());
+    	   extensions.add(new GeoSpatialLiteralExtension<BigdataLiteral>(resolver));    	
       }
     	
     	if (config.isInlineDateTimes()) {

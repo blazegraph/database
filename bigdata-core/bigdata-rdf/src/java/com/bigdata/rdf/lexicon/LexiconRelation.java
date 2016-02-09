@@ -588,6 +588,29 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                   AbstractTripleStore.Options.GEO_SPATIAL_CONFIG,
                   AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_CONFIG);
 
+            /**
+             * We have configuration strings of the form 
+             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].0 = ...
+             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].1 = ...
+             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].2 = ...
+             * ...
+             * 
+             * We read this configuration up to the first index that is not defined.
+             */
+            geoSpatialDatatypeConfigs = new LinkedList<String>();
+            boolean finished = false;
+            for (int i=0; !finished; i++) {
+                final String curId = AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + "." + i;
+                final String curVal = getProperty(curId, null /* fallback */);
+                
+                if (curVal!=null) {
+                    geoSpatialDatatypeConfigs.add(curVal);
+                } else {
+                    finished = true; // we're done
+                }
+                
+            }
+                
             
             // Resolve the vocabulary.
             vocab = getContainer().getVocabulary();
@@ -641,7 +664,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
                     rejectInvalidXSDValues, xFactory, vocab, valueFactory,
-                    uriFactory, geoSpatial, geoSpatialConfig);
+                    uriFactory, geoSpatial, geoSpatialConfig, geoSpatialDatatypeConfigs);
 
         }
         
@@ -941,6 +964,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final private String geoSpatialConfig;
 
     /**
+     * Configuration for geo spatial datatype configurations.
+     */
+    final private List<String> geoSpatialDatatypeConfigs;
+
+    /**
      * Return <code>true</code> if datatype literals are being inlined into
      * the statement indices.
      */
@@ -985,6 +1013,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final public String getGeoSpatialConfig() {
        
        return geoSpatialConfig;
+    }
+    
+    final public List<String> getGeoSpatialDatatypeConfigs() {
+        return geoSpatialDatatypeConfigs;
     }
 
     /**

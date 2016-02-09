@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -133,6 +134,11 @@ public class LexiconConfiguration<V extends BigdataValue>
      * Optional configuration string for the geospatial facilities.
      */
     private final String geoSpatialConfig;
+    
+    /**
+     * Optional configuration of geospatial datatypes
+     */
+    final List<String> geoSpatialDatatypeConfigs;
 
     
     /**
@@ -260,6 +266,11 @@ public class LexiconConfiguration<V extends BigdataValue>
        return geoSpatialConfig;
     }
     
+    @Override
+    public List<String> getGeoSpatialDatatypeConfigs() {
+       
+       return geoSpatialDatatypeConfigs;
+    }
     
     @Override
     public boolean isInlineDateTimes() {
@@ -357,7 +368,8 @@ public class LexiconConfiguration<V extends BigdataValue>
             final BigdataValueFactory valueFactory,//
             final IInlineURIFactory uriFactory,//
             final boolean geoSpatial,
-            final String geoSpatialConfig
+            final String geoSpatialConfig,
+            final List<String> geoSpatialDatatypeConfigs
             ) {
 
         if (blobsThreshold < 0)
@@ -386,6 +398,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.uriFactory = uriFactory;
         this.geoSpatial = geoSpatial;
         this.geoSpatialConfig = geoSpatialConfig;
+        this.geoSpatialDatatypeConfigs = geoSpatialDatatypeConfigs;
         
         /*
          * TODO Make this configurable.

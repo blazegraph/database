@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.List;
 import java.util.TimeZone;
 
 import org.openrdf.model.URI;
@@ -86,6 +87,11 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      */
     public String getGeoSpatialConfig();
     
+
+    /**
+     * Return the list of geospatial datatype configurations
+     */
+    List<String> getGeoSpatialDatatypeConfigs();
 
     /**
      * Return the default time zone to be used for inlining.
@@ -182,5 +188,6 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Get iterator over registered type handlers.
      */
     Iterable<IMathOpHandler> getTypeHandlers();
+
 
 }
