@@ -111,12 +111,8 @@ public class TestInlineURIHandlers extends TestCase2 {
 		//These should be equal as the width is 7
 		assertTrue (!localName.equals(handler.getLocalNameFromDelegate(iv)));
 
-		//FIXME:  CI Debugging
-		System.err.println("Format:  " + String.format("%"+width+"d",intValue));
-		System.err.println("Handler:  " + handler.getLocalNameFromDelegate(iv));
-		
-		
-		assertTrue (String.format("%"+width+"d",intValue).equals(handler.getLocalNameFromDelegate(iv)));
+		//Should be the 7 digit with padded zeros
+		assertTrue (String.format("%0"+width+"d",intValue).equals(handler.getLocalNameFromDelegate(iv)));
 	}		
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -161,11 +157,8 @@ public class TestInlineURIHandlers extends TestCase2 {
 			log.debug(iv.getDTE().name());
 		}
 		
-		//FIXME:  CI Debugging
-		System.err.println(iv.getDTE().name());
-		
 		assertTrue (iv != null);
-		
+
 		assertTrue (intValue == iv.getInlineValue().intValue());
 		
 		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));

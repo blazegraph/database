@@ -55,12 +55,12 @@ public class InlineSuffixedFixedWidthIntegerURIHandler extends
 	@Override
 	@SuppressWarnings("rawtypes")
 	protected AbstractLiteralIV createInlineIV(String localName) {
-		if (!localName.startsWith(this.suffix)) {
+		if (!localName.endsWith(this.suffix)) {
 			return null;
 		}
 	
-		final String intValue = localName.substring(this.suffix.length(), localName.length());
-				
+		final String intValue =localName.substring(0, localName.length() - this.suffix.length());
+		
 		return super.createInlineIV(intValue);
 	}
 
