@@ -51,7 +51,6 @@ public class PubChemVocabularyDecl implements VocabularyDecl {
     static private final URI[] uris = new URI[]{//
 
     	// all predicates in dataset
-    	new URIImpl("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), // rank=0, count=1769695108
     	new URIImpl("http://semanticscience.org/resource/has-attribute"), // rank=1, count=1767498034
     	new URIImpl("http://semanticscience.org/resource/has-value"), // rank=2, count=1757015964
     	new URIImpl("http://purl.obolibrary.org/obo/BFO_0000056"), // rank=3, count=262315251
@@ -60,20 +59,14 @@ public class PubChemVocabularyDecl implements VocabularyDecl {
     	new URIImpl("http://purl.obolibrary.org/obo/IAO_0000136"), // rank=6, count=229958616
     	new URIImpl("http://purl.obolibrary.org/obo/OBI_0000299"), // rank=7, count=229958616
     	new URIImpl("http://semanticscience.org/resource/is-attribute-of"), // rank=8, count=165570126
-    	new URIImpl("http://purl.org/dc/terms/source"), // rank=9, count=158966137
-    	new URIImpl("http://purl.org/dc/terms/available"), // rank=10, count=157277616
-    	new URIImpl("http://purl.org/dc/terms/modified"), // rank=11, count=157277616
     	new URIImpl("http://semanticscience.org/resource/CHEMINF_000477"), // rank=12, count=151538092
     	new URIImpl("http://purl.org/spar/fabio/hasSubjectTerm"), // rank=13, count=148598857
     	new URIImpl("http://purl.org/spar/cito/discusses"), // rank=14, count=41914411
-    	new URIImpl("http://www.w3.org/2004/02/skos/core#exactMatch"), // rank=15, count=32947054
     	new URIImpl("http://semanticscience.org/resource/CHEMINF_000461"), // rank=16, count=30503332
-    	new URIImpl("http://purl.org/dc/terms/title"), // rank=17, count=12426414
     	new URIImpl("http://purl.org/dc/terms/date"), // rank=18, count=10656147
     	new URIImpl("http://purl.org/dc/terms/bibliographicCitation"), // rank=19, count=10656147
     	new URIImpl("http://purl.org/spar/cito/citesAsDataSource"), // rank=20, count=9607311
     	new URIImpl("http://purl.org/spar/cito/isDiscussedBy"), // rank=21, count=7932441
-    	new URIImpl("http://www.w3.org/2000/01/rdf-schema#label"), // rank=22, count=7004613
     	new URIImpl("http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#hasSimilarProtein"), // rank=23, count=4496257
     	new URIImpl("http://semanticscience.org/resource/CHEMINF_000455"), // rank=24, count=3207006
     	new URIImpl("http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#has_parent"), // rank=25, count=2333130
@@ -87,14 +80,9 @@ public class PubChemVocabularyDecl implements VocabularyDecl {
     	new URIImpl("http://purl.obolibrary.org/obo/BFO_0000171"), // rank=33, count=171398
     	new URIImpl("http://purl.org/dc/terms/alternative"), // rank=34, count=165768
     	new URIImpl("http://purl.obolibrary.org/obo/BFO_0000160"), // rank=35, count=150781
-    	new URIImpl("http://purl.org/dc/terms/description"), // rank=36, count=57040
-    	new URIImpl("http://www.w3.org/2004/02/skos/core#closeMatch"), // rank=37, count=16845
     	new URIImpl("http://purl.obolibrary.org/obo/BFO_0000110"), // rank=38, count=8855
     	new URIImpl("http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#encodedBy"), // rank=39, count=6546
-    	new URIImpl("http://www.w3.org/2004/02/skos/core#inScheme"), // rank=40, count=5953
     	new URIImpl("http://purl.org/pav/importedFrom"), // rank=41, count=5937
-    	new URIImpl("http://www.w3.org/2004/02/skos/core#prefLabel"), // rank=42, count=5937
-    	new URIImpl("http://www.w3.org/2004/02/skos/core#broader"), // rank=43, count=5922
     	new URIImpl("http://purl.org/dc/terms/abstract"), // rank=44, count=2179
     	new URIImpl("http://purl.obolibrary.org/obo/BFO_0000178"), // rank=45, count=670
 

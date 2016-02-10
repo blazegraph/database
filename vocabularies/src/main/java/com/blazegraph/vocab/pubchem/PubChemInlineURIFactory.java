@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.blazegraph.vocab.pubchem;
 
-import com.bigdata.rdf.internal.InlineFixedWidthIntegerURIHandler;
 import com.bigdata.rdf.internal.InlinePrefixedFixedWidthIntegerURIHandler;
 import com.bigdata.rdf.internal.InlinePrefixedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlineURIFactory;
@@ -83,7 +82,7 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 	 * http://purl.obolibrary.org/obo/IAO_0000136 //fixed width 7
 	 * http://purl.obolibrary.org/obo/OBI_0000299 //fixed width 7
 	 */
-	private final static String[] uris = {
+	public final static String[] uris = {
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/compound/",  		// 1
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/substance/", 		// 2
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/",  		// 3
@@ -92,10 +91,10 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/gene/",  			// 6
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/",		// 7
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/reference/",       // 8
-			"http://purl.obolibrary.org/obo/", //CHEBI				// 9
+		//	"http://purl.obolibrary.org/obo/", //CHEBI				// 9
 			"http://semanticscience.org/resource/" };			 	// 10
 
-	private final static String[] localNames = { 
+	public final static String[] localNames = { 
 			"CID",													// 1 
 			"SID",													// 2 
 			"AID", 													// 3
@@ -104,7 +103,7 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 			"GID", 													// 6
 			"BSID", 												// 7
 			"PMID", 												// 8
-			"CHEBI_", 												// 9
+			//"CHEBI_", 												// 9
 			"CHEMINF_" };											// 10
 	
 
@@ -118,6 +117,9 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 		
 		 // http://www.bioassayontology.org/bao#BAO_0002877 fixed width 7
 		addHandler( new InlinePrefixedFixedWidthIntegerURIHandler("http://www.bioassayontology.org/bao#","BAO_",7));
+
+		//  http://purl.obolibrary.org/obo/CHEBI_74763  //fixed width 5
+		addHandler( new InlinePrefixedFixedWidthIntegerURIHandler("http://purl.obolibrary.org/obo/","CHEBI_",5));
 
 		// http://purl.obolibrary.org/obo/PR_000005253 //fixed width 9
 		addHandler( new InlinePrefixedFixedWidthIntegerURIHandler("http://purl.obolibrary.org/obo/","PR_",9));

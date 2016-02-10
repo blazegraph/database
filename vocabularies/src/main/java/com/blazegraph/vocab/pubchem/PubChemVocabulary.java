@@ -33,7 +33,11 @@ package com.blazegraph.vocab.pubchem;
  * com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass=com.blazegraph.vocab.pubchem.PubChemVocabulary
  * 
  */
+import com.bigdata.rdf.internal.InlineIPv4URIHandler;
+import com.bigdata.rdf.internal.InlineUUIDURIHandler;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.BaseVocabularyDecl;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151210;
 import com.bigdata.rdf.vocab.decls.DCAllVocabularyDecl;
@@ -76,14 +80,16 @@ public class PubChemVocabulary extends BigdataCoreVocabulary_v20151210 {
     @Override
     protected void addValues() {
 
-        addDecl(new RDFVocabularyDecl());
-        addDecl(new RDFSVocabularyDecl());
-        addDecl(new FOAFVocabularyDecl());
-        addDecl(new SKOSVocabularyDecl());
-        addDecl(new OWLVocabularyDecl());
-        addDecl(new DCAllVocabularyDecl());
-        addDecl(new XMLSchemaVocabularyDecl());
+        //addDecl(new RDFVocabularyDecl());
+        //addDecl(new RDFSVocabularyDecl());
+        //addDecl(new FOAFVocabularyDecl());
+        //addDecl(new SKOSVocabularyDecl());
+        //addDecl(new OWLVocabularyDecl());
+        //addDecl(new DCAllVocabularyDecl());
+        //addDecl(new XMLSchemaVocabularyDecl());
         addDecl(new PubChemVocabularyDecl());
+        
+        super.addValues();
 
     }
 
