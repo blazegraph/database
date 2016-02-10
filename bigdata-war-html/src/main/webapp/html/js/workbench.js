@@ -242,6 +242,7 @@ function getNamespaces(synchronous) {
                } else {
                   use = '<a href="#" class="use-namespace">Use</a>';
                }
+               
                $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="namespace-rebuild-text-index">Rebuild Full Text Index</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
                
                initMapgraphNamespaceMgmtExtensions(title);

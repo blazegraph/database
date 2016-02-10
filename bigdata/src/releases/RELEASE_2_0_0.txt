@@ -1,20 +1,30 @@
-Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
 
-This is a major release candidate of Blazegraph™.  The official release is now made into the Git repository.  Releases after 1.4.0 will no longer be made into SVN. 
+This is a major release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
 
-Blazegraph Features (http://www.blazegraph.com/blazegraph#FeatureMatrix)
+Blazegraph Features (http://www.blazegraph.com/product/)
 
-2.0.0 has significant performance improvements for query optimization and new features.  See https://blog.blazegraph.com/?p=977.
+2.0.0 has significant performance improvements for query optimization, geo-spatial searching, bulk load improvements and many new features.  The artifacts now include a Debian Deployer and RPM.  See https://blog.blazegraph.com/?p=977.
 
 Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
 
 Starting points:
 
-	Blazegraph Wiki:  https://wiki.blazegraph.com/
-	Blazegraph Blog:  https://blog.blazegraph.com/
-	Blazegraph JIRA:  https://jira.blazegraph.com/
-	Blazegraph Support:  http://www.blazegraph.com/support/
-	Public Code Samples:  https://github.com/SYSTAP/blazegraph-samples
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+    Blazegraph Support:  https://www.blazegraph.com/support/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TDF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+    
 
 Download Blazegraph now:
 
@@ -22,11 +32,7 @@ Download Blazegraph now:
 
 Checkout the latest source code:
 	
-git clone -b BIGDATA_RELEASE_1_5_2 --single-branch git://git.code.sf.net/p/bigdata/git BIGDATA_RELEASE_1_5_2
-
-Change log:
-
-Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_RELEASE_2_0_0
+git clone -b BLAZEGRAPH_RELEASE_2_0_0 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_0_0
 
 Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
 
@@ -59,6 +65,7 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
     * [BLZG-1627] - minus fails when preceded with property path
     * [BLZG-1629] - Whitelisted service get rejected
     * [BLZG-1643] - DELETE does not delete properly with Wikidata Query service
+    * [BLZG-1644] - EXPLORE functionality in Blazegraph Workbench broken
     * [BLZG-1648] - Proper FILTER handling in merge join
     * [BLZG-1654] - 2.0.0 Benchmarks
     * [BLZG-1658] - MemoryManager should know when it has been closed
@@ -67,8 +74,9 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
     * [BLZG-1693] - Performance regressions through counters
     * [BLZG-1696] - Inline IPv4 Regression
     * [BLZG-1699] - getURICount() and friends fail with IllegalStateException if blobs index does not exist.
-    * [BLZG-1700] - ProcessReaderHelper as invoked for PIDStat, VMStat, etc. enters spin loop with sleep 100ms. 
     * [BLZG-1702] - GPU initialization in AST2BOpContext should be cached
+    * [BLZG-1711] - ASTEvalHelper.optimizeQuery out of date
+    * [BLZG-1720] - Classpath Issue with Blazegraph RC1 war file
 
 
 ** Improvement
@@ -85,6 +93,7 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
     * [BLZG-1609] - Test case for service whitelist
     * [BLZG-1633] - System parameter & query hint to disable default graph filter
     * [BLZG-1703] - ASTDeferredIVResolution
+    * [BLZG-1733] - Change default to blazegraph.jnl from bigdata.jnl
 
 ** New Feature
     * [BLZG-190] - Workbench must provide editable window to configure/clone namespace
@@ -95,14 +104,12 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
     * [BLZG-1181] - Consequently exploit new built-in projection capabilities of HashIndexOp
     * [BLZG-1388] - xsd:date function
     * [BLZG-1588] - DTEExtension.COMPOUND
+    * [BLZG-1713] - Add DataLoaderServlet to NSS
 
 ** Task
     * [BLZG-23] - Create DEB Packages for Bigdata Delivery
     * [BLZG-38] - Mavenization (was trac #168)
     * [BLZG-175] - Create RPM Packages for Bigdata Delivery
-    * [BLZG-1352] - Hook in Solr Test Suite
-    * [BLZG-1416] - Install Artifactory for SYSTAP maven artifacts
-    * [BLZG-1421] - mavenized version requires script, but windows script not provided
     * [BLZG-1422] - Mavenized startBlazegraph.sh overrides JAVA_OPTS
     * [BLZG-1423] - Why is GROUP_COMMIT enabled in mavenized version?
     * [BLZG-1471] - Convert QueryEngineFactory to use getInstance() and public interface for accessor methods.
@@ -116,12 +123,16 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
     * [BLZG-1662] - Document ?uuid request for REST API
     * [BLZG-1668] - The solutions trace log and SPARQL query log examples need to be present (but not activated) in the default log4j.properties file.
     * [BLZG-1688] - Export Github Commit ID in the BuildInfo class
+    * [BLZG-1707] - Review Recent Wiki Page Updates for 2.0 Release
+    * [BLZG-1724] - CI Needs to deploy snapshots with Maven Central
+    * [BLZG-1726] - Benchmark 2.0.0 Release
 
 ** Sub-task
     * [BLZG-36] - bigdata_maven CI failures (branch BLZG-1269)
     * [BLZG-37] - CI failures in bigdata-jini (start/stop zookeeper)
     * [BLZG-46] - Review maven-based CI job dependency triggers
     * [BLZG-201] - Examine interaction of small slots optimization and group commit.
+    * [BLZG-1204] - Publish Blazegraph Artifacts to Maven Central
     * [BLZG-1262] - Create test-only artifact containing reused data files
     * [BLZG-1269] - Converge bigdata/blazegraph core projects on version 1.5.2-SNAPSHOT (not 1.0)
     * [BLZG-1270] - CI failures in bigdata-jini (bigdata-client version)
@@ -172,6 +183,7 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
     * [BLZG-1649] - Merge load-performance to master
     * [BLZG-1650] - DataLoader should sort files within each directory to establish a stable order for file loading
     * [BLZG-1651] - Prefix and Suffix Inline URI Handler
+    * [BLZG-1656] - bigdata-cache and bigdata-utils dependency refactor
     * [BLZG-1660] - MemoryManager should use read/write allocation lock to protect readers against concurrent close()
     * [BLZG-1667] - Growth in RWStore.alloc() cumulative time (but latency looks ok)
     * [BLZG-1676] - RWStore.showAllocators() must take the allocation lock
@@ -179,4 +191,6 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
     * [BLZG-1680] - MalformedQueryException: IV not resolved
     * [BLZG-1681] - Complex FILTER IN broken (IV resolution)
     * [BLZG-1682] - IV resolution in suquery include broken
+
+
 

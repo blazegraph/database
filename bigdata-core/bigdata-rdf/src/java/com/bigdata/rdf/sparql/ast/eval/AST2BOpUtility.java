@@ -352,7 +352,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
     private static PipelineOp convertQueryBase(PipelineOp left,
             final QueryBase query, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
-
+        
         final ProjectionNode projection = query.getProjection();
         
         final IVariable<?>[] projectedVars = projection == null
@@ -380,6 +380,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         // Add any variables known to be materialized into this scope.
         doneSet.addAll(tmp);
+
+        if( left != null) {
+        	left = (PipelineOp) left.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+        }
 
         return left;
 
@@ -729,6 +733,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (log.isInfoEnabled())
             log.info("\nqueryOrSubquery:\n" + queryBase + "\nplan:\n"
                     + BOpUtility.toString(left));
+        
+        if (left != null) {
+        	left = (PipelineOp) left.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+        }
 
         return left;
 
@@ -3045,8 +3053,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         	left = ctx.gpuEvaluation.convertJoinGroup(left, joinGroup, doneSet, start, ctx);
         	
         }
-        else
-        if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
+        else if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
                 ctx.mergeJoin)) {
 
             /*

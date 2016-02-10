@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -54,9 +54,19 @@ public class MapgraphServletProxy extends BigdataRDFServlet {
 	 */
 	private static final long serialVersionUID = 1L;
 	
+	/**
+	 * Set to true when the first warning has been logged.
+	 */
+	private static boolean hasWarnedGpu = false;
+	
 	public void doPostRequest(HttpServletRequest req, HttpServletResponse resp) throws IOException
 	{
-		throw new RuntimeException("Running without the Mapgraph package.");
+		//The workbench makes this call even in non-GPU mode. 
+		//throw new RuntimeException("Running without the Mapgraph package.");
+		if( !hasWarnedGpu ) {
+			log.warn("Running without GPU Acceleration.   See https://www.blazegraph.com/product/gpu-accelerated/.");
+			hasWarnedGpu = true;
+		}
 	}
 	
 	public static String getDefaultProvider() {

@@ -14,7 +14,7 @@ else
    export LIB_DIR=${INSTALL_DIR}/lib
 fi
 
-export JETTY_CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
+export JETTY_CLASSPATH=`find ${LIB_DIR} -name 'blazegraph-*.jar' -print0 | tr '\0' ':'`:`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
 export DATA_DIR=${BLZG_HOME}/data
 
@@ -37,6 +37,7 @@ export JETTY_OPTS="\
  -Djetty.port=${JETTY_PORT}\
  -Djetty.resourceBase=${JETTY_RESOURCE_BASE}\
  -Djetty.home=${JETTY_RESOURCE_BASE}\
+ -Djetty.overrideWebXml=${JETTY_RESOURCE_BASE}/WEB-INF/override-web.xml\
  -DJETTY_XML=${JETTY_XML}\
  -Djava.util.logging.config.file=${LOGGING_CONFIG}\
  -Dlog4j.configuration=${LOG4J_CONFIG}\

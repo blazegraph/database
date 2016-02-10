@@ -1,0 +1,32 @@
+@prefix geospatial: <http://www.bigdata.com/rdf/geospatial#> .
+@prefix example: <http://www.example.com/> .
+
+example:Oktoberfest-2013
+    rdf:type example:Fair ;
+    rdfs:label "Oktoberfest 2013" ;
+    example:happened "48.13188#11.54965#1379714400"^^geospatial:geoSpatialLiteral .
+
+example:RAR-2013
+    rdf:type example:Festival ;
+    rdfs:label "Rock am Ring 2013" ;
+    example:happened "50.33406#6.94259#1370556000"^^geospatial:geoSpatialLiteral .
+
+example:Oktoberfest-2014
+    rdf:type example:Fair ;
+    rdfs:label "Oktoberfest 2014" ;
+    example:happened "48.13188#11.54965#1411164000"^^geospatial:geoSpatialLiteral .
+
+example:RAR-2014
+    rdf:type example:Festival ;
+    rdfs:label "Rock am Ring 2014" ;
+    example:happened "50.33406#6.94259#1401919200"^^geospatial:geoSpatialLiteral .
+
+example:Oktoberfest-2015
+    rdf:type example:Fair ;
+    rdfs:label "Oktoberfest 2015" ;
+    example:happened "48.13188#11.54965#1442613600"^^geospatial:geoSpatialLiteral .
+
+example:RAR-2015
+    rdf:type example:Festival ;
+    rdfs:label "Rock am Ring 2015" ;
+    example:happened "50.36780#7.31170#1464904800"^^geospatial:geoSpatialLiteral .

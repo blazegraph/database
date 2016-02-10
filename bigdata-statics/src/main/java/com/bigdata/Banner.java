@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -353,13 +353,35 @@ public class Banner {
      */
     public synchronized static Map<String,String> getBuildInfo() {
 
+    	final String BUILD_INFO = "com.bigdata.BuildInfo";
+    	
         if (buildInfoRef.get() == null) {
+        	final Map<String,String> map = getStaticVariables(BUILD_INFO);
+            // set at most once.
+            buildInfoRef.compareAndSet(null/* expect */,
+                    Collections.unmodifiableMap(map)/* update */);
+
+        }
+        
+        return buildInfoRef.get();
+    		
+    }
+    
+    /**
+     * Utility class to get the static string variables for a given class name.
+     *  
+     * @param className
+     * @return
+     */
+
+    public synchronized static Map<String,String> getStaticVariables(final String className) {
+
 
             final Map<String,String> map = new LinkedHashMap<String, String>();
             
             try {
             
-                final Class<?> cls = Class.forName("com.bigdata.BuildInfo");
+                final Class<?> cls = Class.forName(className);
                 
                 for (Field f : cls.getFields()) {
 
@@ -400,7 +422,7 @@ public class Banner {
 
             } catch (ClassNotFoundException e) {
 
-                log.warn("Not found: " + "com.bigdata.BuildInfo");
+                log.warn("Not found: " + className);
 
             } catch (Throwable t) {
 
@@ -408,14 +430,7 @@ public class Banner {
 
             }
 
-            // set at most once.
-            buildInfoRef.compareAndSet(null/* expect */,
-                    Collections.unmodifiableMap(map)/* update */);
-
-        }
-        
-        return buildInfoRef.get();
-        
+       return map; 
     }
 
     private final static AtomicReference<Map<String, String>> buildInfoRef = new AtomicReference<Map<String, String>>();
@@ -502,7 +517,7 @@ public class Banner {
         "\n                  Affordable"+//
         "\n      Web-Scale Computing for the Enterprise"+//
         "\n"+//
-        "\nCopyright SYSTAP, LLC 2006-2015.  All rights reserved."+//
+        "\nCopyright SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved."+//
         "\n"+//
         "\n"+fullyQualifiedHostName+//
         "\n"+new Date()+//

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -57,6 +58,44 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
    private final ISnapshotFactory snapshotFactory;
    
    protected static final Logger log = Logger.getLogger(SnapshotTask.class);
+   
+   public interface Options {
+	   
+	  /**
+	   * 
+	   * Java property to override the default GZIP buffer size used for {@link GZipInputStream} and {@link GZipOutputStream}. 
+	   * 
+	   * This specifies the size in Bytes to use.  The default is 512k.
+	   * 
+	   * -Dcom.bigdata.journal.SnapshotTask.gzipBufferSize=512
+	   * 
+	   * A larger value such as below is recommended for larger files.
+	   * 
+	   * -Dcom.bigdata.journal.SnapshotTask.gzipBufferSize=65535
+	   *  
+	   */
+	   
+	   public static final String GZIP_BUFFER_SIZE = SnapshotTask.class.getClass().getName()+".gzipBufferSize"; 
+	   
+   }
+   
+   private static int getGzipBuffer() {
+	   
+	   final String s = System.getProperty(Options.GZIP_BUFFER_SIZE);
+	   
+	   if(s == null || s.isEmpty()) {
+		   return DEFAULT_BUFFER;
+	   } else {
+		   return Integer.parseInt(s);
+	   }
+	   
+   }
+   
+   /**
+    * See BLZG-1732
+    */
+   private static final int GZIP_BUFFER =  getGzipBuffer();
+   private static final int DEFAULT_BUFFER = 512;
    
    /**
     * The prefix for the temporary files used to generate snapshots.
@@ -144,7 +183,7 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
             osx = new FileOutputStream(tmp);
 
             if (snapshotFactory.getCompress())
-               osx = new GZIPOutputStream(osx);
+               osx = new GZIPOutputStream(osx, GZIP_BUFFER);
 
             os = new DataOutputStream(osx);
 
@@ -245,7 +284,7 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
    static private void copyStream(final InputStream content,
            final OutputStream outstr) throws IOException {
 
-       final byte[] buf = new byte[1024];
+       final byte[] buf = new byte[GZIP_BUFFER];
 
        while (true) {
 
@@ -296,8 +335,9 @@ public class SnapshotTask implements Callable<ISnapshotResult> {
        InputStream is = null;
        OutputStream os = null;
        try {
-           is = new GZIPInputStream(new FileInputStream(src));
-           os = new FileOutputStream(dst);
+    	   //BLZG-1732:   
+           is = new GZIPInputStream(new FileInputStream(src), GZIP_BUFFER);
+           os = new BufferedOutputStream(new FileOutputStream(dst));
            copyStream(is, os);
            os.flush();
        } finally {

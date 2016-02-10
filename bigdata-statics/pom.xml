@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <!--
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -37,8 +37,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <name>Blazegraph Statics</name>
   <description>Blazegraph Static Utility Classes</description>
   <build>
-   <plugins>
-    <plugin>
+    <plugins>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>2.6</version>
@@ -49,7 +49,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             </goals>
           </execution>
         </executions>
-     </plugin>
+      </plugin>
     </plugins>
   </build>
   <reporting>
@@ -62,9 +62,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <show>public</show>
           <maxmemory>1000m</maxmemory>
           <author>true</author>
-	      <version>true</version>
+          <version>true</version>
           <doctitle><![CDATA[<h1>Blazegraph Statics</h1>]]></doctitle>
-          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+          <bottom><![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC DBA Blazegraph. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -81,17 +81,16 @@ ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
- 
         </configuration>
       </plugin>
     </plugins>
   </reporting>
   <dependencies>
     <dependency>
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
@@ -108,21 +107,21 @@ ga('send', 'pageview');
       <artifactId>bigdata-common-util</artifactId>
       <version>${project.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit4.version}</version>
       <scope>test</scope>
     </dependency>
-     <dependency>
-       <groupId>com.fasterxml.jackson.core</groupId>
-       <artifactId>jackson-core</artifactId>
-       <version>${jackson.version}</version>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.version}</version>
     </dependency>
     <dependency>
-       <groupId>com.fasterxml.jackson.core</groupId>
-       <artifactId>jackson-annotations</artifactId>
-       <version>${jackson.version}</version>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>${jackson.version}</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>

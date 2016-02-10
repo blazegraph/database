@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -46,8 +46,8 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
    SELECT ?res WHERE {
      ?res geo:search "inRectangle" .
      ?res geo:predicate <http://o> .
-     ?res geo:spatialRectangleUpperLeft "0.00001#0.00002" .
-     ?res geo:spatialRectangleLowerRight "0.00003#0.00003" .
+     ?res geo:spatialRectangleSouthWest "0.00001#0.00002" .
+     ?res geo:spatialRectangleNorthEast "0.00003#0.00003" .
      ?res geo:timeStart "1" .
      ?res geo:timeEnd "3" .
    }
@@ -164,16 +164,14 @@ public interface GeoSpatial {
    final URI SPATIAL_CIRCLE_RADIUS = new URIImpl(NAMESPACE + "spatialCircleRadius");
    
    /**
-    * In case of a {@link GeoFunction#IN_RECTANGLE} query only: upper left of the bounding rectangle.
-    * TODO: northWest would probably be more appropriate
+    * In case of a {@link GeoFunction#IN_RECTANGLE} query only: south west border point of the bounding rectangle.
     */
-   final URI SPATIAL_RECTANGLE_UPPER_LEFT = new URIImpl(NAMESPACE + "spatialRectangleUpperLeft");
+   final URI SPATIAL_RECTANGLE_SOUTH_WEST = new URIImpl(NAMESPACE + "spatialRectangleSouthWest");
    
    /**
-    * In case of a {@link GeoFunction#IN_RECTANGLE} query only: lower right of the bounding rectangle.
-    * TODO: southEast would probably be more appropriate
+    * In case of a {@link GeoFunction#IN_RECTANGLE} query only: north east border point of the bounding rectangle.
     */   
-   final URI SPATIAL_RECTANGLE_LOWER_RIGHT = new URIImpl(NAMESPACE + "spatialRectangleLowerRight");
+   final URI SPATIAL_RECTANGLE_NORTH_EAST = new URIImpl(NAMESPACE + "spatialRectangleNorthEast");
    
    /**
     * The spatial unit used for distances specified in the geospatial search request.

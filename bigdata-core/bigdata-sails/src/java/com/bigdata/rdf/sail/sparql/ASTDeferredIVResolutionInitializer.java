@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,8 +33,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -105,6 +107,10 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     private final static Logger log = Logger
             .getLogger(ASTDeferredIVResolutionInitializer.class);
+
+    private final static boolean INFO = log.isInfoEnabled();
+
+    private final static List<URI> RDF_VOCAB = Arrays.asList(RDF.FIRST, RDF.REST, RDF.NIL, BD.VIRTUAL_GRAPH);
 
     private final Map<Value, BigdataValue> vocab;
 
@@ -231,7 +237,9 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
                     bigdataValue = getBigdataValue(rdfNode.getValue(), dte);
                     if (!bigdataValue.stringValue().equals(rdfNode.getValue())) {
                         // Data loss could occur if inline IV will be used, as string representation of original value differ from decoded value
+//                        iv = bigdataValue.getIV();
                         bigdataValue = valueFactory.createLiteral(rdfNode.getValue(), dataTypeUri);
+//                        bigdataValue.setIV(iv);
                     }
                 } else if (value instanceof ASTTrue) {
                     bigdataValue = valueFactory.createLiteral(true);
@@ -258,6 +266,9 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
                 if (bigdataValue!=null) {
                     value.setRDFValue(bigdataValue);
+                    // filling in a dummy IV for BigdataExprBuilder
+                    // @see https://jira.blazegraph.com/browse/BLZG-1717 (IV not resolved)
+                    fillInDummyIV(bigdataValue);
                     vocab.put(bigdataValue, bigdataValue);
                 }
                 
@@ -271,53 +282,48 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
          */
         
         // RDF Collection syntactic sugar vocabulary items.
-        vocab.put(RDF.FIRST, valueFactory.asValue(RDF.FIRST));
-        vocab.put(RDF.REST, valueFactory.asValue(RDF.REST));
-        vocab.put(RDF.NIL, valueFactory.asValue(RDF.NIL));
-        vocab.put(BD.VIRTUAL_GRAPH, valueFactory.asValue(BD.VIRTUAL_GRAPH));
-
-        /*
-		 * Note: Batch resolution the BigdataValue objects against the database
-		 * DOES NOT happen here. It will be done in ASTDeferredIVResolution.
-		 * Mock IVs used until then.
-		 */
-        {
-
-            // Cache the BigdataValues on the IVs for later
-            for (final BigdataValue value : vocab.values()) {
-
-                final IV iv = value.getIV();
-
-                if (iv == null) {
-
-                    /*
-                     * Since the term identifier is NULL this value is not known
-                     * to the kb.
-                     */
-
-                    if (log.isInfoEnabled())
-                        log.info("Not in knowledge base: " + value);
-
-                    /*
-                     * Create a dummy iv and cache the unknown value on it so
-                     * that it can be used during query evaluation.
-                     */
-                    final IV dummyIV = TermId.mockIV(VTE.valueOf(value));
-
-                    value.setIV(dummyIV);
-
-                    dummyIV.setValue(value);
-
-                } else {
-
-                    iv.setValue(value);
-
-                }
-
-            }
-
+        for (Value value: RDF_VOCAB) {
+            BigdataValue bigdataValue = valueFactory.asValue(value);
+            fillInDummyIV(bigdataValue);
+            vocab.put(value, bigdataValue);
         }
 
+    }
+
+    /*
+     * Note: Batch resolution the BigdataValue objects against the database
+     * DOES NOT happen here. It will be done in ASTDeferredIVResolution.
+     * Mock IVs used until then.
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private void fillInDummyIV(BigdataValue value) {
+        final IV iv = value.getIV();
+
+        if (iv == null) {
+
+            /*
+             * Since the term identifier is NULL this value is not known
+             * to the kb.
+             */
+
+            if (INFO)
+                log.info("Not in knowledge base: " + value);
+
+            /*
+             * Create a dummy iv and cache the unknown value on it so
+             * that it can be used during query evaluation.
+             */
+            final IV dummyIV = TermId.mockIV(VTE.valueOf(value));
+
+            value.setIV(dummyIV);
+
+            dummyIV.setValue(value);
+
+        } else {
+
+            iv.setValue(value);
+
+        }
     }
 
     /**

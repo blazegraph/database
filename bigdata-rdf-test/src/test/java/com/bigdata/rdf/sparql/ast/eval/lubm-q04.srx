@@ -1,0 +1,487 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+	<head>
+		<variable name='x'/>
+		<variable name='y1'/>
+		<variable name='y2'/>
+		<variable name='y3'/>
+	</head>
+	<results>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor0</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor0@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor0</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor1</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor1@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor1</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor2</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor2@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor2</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor3</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor3@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor3</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor4</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor4@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor4</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor5</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor5@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor5</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor6</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor6@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor6</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor7</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor7@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor7</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor8</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor8@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor8</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssistantProfessor9</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssistantProfessor9@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssistantProfessor9</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor0</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor0@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor0</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor1</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor1@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor1</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor10</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor10@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor10</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor11</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor11@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor11</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor12</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor12@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor12</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor13</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor13@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor13</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor2</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor2@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor2</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor3</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor3@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor3</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor4</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor4@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor4</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor5</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor5@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor5</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor6</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor6@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor6</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor7</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor7@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor7</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor8</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor8@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor8</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/AssociateProfessor9</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>AssociateProfessor9@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>AssociateProfessor9</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor0</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor0@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor0</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor1</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor1@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor1</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor2</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor2@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor2</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor3</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor3@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor3</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor4</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor4@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor4</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor5</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor5@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor5</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor6</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor6@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor6</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor7</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor7@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor7</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor8</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor8@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor8</literal>
+			</binding>
+		</result>
+		<result>
+			<binding name='x'>
+				<uri>http://www.Department0.University0.edu/FullProfessor9</uri>
+			</binding>
+			<binding name='y2'>
+				<literal>FullProfessor9@Department0.University0.edu</literal>
+			</binding>
+			<binding name='y3'>
+				<literal>xxx-xxx-xxxx</literal>
+			</binding>
+			<binding name='y1'>
+				<literal>FullProfessor9</literal>
+			</binding>
+		</result>
+	</results>
+</sparql>

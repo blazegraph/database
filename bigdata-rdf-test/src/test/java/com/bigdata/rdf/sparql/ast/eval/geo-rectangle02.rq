@@ -4,8 +4,8 @@ SELECT ?res WHERE {
   SERVICE geo:search {
     ?res geo:search "inRectangle" .
     ?res geo:predicate <http://p> .
-    ?res geo:spatialRectangleUpperLeft "5#5" .
-    ?res geo:spatialRectangleLowerRight "5#5" .
+    ?res geo:spatialRectangleSouthWest "5#5" .
+    ?res geo:spatialRectangleNorthEast "5#5" .
     ?res geo:timeStart "1" .
     ?res geo:timeEnd "10" .
   }
