@@ -245,7 +245,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
                 s = s.substring(0, 10+offset);
             } else if (dt.equals(XSD.TIME)) {
                 // everything after the date (from 11 chars in)
-                s = s.substring(10+offset);
+                s = s.substring(11+offset);
             } else if (dt.equals(XSD.GDAY)) {
                 // gDay Defines a part of a date - the day (---DD)
                 s = "---" + s.substring(8+offset, 10+offset);
@@ -257,10 +257,10 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
                 s = "--" + s.substring(5+offset, 10+offset);
             } else if (dt.equals(XSD.GYEAR)) {
                 // gYear Defines a part of a date - the year (YYYY)
-                s = s.substring(0+offset, 4+offset);
+                s = s.substring(0, 4+offset);
             } else if (dt.equals(XSD.GYEARMONTH)) {
                 // gYearMonth    Defines a part of a date - the year and month (YYYY-MM)
-                s = s.substring(0+offset, 7+offset);
+                s = s.substring(0, 7+offset);
             } 
             
             return (V) vf.createLiteral(s, dt);
