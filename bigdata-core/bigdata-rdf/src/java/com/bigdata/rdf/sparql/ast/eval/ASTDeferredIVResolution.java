@@ -1101,7 +1101,9 @@ public class ASTDeferredIVResolution {
                 
                 final BigdataValue toBeResolved = vf.asValue(v);
                 ivs[i] = v.getIV();
-                toBeResolved.clearInternalValue();
+                if (!toBeResolved.isRealIV() || !toBeResolved.getIV().isVocabulary()) {
+                	toBeResolved.clearInternalValue();
+                }
                 values[i++] = toBeResolved;
                 
             }
