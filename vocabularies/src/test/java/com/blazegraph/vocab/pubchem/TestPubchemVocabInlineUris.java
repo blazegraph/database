@@ -88,6 +88,20 @@ public class TestPubchemVocabInlineUris extends AbstractTripleStoreTestCase {
 				sb.add(uri, pred, obj);
 			}
 			
+			for (int i = 0; i < PubChemInlineURIFactory.descriptorSuffix.length; i++) {
+
+				final String uriStr = PubChemInlineURIFactory.descriptorNS;
+				final String prefix = PubChemInlineURIFactory.descriptorPrefix;
+				final String suffix = PubChemInlineURIFactory.descriptorSuffix[i];				
+
+				final int test = rand.nextInt(999999);
+
+				final BigdataURI uri = vf.createURI(uriStr+prefix+test+suffix);
+
+				uriList.push(uri);
+				sb.add(uri, pred, obj);
+			}
+			
 			{  //Add the fixed width ones
 				
 				 // http://www.bioassayontology.org/bao#BAO_0002877 fixed width 7

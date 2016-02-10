@@ -41,9 +41,13 @@ import com.bigdata.rdf.model.BigdataLiteral;
  */
 
 public class InlinePrefixedIntegerURIHandler extends
-		InlineSignedIntegerURIHandler {
+		InlineSignedIntegerURIHandler implements IPrefixedURIHandler {
 
 	private String prefix = null;
+
+	public String getPrefix() {
+		return prefix;
+	}
 
 	public InlinePrefixedIntegerURIHandler(String namespace, String prefix) {
 		super(namespace);

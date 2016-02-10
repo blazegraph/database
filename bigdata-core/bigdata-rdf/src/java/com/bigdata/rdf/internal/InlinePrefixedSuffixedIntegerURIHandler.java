@@ -28,50 +28,55 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Utility IV to generate IVs for URIs in the form of
- * http://example./org/value/STRPREFIX1234234513 where the localName of the URI
- * is a string prefix followed by an integer value.
+ * Utility IV to generate IVs for URIs in the form of http://example./org/value/STRPREFIX1234234513STRSUFFIC
+ * where the localName of the URI is a string  prefix followed by an integer  value followed by a string suffix.
  * 
- * You should extend this class with implementation for specific instances of
- * URIs that follow this form such as:
- * http://rdf.ncbi.nlm.nih.gov/pubchem/compound/1234234_CID would be create as
+ * You should extend this class with implementation for specific instances of URIs that follow
+ * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_000123_SUFFIX would be
+ * created as
  * 
- * InlineSuffixedIntegerURIHandler handler = new InlineSuffixedIntegerURIHandler( "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","_CID");
+ * InlinePrefixedSuffixedIntegerURIHandler handler = new InlinePrefixedSuffixedIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_","_SUFFIX");
  * 
  * 
  */
 
-public class InlineSuffixedIntegerURIHandler extends
-		InlineSignedIntegerURIHandler implements ISuffixedURIHandler {
+public class InlinePrefixedSuffixedIntegerURIHandler extends
+		InlineSignedIntegerURIHandler implements IPrefixedURIHandler, ISuffixedURIHandler {
 
+	private String prefix = null;
 	private String suffix = null;
 
-	public InlineSuffixedIntegerURIHandler(String namespace, String suffix) {
+	public InlinePrefixedSuffixedIntegerURIHandler(final String namespace,
+			final String prefix, final String suffix) {
 		super(namespace);
+		this.prefix = prefix;
 		this.suffix = suffix;
 	}
 
 	@Override
 	@SuppressWarnings("rawtypes")
 	protected AbstractLiteralIV createInlineIV(String localName) {
-		if (!localName.endsWith(this.suffix)) {
+		if (!localName.startsWith(this.prefix) || !localName.endsWith(suffix)) {
 			return null;
 		}
-		return super.createInlineIV(localName.substring(0, localName.length()
-				- this.suffix.length()));
+
+		final String intValue = localName.substring(this.prefix.length(),
+				localName.length() - this.suffix.length());
+				
+		return super.createInlineIV(intValue);
 	}
 
 	@Override
 	public String getLocalNameFromDelegate(
 			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		return super.getLocalNameFromDelegate(delegate) + this.suffix;
+		return this.prefix + super.getLocalNameFromDelegate(delegate) + suffix;
+	}
+
+	public String getPrefix() {
+		return prefix;
 	}
 
 	public String getSuffix() {
 		return suffix;
-	}
-
-	public void setSuffix(String suffix) {
-		this.suffix = suffix;
 	}
 }

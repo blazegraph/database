@@ -164,5 +164,57 @@ public class TestInlineURIHandlers extends TestCase2 {
 		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
 		
 	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test	
+	public void testPrefixedSuffixFixedWidthIntegerURIHandler() {
+	
+		final String nameSpace = "http://blazegraph.com/";
+		final String localName = "PRE_001234_SUFFIX";
+		final String pre = "PRE_";
+		final String fixture = "_SUFFIX";
+		final int intValue = 1234;
+		final int width = 6;
+		
+		InlinePrefixedSuffixedFixedWidthIntegerURIHandler handler = new InlinePrefixedSuffixedFixedWidthIntegerURIHandler(nameSpace, pre, fixture, width);
+		
+		XSDNumericIV iv = (XSDNumericIV) handler.createInlineIV(localName);
+		
+		if(log.isDebugEnabled()) {
+			log.debug(iv.getDTE().name());
+		}
+		
+		assertTrue (iv != null);
 
+		assertTrue (intValue == iv.getInlineValue().intValue());
+		
+		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
+		
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test	
+	public void testPrefixedSuffixIntegerURIHandler() {
+	
+		final String nameSpace = "http://blazegraph.com/";
+		final String localName = "PRE_1234_SUFFIX";
+		final String pre = "PRE_";
+		final String fixture = "_SUFFIX";
+		final int intValue = 1234;
+		
+		InlinePrefixedSuffixedIntegerURIHandler handler = new InlinePrefixedSuffixedIntegerURIHandler(nameSpace, pre, fixture);
+		
+		XSDNumericIV iv = (XSDNumericIV) handler.createInlineIV(localName);
+		
+		if(log.isDebugEnabled()) {
+			log.debug(iv.getDTE().name());
+		}
+		
+		assertTrue (iv != null);
+
+		assertTrue (intValue == iv.getInlineValue().intValue());
+		
+		assertTrue (localName.equals(handler.getLocalNameFromDelegate(iv)));
+		
+	}
 }

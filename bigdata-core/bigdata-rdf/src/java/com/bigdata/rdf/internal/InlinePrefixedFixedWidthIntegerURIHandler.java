@@ -41,7 +41,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  */
 
 public class InlinePrefixedFixedWidthIntegerURIHandler extends
-		InlineSignedIntegerURIHandler {
+		InlineSignedIntegerURIHandler implements IPrefixedURIHandler {
 
 	private String prefix = null;
 	private int width = 0;
@@ -75,5 +75,9 @@ public class InlinePrefixedFixedWidthIntegerURIHandler extends
 		final String localName = this.prefix + String.format("%0" + width + "d", intVal);
 
 		return localName;
+	}
+	
+	public String getPrefix() {
+		return prefix;
 	}
 }
