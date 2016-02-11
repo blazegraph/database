@@ -1936,5 +1936,31 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
           "ticket_bg1750-res.trig"// resultFileURL
          ).runTest();   
    }
+   
+   /**
+    * BLZG-1748: Regressions in date comparison
+    */
+   public void test_ticket_1748a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1748a",// testURI,
+           "ticket_bg1748a.rq",// queryFileURL
+           "ticket_bg1748.trig",// dataFileURL
+           "ticket_bg1748.srx"// resultFileURL
+          ).runTest();   
+    }
+   
+   /**
+    * BLZG-1748: Regressions in date comparison
+    */
+   public void test_ticket_1748b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1748b",// testURI,
+           "ticket_bg1748b.rq",// queryFileURL
+           "ticket_bg1748.trig",// dataFileURL
+           "ticket_bg1748.srx"// resultFileURL
+          ).runTest();   
+    }
 
 }
