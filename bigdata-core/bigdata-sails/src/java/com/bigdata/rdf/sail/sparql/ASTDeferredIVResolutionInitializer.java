@@ -198,7 +198,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
                 } else if (value instanceof ASTIRI) {
                     iv = new TermId<BigdataValue>(VTE.URI,0);
                     bigdataValue = valueFactory.createURI(((ASTIRI)value).getValue());
-                    if (!bigdataValue.isRealIV() || !bigdataValue.getIV().isVocabulary()) {
+                    if (!bigdataValue.isRealIV()) {
                     	bigdataValue.clearInternalValue();
                     	bigdataValue.setIV(iv);
                     }

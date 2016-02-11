@@ -1091,7 +1091,7 @@ public class ASTDeferredIVResolution {
 
                 final BigdataValue toBeResolved = v; // asValue() invoked above. // f.asValue(v);
                 ivs[i] = TermId.mockIV(VTE.valueOf(v));
-                if (!toBeResolved.isRealIV() || !toBeResolved.getIV().isVocabulary()) {
+                if (!toBeResolved.isRealIV()) {
                 	toBeResolved.clearInternalValue();
                 }
                 values[i++] = toBeResolved;
@@ -1102,7 +1102,7 @@ public class ASTDeferredIVResolution {
                 
                 final BigdataValue toBeResolved = vf.asValue(v);
                 ivs[i] = v.getIV();
-                if (!toBeResolved.isRealIV() || !toBeResolved.getIV().isVocabulary()) {
+                if (!toBeResolved.isRealIV()) {
                 	toBeResolved.clearInternalValue();
                 }
                 values[i++] = toBeResolved;
