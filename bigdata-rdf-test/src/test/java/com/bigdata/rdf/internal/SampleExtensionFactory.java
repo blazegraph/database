@@ -1,9 +1,10 @@
 package com.bigdata.rdf.internal;
 
-import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -13,13 +14,11 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public class SampleExtensionFactory implements IExtensionFactory {
 
-    private final Collection<IExtension> extensions;
-    
-    private volatile IExtension[] extensionsArray;
-    
+    private final List<IExtension<? extends BigdataValue>> extensions;
+        
     public SampleExtensionFactory() {
         
-        extensions = new LinkedList<IExtension>(); 
+        extensions = new LinkedList<IExtension<? extends BigdataValue>>(); 
             
     }
     
@@ -32,15 +31,13 @@ public class SampleExtensionFactory implements IExtensionFactory {
 //    				lex, lex.getInlineDateTimesTimeZone()));
 		extensions.add(new EpochExtension(resolver));
 		extensions.add(new ColorsEnumExtension(resolver));
-		extensionsArray = extensions.toArray(new IExtension[2]);
+//		extensionsArray = extensions.toArray(new IExtension[2]);
         
     }
     
     @Override
-    public IExtension[] getExtensions() {
-        
-        return extensionsArray;
-        
+    public Iterator<IExtension<? extends BigdataValue>> getExtensions() {
+        return Collections.unmodifiableList(extensions).iterator();
     }
     
 }
