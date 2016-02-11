@@ -37,11 +37,12 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * 
  * InlinePrefixedSuffixedFixedWidthIntegerURIHandler handler = new InlinePrefixedSuffixedFixedWidthIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_","_SUFFIX",6)
  * 
+ * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
  */
 
 public class InlinePrefixedSuffixedFixedWidthIntegerURIHandler extends
-		InlineSignedIntegerURIHandler implements IPrefixedURIHandler, ISuffixedURIHandler {
+		InlineLocalNameIntegerURIHandler implements IPrefixedURIHandler, ISuffixedURIHandler {
 
 	private String prefix = null;
 	private String suffix = null;
@@ -55,6 +56,15 @@ public class InlinePrefixedSuffixedFixedWidthIntegerURIHandler extends
 		this.width = width;
 	}
 
+	public InlinePrefixedSuffixedFixedWidthIntegerURIHandler(final String namespace,
+			final String prefix, final String suffix, final int width, final int id) {
+		super(namespace);
+		this.prefix = prefix;
+		this.suffix = suffix;
+		this.width = width;
+		this.packedId = id;
+	}
+
 	@Override
 	@SuppressWarnings("rawtypes")
 	protected AbstractLiteralIV createInlineIV(String localName) {
@@ -65,7 +75,7 @@ public class InlinePrefixedSuffixedFixedWidthIntegerURIHandler extends
 		final String intValue = localName.substring(this.prefix.length(),
 				localName.length() - this.suffix.length());
 				
-		return super.createInlineIV(intValue);
+		return super.createInlineIV(getPackedValueString(intValue));
 	}
 
 	@Override
@@ -73,7 +83,7 @@ public class InlinePrefixedSuffixedFixedWidthIntegerURIHandler extends
 			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
 		final String intStr = super.getLocalNameFromDelegate(delegate);
 
-		final int intVal = Integer.parseInt(intStr);
+		final int intVal = (int) getUnpackedValueFromString(intStr);
 
 		return this.prefix  + String.format("%0" + width + "d", intVal) + suffix;
 	}
@@ -82,15 +92,7 @@ public class InlinePrefixedSuffixedFixedWidthIntegerURIHandler extends
 		return prefix;
 	}
 
-	public void setPrefix(String prefix) {
-		this.prefix = prefix;
-	}
-
 	public String getSuffix() {
 		return suffix;
-	}
-
-	public void setSuffix(String suffix) {
-		this.suffix = suffix;
 	}
 }

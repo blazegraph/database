@@ -169,6 +169,10 @@ public class TestAll extends TestCase {
         //Inline URI Handlers
         suite.addTestSuite(TestInlineURIHandlers.class);
         
+        //Test handlers for packing multiple inline URI handlers into a single
+        //namespace.
+        suite.addTestSuite(TestInlineLocalNameIntegerURIHandler.class);
+        
         return suite;
         
     }

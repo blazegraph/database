@@ -140,9 +140,11 @@ public class TestPubchemVocabInlineUris extends AbstractTripleStoreTestCase {
 				log.debug(store.dumpStore());
 			
 			for (final BigdataURI uri: uriList ) {
+
 				if(log.isDebugEnabled()) {
 					log.debug("Checking " + uri.getNamespace() + " "+ uri.getLocalName() + " inline: " + uri.getIV().isInline());
 				}
+
 				assertTrue(uri.getIV().isInline());
 			}
 

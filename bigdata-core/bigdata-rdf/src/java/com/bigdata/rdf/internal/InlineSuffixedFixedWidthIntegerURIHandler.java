@@ -37,19 +37,29 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * 
  * InlinePrefixedFixedWidthIntegerURIHandler handler = new InlinePrefixedFixedWidthIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","_CID", 7);
  * 
+ * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
  */
 
 public class InlineSuffixedFixedWidthIntegerURIHandler extends
-		InlineSignedIntegerURIHandler implements ISuffixedURIHandler {
+		InlineLocalNameIntegerURIHandler implements ISuffixedURIHandler {
 
 	private String suffix = null;
 	private int width = 0;
 
-	public InlineSuffixedFixedWidthIntegerURIHandler(String namespace, String suffix, int width) {
+	public InlineSuffixedFixedWidthIntegerURIHandler(final String namespace,
+			final String suffix, final int width) {
 		super(namespace);
 		this.suffix = suffix;
 		this.width = width;
+	}
+
+	public InlineSuffixedFixedWidthIntegerURIHandler(final String namespace,
+			final String suffix, final int width, final int id) {
+		super(namespace);
+		this.suffix = suffix;
+		this.width = width;
+		this.packedId = id;
 	}
 
 	@Override
@@ -61,7 +71,7 @@ public class InlineSuffixedFixedWidthIntegerURIHandler extends
 	
 		final String intValue =localName.substring(0, localName.length() - this.suffix.length());
 		
-		return super.createInlineIV(intValue);
+		return super.createInlineIV(getPackedValueString(intValue));
 	}
 
 	@Override
@@ -70,7 +80,7 @@ public class InlineSuffixedFixedWidthIntegerURIHandler extends
 
 		final String intStr = super.getLocalNameFromDelegate(delegate);
 
-		final int intVal = Integer.parseInt(intStr);
+		final int intVal = (int) getUnpackedValueFromString(intStr);
 
 		final String localName = String.format("%0" + width + "d", intVal) + this.suffix;
 

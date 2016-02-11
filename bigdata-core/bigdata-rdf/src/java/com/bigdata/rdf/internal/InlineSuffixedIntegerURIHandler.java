@@ -38,40 +38,49 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * 
  * InlineSuffixedIntegerURIHandler handler = new InlineSuffixedIntegerURIHandler( "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","_CID");
  * 
+ * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
  */
 
 public class InlineSuffixedIntegerURIHandler extends
-		InlineSignedIntegerURIHandler implements ISuffixedURIHandler {
+		InlineLocalNameIntegerURIHandler implements ISuffixedURIHandler {
 
 	private String suffix = null;
 
-	public InlineSuffixedIntegerURIHandler(String namespace, String suffix) {
+	public InlineSuffixedIntegerURIHandler(final String namespace, final String suffix) {
 		super(namespace);
 		this.suffix = suffix;
 	}
 
+	public InlineSuffixedIntegerURIHandler(final String namespace,
+			final String suffix, final int id) {
+		super(namespace);
+		this.suffix = suffix;
+		this.packedId = id;
+	}
+
 	@Override
 	@SuppressWarnings("rawtypes")
-	protected AbstractLiteralIV createInlineIV(String localName) {
+	protected AbstractLiteralIV createInlineIV(final String localName) {
 		if (!localName.endsWith(this.suffix)) {
 			return null;
 		}
-		return super.createInlineIV(localName.substring(0, localName.length()
+		
+		final String intVal = getPackedValueString(localName.substring(0, localName.length()
 				- this.suffix.length()));
+
+		return super.createInlineIV(intVal);
 	}
 
 	@Override
 	public String getLocalNameFromDelegate(
-			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		return super.getLocalNameFromDelegate(delegate) + this.suffix;
+			final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+
+		return getUnpackedValueFromString(super
+				.getLocalNameFromDelegate(delegate)) + this.suffix;
 	}
 
 	public String getSuffix() {
 		return suffix;
-	}
-
-	public void setSuffix(String suffix) {
-		this.suffix = suffix;
 	}
 }

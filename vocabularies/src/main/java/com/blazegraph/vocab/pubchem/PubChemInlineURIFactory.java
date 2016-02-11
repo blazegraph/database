@@ -24,19 +24,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.blazegraph.vocab.pubchem;
 
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.rdf.internal.IPrefixedURIHandler;
-import com.bigdata.rdf.internal.ISuffixedURIHandler;
+import com.bigdata.rdf.internal.InlineIntegerURIHandlerMap;
 import com.bigdata.rdf.internal.InlinePrefixedFixedWidthIntegerURIHandler;
 import com.bigdata.rdf.internal.InlinePrefixedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlinePrefixedSuffixedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlineURIFactory;
 import com.bigdata.rdf.internal.InlineURIHandler;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * InlineURIFactory for the {@link PubChemVocabularyDecl}
@@ -105,7 +104,7 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/", // 7
 			"http://rdf.ncbi.nlm.nih.gov/pubchem/reference/", // 8
 			"http://semanticscience.org/resource/",  // 9
-			"http://purl.obolibrary.org/obo/" }; 			///10
+			};
 
 	public final static String[] localNames = { "CID", // 1
 			"SID", // 2
@@ -115,8 +114,8 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 			"GID", // 6
 			"BSID", // 7
 			"PMID", // 8
-			"CHEMINF_", //9
-			"CHEBI_"}; // 10
+			"CHEMINF_" //9
+			};
 
 	/*
 	 * http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/
@@ -155,13 +154,14 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 			"_Defined_Atom_Stereo_Count", "_Covalent_Unit_Count",
 			"_Compound_Identifier" };
 
-	//Precompile
-	public static final Pattern descriptorPattern = Pattern.compile("(.*_)(\\d+)(_.*)");
-
-	public static final String descriptorPrefix = "CID_";
+	
+	public static final String descriptorPrefix = "CID";
 	public static final String descriptorNS = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/";
+	
+	public static final String oboNS = "http://purl.obolibrary.org/obo/";
 
 	public PubChemInlineURIFactory() {
+
 		super();
 
 		for (int i = 0; i < uris.length; i++) {
@@ -173,116 +173,86 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 		addHandler(new InlinePrefixedFixedWidthIntegerURIHandler(
 				"http://www.bioassayontology.org/bao#", "BAO_", 7));
 
-		// http://purl.obolibrary.org/obo/PR_000005253 //fixed width 9
-		addHandler(new InlinePrefixedFixedWidthIntegerURIHandler(
-				"http://purl.obolibrary.org/obo/", "PR_", 9));
+		{
+			// Create a map of Handlers for the
+			// "http://purl.obolibrary.org/obo/"
+			// namespace
 
-		// http://purl.obolibrary.org/obo/IAO_0000136 //fixed width 7
-		addHandler(new InlinePrefixedFixedWidthIntegerURIHandler(
-				"http://purl.obolibrary.org/obo/", "IAO_", 7));
+			final InlineIntegerURIHandlerMap oboMap = new InlineIntegerURIHandlerMap(
+					oboNS);
 
-		// http://purl.obolibrary.org/obo/OBI_0000299 //fixed width 7
-		addHandler(new InlinePrefixedFixedWidthIntegerURIHandler(
-				"http://purl.obolibrary.org/obo/", "OBI_", 7));
+			int i = 0;
+			// http://purl.obolibrary.org/obo/PR_000005253 //fixed width 9
+			InlineURIHandler handler = new InlinePrefixedIntegerURIHandler(
+					"http://purl.obolibrary.org/obo/", "CHEBI_", i);
 
-		for (int i = 0; i < descriptorSuffix.length; i++) {
-			addHandler(new InlinePrefixedSuffixedIntegerURIHandler(
-					descriptorNS, descriptorPrefix, descriptorSuffix[i]));
-		}
+			addHandler(handler);
+			oboMap.addHandlerForNS(i++, handler);
 
-	}
+			// http://purl.obolibrary.org/obo/PR_000005253 //fixed width 9
+			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
+					"http://purl.obolibrary.org/obo/", "PR_", 9, i);
 
-	@Override
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public URIExtensionIV createInlineURIIV(final URI uri) {
+			addHandler(handler);
+			oboMap.addHandlerForNS(i++, handler);
 
-		String str;
+			// http://purl.obolibrary.org/obo/IAO_0000136 //fixed width 7
+			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
+					"http://purl.obolibrary.org/obo/", "IAO_", 7, i);
+			addHandler(handler);
+			oboMap.addHandlerForNS(i++, handler);
 
-		//Custom pubchem handling for multiple different inline values
-		//with the same namespace
-		//Only do this for the desriptorNS
-		//TODO:  Handle same namespace, different suffix.  push up into InlineURIFactory
-		if(uri.getNamespace().equals(descriptorNS)) {
+			// http://purl.obolibrary.org/obo/OBI_0000299 //fixed width 7
+			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
+					"http://purl.obolibrary.org/obo/", "OBI_", 7, i);
 
-			final String lName = uri.getLocalName();
-		    //We know these are in the form prefix_integer_suffix	
-			
-			Matcher m = descriptorPattern.matcher(lName);
-			
-			if(m.matches()) {
-				str = uri.getNamespace();
-				str+=m.group(1);
-				str+=m.group(3);
-			} else { //drop into default
-				str = uri.stringValue();
-			}
-			
-		} else {
-			str = uri.stringValue();
-		}
-		
-
-		// Find handler with longest prefix match LTE the given URI.
-		final Map.Entry<String, InlineURIHandler> floorEntry = getHandlersByNamespace()
-				.floorEntry(str);
-
-		if (floorEntry == null) {
-
-			// No potentially suitable handler.
-			return null;
+			addHandler(handler);
+			oboMap.addHandlerForNS(i++, handler);
 
 		}
 
-		final String prefix = floorEntry.getKey();
+		{
 
-		/*
-		 * Note: the floorEntry is NOT guaranteed to be a prefix. It can also be
-		 * strictly LT the probe key. Therefore we must additionally verify here
-		 * that the prefix under which the URI handler was registered is a
-		 * prefix of the URI before invoking that handler.
-		 */
-		if (str.startsWith(prefix)) {
+			// Now we want to a namespace with multiple different inline
+			// URI Handlers based on local name variations.
+			final InlineIntegerURIHandlerMap hMap = new InlineIntegerURIHandlerMap(
+					descriptorNS);
 
-			final InlineURIHandler handler = floorEntry.getValue();
+			for (int i = 0; i < descriptorSuffix.length; i++) {
+				final InlineURIHandler h = new InlinePrefixedSuffixedIntegerURIHandler(
+						descriptorNS, descriptorPrefix, descriptorSuffix[i], i);
 
-			final URIExtensionIV iv = handler.createInlineIV(uri);
+				// Add the handler directly (will resolve based on the localname
+				// variants)
+				addHandler(h);
 
-			if (iv != null) {
-
-				return iv;
-
+				// Add the handler to the namespace map
+				hMap.addHandlerForNS(i, h);
 			}
 
+			// Add the handler map for the base namespace URI
+			addHandler(hMap);
+
 		}
-
-		return null;
-
-	}
-
-	@Override
-	/**
-	 * Override to allow for prefix and suffix handlers with the same URI, but different suffixes. 
-	 * 
-	 */
-	protected void addHandler(final InlineURIHandler handler) {
-
-		getHandlersByNamespace().put(getKeyForHandler(handler), handler);
 
 	}
 	
-	private String getKeyForHandler(final InlineURIHandler handler) {
-	
-		String key = handler.getNamespace();
+	/*
+	@Override
+	public String getLocalNameFromDelegate(final URI namespace,
+			final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
 		
-		if(handler instanceof IPrefixedURIHandler) {
-			key += ((IPrefixedURIHandler)handler).getPrefix();
+		System.err.println("Getting handler for " + namespace);
+		final InlineURIHandler handler = getHandlersByNamespace().get(namespace);
+
+		if (handler == null) {
+			throw new IllegalArgumentException(
+					"Can't resolve uri handler for \"" + namespace
+							+ "\".  Maybe its be deregistered?");
 		}
-		
-		if(handler instanceof ISuffixedURIHandler) {
-			key += ((ISuffixedURIHandler)handler).getSuffix();
-		}
-		
-		return key;
-		
+
+		return handler.getLocalNameFromDelegate(delegate);
+
 	}
+	*/
 }

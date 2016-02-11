@@ -37,11 +37,12 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * 
  * InlinePrefixedIntegerURIHandler handler = new InlinePrefixedIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_");
  * 
+ * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
  */
 
 public class InlinePrefixedIntegerURIHandler extends
-		InlineSignedIntegerURIHandler implements IPrefixedURIHandler {
+		InlineLocalNameIntegerURIHandler implements IPrefixedURIHandler {
 
 	private String prefix = null;
 
@@ -49,9 +50,15 @@ public class InlinePrefixedIntegerURIHandler extends
 		return prefix;
 	}
 
-	public InlinePrefixedIntegerURIHandler(String namespace, String prefix) {
+	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix) {
 		super(namespace);
 		this.prefix = prefix;
+	}
+
+	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix, final int id) {
+		super(namespace);
+		this.prefix = prefix;
+		this.packedId = id;
 	}
 
 	@Override
@@ -63,12 +70,12 @@ public class InlinePrefixedIntegerURIHandler extends
 	
 		final String intValue = localName.substring(this.prefix.length(), localName.length());
 				
-		return super.createInlineIV(intValue);
+		return super.createInlineIV(getPackedValueString(intValue));
 	}
 
 	@Override
 	public String getLocalNameFromDelegate(
 			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		return this.prefix + super.getLocalNameFromDelegate(delegate);
+		return this.prefix + getUnpackedValueFromString(super.getLocalNameFromDelegate(delegate));
 	}
 }
