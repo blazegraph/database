@@ -152,7 +152,7 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 			"_Hydrogen_Bond_Donor_Count", "_Hydrogen_Bond_Acceptor_Count",
 			"_Exact_Mass", "_Defined_Bond_Stereo_Count",
 			"_Defined_Atom_Stereo_Count", "_Covalent_Unit_Count",
-			"_Compound_Identifier" };
+			"_Compound_Identifier", "_Canonical_SMILES" };
 
 	
 	public static final String descriptorPrefix = "CID";
