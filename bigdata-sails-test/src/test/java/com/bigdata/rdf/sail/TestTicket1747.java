@@ -24,26 +24,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import java.io.IOException;
-import java.util.Set;
-
-import org.openrdf.model.URI;
+import java.util.List;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
-import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.sail.SailRepository;
-import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.sparql.ast.*;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
 
 /**
@@ -53,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
  * @see <a href="https://jira.blazegraph.com/browse/BLZG-1747">
  * Persistent "Unknown extension" issue in WIkidata Query Service</a>
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class TestTicket1747 extends QuadsTestCase {
 	
     public TestTicket1747() {
@@ -63,9 +62,6 @@ public class TestTicket1747 extends QuadsTestCase {
 	}
 
 	public void testBug() throws Exception {
-
-	    // try with Sesame MemoryStore:
-//		executeQuery(new SailRepository(new MemoryStore()));
 
 //		Setup a triple store using a vocabulary that declares xsd:dateTime (this should be in the default vocabulary).
 		
@@ -79,18 +75,17 @@ public class TestTicket1747 extends QuadsTestCase {
 
 	private void executeQuery(final BigdataSailRepository repo)
 			throws RepositoryException, MalformedQueryException,
-			QueryEvaluationException, RDFParseException, IOException {
+			QueryEvaluationException, RDFParseException, IOException, VisitorException {
 		try {
 			repo.initialize();
 			final BigdataSailRepositoryConnection conn = repo.getConnection();
-			conn.setAutoCommit(false);
-			BigdataValueFactory vf = conn.getValueFactory();
 			try {
+				BigdataValueFactory vf = conn.getValueFactory();
 			
 				//				Verify that you can resolve xsd:dateTime to a non-mock IV.
 				IV xsdDateTimeIV = conn.getTripleStore().getLexiconRelation().resolve(vf.createURI(XMLSchema.DATETIME.stringValue())).getIV();
-				assertTrue(xsdDateTimeIV.isVocabulary());
 				assertFalse(xsdDateTimeIV.isNullIV());
+				assertTrue(xsdDateTimeIV.isVocabulary());
 
 //				Parse the first query on this ticket.
 				String query = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\r\n" + 
@@ -116,8 +111,8 @@ public class TestTicket1747 extends QuadsTestCase {
 
 //				Verify that re-resolution of xsd:dateTime does not return a MockIV.
 		        xsdDateTimeIV = conn.getTripleStore().getLexiconRelation().resolve(XMLSchema.DATETIME).getIV();
-		        assertTrue(xsdDateTimeIV.isVocabulary());
 		        assertFalse(xsdDateTimeIV.isNullIV());
+		        assertTrue(xsdDateTimeIV.isVocabulary());
 
 //				Invoke deferred IV resolution on the parsed query.
 		        ASTDeferredIVResolution.resolveQuery(conn.getTripleStore(), astContainer);
@@ -125,15 +120,35 @@ public class TestTicket1747 extends QuadsTestCase {
 	        
 //				Verify that re-resolution of xsd:dateTime does not return a MockIV.
 		        xsdDateTimeIV = conn.getTripleStore().getLexiconRelation().resolve(XMLSchema.DATETIME).getIV();
-		        assertTrue(xsdDateTimeIV.isVocabulary());
 		        assertFalse(xsdDateTimeIV.isNullIV());
+		        assertTrue(xsdDateTimeIV.isVocabulary());
 //				Verify that the parsed query does not contain a MockIV for xsd:dateTime
-		        // TODO
+		        QueryRoot queryRoot = astContainer.getOriginalAST();
+		        GraphPatternGroup whereClause = queryRoot.getWhereClause();
+				List<FilterNode> filterNodes = whereClause.getChildren(FilterNode.class);
+				for (FilterNode filterNode: filterNodes) {
+					checkNode(filterNode);
+		        }
 			} finally {
 				conn.close();
 			}
 		} finally {
 			repo.shutDown();
+		}
+	}
+
+	private void checkNode(BOp bop) {
+		if (bop instanceof ConstantNode) {
+			BigdataValue value = ((ConstantNode)bop).getValue();
+			if (XMLSchema.DATETIME.equals(value)) {
+				IV xsdDateTimeIV = value.getIV();
+		        assertFalse(xsdDateTimeIV.isNullIV());
+				assertTrue(xsdDateTimeIV.isVocabulary());
+			}
+		} else {
+			for (BOp arg: bop.args()) {
+				checkNode(arg);
+			}
 		}
 	}
 }
