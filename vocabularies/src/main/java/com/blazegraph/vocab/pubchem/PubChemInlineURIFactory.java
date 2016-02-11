@@ -182,31 +182,26 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 					oboNS);
 
 			int i = 0;
-			// http://purl.obolibrary.org/obo/PR_000005253 //fixed width 9
+			// http://purl.obolibrary.org/obo/CHEBI_13453 
 			InlineURIHandler handler = new InlinePrefixedIntegerURIHandler(
 					"http://purl.obolibrary.org/obo/", "CHEBI_", i);
 
-			addHandler(handler);
 			oboMap.addHandlerForNS(i++, handler);
 
 			// http://purl.obolibrary.org/obo/PR_000005253 //fixed width 9
 			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
 					"http://purl.obolibrary.org/obo/", "PR_", 9, i);
 
-			addHandler(handler);
 			oboMap.addHandlerForNS(i++, handler);
 
 			// http://purl.obolibrary.org/obo/IAO_0000136 //fixed width 7
 			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
 					"http://purl.obolibrary.org/obo/", "IAO_", 7, i);
-			addHandler(handler);
 			oboMap.addHandlerForNS(i++, handler);
 
 			// http://purl.obolibrary.org/obo/OBI_0000299 //fixed width 7
 			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
 					"http://purl.obolibrary.org/obo/", "OBI_", 7, i);
-
-			addHandler(handler);
 			oboMap.addHandlerForNS(i++, handler);
 
 		}
@@ -222,10 +217,6 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 				final InlineURIHandler h = new InlinePrefixedSuffixedIntegerURIHandler(
 						descriptorNS, descriptorPrefix, descriptorSuffix[i], i);
 
-				// Add the handler directly (will resolve based on the localname
-				// variants)
-				addHandler(h);
-
 				// Add the handler to the namespace map
 				hMap.addHandlerForNS(i, h);
 			}
@@ -236,23 +227,4 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 		}
 
 	}
-	
-	/*
-	@Override
-	public String getLocalNameFromDelegate(final URI namespace,
-			final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		
-		System.err.println("Getting handler for " + namespace);
-		final InlineURIHandler handler = getHandlersByNamespace().get(namespace);
-
-		if (handler == null) {
-			throw new IllegalArgumentException(
-					"Can't resolve uri handler for \"" + namespace
-							+ "\".  Maybe its be deregistered?");
-		}
-
-		return handler.getLocalNameFromDelegate(delegate);
-
-	}
-	*/
 }

@@ -80,13 +80,6 @@ public class PubChemVocabulary extends BigdataCoreVocabulary_v20151210 {
     @Override
     protected void addValues() {
 
-        //addDecl(new RDFVocabularyDecl());
-        //addDecl(new RDFSVocabularyDecl());
-        //addDecl(new FOAFVocabularyDecl());
-        //addDecl(new SKOSVocabularyDecl());
-        //addDecl(new OWLVocabularyDecl());
-        //addDecl(new DCAllVocabularyDecl());
-        //addDecl(new XMLSchemaVocabularyDecl());
         addDecl(new PubChemVocabularyDecl());
         
         super.addValues();

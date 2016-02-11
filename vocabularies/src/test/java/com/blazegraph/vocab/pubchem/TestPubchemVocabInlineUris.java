@@ -125,7 +125,6 @@ public class TestPubchemVocabInlineUris extends AbstractTripleStoreTestCase {
 				uriList.push(uri);
 				sb.add(uri, pred, obj);
 				
-				// http://purl.obolibrary.org/obo/OBI_0000299 //fixed width 7
 				//http://purl.obolibrary.org/obo/CHEBI_74763
 				uri = vf.createURI("http://purl.obolibrary.org/obo/CHEBI_74763");
 				uriList.push(uri);
