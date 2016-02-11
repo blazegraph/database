@@ -665,12 +665,11 @@ public class ASTDeferredIVResolution {
             // HAVING clause
             {
                 final HavingNode having = queryRoot.getHaving();
-                if (having!=null) {
-                    for (final IConstraint c: having.getConstraints()) {
-                        for (final BOp bop: c.args()) {
-                            fillInIV(store, bop);
-                        }
-                    }
+                
+                if (having != null) {
+                	
+                	fillInIV(store, having);
+                	
                 }
             }
     
