@@ -27,6 +27,7 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -854,12 +855,16 @@ public class ASTDeferredIVResolution {
                     defer(((TermId)v).getValue(), new Handler(){
                         @Override
                         public void handle(final IV newIV) {
-                            List<BOp> args = bop.args();
-							if (args instanceof ArrayList) {
-                                args.set(fk, new Constant(newIV));
-                            } else {
-                            	log.warn("bop.args() class " + args.getClass() + " or " + bop.getClass() + " does not allow updates");
-                            }
+                        	if (bop instanceof BOpBase) {
+                        		((BOpBase)bop).__replaceArg(fk, new Constant(newIV));
+                        	} else {
+	                            List<BOp> args = bop.args();
+								if (args instanceof ArrayList) {
+	                                args.set(fk, new Constant(newIV));
+	                            } else {
+	                            	log.warn("bop.args() class " + args.getClass() + " or " + bop.getClass() + " does not allow updates");
+	                            }
+                        	}
                         }
                     });
                 }
