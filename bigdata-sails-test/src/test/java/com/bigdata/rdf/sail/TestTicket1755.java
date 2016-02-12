@@ -46,6 +46,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
@@ -118,7 +119,14 @@ public class TestTicket1755 extends QuadsTestCase {
 							"   ?s <http://end> ?end.\r\n" + 
 							"   FILTER(\"0521-01-01\"^^<http://www.w3.org/2001/XMLSchema#date> >= ?begin)\r\n" + 
 							"}";
-					testQuery(conn, query);
+					/*
+					 * There are 3 IVs in the parsed tree:
+					 * LiteralExtensionIV in Constant as an argument of ConstantNode in FunctionNode
+					 * LiteralExtensionIV in BigdataValue in ConstantNode as an argument of FunctionNode
+					 * LiteralExtensionIV in Constant as an argument of valueExpression annotation of FunctionNode
+					 */
+					int expectedIVs = 3;
+					testQuery(conn, query, expectedIVs);
 				}
 				{
 					final String query = "SELECT ?s WHERE {\r\n" + 
@@ -126,7 +134,17 @@ public class TestTicket1755 extends QuadsTestCase {
 							"   ?s <http://end> ?end.\r\n" + 
 							"   FILTER((\"0521-01-01\"^^<http://www.w3.org/2001/XMLSchema#date> >= ?begin) && true)\r\n" + 
 							"}";
-					testQuery(conn, query);
+					/*
+					 * There are 6 IVs in the parsed tree:
+					 * LiteralExtensionIV in Constant as an argument of CompareBOp in valueExpression annotation of FunctionNode
+					 * XSDBooleanIV in Constant as an  argument of EBVBOp in valueExpression annotation of FunctionNode
+					 * LiteralExtensionIV in Constant as an argument of valueExpression annotation of FunctionNode
+					 * LiteralExtensionIV in BigdataValue in ConstantNode as an argument of FunctionNode
+					 * LiteralExtensionIV in Constant as an argument of ConstantNode
+					 * XSDBoolean in Constant as an argument  of  ConstantNode
+					 */
+					int expectedIVs = 6;
+					testQuery(conn, query, expectedIVs);
 				}
 
 			} finally {
@@ -139,7 +157,7 @@ public class TestTicket1755 extends QuadsTestCase {
 
 	@SuppressWarnings("unchecked")
 	private void testQuery(final BigdataSailRepositoryConnection conn,
-			final String query) throws MalformedQueryException, RepositoryException, QueryEvaluationException {
+			final String query, final int expectedIVs) throws MalformedQueryException, RepositoryException, QueryEvaluationException {
 		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
 		TupleQueryResult tqr = tq.evaluate();
 		try {
@@ -152,21 +170,23 @@ public class TestTicket1755 extends QuadsTestCase {
 			QueryRoot queryRoot = ((BigdataSailTupleQuery)tq).getASTContainer().getOriginalAST();
 			cnt = 0;
 			for (Object filterNode: queryRoot.getWhereClause().getChildren(FilterNode.class)) {
-				cnt += checkNode((FilterNode)filterNode);
+				cnt += checkNode((BOp)filterNode);
 			}
-			assertEquals("Expected inlined IV for date literal", 1, cnt);
+			assertEquals("Expected inlined IV for date literal", expectedIVs, cnt);
 		} finally {
 			tqr.close();
 		}
 	}
 
 	private int checkNode(BOp bop) {
+		int cnt = 0;
+		for (BOp arg: bop.args()) {
+			cnt += checkNode(arg);
+		}
 		if (bop instanceof ValueExpressionNode) {
-			int cnt = 0;
 			for (BOp arg: ((ValueExpressionNode)bop).getValueExpression().args()) {
 				cnt+=checkNode(arg);
 			}
-			return cnt;
 		}
 		if (bop instanceof ConstantNode) {
 			// constant node in AST
@@ -174,21 +194,16 @@ public class TestTicket1755 extends QuadsTestCase {
 			if (value instanceof BigdataLiteral && XMLSchema.DATE.equals(((BigdataLiteral)value).getDatatype())) {
 		        assertFalse(((BigdataLiteral)value).getIV().isNullIV());
 				assertTrue(value.getIV() instanceof LiteralExtensionIV);
-				return 1;
+				cnt++;
 			}
-			return 0;
-		} else if (bop instanceof Constant) {
+		}
+		if (bop instanceof Constant) {
 			// constant in valueExpr
 			IV value = (IV) ((Constant)bop).get();
 	        assertFalse(value.isNullIV());
-			assertTrue(value instanceof LiteralExtensionIV);
-			return 1;
-		} else {
-			int cnt = 0;
-			for (BOp arg: bop.args()) {
-				cnt += checkNode(arg);
-			}
-			return cnt;
+			assertTrue(value instanceof LiteralExtensionIV || value instanceof XSDBooleanIV);
+			cnt++;
 		}
+		return cnt;
 	}
 }
