@@ -27,6 +27,7 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -665,12 +666,11 @@ public class ASTDeferredIVResolution {
             // HAVING clause
             {
                 final HavingNode having = queryRoot.getHaving();
-                if (having!=null) {
-                    for (final IConstraint c: having.getConstraints()) {
-                        for (final BOp bop: c.args()) {
-                            fillInIV(store, bop);
-                        }
-                    }
+                
+                if (having != null) {
+                	
+                	fillInIV(store, having);
+                	
                 }
             }
     
@@ -855,9 +855,16 @@ public class ASTDeferredIVResolution {
                     defer(((TermId)v).getValue(), new Handler(){
                         @Override
                         public void handle(final IV newIV) {
-                            if (bop.args() instanceof ArrayList) {
-                                bop.args().set(fk, new Constant(newIV));
-                            }
+                        	if (bop instanceof BOpBase) {
+                        		((BOpBase)bop).__replaceArg(fk, new Constant(newIV));
+                        	} else {
+	                            List<BOp> args = bop.args();
+								if (args instanceof ArrayList) {
+	                                args.set(fk, new Constant(newIV));
+	                            } else {
+	                            	log.warn("bop.args() class " + args.getClass() + " or " + bop.getClass() + " does not allow updates");
+	                            }
+                        	}
                         }
                     });
                 }
@@ -953,30 +960,32 @@ public class ASTDeferredIVResolution {
             }
             final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
             if (fve instanceof IVValueExpression) {
-                for (int k = 0; k < fve.arity(); k++) {
-                    final BOp veBop = fve.get(k);
-                    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
-                        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
-                        final int fk = k;
-                        defer(v, new Handler(){
-                            @Override
-                            public void handle(final IV newIV) {
-                                final BigdataValue resolved = vf.asValue(v);
-                                if (resolved.getIV() == null && newIV!=null) {
-                                    resolved.setIV(newIV);
-                                    newIV.setValue(resolved);
-                                    final Constant newConstant = new Constant(newIV);
-                                    // we need to reread value expression from the node, as it might get changed by sibling nodes resolution
-                                    // @see https://jira.blazegraph.com/browse/BLZG-1682
-                                    final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
-                                    IValueExpression<? extends IV> newVe = (IValueExpression<? extends IV>) ((IVValueExpression) fve).setArg(fk, newConstant);
-                                    ((FunctionNode)bop).setValueExpression(newVe);
-                                    ((FunctionNode) bop).setArg(fk, new ConstantNode(newConstant));
-                                }
-                            }
-                        });
-                    }
-                }
+        		for (int k = 0; k < fve.arity(); k++) {
+        		    final BOp veBop = fve.get(k);
+        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
+        		        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
+        		        final int fk = k;
+        		        defer(v, new Handler(){
+        		            @Override
+        		            public void handle(final IV newIV) {
+        		                final BigdataValue resolved = vf.asValue(v);
+        		                if (resolved.getIV() == null && newIV!=null) {
+        		                    resolved.setIV(newIV);
+        		                    newIV.setValue(resolved);
+        		                    final Constant newConstant = new Constant(newIV);
+        		                    // we need to reread value expression from the node, as it might get changed by sibling nodes resolution
+        		                    // @see https://jira.blazegraph.com/browse/BLZG-1682
+        		                    final IValueExpression<? extends IV> fve = ((ValueExpressionNode)bop).getValueExpression();
+        		                    IValueExpression<? extends IV> newVe = (IValueExpression<? extends IV>) ((IVValueExpression) fve).setArg(fk, newConstant);
+        		                    ((ValueExpressionNode)bop).setValueExpression(newVe);
+        		                    ((ValueExpressionNode)bop).setArg(fk, new ConstantNode(newConstant));
+        		                }
+        		            }
+        		        });
+        		    } else if (veBop instanceof IVValueExpression) {
+        		    	fillInIV(store, veBop);
+        		    }
+        		}
             } else if (fve instanceof Constant) {
                 final Object value = ((Constant)fve).get();
                 if (value instanceof BigdataValue) {
@@ -1092,7 +1101,9 @@ public class ASTDeferredIVResolution {
 
                 final BigdataValue toBeResolved = v; // asValue() invoked above. // f.asValue(v);
                 ivs[i] = TermId.mockIV(VTE.valueOf(v));
-                toBeResolved.clearInternalValue();
+                if (!toBeResolved.isRealIV()) {
+                	toBeResolved.clearInternalValue();
+                }
                 values[i++] = toBeResolved;
                 
             }
@@ -1101,7 +1112,9 @@ public class ASTDeferredIVResolution {
                 
                 final BigdataValue toBeResolved = vf.asValue(v);
                 ivs[i] = v.getIV();
-                toBeResolved.clearInternalValue();
+                if (!toBeResolved.isRealIV()) {
+                	toBeResolved.clearInternalValue();
+                }
                 values[i++] = toBeResolved;
                 
             }
