@@ -5,10 +5,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -77,7 +78,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.BaseVocabulary;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.util.Bytes;
@@ -948,9 +948,9 @@ public class HashCollisionUtility {
 
 		    @Override
 			@SuppressWarnings("rawtypes")
-			public IExtension[] getExtensions() {
-				return new IExtension[] {};
-			}
+		    public Iterator<IExtension<? extends BigdataValue>> getExtensions() {
+		        return Collections.emptyIterator();
+		    }
 		};
 		
 		final InlineURIFactory uriFactory = new InlineURIFactory();
