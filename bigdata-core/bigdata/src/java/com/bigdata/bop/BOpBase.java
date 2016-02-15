@@ -288,6 +288,20 @@ public class BOpBase extends CoreBaseBOp {
 
     }
 
+    /**
+     * Effectively overwrites the specified argument with the provided value.<p>
+     * WARNING: this method could break logic of the code, which relies on immutability of the arguments list.
+     * It is introduced while fixing issues with deferred IV resolution and intended to be used only before IV resolution completed.
+     * @see https://jira.blazegraph.com/browse/BLZG-1755 (Date literals in complex FILTER not properly resolved)
+     * @param index
+     *            The index of the child expression to be replaced.
+     * @param newArg
+     *            The new child expression.
+     */
+    public void __replaceArg(final int index, final BOp newArg) {
+    	args[index] = newArg;
+    }
+    
     @Override
     public int arity() {
         
