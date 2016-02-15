@@ -521,6 +521,8 @@ public class StatusServlet extends BigdataRDFServlet {
             if(log.isDebugEnabled()) {
             	log.debug("Snapshot requested.  Writing backup to " + snapfact.getFile());
             }
+
+            System.err.println("Snapshot requested.  Writing backup to " + snapfact.getFile());
            
             ((Journal) getIndexManager()).snapshot(snapfact);
             
