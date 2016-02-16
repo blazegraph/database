@@ -22,7 +22,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
- * Created on Sep 18, 2015
+ * Created on Feb 10, 2016
+ * 
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt/a>
  */
 package com.bigdata.service;
 
@@ -37,16 +39,13 @@ import org.codehaus.jettison.json.JSONObject;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaDescription;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription.Datatype;
-import com.bigdata.rdf.sail.webapp.client.StringUtil;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Singleton class providing access to the GeoSpatial index configuration.
- * This is thought as a workaround that eases configuration, we should
- * probably get rid of this class once we have fully generalized the system
- * to deal with arbitrary indices.
+ * Currently implemented as a singleton, which might be re-considered.
  * 
- * @author msc
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
+ * @version $Id$
  */
 public class GeoSpatialConfig {
 
@@ -59,7 +58,7 @@ public class GeoSpatialConfig {
    
    private SchemaDescription schemaDescription;
 
-   private List<GeoSpatialDatatypeConfig> datatypeConfigs;
+   private List<GeoSpatialDatatypeConfiguration> datatypeConfigs;
    
    private GeoSpatialConfig() {
       init(null, null);
@@ -82,7 +81,7 @@ public class GeoSpatialConfig {
    
    private void initDatatypes(List<String> geoSpatialDatatypeConfigs) {
        
-       datatypeConfigs = new ArrayList<GeoSpatialDatatypeConfig>();
+       datatypeConfigs = new ArrayList<GeoSpatialDatatypeConfiguration>();
        
        if (geoSpatialDatatypeConfigs==null)
            return; // nothing to be done
@@ -99,7 +98,7 @@ public class GeoSpatialConfig {
                 String uri = (String)topLevelNode.get("uri");
                 JSONArray fields = (JSONArray)topLevelNode.get("fields");
                 
-                final GeoSpatialDatatypeConfig dc = new GeoSpatialDatatypeConfig(uri, fields);
+                final GeoSpatialDatatypeConfiguration dc = new GeoSpatialDatatypeConfiguration(uri, fields);
                 datatypeConfigs.add(dc);
 
                 
