@@ -26,6 +26,8 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 
+import org.apache.log4j.Logger;
+
 /**
  * Provides a basic implementation of a {@link ISnapshotFactory} to be used 
  * with non-HA operations to provide online backup capabilities.
@@ -35,33 +37,66 @@ import java.io.IOException;
  * @author beebs
  *
  */
-public class SnapshotFactory implements ISnapshotFactory {
+public class BasicSnapshotFactory implements ISnapshotFactory {
 
+	 /**
+     * Logger.
+     */
+    private static final Logger log = Logger.getLogger(BasicSnapshotFactory.class);
+    
+    private static final boolean debug = log.isDebugEnabled();
+    private static final boolean info = log.isDebugEnabled();
+	
 	//Default to "backup.jnl" in the directory where the service is running.
 	private String file = "backup.jnl";
 	
 	//Default to uncompressed
 	private boolean compress = false;
 	
-	public SnapshotFactory(final String file, final boolean compress) {
+	public BasicSnapshotFactory(final String file, final boolean compress) {
 		
 		this.file = file;
 		this.compress = compress;
 		
 	}
 	
-	public SnapshotFactory() {}  //Use defaults
+	public BasicSnapshotFactory() {
+		
+		//Get the absolute path for the running instance.
+		file = getAbsolutePath(file);
+		
+	}  
 
 	public String getFile() {
 		return file;
 	}
 
 	public void setFile(String file) {
-		this.file = file;
+		this.file = getAbsolutePath(file);
 	}
 
 	public void setCompress(boolean compress) {
 		this.compress = compress;
+	}
+	
+	/**
+	 * Utility to get the absolute path of a file if passed a relative one.
+	 * 
+	 * @param file
+	 * @return
+	 */
+	protected String getAbsolutePath(String file) {
+
+		String ret = file;
+
+		File f = new File(file);
+		//Check if we have a relative path file and use the absolute path.
+		if(f.getParent() == null) {
+			ret = f.getAbsolutePath();
+		}
+		f = null;
+		
+		return ret;
 	}
 
 	/**
@@ -77,7 +112,17 @@ public class SnapshotFactory implements ISnapshotFactory {
 
 		File f = new File(file);
 		
+		if(!f.createNewFile() ) {
+			if(debug) {
+				log.debug("Backup file " + file + " already exists.");
+			}
+			throw new RuntimeException("Backup file " + file + " already exists.");
+		}
+		
 		if(!f.canWrite()) {
+			if(debug) {
+				log.debug("Backup file " + file + " is not writable.");
+			}
 			throw new RuntimeException("Backup file " + file + " is not writable.");
 		}
 		

@@ -66,8 +66,9 @@ import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ISnapshotResult;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.SnapshotFactory;
+import com.bigdata.journal.BasicSnapshotFactory;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.QueryCancellationHelper;
 import com.bigdata.rdf.sail.model.JsonHelper;
@@ -178,21 +179,7 @@ public class StatusServlet extends BigdataRDFServlet {
      */
     static final String SNAPSHOT = "snapshot";
     
-    /**
-     * Request an online backup of the journal (non-HA Mode).  The 
-     * backup will be written to the backup file specified as the
-     * value of the Request Parameter, i.e.
-     * 
-     * <code> curl --data-urlencode "BACKUP=/path/to/backup.jnl" http://localhost:9999/blazegraph/status <code>
-     * 
-     * Will place the backup file in /path/to/backup.jnl.
-     * 
-     * If not backupFile is specified, it will be written to backup.jnl 
-     * in the directory where the java process is currently executing.
-     * 
-     */
     
-    static final String BACKUP = "backup";
     
 
     /**
@@ -507,27 +494,7 @@ public class StatusServlet extends BigdataRDFServlet {
             return;
         }
         
-        if(req.getParameter(BACKUP) != null)
-        {
-        	//TODO:  Should we add a compression parameter?
-            final String backupFile = req.getParameter(StatusServlet.BACKUP);
-
-            final SnapshotFactory snapfact = new SnapshotFactory();
-            
-            if (backupFile != null) {
-            	snapfact.setFile(backupFile);
-            }
-            
-            if(log.isDebugEnabled()) {
-            	log.debug("Snapshot requested.  Writing backup to " + snapfact.getFile());
-            }
-
-            System.err.println("Snapshot requested.  Writing backup to " + snapfact.getFile());
-           
-            ((Journal) getIndexManager()).snapshot(snapfact);
-            
-            
-        }
+        
         
 		final String acceptHeader = ConnegUtil
 				.getMimeTypeForQueryParameterServiceRequest(
@@ -739,8 +706,6 @@ public class StatusServlet extends BigdataRDFServlet {
 
             }
 
-            // final boolean showQuorum = req.getParameter(SHOW_QUORUM) != null;
-
             if (getIndexManager() instanceof AbstractJournal) {
 
                 final Quorum<HAGlue, QuorumService<HAGlue>> quorum = ((AbstractJournal) getIndexManager())
@@ -780,9 +745,8 @@ public class StatusServlet extends BigdataRDFServlet {
 				current.node("p").text("Build Git Branch=").node("span")
 						.attr("id", "gitBranch").text(gitBranch).close()
 						.close();
-			}
-
-
+			}	
+			
             current.node("p").text("Accepted query count=")
                .node("span").attr("id", "accepted-query-count")
                .text("" +getBigdataRDFContext().getQueryIdFactory().get())
