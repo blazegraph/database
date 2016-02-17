@@ -1031,6 +1031,56 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     }
     
     /**
+     * Initiate an online backup using the {@link com.bigdata.rdf.sail.webapp.BackupServlet}.
+     * 
+     * 
+     * @param file  -- The name of the file for the backup. (default = "backup.jnl")
+     * @param compress -- Use compression for the snapshot (default = false)
+     * @param block  -- Block on the response (default = true)
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1727
+     */
+	public void onlineBackup(final String file, final boolean compress,
+			final boolean block) throws Exception {
+		
+		/**
+		 * Use copies of these from {@link com.bigdata.rdf.sail.webapp.BackupServlet}
+		 * to avoid introducing cyclical dependency with bigdata-core.
+		 * 
+		 */
+		
+		final String COMPRESS = "compress";
+
+		final String FILE = "file";
+
+		final String BLOCK = "block";
+		
+        final ConnectOptions opts = newConnectOptions(baseServiceURL + "/backup", UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+        	opts.addRequestParam(FILE, file);
+        	opts.addRequestParam(COMPRESS, Boolean.toString(compress));
+        	opts.addRequestParam(BLOCK, Boolean.toString(block));
+
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+        } finally {
+            if (response != null)
+                response.abort();
+
+        }
+    	
+    }
+    
+    /**
      * 
      * Initiate the data loader for a namespace within the a NSS
      * 
