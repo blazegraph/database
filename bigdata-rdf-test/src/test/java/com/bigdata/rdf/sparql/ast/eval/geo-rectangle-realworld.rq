@@ -1,0 +1,14 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+PREFIX example: <http://www.example.com/>
+
+SELECT * WHERE {
+  SERVICE geo:search {
+    ?event geo:search "inRectangle" .
+    ?event geo:predicate example:happened .
+    ?event geo:spatialRectangleSouthWest "47.55793#7.58899" . # Basel
+    ?event geo:spatialRectangleNorthEast "48.56420#13.42620" . # Passau 
+    ?event geo:timeStart "0" . # 01.01.2013, 00:00:00
+    ?event geo:timeEnd "1388530799" .   # 31.12.2013, 23:59:59
+    ?event geo:locationAndTimeValue ?locationAndTime .
+  }
+}

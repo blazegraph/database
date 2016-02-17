@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ import com.bigdata.rdf.sparql.ast.FilterNode;
  * operation to be applied to the operands is specified by the 
  * {@link Annotations#OP} annotation.
  */
-public class NumericBOp extends IVValueExpression<IV>  {
+public class NumericBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 9136864442064392445L;
     
@@ -153,6 +153,15 @@ public class NumericBOp extends IVValueExpression<IV>  {
         sb.append("(").append(left()).append(")");
         return sb.toString();
 
+    }
+
+    /**
+     * The MathBOp can work on inline numerics. It is only when the operands
+     * evaluate to non-inline numerics that this bop needs materialization.
+     */
+    @Override
+    public Requirement getRequirement() {
+    	return INeedsMaterialization.Requirement.SOMETIMES;
     }
 
 }

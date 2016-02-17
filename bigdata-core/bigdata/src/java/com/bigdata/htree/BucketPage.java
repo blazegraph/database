@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -119,8 +119,6 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * read operations as long as there is no writer.
  */
 class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
-
-    private static final Logger log = Logger.getLogger(BucketPage.class);
 
 	/**
 	 * The data record. {@link MutableBucketData} is used for all mutation
@@ -585,7 +583,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			}
 			if (insIndex < 0) {
 				insIndex = -insIndex - 1;
-			} else if (log.isTraceEnabled()){
+			} else if (TRACE){
 				log.trace("Insert duplicate key");
 			}
 			

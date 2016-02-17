@@ -1,0 +1,7 @@
+{
+<http://s> <http://p1> <http://o1> .
+<http://o1> <http://a> "a" .
+<http://o1> <http://b> "b" .
+<http://s> <http://p2> <http://o2> .
+<http://o2> <http://c> "c" .
+}

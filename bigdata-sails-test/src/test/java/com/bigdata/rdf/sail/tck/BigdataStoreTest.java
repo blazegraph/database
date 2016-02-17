@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -287,13 +287,12 @@ public class BigdataStoreTest extends RDFStoreTest {
 		// new pattern
 		((BigdataSailConnection) con).flush();
 		final AbstractTripleStore db = ((BigdataSailConnection) con).getTripleStore();
-		final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-		        db).parseQuery2(query, null);
+		final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(query, null);
 		final QueryRoot originalQuery = astContainer.getOriginalAST();
 		originalQuery.setIncludeInferred(false);
 		final TupleQueryResult queryResult = ASTEvalHelper.evaluateTupleQuery(
 		        db, astContainer, new QueryBindingSet(
-		        		bs));
+		        		bs), null /* dataset */);
 		
 		return queryResult;
 		

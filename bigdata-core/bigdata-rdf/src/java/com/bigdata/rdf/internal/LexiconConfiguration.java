@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -123,6 +124,19 @@ public class LexiconConfiguration<V extends BigdataValue>
     private final boolean inlineXSDDatatypeLiterals;
 
     /**
+     * <code>true</code> if geospatial support is enabled
+     */
+    private final boolean geoSpatial;
+    
+
+
+    /**
+     * Optional configuration string for the geospatial facilities.
+     */
+    private final String geoSpatialConfig;
+
+    
+    /**
      * <code>true</code> if textual literals will be inlined.
      *
      * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
@@ -186,13 +200,13 @@ public class LexiconConfiguration<V extends BigdataValue>
      * extension to the {@link IExtension}.
      */
     @SuppressWarnings("rawtypes")
-    private final Map<IV, IExtension<BigdataValue>> iv2ext;
+    private final Map<IV, IExtension<? extends BigdataValue>> iv2ext;
 
     /**
      * Mapping from the string value of the datatype URI for a registered
      * extension to the {@link IExtension}.
      */
-    private final Map<String, IExtension<BigdataValue>> datatype2ext;
+    private final Map<String, IExtension<? extends BigdataValue>> datatype2ext;
     
     /**
      * The set of inline datatypes that should be included in the text index 
@@ -206,7 +220,7 @@ public class LexiconConfiguration<V extends BigdataValue>
      * @see BLZG-1592 (ConcurrentModificationException in MathBOp when using expression in BIND)
      */
     private final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
-
+    
     @Override
     public final BigdataValueFactory getValueFactory() {
 
@@ -234,7 +248,20 @@ public class LexiconConfiguration<V extends BigdataValue>
         return inlineXSDDatatypeLiterals;
 
     }
+    
+    @Override
+    public boolean isGeoSpatial() {
+       
+       return geoSpatial;
+    }
 
+    @Override
+    public String getGeoSpatialConfig() {
+       
+       return geoSpatialConfig;
+    }
+    
+    
     @Override
     public boolean isInlineDateTimes() {
         return inlineDateTimes;
@@ -329,7 +356,9 @@ public class LexiconConfiguration<V extends BigdataValue>
             final IExtensionFactory xFactory,//
             final Vocabulary vocab,
             final BigdataValueFactory valueFactory,//
-            final IInlineURIFactory uriFactory
+            final IInlineURIFactory uriFactory,//
+            final boolean geoSpatial,
+            final String geoSpatialConfig
             ) {
 
         if (blobsThreshold < 0)
@@ -356,6 +385,8 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.vocab = vocab;
         this.valueFactory = valueFactory;
         this.uriFactory = uriFactory;
+        this.geoSpatial = geoSpatial;
+        this.geoSpatialConfig = geoSpatialConfig;
         
         /*
          * TODO Make this configurable.
@@ -370,9 +401,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 		 * synchronization.
 		 */
 
-        iv2ext = new LinkedHashMap<IV, IExtension<BigdataValue>>();
+        iv2ext = new LinkedHashMap<IV, IExtension<? extends BigdataValue>>();
 
-        datatype2ext = new LinkedHashMap<String, IExtension<BigdataValue>>();
+        datatype2ext = new LinkedHashMap<String, IExtension<? extends BigdataValue>>();
 
     }
 
@@ -382,8 +413,13 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         xFactory.init(resolver, (ILexiconConfiguration<BigdataValue>) this/* config */);
 
-        for (IExtension<BigdataValue> extension : xFactory.getExtensions()) {
+        @SuppressWarnings("rawtypes")
+        final Iterator<IExtension<? extends BigdataValue>> itr = xFactory.getExtensions();
 
+        while(itr.hasNext()) {
+            
+            final IExtension<?> extension = itr.next();
+            
 //            final BigdataURI datatype = extension.getDatatype();
         	for (BigdataURI datatype : extension.getDatatypes()) {
 
@@ -424,7 +460,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         final IV datatypeIV = iv.getExtensionIV();
 
         // Find the IExtension from the datatype IV.
-        final IExtension<BigdataValue> ext = iv2ext.get(datatypeIV);
+        final IExtension<? extends BigdataValue> ext = iv2ext.get(datatypeIV);
 
         if (ext == null)
             throw new RuntimeException("Unknown extension: " + datatypeIV);
@@ -660,7 +696,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     private AbstractInlineIV<BigdataLiteral, ?> createExtensionIV(
             final Literal value, final URI datatype) {
 
-        final IExtension<BigdataValue> xFactory =
+        final IExtension<? extends BigdataValue> xFactory =
             datatype2ext.get(datatype.stringValue());
 
         try {
@@ -804,7 +840,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 					 * parseable as an IPv4.
 					 */
 					return new IPv4AddrIV<BigdataLiteral>(v);
-				 case PACKED_LONG:
+                case PACKED_LONG:
 				    /*
 				     * Extension for packed long value in the range [0;72057594037927935L].
 				     */

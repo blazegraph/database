@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -528,8 +528,8 @@ public class QueryServlet extends BigdataRDFServlet {
 					 * parse the query exactly once in order to minimize the
 					 * resources associated with the query parser.
 					 */
-					final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-							tripleStore).parseUpdate2(updateStr, baseURI);
+					final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+							.parseUpdate2(updateStr, baseURI);
 
 					if (log.isDebugEnabled())
 						log.debug(astContainer.toString());
@@ -1112,52 +1112,72 @@ public class QueryServlet extends BigdataRDFServlet {
                      current.node("th").text("elapsed [us]").close();
                      current.node("th").text("numCalls").close();
                      current = current.close(); // tr
-                        
-                     // parser stats
-                     final StaticAnalysisStat pStat = saStats.getParserStat();
-                     if (pStat!=null) {
-                        current = current.node("tr");
-                        current.node("td").text(pStat.getStatName()).close();
-                        current.node("td").text("Parser").close();
-                        current.node("td").text(String.valueOf(pStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(pStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(pStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
-                        
-                     final StaticAnalysisStat lStat = saStats.getOptimizerLoopStat();
-                     if (lStat!=null) {
-                        current = current.node("tr");
-                        current.node("td").text(lStat.getStatName()).close();
-                        current.node("td").text("Optimizers (all)").close();                        
-                        current.node("td").text(String.valueOf(lStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(lStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(lStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
+                   
+                     {
+							// parser stats
+							final StaticAnalysisStat pStat = saStats.getParserStat();
+							if (pStat != null) {
+								current = current.node("tr");
+								current.node("td").text(pStat.getStatName()).close();
+								current.node("td").text("Parser").close();
+								current.node("td").text(String.valueOf(pStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(pStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(pStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
+						{
+							// batch resolve Value => IV stats
+							final StaticAnalysisStat rStat = saStats.getResolveValuesStat();
+							if (rStat != null) {
+								current = current.node("tr");
+								current.node("td").text(rStat.getStatName()).close();
+								current.node("td").text("Resolve Values").close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(rStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
 
-                     final Collection<StaticAnalysisStat> optimizerStats = 
-                        saStats.getOptimizerStats();
-                     for (StaticAnalysisStat oStat : optimizerStats) {
-                        current = current.node("tr");
-                        current.node("td").text(oStat.getStatName()).close();
-                        current.node("td").text("Optimizer").close();
-                        current.node("td").text(String.valueOf(oStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(oStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(oStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
-                        
-                     final StaticAnalysisStat rStat = saStats.getRangeCountStat();
-                     if (rStat!=null) {
-                        current = current.node("tr");
-                        current.node("td").text(rStat.getStatName()).close();
-                        current.node("td").text("Range Count").close();                        
-                        current.node("td").text(String.valueOf(rStat.getElapsed()/1000000)).close();
-                        current.node("td").text(String.valueOf(rStat.getElapsed()/1000)).close();
-                        current.node("td").text(String.valueOf(rStat.getNrCalls())).close();
-                        current = current.close(); // tr
-                     }
+						{
+							final StaticAnalysisStat lStat = saStats.getOptimizerLoopStat();
+							if (lStat != null) {
+								current = current.node("tr");
+								current.node("td").text(lStat.getStatName()).close();
+								current.node("td").text("Optimizers (all)").close();
+								current.node("td").text(String.valueOf(lStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(lStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(lStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
+
+						{
+							final Collection<StaticAnalysisStat> optimizerStats = saStats.getOptimizerStats();
+							for (StaticAnalysisStat oStat : optimizerStats) {
+								current = current.node("tr");
+								current.node("td").text(oStat.getStatName()).close();
+								current.node("td").text("Optimizer").close();
+								current.node("td").text(String.valueOf(oStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(oStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(oStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
+
+						{
+							final StaticAnalysisStat rStat = saStats.getRangeCountStat();
+							if (rStat != null) {
+								current = current.node("tr");
+								current.node("td").text(rStat.getStatName()).close();
+								current.node("td").text("Range Count").close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000000)).close();
+								current.node("td").text(String.valueOf(rStat.getElapsed() / 1000)).close();
+								current.node("td").text(String.valueOf(rStat.getNrCalls())).close();
+								current = current.close(); // tr
+							}
+						}
                         
                      current = current.close(); // table
                         

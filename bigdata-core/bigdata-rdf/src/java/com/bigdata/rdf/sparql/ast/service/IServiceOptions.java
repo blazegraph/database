@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -60,11 +60,9 @@ public interface IServiceOptions {
 
     /**
      * Return <code>true</code> iff the end point supports
-     * <code>SPARQL 1.1</code> (including the <code>SPARQL 1.1 BINDINGS</code>).
-     * When <code>false</code>, the solutions will be vectored to the end point
-     * using a technique which is compatible with <code>SPARQL 1.0</code>.
+     * <code>SPARQL 1.0</code>  
      */
-    boolean isSparql11();
+     boolean isSparql10();
 
     /**
      * Return <code>true</code> iff the service end point is one which should
@@ -85,5 +83,18 @@ public interface IServiceOptions {
      * known to expose the bigdata LBS pattern.
      */
     boolean isBigdataLBS();
+    
+    
+    /**
+     * Returns if {@link SPARQLVersion#SPARQL_11} iff the end point supports
+     * <code>SPARQL 1.1</code>.
+     * When {@link SPARQLVersion#SPARQL_10}, the solutions will be vectored to the end point
+     * using a technique which is compatible with <code>SPARQL 1.0</code>.
+     * 
+     * @return the SPARQL version {@link SPARQLVersion}
+     * 
+     *      
+     */
+    SPARQLVersion getSPARQLVersion();
     
 }

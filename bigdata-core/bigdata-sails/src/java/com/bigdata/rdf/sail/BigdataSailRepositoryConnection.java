@@ -1,12 +1,12 @@
 /**
 
- Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+ Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
  Contact:
- SYSTAP, LLC
+ SYSTAP, LLC DBA Blazegraph
  2501 Calvert ST NW #106
  Washington, DC 20008
- licenses@systap.com
+ licenses@blazegraph.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -218,8 +218,8 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         getSailConnection()
                 .flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                getTripleStore()).parseQuery2(queryStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                .parseQuery2(queryStr, baseURI);
 
         final QueryType queryType = astContainer.getOriginalAST()
                 .getQueryType();
@@ -275,8 +275,8 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
                 .flushStatementBuffers(true/* assertions */, true/* retractions */);
 
         // Parse the UPDATE request.
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                getTripleStore()).parseUpdate2(updateStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                .parseUpdate2(updateStr, baseURI);
 
         return new BigdataSailUpdate(astContainer, this);
 

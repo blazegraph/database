@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
      
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -419,6 +419,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     public long acceptSolutions(final ICloseableIterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
+        if (!open.get())
+            throw new IllegalStateException();
+
         try {
 
             final JVMHashIndex index = getRightSolutions();
@@ -527,7 +530,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             final BOpStats stats,//
             final IBuffer<IBindingSet> outputBuffer//
             ) {
-        
+
         hashJoin2(leftItr, stats, outputBuffer, constraints);
         
     }
@@ -547,6 +550,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             final IBuffer<IBindingSet> outputBuffer,//
             final IConstraint[] constraints//
             ) {
+
+        if (!open.get())
+            throw new IllegalStateException();
 
         final JVMHashIndex rightSolutions = getRightSolutions();
           
@@ -720,6 +726,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     @Override
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
 
+        if (!open.get())
+            throw new IllegalStateException();
+
         try {
 
             @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -860,6 +869,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     @Override
     public void outputSolutions(final IBuffer<IBindingSet> out) {
         
+       if (!open.get())
+           throw new IllegalStateException();
+
        try {
 
           final JVMHashIndex rightSolutions = getRightSolutions();

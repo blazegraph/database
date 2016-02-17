@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
 package com.bigdata.rdf.internal;
+
+import java.util.Iterator;
 
 import org.openrdf.model.URI;
 
@@ -59,6 +61,6 @@ public interface IExtensionFactory {
     /**
      * Return the supported extensions.
      */
-    IExtension[] getExtensions();
+    Iterator<IExtension<? extends BigdataValue>> getExtensions();
     
 }

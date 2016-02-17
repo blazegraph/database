@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -101,7 +101,7 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
      * numeric values and these tests test for syntactic differences, i.e.
      * 01 != 1.
      */
-    static final Collection<String> cannotInlineTests = Arrays.asList(new String[] {
+    static protected final Collection<String> cannotInlineTests = Arrays.asList(new String[] {
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-01",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-03",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-04",
@@ -400,6 +400,11 @@ graph ?g {
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
 
+        /*
+The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
+         */
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg03",
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg07",
     });
 
 	/**
@@ -407,7 +412,7 @@ graph ?g {
 	 * comparisons. This appears to work with {ASCII,IDENTICAL} or
 	 * {JDK,IDENTICAL} but not with {ICU,IDENTICAL} for some reason.
 	 */
-    static final Collection<String> unicodeStrengthIdentical = Arrays.asList(new String[] {
+    static protected final Collection<String> unicodeStrengthIdentical = Arrays.asList(new String[] {
     		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1"
     });
     
@@ -498,7 +503,7 @@ graph ?g {
      * 
      * @return The test suite without the data set tests.
      */
-    static TestSuite filterOutTests(final TestSuite suite1, final String name) {
+    static protected TestSuite filterOutTests(final TestSuite suite1, final String name) {
 
         final TestSuite suite2 = new TestSuite(suite1.getName());
         final Enumeration<Test> e = suite1.tests();
@@ -517,7 +522,7 @@ graph ?g {
        
     }
 
-    static TestSuite filterOutTests(final TestSuite suite1, final Collection<String> testURIs) {
+    static protected TestSuite filterOutTests(final TestSuite suite1, final Collection<String> testURIs) {
 
         final TestSuite suite2 = new TestSuite(suite1.getName());
         final Enumeration<Test> e = suite1.tests();
@@ -543,7 +548,7 @@ graph ?g {
      * suite is run. When specified, only the tests matching these test URIs are
      * run.
      */
-    static final Collection<String> testURIs = Arrays.asList(new String[] {
+    static protected final Collection<String> testURIs = Arrays.asList(new String[] {
 
 /////*            
 //        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#strdt01",
@@ -854,7 +859,7 @@ graph ?g {
      *             if there is no test in the suite which is associated with
      *             that testURI.
      */
-    static SPARQLQueryTest getSingleTest(final TestSuite suite,
+    static protected SPARQLQueryTest getSingleTest(final TestSuite suite,
             final String testURI) throws RuntimeException {
     
         final Enumeration<Test> e1 = suite.tests();

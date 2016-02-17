@@ -1,0 +1,196 @@
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a major release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
+
+Blazegraph Features (http://www.blazegraph.com/product/)
+
+2.0.0 has significant performance improvements for query optimization, geo-spatial searching, bulk load improvements and many new features.  The artifacts now include a Debian Deployer and RPM.  See https://blog.blazegraph.com/?p=977.
+
+Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
+
+Starting points:
+
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+    Blazegraph Support:  https://www.blazegraph.com/support/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TDF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+    
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BLAZEGRAPH_RELEASE_2_0_0 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_0_0
+
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_0_0
+
+** Bug
+    * [BLZG-611] - Mock IV / TermId hashCode()/equals() problems
+    * [BLZG-1023] - SystemProperty vs Property
+    * [BLZG-1218] - Strange error when using INSERT DATA
+    * [BLZG-1227] - SPARQL Update does not work with RDR
+    * [BLZG-1236] - Recycler error in 1.5.1
+    * [BLZG-1414] - New site redirects interfere with maven builds
+    * [BLZG-1415] - Blueprints Test Failures
+    * [BLZG-1418] - Property path operator is not interrupted by query deadline or query cancellation
+    * [BLZG-1430] - NanoSparqlServer doesn't start for benchmarks
+    * [BLZG-1433] - bigdata-jini compile errors in post-maven eclipse IDE
+    * [BLZG-1441] - log4j  "No appenders found" under eclipse.
+    * [BLZG-1447] - NSS test suite does not run under Eclipse (post-maven)
+    * [BLZG-1463] - BINDINGS clause in 1.5.2
+    * [BLZG-1464] - QueryCancellationHelper refactor is broken in StatusServlet
+    * [BLZG-1498] - hint:Query hint:optimizer "None" ignored for Property Paths
+    * [BLZG-1499] - Maven Build for jini-test fails if Zookeeper is not installed
+    * [BLZG-1504] - OS Performance counter utilities are not sufficiently robust to changes in the record format.
+    * [BLZG-1520] - Create Wiki Entries for New Blazegraph-samples
+    * [BLZG-1542] - MINUS/OPTIONAL semantics are lost when sub-SELECT is rewritten into a NamedSubquery if sub-SELECT was the only node in the join group
+    * [BLZG-1567] - Shell scripts must quote environment variables
+    * [BLZG-1571] - Blazegraph produces NPE when unknown service is invoked
+    * [BLZG-1585] - Blazegraph SERVICE call uses the non standard BINDINGS keyword instead of the finally accepted values clause
+    * [BLZG-1591] - NotMaterializedException with ORDER BY clause
+    * [BLZG-1592] - ConcurrentModificationException in MathBOp when using expression in BIND
+    * [BLZG-1600] - IllegalStateException for analytic mode query
+    * [BLZG-1627] - minus fails when preceded with property path
+    * [BLZG-1629] - Whitelisted service get rejected
+    * [BLZG-1643] - DELETE does not delete properly with Wikidata Query service
+    * [BLZG-1644] - EXPLORE functionality in Blazegraph Workbench broken
+    * [BLZG-1648] - Proper FILTER handling in merge join
+    * [BLZG-1654] - 2.0.0 Benchmarks
+    * [BLZG-1658] - MemoryManager should know when it has been closed
+    * [BLZG-1659] - OPTIONAL fails to return values when / is used
+    * [BLZG-1683] - Required property relationName for HTreeDistinctBindingSetsOp
+    * [BLZG-1693] - Performance regressions through counters
+    * [BLZG-1696] - Inline IPv4 Regression
+    * [BLZG-1699] - getURICount() and friends fail with IllegalStateException if blobs index does not exist.
+    * [BLZG-1702] - GPU initialization in AST2BOpContext should be cached
+    * [BLZG-1711] - ASTEvalHelper.optimizeQuery out of date
+    * [BLZG-1720] - Classpath Issue with Blazegraph RC1 war file
+
+
+** Improvement
+    * [BLZG-1304] - Symmetric hash join operator (non-blocking)
+    * [BLZG-1320] - Optimization of FILTER NOT EXISTS + LIMIT
+    * [BLZG-1377] - Update the service endpoint to be blazegraph
+    * [BLZG-1396] - IPv4AddrIV Inline URI does not support Endpoint Notation
+    * [BLZG-1400] - Blazegraph Distribution should allow configuration of runtime user
+    * [BLZG-1429] - Create run-time jar with Blazegraph-only artifacts
+    * [BLZG-1488] - Advancer pattern should be called in hasNext()
+    * [BLZG-1594] - Cluster: Setting 'stop' to state kills all java apps
+    * [BLZG-1595] - DTEExtension for compressed timestamp
+    * [BLZG-1608] - Analytic version of PipelinedHashJoin
+    * [BLZG-1609] - Test case for service whitelist
+    * [BLZG-1633] - System parameter & query hint to disable default graph filter
+    * [BLZG-1703] - ASTDeferredIVResolution
+    * [BLZG-1733] - Change default to blazegraph.jnl from bigdata.jnl
+
+** New Feature
+    * [BLZG-190] - Workbench must provide editable window to configure/clone namespace
+    * [BLZG-344] - Mavenization of bigdata
+    * [BLZG-697] - Manage truth maintenance in SPARQL UPDATE
+    * [BLZG-1164] - Support TinkerPop3 APIs
+    * [BLZG-1176] - SPARQL Parsers should not be db mode aware
+    * [BLZG-1181] - Consequently exploit new built-in projection capabilities of HashIndexOp
+    * [BLZG-1388] - xsd:date function
+    * [BLZG-1588] - DTEExtension.COMPOUND
+    * [BLZG-1713] - Add DataLoaderServlet to NSS
+
+** Task
+    * [BLZG-23] - Create DEB Packages for Bigdata Delivery
+    * [BLZG-38] - Mavenization (was trac #168)
+    * [BLZG-175] - Create RPM Packages for Bigdata Delivery
+    * [BLZG-1422] - Mavenized startBlazegraph.sh overrides JAVA_OPTS
+    * [BLZG-1423] - Why is GROUP_COMMIT enabled in mavenized version?
+    * [BLZG-1471] - Convert QueryEngineFactory to use getInstance() and public interface for accessor methods.
+    * [BLZG-1497] - ConcurrentWeakValueCache and com.bigdata.cache should be separate artifact.
+    * [BLZG-1501] - Investigate removing LRUNexus
+    * [BLZG-1565] - Document the blazegraph workbench
+    * [BLZG-1566] - As a user, I am annoyed when maven takes forever to recompile blazegraph
+    * [BLZG-1575] - Small slot optimization meta-ticket
+    * [BLZG-1601] - PGP Signing for Deployers and Maven Central Deployment
+    * [BLZG-1607] - Document the whitelist feature on the blazegraph wiki
+    * [BLZG-1662] - Document ?uuid request for REST API
+    * [BLZG-1668] - The solutions trace log and SPARQL query log examples need to be present (but not activated) in the default log4j.properties file.
+    * [BLZG-1688] - Export Github Commit ID in the BuildInfo class
+    * [BLZG-1707] - Review Recent Wiki Page Updates for 2.0 Release
+    * [BLZG-1724] - CI Needs to deploy snapshots with Maven Central
+    * [BLZG-1726] - Benchmark 2.0.0 Release
+
+** Sub-task
+    * [BLZG-36] - bigdata_maven CI failures (branch BLZG-1269)
+    * [BLZG-37] - CI failures in bigdata-jini (start/stop zookeeper)
+    * [BLZG-46] - Review maven-based CI job dependency triggers
+    * [BLZG-201] - Examine interaction of small slots optimization and group commit.
+    * [BLZG-1204] - Publish Blazegraph Artifacts to Maven Central
+    * [BLZG-1262] - Create test-only artifact containing reused data files
+    * [BLZG-1269] - Converge bigdata/blazegraph core projects on version 1.5.2-SNAPSHOT (not 1.0)
+    * [BLZG-1270] - CI failures in bigdata-jini (bigdata-client version)
+    * [BLZG-1271] - bigdata-client should not depend on bigdata maven project
+    * [BLZG-1272] - bigdata-gas must not use anything from bigdata.
+    * [BLZG-1277] - Maven complains about junit3 vs junit4
+    * [BLZG-1278] - Implement maximum waste policy for small slot allocators
+    * [BLZG-1291] - Blazegraph dotnetrdf client support
+    * [BLZG-1292] - Blazegraph Python Client Support
+    * [BLZG-1302] - DumpJournal should provide metadata about the deferred deletes
+    * [BLZG-1324] - BigdataSailFactory must be split into remote client and embedded client classes
+    * [BLZG-1370] - bigdata shouldn't depend on the bigdata-jini artifact.
+    * [BLZG-1378] - Decouple bigdata-jini from bigdata-ha
+    * [BLZG-1428] - Split out bigdata-rdf tests
+    * [BLZG-1435] - Integrate Maven Release Plugin to Mavenized Version
+    * [BLZG-1442] - javacc Generation of Sparql Grammar
+    * [BLZG-1448] - Maven Artifacts for Tar.gz Deployers
+    * [BLZG-1472] - Pull out com.bigdata.zookeeper and com.bigdata.quorum.zk into their own module
+    * [BLZG-1478] - Interleaved querying of GeoSpatial index
+    * [BLZG-1480] - Exhaustive set of test cases for GeoSpatial feature
+    * [BLZG-1481] - GeoSpatial service quads mode support
+    * [BLZG-1486] - Benchmark branch before merge to master.
+    * [BLZG-1503] - Avoid exception when querying for values outside range min
+    * [BLZG-1507] - Implement support for DTE extension types for URIs
+    * [BLZG-1519] - Refactor test suite to remove tight coupling with IVs while checking up parsed queries
+    * [BLZG-1522] - RDF Parser and index writers should overlap
+    * [BLZG-1531] - Add option to make the DataLoader robust to files that cause rio to throw a fatal exception
+    * [BLZG-1534] - Poor person's durable queues pattern for DataLoader 
+    * [BLZG-1536] - Update DataLoader documentation on the wiki
+    * [BLZG-1551] - Storage statistics documentation and corrections
+    * [BLZG-1553] - Create Debian HA-1 Deployment Artifact
+    * [BLZG-1555] - Review CI surefire testing options
+    * [BLZG-1556] - Examine impact of dirty list threshold vs direct buffer size on write cache performance for bulk load
+    * [BLZG-1562] - DataLoader.Options.FLUSH does not defer flush of StatementBuffer
+    * [BLZG-1572] - Patch 1.5.2 to provide more information about deferred free issues.
+    * [BLZG-1589] - Modify the default behavior for setting the clear/dirty list threshold
+    * [BLZG-1593] - LexiconRelation.addTerms() does not reject BigdataValue objects from another namespace nor call asValue() on them to put them in the correct namespace
+    * [BLZG-1596] - Enable small slot optimization by default
+    * [BLZG-1598] - Update TestRWJournal test that fails with changed assumptions when small slots are enabled.
+    * [BLZG-1599] - Release python and dotnetrdf bindings as public github projects.
+    * [BLZG-1602] - BTree Eviction - Index Out Of Bounds when loading data (small slot optimization?)
+    * [BLZG-1611] - Broken binary compatibility through DTE Extension change (development version only)
+    * [BLZG-1628] - Document the new capabilities on the blazegraph wiki
+    * [BLZG-1635] - Range scan optimization not working in context of multiple range restrictions
+    * [BLZG-1639] - Create a new default vocabulary that includes missing vocabulary items
+    * [BLZG-1646] - BytesAppData counter can not be tracked accurately and should be removed
+    * [BLZG-1647] - Type casts to unsignedLong and long
+    * [BLZG-1649] - Merge load-performance to master
+    * [BLZG-1650] - DataLoader should sort files within each directory to establish a stable order for file loading
+    * [BLZG-1651] - Prefix and Suffix Inline URI Handler
+    * [BLZG-1656] - bigdata-cache and bigdata-utils dependency refactor
+    * [BLZG-1660] - MemoryManager should use read/write allocation lock to protect readers against concurrent close()
+    * [BLZG-1667] - Growth in RWStore.alloc() cumulative time (but latency looks ok)
+    * [BLZG-1676] - RWStore.showAllocators() must take the allocation lock
+    * [BLZG-1678] - Remove BigdataValueFactoryHeadlessImpl
+    * [BLZG-1680] - MalformedQueryException: IV not resolved
+    * [BLZG-1681] - Complex FILTER IN broken (IV resolution)
+    * [BLZG-1682] - IV resolution in suquery include broken
+
+
+

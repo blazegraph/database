@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -59,10 +59,20 @@ public class OpenrdfNativeServiceOptions extends ServiceOptionsBase implements
 
     /**
      * Always returns <code>false</code> (response is ignored).
+     * 
      */
     @Override
-    final public boolean isSparql11() {
+    final public boolean isSparql10() {
         return false;
     }
+
+    /**
+     * Always returns <code>null</code> (response is ignored).
+     * 
+     */
+	@Override
+	final public SPARQLVersion getSPARQLVersion() {
+		return null;
+	}
 
 }

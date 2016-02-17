@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -59,6 +59,9 @@ public class TestAll extends TestCase {
 
         // Test suite of NSS startup behavior and overrides.
         suite.addTestSuite(TestNanoSparqlServer.class);
+
+        suite.addTestSuite(TestServiceWhiteList.class);
+
 //
 //        /*
 //         * WebApp Client.
@@ -99,7 +102,7 @@ public class TestAll extends TestCase {
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
-
+        
         return suite;
 
     }

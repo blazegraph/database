@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -244,8 +244,8 @@ public class NanoSparqlClient {
 //			final QueryParser engine = new SPARQLParserFactory().getParser();
 //			
 //			final ParsedQuery q = engine.parseQuery(opts.queryStr, opts.baseURI);
-            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                    opts.tmpKb).parseQuery2(opts.queryStr, opts.baseURI);
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
+                    .parseQuery2(opts.queryStr, opts.baseURI);
 
             final QueryType queryType = opts.queryType = astContainer
                     .getOriginalAST().getQueryType();

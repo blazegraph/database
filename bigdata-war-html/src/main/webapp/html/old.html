@@ -4,7 +4,7 @@
 <head profile="http://www.w3.org/2005/10/profile">
 <link rel="icon" 
       type="image/png" 
-      href="/bigdata/html/favicon.ico" />
+      href="html/favicon.ico" />
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
 <title>bigdata&#174; NanoSparqlServer</title>
 <!-- $Id$ -->
@@ -26,16 +26,16 @@
 The following URLs should be active when deployed in the default configuration:
 </p>
 <dl>
-<dt>http://hostname:port/bigdata</dt>
+<dt>http://hostname:port/blazegraph</dt>
 <dd>This page.</dd>
-<dt>http://hostname:port/bigdata/sparql</dt>
-<dd>The SPARQL REST API (<a href="/bigdata/sparql">Service Description + VoID Description</a>).</dd>
-<dt>http://hostname:port/bigdata/namespace</dt>
-<dd>VoID <a href="/bigdata/namespace">graph of available KBs</a> from this service.</dd>
-<dt>http://hostname:port/bigdata/status</dt>
-<dd>A <a href="/bigdata/status">status</a> page.</dd>
-<dt>http://hostname:port/bigdata/counters</dt>
-<dd>A <a href="/bigdata/counters"> performance counters</a> page.</dd>
+<dt>http://hostname:port/blazegraph/sparql</dt>
+<dd>The SPARQL REST API (<a href="/blazegraph/sparql">Service Description + VoID Description</a>).</dd>
+<dt>http://hostname:port/blazegraph/namespace</dt>
+<dd>VoID <a href="/blazegraph/namespace">graph of available KBs</a> from this service.</dd>
+<dt>http://hostname:port/blazegraph/status</dt>
+<dd>A <a href="/blazegraph/status">status</a> page.</dd>
+<dt>http://hostname:port/blazegraph/counters</dt>
+<dd>A <a href="/blazegraph/counters"> performance counters</a> page.</dd>
 </dl>
 
 <p>
@@ -51,7 +51,7 @@ which this page was accessed.
       title="W3C SPARQL 1.1 Query Recommendation"
      target="_blank"
       > SPARQL Query </a></h2>
-<FORM action="/bigdata/sparql" method="post" name="QUERY">
+<FORM action="sparql" method="post" name="QUERY">
    <P>
    <TEXTAREA name="query" rows="10" cols="80" title="Enter SPARQL Query."
    >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
@@ -85,7 +85,7 @@ which this page was accessed.
       title="W3C SPARQL Update Recommendation"
      target="_blank"
      >SPARQL Update</a></h2>
-<FORM action="/bigdata/sparql" method="post">
+<FORM action="sparql" method="post">
    <P>
    <TEXTAREA name="update" rows="10" cols="80" title="Enter SPARQL Update."
    >

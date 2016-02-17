@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
@@ -39,7 +38,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -52,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -63,7 +62,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.spo.SPOPredicate;
 
 /**
  * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range count
@@ -452,16 +450,30 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 		final VarNode theVar = assignmentNode.getVarNode();
 
 		// Mark the triple pattern for fast range count.
-		markForFastRangeCount(sp, theVar);
+		if (markForFastRangeCount(sp, theVar)) {
+
+			// in case the triple pattern has been marked (i.e., the method returns
+			// true, rewrite the projection as SELECT ?var.
+			final ProjectionNode newProjection = new ProjectionNode();
+			newProjection.addProjectionVar(theVar);
+			queryBase.setProjection(newProjection);
+
+		} // else: nothing to do
 		
-		// Rewrite the projection as SELECT ?var.
-		final ProjectionNode newProjection = new ProjectionNode();
-		newProjection.addProjectionVar(theVar);
-		queryBase.setProjection(newProjection);
 		
 	}
 
-   protected void markForFastRangeCount(final StatementPatternNode sp,
+
+   /**
+    * Marks the triple pattern for fast range count, if supported. If fast range
+    * counts are supported (they're currently not yet on the GPU) and the triple
+    * pattern has been marked, the method returns true. Otherwise, it must
+    * return false (see ASTGPUFastRangeCountOptimizer override).
+    * 
+    * @param sp
+    * @param fastRangeCountVariable
+    */
+   protected boolean markForFastRangeCount(final StatementPatternNode sp,
                                         final VarNode fastRangeCountVariable)
    {
       // Mark the triple pattern with the FAST-RANGE-COUNT attribute.
@@ -475,6 +487,8 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
        * cardinality to the minimum.
        */
       sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 1L);
+      
+      return true;
    }
 
 }

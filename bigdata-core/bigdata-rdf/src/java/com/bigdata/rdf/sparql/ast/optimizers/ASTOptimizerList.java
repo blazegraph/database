@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -50,6 +50,16 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
         IASTOptimizer {
     
     private static final Logger log = Logger.getLogger(ASTOptimizerList.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static private boolean INFO = log.isInfoEnabled();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static private boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 
@@ -97,9 +107,8 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
 
         final IQueryNode queryNode = input.getQueryNode();
         final IBindingSet[] bindingSets = input.getBindingSets();    
-        
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("Original AST:\n" + queryNode);
 
         // Avoid side-effects on the original AST!
@@ -111,7 +120,7 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
            
             final long startOpt = System.nanoTime();
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Applying: " + opt);
 
             tmp = opt.optimize(context, tmp);
@@ -119,7 +128,7 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
             if (queryNode == null)
                 throw new AssertionError("Optimized discarded query: " + opt);
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("Rewritten AST:\n" + tmp.getQueryNode());
 
             saStats.registerOptimizerCall(

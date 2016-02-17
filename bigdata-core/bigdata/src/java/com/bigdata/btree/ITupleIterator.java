@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,7 +39,6 @@ import com.bigdata.btree.filter.TupleFilter;
  * @see IRangeQuery
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ITupleIterator<E> extends Iterator<ITuple<E>> {
 
@@ -59,6 +58,7 @@ public interface ITupleIterator<E> extends Iterator<ITuple<E>> {
      * @throws NoSuchElementException
      *             if there is no next entry.
      */
+	@Override
     public ITuple<E> next();
         
 }

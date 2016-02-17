@@ -81,7 +81,7 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
      * @return The matching properties as read before they were deleted.
      */
     @Override
-    public TPS apply(final IIndex ndx) {
+	public TPS apply(final IIndex ndx) {
 
         final long timestamp = TimestampChooser.chooseTimestamp(ndx, this.writeTime);
                 

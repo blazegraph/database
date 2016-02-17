@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@ package com.bigdata.rdf.sail;
 
 import java.util.concurrent.TimeUnit;
 
-import org.openrdf.query.Dataset;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
@@ -32,8 +31,8 @@ import org.openrdf.repository.sail.SailGraphQuery;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -50,21 +49,6 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
 
     }
 
-    @Override
-    public void setDataset(final Dataset dataset) {
-
-        /*
-         * Batch resolve RDF Values to IVs and then set on the query model.
-         */
-
-        final Object[] tmp = new BigdataValueReplacer(getTripleStore())
-                .replaceValues(dataset, null/* bindings */);
-
-        astContainer.getOriginalAST().setDataset(
-                new DatasetNode((Dataset) tmp[0], false/* update */));
-
-    }
-    
     @Override
     public String toString() {
 
@@ -114,7 +98,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
 
         final GraphQueryResult queryResult = ASTEvalHelper.evaluateGraphQuery(
                 getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
+                        getBindings()), getDataset());
 
         return queryResult;
 
@@ -141,8 +125,9 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
         originalQuery.setIncludeInferred(getIncludeInferred());
 
         final QueryRoot optimized = ASTEvalHelper.optimizeQuery(
-                getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
+                astContainer,
+                new AST2BOpContext(astContainer, getTripleStore()),
+                new QueryBindingSet(getBindings()), getDataset());
 
         return optimized;
 

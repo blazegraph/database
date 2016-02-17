@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@ import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.Sail;
 
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.util.httpd.Config;
 
 /**
  * Helper class to create a bigdata instance.
@@ -107,8 +108,7 @@ public class BigdataSailFactory {
     */
    public static BigdataSailRemoteRepository connect(final String host,
          final int port) {
-     
-       return connect("http://" + host + ":" + port + "/bigdata"); 
+       return connect("http://" + host + ":" + port + "/" + Config.BLAZEGRAPH_PATH); 
         
     }
     
@@ -148,7 +148,7 @@ public class BigdataSailFactory {
 
 	/**
 	 * Massage the service endpoint to ensure that it ends with
-	 * </code>/bigdata</code>
+	 * </code>/blazegraph</code>
 	 */
    @Deprecated // We are getting rid of this, right?
     static private String normalizeEndpoint(final String serviceEndpoint) {
@@ -163,33 +163,33 @@ public class BigdataSailFactory {
         	return serviceEndpoint.substring(0,
         				serviceEndpoint.length()-"/sparql/".length());
         	
-        } else if (serviceEndpoint.endsWith("/bigdata/")) {
+        } else if (serviceEndpoint.endsWith("/" + Config.BLAZEGRAPH_PATH + "/")) {
             
         	return serviceEndpoint.substring(0, 
         				serviceEndpoint.length()-1) ;
-        	
-        } else if (serviceEndpoint.endsWith("/bigdata")) {
+       
+        } else if (serviceEndpoint.endsWith("/" + Config.BLAZEGRAPH_PATH)) {
             
         	return serviceEndpoint;
         	
-		} else if (serviceEndpoint.contains("/bigdata")
+		} else if (serviceEndpoint.contains("/" + Config.BLAZEGRAPH_PATH)
 				&& serviceEndpoint.endsWith("/")) {
-			// This is the case of /bigdata/namespace/NAMESPACE/
+			// This is the case of /blazegraph/namespace/NAMESPACE/
 
 			return serviceEndpoint.substring(0, serviceEndpoint.length() - 1);
 
-		} else if (serviceEndpoint.contains("/bigdata")) {
-			// This is the case of /bigdata/namespace/NAMESPACE
+		} else if (serviceEndpoint.contains("/" + Config.BLAZEGRAPH_PATH)) {
+			// This is the case of /blazegraph/namespace/NAMESPACE
 
 			return serviceEndpoint;
 
 		} else if (serviceEndpoint.endsWith("/")) {
 
-			return serviceEndpoint + "bigdata";
+			return serviceEndpoint + Config.BLAZEGRAPH_PATH;
 
 		} else {
             
-        	return serviceEndpoint + "/bigdata";
+        	return serviceEndpoint + "/" + Config.BLAZEGRAPH_PATH;
         	
         }
         
