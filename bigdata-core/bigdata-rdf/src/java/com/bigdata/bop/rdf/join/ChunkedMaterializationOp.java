@@ -28,10 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.rdf.join;
 
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
@@ -281,8 +281,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
     static void resolveChunk(final IVariable<?>[] required,
             final LexiconRelation lex,//
             final IBindingSet[] chunk,//
-            final boolean materializeInlineIVs//
-    ) {
+            final boolean materializeInlineIVs) {
 
         if (log.isInfoEnabled())
             log.info("Fetched chunk: size=" + chunk.length + ", chunk="
@@ -300,8 +299,11 @@ public class ChunkedMaterializationOp extends PipelineOp {
         final int initialCapacity = required == null ? chunk.length
                 : ((required.length == 0) ? 1 : chunk.length * required.length);
 
-        final Collection<IV<?, ?>> ids = new HashSet<IV<?, ?>>(initialCapacity);
-
+        // in the following map we store, for each IV, the constant that was
+        // associated with this IV; we later use these constants canonically
+        final Map<IV<?, ?>, IConstant<?>> idToConstMap = 
+            new HashMap<IV<?, ?>, IConstant<?>>(initialCapacity);
+        
         for (IBindingSet solution : chunk) {
 
             final IBindingSet bindingSet = solution;
@@ -333,8 +335,9 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     if (iv.needsMaterialization() || materializeInlineIVs) {
 
-                        ids.add(iv);
-
+                        if (!idToConstMap.containsKey(iv)) {
+                            idToConstMap.put(iv, entry.getValue());
+                        }
                     }
 
 //                    handleIV(iv, ids, materializeInlineIVs);
@@ -363,8 +366,9 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     if (iv.needsMaterialization() || materializeInlineIVs) {
 
-                        ids.add(iv);
-
+                        if (!idToConstMap.containsKey(iv)) {
+                            idToConstMap.put(iv, c);
+                        }
                     }
 
 //                    handleIV(iv, ids, materializeInlineIVs);
@@ -379,21 +383,21 @@ public class ChunkedMaterializationOp extends PipelineOp {
         // Arrays.toString(ids.toArray()));
 
         if (log.isInfoEnabled())
-            log.info("Resolving " + ids.size() + " IVs, required="
+            log.info("Resolving " + idToConstMap.keySet().size() + " IVs, required="
                     + Arrays.toString(required));
 
-        // batch resolve term identifiers to terms.
-        final Map<IV<?, ?>, BigdataValue> terms = lex.getTerms(ids);
-
+        // batch resolve term identifiers to terms; as a side-effect, this sets the cache
+        // on the IVs that we pass in
+        final Map<IV<?, ?>, BigdataValue> terms = lex.getTerms(idToConstMap.keySet());
+        
         /*
-         * Resolve the IVs.
+         * Resolve the duplicates
          */
-        for (IBindingSet e : chunk) {
+        for (int i=0; i<chunk.length; i++) {
 
-            getBindingSet(required, e, terms);
+            getBindingSet(required, chunk[i], terms, idToConstMap);
 
         }
-
     }
     
 //    /**
@@ -468,12 +472,16 @@ public class ChunkedMaterializationOp extends PipelineOp {
     static private void getBindingSet(//
             final IVariable<?>[] required,
             final IBindingSet bindingSet,
-            final Map<IV<?, ?>, BigdataValue> terms) {
+            final Map<IV<?, ?>, BigdataValue> terms,
+            final Map<IV<?, ?>, IConstant<?>> idsToConstMap) {
 
         if (bindingSet == null)
             throw new IllegalArgumentException();
 
         if (terms == null)
+            throw new IllegalArgumentException();
+
+        if (idsToConstMap == null)
             throw new IllegalArgumentException();
 
         if (required != null) {
@@ -501,9 +509,12 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 }
 
-                final BigdataValue value = terms.get(iv);
-                
-                conditionallySetIVCache(iv,value);
+                if (iv.isInline()) {
+                  bindingSet.set(var, idsToConstMap.get(iv));
+                } else {
+                    final BigdataValue value = terms.get(iv);
+                    conditionallySetIVCache(iv,value);
+                }                
 
             }
             
@@ -533,8 +544,12 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 final IV<?, ?> iv = (IV<?, ?>) boundValue;
 
                 final BigdataValue value = terms.get(iv);
-
-                conditionallySetIVCache(iv, value);
+                
+                if (iv.isInline()) {
+                    bindingSet.set(entry.getKey(), idsToConstMap.get(iv));
+                } else {
+                    conditionallySetIVCache(iv,value);
+                }
 
             }
 
