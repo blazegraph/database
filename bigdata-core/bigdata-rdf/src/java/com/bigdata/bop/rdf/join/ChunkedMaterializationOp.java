@@ -510,7 +510,20 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 }
 
                 if (iv.isInline()) {
-                  bindingSet.set(var, idsToConstMap.get(iv));
+                    
+                    final IConstant<?> cVal = idsToConstMap.get(iv);
+                    if (cVal == null) {
+
+                        if (iv.needsMaterialization()) {
+                            // Not found in dictionary. This is an error.
+                            throw new RuntimeException("Could not resolve: iv=" + iv);
+
+                        } // else NOP - Value is not required.
+
+                    } else {
+                        bindingSet.set(var, cVal);
+                    }
+                    
                 } else {
                     final BigdataValue value = terms.get(iv);
                     conditionallySetIVCache(iv,value);
@@ -546,7 +559,20 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 final BigdataValue value = terms.get(iv);
                 
                 if (iv.isInline()) {
-                    bindingSet.set(entry.getKey(), idsToConstMap.get(iv));
+                    
+                    final IConstant<?> cVal = idsToConstMap.get(iv);
+                    if (cVal == null) {
+
+                        if (iv.needsMaterialization()) {
+                            // Not found in dictionary. This is an error.
+                            throw new RuntimeException("Could not resolve: iv=" + iv);
+
+                        } // else NOP - Value is not required.
+
+                    } else {
+                        bindingSet.set(entry.getKey(), idsToConstMap.get(iv));
+                    }
+                    
                 } else {
                     conditionallySetIVCache(iv,value);
                 }
