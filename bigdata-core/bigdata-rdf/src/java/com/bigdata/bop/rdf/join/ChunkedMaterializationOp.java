@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
@@ -244,9 +243,10 @@ public class ChunkedMaterializationOp extends PipelineOp {
                     stats.chunksIn.increment();
                     stats.unitsIn.add(a.length);
 
-                    resolveChunk(vars, lex, a, materializeInlineIVs);
+                    final IBindingSet[] aOut = 
+                        resolveChunk(vars, lex, a, materializeInlineIVs);
 
-                    sink.add(a);
+                    sink.add(aOut);
 
                 }
 
@@ -275,17 +275,19 @@ public class ChunkedMaterializationOp extends PipelineOp {
      *            materialize all variable bindings.
      * @param lex
      *            The lexicon reference.
-     * @param chunk
+     * @param chunkIn
      *            The chunk of solutions whose variables will be materialized.
+     *            
+     * @return a new binding set in which the chunks have been resolved
      */
-    static void resolveChunk(final IVariable<?>[] required,
+    static IBindingSet[] resolveChunk(final IVariable<?>[] required,
             final LexiconRelation lex,//
-            final IBindingSet[] chunk,//
+            final IBindingSet[] chunkIn,//
             final boolean materializeInlineIVs) {
 
         if (log.isInfoEnabled())
-            log.info("Fetched chunk: size=" + chunk.length + ", chunk="
-                    + Arrays.toString(chunk));
+            log.info("Fetched chunk: size=" + chunkIn.length + ", chunk="
+                    + Arrays.toString(chunkIn));
 
         /*
          * Create a collection of the distinct term identifiers used in this
@@ -296,15 +298,15 @@ public class ChunkedMaterializationOp extends PipelineOp {
          * Estimate the capacity of the hash map based on the #of variables to
          * materialize per solution and the #of solutions.
          */
-        final int initialCapacity = required == null ? chunk.length
-                : ((required.length == 0) ? 1 : chunk.length * required.length);
+        final int initialCapacity = required == null ? chunkIn.length
+                : ((required.length == 0) ? 1 : chunkIn.length * required.length);
 
         // in the following map we store, for each IV, the constant that was
         // associated with this IV; we later use these constants canonically
         final Map<IV<?, ?>, IConstant<?>> idToConstMap = 
             new HashMap<IV<?, ?>, IConstant<?>>(initialCapacity);
         
-        for (IBindingSet solution : chunk) {
+        for (IBindingSet solution : chunkIn) {
 
             final IBindingSet bindingSet = solution;
 
@@ -393,11 +395,14 @@ public class ChunkedMaterializationOp extends PipelineOp {
         /*
          * Resolve the duplicates
          */
-        for (int i=0; i<chunk.length; i++) {
+        final IBindingSet[] chunkOut = new IBindingSet[chunkIn.length];
+        for (int i=0; i<chunkIn.length; i++) {
 
-            getBindingSet(required, chunk[i], terms, idToConstMap);
+            chunkOut[i] = getBindingSet(required, chunkIn[i], terms, idToConstMap);
 
         }
+        
+        return chunkOut;
     }
     
 //    /**
@@ -457,7 +462,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
      * @param required
      *            The variables to be resolved -or- <code>null</code> if all
      *            variables should have been resolved.
-     * @param bindingSet
+     * @param bindingSetIn
      *            A solution whose {@link IV}s will be resolved to the
      *            corresponding {@link BigdataValue}s in the caller's
      *            <code>terms</code> map. The {@link IVCache} associations are
@@ -469,13 +474,13 @@ public class ChunkedMaterializationOp extends PipelineOp {
      *             if the {@link IBindingSet} was not materialized with the
      *             {@link IBindingSet}.
      */
-    static private void getBindingSet(//
+    static private IBindingSet getBindingSet(//
             final IVariable<?>[] required,
-            final IBindingSet bindingSet,
+            final IBindingSet bindingSetIn,
             final Map<IV<?, ?>, BigdataValue> terms,
             final Map<IV<?, ?>, IConstant<?>> idsToConstMap) {
 
-        if (bindingSet == null)
+        if (bindingSetIn == null)
             throw new IllegalArgumentException();
 
         if (terms == null)
@@ -484,6 +489,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
         if (idsToConstMap == null)
             throw new IllegalArgumentException();
 
+        final IBindingSet bindingSetOut = bindingSetIn.clone();
         if (required != null) {
 
             /*
@@ -493,7 +499,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
             for (IVariable<?> var : required) {
 
                 @SuppressWarnings("unchecked")
-                final IConstant<IV<?, ?>> c = bindingSet.get(var);
+                final IConstant<IV<?, ?>> c = bindingSetOut.get(var);
 
                 if (c == null) {
                     // Variable is not bound in this solution.
@@ -521,7 +527,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
                         } // else NOP - Value is not required.
 
                     } else {
-                        bindingSet.set(var, cVal);
+                        bindingSetOut.set(var, cVal);
                     }
                     
                 } else {
@@ -538,7 +544,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
              */
             
             @SuppressWarnings("rawtypes")
-            final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
+            final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSetOut
                     .iterator();
 
             while (itr.hasNext()) {
@@ -570,7 +576,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
                         } // else NOP - Value is not required.
 
                     } else {
-                        bindingSet.set(entry.getKey(), idsToConstMap.get(iv));
+                        bindingSetOut.set(entry.getKey(), idsToConstMap.get(iv));
                     }
                     
                 } else {
@@ -580,6 +586,8 @@ public class ChunkedMaterializationOp extends PipelineOp {
             }
 
         }
+        
+        return bindingSetOut;
 
 	}
 
