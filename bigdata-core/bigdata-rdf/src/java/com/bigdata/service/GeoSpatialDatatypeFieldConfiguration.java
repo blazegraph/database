@@ -21,18 +21,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+ * Created on Feb 10, 2016
+ */
 package com.bigdata.service;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.log4j.Logger;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription;
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription.Datatype;
 
 /**
  * Configuration of a single field/component in a given geospatial (multi-dimensional)
@@ -44,7 +40,11 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.Schem
 public class GeoSpatialDatatypeFieldConfiguration {
     
     final static private Logger log = Logger.getLogger(GeoSpatialDatatypeFieldConfiguration.class);
-
+    
+    private final static String JSON_STR_VALUETYPE = "valueType";
+    private final static String JSON_STR_MINVALUE = "minValue";
+    private final static String JSON_STR_MULTIPLIER = "multiplier";
+    private final static String JSON_STR_SERVICEMAPPING = "serviceMapping";
 
     /**
      * We support fields of values LONG and DOUBLE right now. Note that DOUBLE
@@ -54,6 +54,18 @@ public class GeoSpatialDatatypeFieldConfiguration {
        LONG,
        DOUBLE
     }
+    
+    /**
+     * Service mapping.
+     */
+    public enum ServiceMapping {
+        LATITUDE,
+        LONGITUDE,
+        TIME,
+        COORD_SYSTEM,
+        
+        CUSTOM
+    }
 
     /**
      * The valueType of the field.
@@ -61,52 +73,89 @@ public class GeoSpatialDatatypeFieldConfiguration {
     private final ValueType valueType;
 
     /**
-     * The minimum value definig a shift in the bits.
+     * The minimum value defining a shift in the bits. May be null (meaning there is no minValue defined).
      */
-    private final long minValue;
+    private Long minValue;
 
     /**
-     * The multiplier (aka precision)
+     * The multiplier (aka precision). Defaults to 1 (identity element for multiplication).
      */
-    private final long multiplier; // aka precision
+    private long multiplier;
     
     /**
-     * Mapping to the service.
+     * Mapping to the service. If serviceMapping==CUSTOM, this is a string
+     * defined in variable customServiceMapping, otherwise the latter is null.
      */
-    private final String serviceMapping;
-        
+    private ServiceMapping serviceMapping = ServiceMapping.CUSTOM; // default
+    
+    
+    /**
+     * Custom service mapping string.
+     */
+    private String customServiceMapping;
     
 
-    public GeoSpatialDatatypeFieldConfiguration(String uri, JSONObject fieldJson) throws IllegalArgumentException {
+    public GeoSpatialDatatypeFieldConfiguration(JSONObject fieldJson) throws IllegalArgumentException {
         
-        
+
+        /**
+         * Parse JSON structure such as:
+         * { "valueType": "LONG", "multiplier": "1", "minVal" : "0" , "serviceMapping" : "COORD_SYSTEM"  },
+         * where minVal and multiplier are optional, the other two components are mandatory.
+         */
         try {
-                // JSON struct: { "valueType": "double", "multiplier": "100000", "serviceMapping": "latitude" }
-            valueType = ValueType.valueOf((String)fieldJson.get("valueType"));
-            minValue = Long.valueOf((String)fieldJson.get("minVal"));
-            multiplier = Long.valueOf((String)fieldJson.get("multiplier"));
-            serviceMapping = (String)fieldJson.get("serviceMapping");
+
+            // component 1: valueType (required)
+            valueType = ValueType.valueOf((String)fieldJson.get(JSON_STR_VALUETYPE));
+            
+            // component 2: minValue (optional)
+            minValue=null; // default
+            if (fieldJson.has(JSON_STR_MINVALUE)) {
+                final String minValueStr = (String)fieldJson.get(JSON_STR_MINVALUE);
+                if (minValueStr!=null && !minValueStr.isEmpty()) {
+                    minValue = Long.valueOf(minValueStr);
+                } // else: stay with default
+            }
+            
+            // component 3: multiplier (optional)            
+            multiplier=1; // default
+            if (fieldJson.has(JSON_STR_MULTIPLIER)) {
+                final String multiplierStr = (String)fieldJson.get(JSON_STR_MULTIPLIER);
+                if (multiplierStr!=null && !multiplierStr.isEmpty()) {
+                    multiplier = Long.valueOf(multiplierStr);
+                }
+            }
+            
+            // component 4: serviceMapping (required)
+            final String serviceMappingStr = (String)fieldJson.get(JSON_STR_SERVICEMAPPING);
+            try {
                 
+                serviceMapping = ServiceMapping.valueOf((String)fieldJson.get(JSON_STR_SERVICEMAPPING));
+                customServiceMapping = null;
                 
-//                System.err.println("valueType=" + valueType +  " / multiplier=" + multiplier + " / serviceMapping=" + serviceMapping);
+            } catch (Exception e) {
+             
+                customServiceMapping = serviceMappingStr;
+                        
+            }
+
         } catch (NumberFormatException e) {
             
             log.warn("Expecting values that are of type long for minValue and multiplier.");
-            throw new IllegalArgumentException(e);
+            throw new IllegalArgumentException(e); // forward exception
             
         } catch (JSONException e) {
                 
             log.warn("Field could not be parsed: " + e.getMessage());
-            throw new IllegalArgumentException(e);
+            throw new IllegalArgumentException(e); // forward exception
             
         } catch (Exception e) {
             
             log.warn("Exception while initializing field: " + e.getMessage());
-            throw new IllegalArgumentException(e);
+            throw new IllegalArgumentException(e); // forward exception
         }
                 
     }
-    
     
 
     public ValueType getValueType() {
@@ -115,7 +164,7 @@ public class GeoSpatialDatatypeFieldConfiguration {
 
 
 
-    public long getMinValue() {
+    public Long getMinValue() {
         return minValue;
     }
 
@@ -127,8 +176,12 @@ public class GeoSpatialDatatypeFieldConfiguration {
 
 
 
-    public String getServiceMapping() {
+    public ServiceMapping getServiceMapping() {
         return serviceMapping;
     }
 
+    
+    public String getCustomServiceMapping() {
+        return customServiceMapping;
+    }
 }

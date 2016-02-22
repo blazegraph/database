@@ -23,13 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
  * Created on Feb 10, 2016
- * 
- * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt/a>
  */
 package com.bigdata.service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -42,85 +42,114 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.Schem
 
 /**
  * Singleton class providing access to the GeoSpatial index configuration.
- * Currently implemented as a singleton, which might be re-considered.
+ * 
+ * TODO: Singleton implementation might be re-considered.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
 public class GeoSpatialConfig {
 
-   final static private Logger log = Logger.getLogger(GeoSpatialConfig.class);
+    final static private Logger log = Logger.getLogger(GeoSpatialConfig.class);
+
+    private final static String JSON_STR_CONFIG = "config";
+    private final static String JSON_STR_URI = "uri";
+    private final static String JSON_STR_FIELDS = "fields";
+   
+
     
-   private static GeoSpatialConfig instance;
-   
-   private static final String COMPONENT_SEPARATOR = ";";
-   private static final String FIELD_SEPARATOR = "#";
-   
-   private SchemaDescription schemaDescription;
+    private static GeoSpatialConfig instance;
 
-   private List<GeoSpatialDatatypeConfiguration> datatypeConfigs;
+    private static final String COMPONENT_SEPARATOR = ";";
+    private static final String FIELD_SEPARATOR = "#";
+
+    private SchemaDescription schemaDescription;
+
+    private List<GeoSpatialDatatypeConfiguration> datatypeConfigs;
+
+    private GeoSpatialConfig() {
+        init(null, null);
+    }
+
+    public static GeoSpatialConfig getInstance() {
+
+        if (instance == null) {
+            instance = new GeoSpatialConfig();
+        }
+
+        return instance;
+    }
+
+    public void init(final String initStringSchemaDescription, final List<String> geoSpatialDatatypeConfigs) {
+
+        initSchemaDescription(initStringSchemaDescription);
+        initDatatypes(geoSpatialDatatypeConfigs);
+    }
    
-   private GeoSpatialConfig() {
-      init(null, null);
-   }
-   
-   public static GeoSpatialConfig getInstance() {
-      
-      if (instance==null) {
-         instance = new GeoSpatialConfig();
-      }
-      
-      return instance;
-   }
-   
-   public void init(String initStringSchemaDescription, List<String> geoSpatialDatatypeConfigs) {
-      
-      initSchemaDescription(initStringSchemaDescription);
-      initDatatypes(geoSpatialDatatypeConfigs);
-   }
-   
-   private void initDatatypes(List<String> geoSpatialDatatypeConfigs) {
+    private void initDatatypes(List<String> geoSpatialDatatypeConfigs) {
        
-       datatypeConfigs = new ArrayList<GeoSpatialDatatypeConfiguration>();
+        datatypeConfigs = new ArrayList<GeoSpatialDatatypeConfiguration>();
        
-       if (geoSpatialDatatypeConfigs==null)
-           return; // nothing to be done
-       
-       for (final String configStr : geoSpatialDatatypeConfigs) {
+        if (geoSpatialDatatypeConfigs==null)
+            return; // nothing to be done
+
+        /**
+         * We expect a JSON config string of the following format (example):
+         * 
+         * {"config": { 
+         *   "uri": "<http://my.custom.datatype2.uri>", 
+         *   "fields": [ 
+         *     { "valueType": "DOUBLE", "multiplier": "100000", "serviceMapping": "LATITUDE" }, 
+         *     { "valueType": "DOUBLE", "multiplier": "100000", "serviceMapping": "LONGITUDE" }, 
+         *     { "valueType": "LONG, "multiplier": "1", "minValue" : "0" , "serviceMapping": "TIME"  }, 
+         *     { "valueType": "LONG", "multiplier": "1", "minValue" : "0" , "serviceMapping" : "COORD_SYSTEM"  } 
+         *   ] 
+         * }}
+         */
+        for (final String configStr : geoSpatialDatatypeConfigs) {
            
-           if (configStr==null || configStr.isEmpty())
-               continue; // skip
+            if (configStr==null || configStr.isEmpty())
+                continue; // skip
 
-           try {
+            try {
 
-                JSONObject json = new JSONObject(configStr);
-                JSONObject topLevelNode = (JSONObject)json.get("config");
-                String uri = (String)topLevelNode.get("uri");
-                JSONArray fields = (JSONArray)topLevelNode.get("fields");
-                
-                final GeoSpatialDatatypeConfiguration dc = new GeoSpatialDatatypeConfiguration(uri, fields);
-                datatypeConfigs.add(dc);
+                // read values from JSON
+                final JSONObject json = new JSONObject(configStr);
+                final JSONObject topLevelNode = (JSONObject)json.get(JSON_STR_CONFIG);
+                final String uri = (String)topLevelNode.get(JSON_STR_URI);
+                final JSONArray fields = (JSONArray)topLevelNode.get(JSON_STR_FIELDS);
 
-                
-                // {"config": { 
-                //   "uri": "<http://my.custom.datatype2.uri>", 
-                //   "fields": [ 
-                //     { "valueType": "double", "multiplier": "100000", "serviceMapping": "latitude" }, 
-                //     { "valueType": "double", "multiplier": "100000", "serviceMapping": "longitude" }, 
-                //     { "valueType": "long", "multiplier": "1", "minVal" : "0" , "serviceMapping": "time"  }, 
-                //     { "valueType": "long", "multiplier": "1", "minVal" : "0" , "serviceMapping" : "coordSystem"  } 
-                //   ] 
-                // }}
+                // delegate to GeoSpatialDatatypeConfiguration for construction
+                datatypeConfigs.add(new GeoSpatialDatatypeConfiguration(uri, fields));
                 
             } catch (JSONException e) {
                 
-                log.warn("Problem parsing JSON for geoSpatialDatatypeConfig:" + e.getMessage(), e);
+                log.warn("Illegal JSON configuration: " + e.getMessage());
+                throw new IllegalArgumentException(e); // forward exception
             }
            
-       }
-       
+            // validate that there are no duplicate URIs used for the datatypeConfigs
+            final Set<String> uris = new HashSet<String>();
+            for (int i=0; i<datatypeConfigs.size(); i++) {
+                
+                final String curUri = datatypeConfigs.get(i).getUri();
+                
+                if (uris.contains(curUri)) {
+                    throw new IllegalArgumentException("Duplicate URI used for geospatial datatype config: " + curUri);
+                }
+                
+                uris.add(curUri);
+            }
+
+        }
+    }
+
+   
+   public List<GeoSpatialDatatypeConfiguration> getDatatypeConfigs() {
+       return datatypeConfigs;
    }
 
+    // TODO: this is legacy and should be removed at some point
     public SchemaDescription getSchemaDescription() {
           return schemaDescription;
        }
@@ -137,6 +166,7 @@ public class GeoSpatialConfig {
     * If no schema description string is given (or the given string is empty), 
     * the default schema description is returned.
     */
+    // TODO: this is legacy and should be removed at some point
    private void initSchemaDescription(String initString) {
      
 
@@ -203,6 +233,7 @@ public class GeoSpatialConfig {
     * The default schema is a fixed, three-dimensional datatype
     * made up of latitude, longitude and time.
     */
+   // TODO: this is legacy and should be replaced at some point
    private SchemaDescription defaultSchemaDescription() {
       
       final List<SchemaFieldDescription> sfd = 

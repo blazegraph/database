@@ -5,9 +5,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -77,7 +77,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.BaseVocabulary;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.util.Bytes;
@@ -977,8 +976,8 @@ public class HashCollisionUtility {
 				vf,
 				uriFactory,
 				false, // GeoSpatial support
-				null  // GeoSpatial config string
-				);
+				null,  // GeoSpatial config string
+				new ArrayList<String>());
 		
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(
 //				50000 // hard reference queue capacity
