@@ -214,12 +214,17 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL, "true");
 
         // set GeoSpatial configuration: use a higher precision and range shifts; 
-        // the test account for this higher precision (and assert that range shifts
+        // the test accounts for this higher precision (and assert that range shifts
         // actually do not harm the evaluation process)
         properties.setProperty(
-           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_CONFIG, 
-           "DOUBLE#1000000#0;DOUBLE#100000#0;LONG#1#0");
-
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".0",
+           "{\"config\": "
+           + "{ \"uri\": \"<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral>\", "
+           + "\"fields\": [ "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
+           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"TIME\"  } "
+           + "]}}");
 
         return properties;
 

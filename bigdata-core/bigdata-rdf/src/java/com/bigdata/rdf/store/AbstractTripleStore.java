@@ -1305,17 +1305,18 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_GEO_SPATIAL = "false";
 
         /**
-         * GeoSpatial configuration. See https://jira.blazegraph.com/browse/BLZG-249.
-         */
-        String GEO_SPATIAL_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialConfig";
-      
-        String DEFAULT_GEO_SPATIAL_CONFIG = null;
-        
-        /**
          * GeoSpatial datatype configuration.        
          */
         String GEO_SPATIAL_DATATYPE_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialDatatypeConfig";
 
+        String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG =
+            "{\"config\": "
+            + "{ \"uri\": \"<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral>\", "
+            + "\"fields\": [ "
+            + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
+            + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
+            + "{ \"valueType\": \"LONG\", \"serviceMapping\" : \"TIME\"  } "
+            + "]}}";
         
         /**
          * If this option is set to false, do not compute closure for sids.

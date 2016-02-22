@@ -30,7 +30,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -49,7 +48,8 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.service.GeoSpatialConfig;
+import com.bigdata.service.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
 import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
@@ -89,7 +89,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    private final BigdataURI datatype;
    
-   private SchemaDescription sd;
+   private final GeoSpatialDatatypeConfiguration datatypeConfig;
    
    // re-usable key builder, initialized once in the beginning
    final IKeyBuilder kb;
@@ -99,23 +99,14 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * 
     * @param resolver
     */
-   public GeoSpatialLiteralExtension(final IDatatypeURIResolver resolver) {
-
-      this(resolver, defaultSchemaDescription());
-   }
-
-   /**
-    * Constructor setting up an instance with a custom schema description.
-    * @param resolver
-    * @param sd
-    */
    public GeoSpatialLiteralExtension(
-      final IDatatypeURIResolver resolver, final SchemaDescription sd) {
+       final IDatatypeURIResolver resolver, final GeoSpatialDatatypeConfiguration config) {
 
-      this.datatype = resolver.resolve(datatypeURI);
-      this.sd = sd;
-      this.kb = KeyBuilder.newInstance();
+       this.datatype = resolver.resolve(datatypeURI);
+       this.datatypeConfig = config; 
+       this.kb = KeyBuilder.newInstance();
    }
+
    
    @Override
    public Set<BigdataURI> getDatatypes() {
@@ -185,10 +176,10 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public LiteralExtensionIV createIV(Object[] components) {
 
       // convert component array into long's (B->C)
-      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
+      final long[] componentsAsLongArr = componentsAsLongArr(components, datatypeConfig);
 
       // convert the long array into a byte[] (C->D)
-      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, datatypeConfig);
 
       // convert into a valid two's complement byte array (D->E)
       final byte[] zOrderByteArrayTwoCompl = padLeadingZero(zOrderByteArray);
@@ -209,10 +200,10 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public byte[] toZOrderByteArray(Object[] components) {
       
       // convert component array into long's (B->C)
-      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
+      final long[] componentsAsLongArr = componentsAsLongArr(components, datatypeConfig);
 
       // convert the long array into a byte[] (C->D)
-      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, datatypeConfig);
 
       // convert into a valid two's complement byte array (D->E)
       return padLeadingZero(zOrderByteArray);
@@ -251,11 +242,11 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * Implements step B->C.
     */
    public final long[] componentsAsLongArr(
-      final Object[] components, final SchemaDescription sd) {
+      final Object[] components, final GeoSpatialDatatypeConfiguration datatypeConfig) {
 
-      final long[] ret = new long[sd.getNumDimensions()];
+      final int numDimensions = datatypeConfig.getNumDimensions();
+      final long[] ret = new long[numDimensions];
 
-      final int numDimensions = sd.getNumDimensions();
       if (numDimensions != components.length) {
          throw new IllegalArgumentException(
             "Literal value has wrong format. Expected " + numDimensions 
@@ -265,9 +256,9 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       for (int i = 0; i < components.length; i++) {
          
          final Object component = components[i];
-         final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
+         final GeoSpatialDatatypeFieldConfiguration fieldConfig = datatypeConfig.getFields().get(i);
          
-         final BigDecimal precisionAdjustment = BigDecimal.valueOf(sfd.getPrecision());
+         final BigDecimal precisionAdjustment = BigDecimal.valueOf(fieldConfig.getMultiplier());
 
          final BigDecimal componentAsBigInteger =
                component instanceof BigDecimal ?
@@ -289,7 +280,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * Implements step C->D
     */
    public byte[] toZOrderByteArray(
-         final long[] componentsAsLongArr, final SchemaDescription sd) {
+         final long[] componentsAsLongArr, final GeoSpatialDatatypeConfiguration datatypeConfig) {
       
       kb.reset();
       
@@ -299,7 +290,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          final long componentAsLong = componentsAsLongArr[i];
          
          // shift component by given range
-         final Long minValue = sd.getSchemaFieldDescription(i).getMinValue();
+         final Long minValue = datatypeConfig.getFields().get(i).getMinValue();
          final long componentAsLongRangeShifted = 
             minValue==null ? 
             componentAsLong : 
@@ -308,7 +299,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          kb.append(componentAsLongRangeShifted);
       }
       
-      return kb.toZOrder(sd.getNumDimensions());
+      return kb.toZOrder(datatypeConfig.getNumDimensions());
    }
    
    /**
@@ -430,7 +421,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     */
    public byte[] toZOrderByteArray(final BigInteger bigInt) {
 
-      final int numDimensions = sd.getNumDimensions();
+      final int numDimensions = datatypeConfig.getNumDimensions();
 
       // convert BigInteger back to byte array (F->E)
       final byte[] bigIntAsByteArr = bigInt.toByteArray();
@@ -481,11 +472,11 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          kb.append(byteArr[i]);
       }
       
-      final long[] componentsAsLongArr = kb.fromZOrder(sd.getNumDimensions());
+      final long[] componentsAsLongArr = kb.fromZOrder(datatypeConfig.getNumDimensions());
       
       // revert range shift
       for (int i=0; i<componentsAsLongArr.length; i++) {
-         final Long minValue = sd.getSchemaFieldDescription(i).getMinValue();
+         final Long minValue = datatypeConfig.getFields().get(i).getMinValue();
          if (minValue!=null) {
             componentsAsLongArr[i] = decodeRangeShift(componentsAsLongArr[i], minValue);
          }
@@ -541,7 +532,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     */
    final public Object[] longArrAsComponentArr(final long[] arr) {
       
-      final int numDimensions = sd.getNumDimensions();
+      final int numDimensions = datatypeConfig.getNumDimensions();
       if (arr.length!=numDimensions) {
          throw new IllegalArgumentException(
                "Encoding has wrong format. Expected " + numDimensions 
@@ -552,13 +543,13 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final Object[] componentArr = new Object[arr.length];
       for (int i=0; i<arr.length; i++) {
 
-         final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
-         final double precisionAdjustment = sfd.getPrecision();
+         final GeoSpatialDatatypeFieldConfiguration fieldConfig = datatypeConfig.getFields().get(i);
+         final double precisionAdjustment = fieldConfig.getMultiplier();
          
          if (i>0)
             buf.append(COMPONENT_SEPARATOR);
          
-         switch (sfd.getDatatype()) {
+         switch (fieldConfig.getValueType()) {
          case DOUBLE:
             componentArr[i] = (double)arr[i]/precisionAdjustment;
             break;
@@ -591,115 +582,12 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return ret;
       
    }
-
-   /****************************************************************************
-    ***************               SCHEMA MANAGEMENT              ***************
-    ***************************************************************************/
+   
    /**
-    * Gets the number of dimensions from the underlying schema description
+    * Return the number of dimensions of the literal
+    * @return
     */
    public int getNumDimensions() {
-      return sd.getNumDimensions();
+       return datatypeConfig.getNumDimensions();
    }
-   
-   /**
-     * For now, we're using a fixed, three-dimensional datatype for
-     * latitued, longitude and time.
-     */
-   private static SchemaDescription defaultSchemaDescription() {
-
-      // load schema desciption from config
-      return GeoSpatialConfig.getInstance().getSchemaDescription();
-   }
-
-   
-   /**
-    * Schema description for a geospatial literal
-    */
-   public static class SchemaDescription {
-
-      private final List<SchemaFieldDescription> fields;
-      
-      public SchemaDescription(List<SchemaFieldDescription> fields) {
-         this.fields = fields;
-      }
-      
-      public int getNumDimensions() {
-         return fields.size();
-      }
-      
-      public SchemaFieldDescription getSchemaFieldDescription(int index) {
-         return fields.get(index);
-      }
-
-   }
-   
-   /**
-    * Description of a field in the schema.
-    */
-   public static class SchemaFieldDescription {
-      
-      /**
-       * We support doubles and floats for now
-       */
-      public enum Datatype {
-         LONG,
-         DOUBLE
-      }
-      
-      public Long minValue; // the minimun value appearing in the data
-
-      private final Datatype datatype;
-
-      /**
-       * Precision of the value, given as a multiplicator applied on top
-       * of a given value. Typically precisions are 1000, meaning for instance
-       * that we consider 3 after decimal positions for doubles. The precision
-       * field can be used as well to shift long values, e.g. to align them
-       * more closely in the index.
-       */
-      private final long precision;
-      
-      public SchemaFieldDescription(
-         final Datatype datatype, final long precision) {
-         
-         this(datatype, precision, null);
-      }
-      
-      /**
-       * Precision of float value. Based on the precision, we convert the
-       * double into a long value. E.g., if the precision is 8 (meaning
-       * 8 positions after decimal point), we multiply the double by 8
-       * and convert into a long value (ignoring additional positions).
-       * 
-       * The minValue and maxValue parameters allow to set a range in which
-       * we know the parameters are. This is used internally for range
-       * adjustments and may help to get better performance.
-       */
-      public SchemaFieldDescription(
-            final Datatype datatype, final long precision,
-            final Long minValue) {
-         
-            this.datatype = datatype;
-            this.precision = precision;
-            this.minValue = minValue;
-                  
-         }
-      
-      public Datatype getDatatype() {
-         return datatype;
-      }
-
-      public long getPrecision() {
-         return precision;
-      }
-      
-      public Long getMinValue() {
-         return minValue;
-      }
-
-      
-   }
-
-
 }

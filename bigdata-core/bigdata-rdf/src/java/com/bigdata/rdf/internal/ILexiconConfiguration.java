@@ -81,13 +81,6 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      */
     public boolean isGeoSpatial();
     
-    
-    /**
-     * Return the configuration string for the GeoSpatial service
-     */
-    public String getGeoSpatialConfig();
-    
-
     /**
      * Return the list of geospatial datatype configurations
      */

@@ -36,10 +36,6 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaDescription;
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription;
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription.Datatype;
-
 /**
  * Singleton class providing access to the GeoSpatial index configuration.
  * 
@@ -55,20 +51,20 @@ public class GeoSpatialConfig {
     private final static String JSON_STR_CONFIG = "config";
     private final static String JSON_STR_URI = "uri";
     private final static String JSON_STR_FIELDS = "fields";
-   
 
-    
-    private static GeoSpatialConfig instance;
-
-    private static final String COMPONENT_SEPARATOR = ";";
-    private static final String FIELD_SEPARATOR = "#";
-
-    private SchemaDescription schemaDescription;
-
+    /**
+     * List containing the configurations for the geospatial datatypes.
+     */
     private List<GeoSpatialDatatypeConfiguration> datatypeConfigs;
 
+    /**
+     * The one and only singleton instance.
+     */
+    private static GeoSpatialConfig instance;
+
+
     private GeoSpatialConfig() {
-        init(null, null);
+        init(null);
     }
 
     public static GeoSpatialConfig getInstance() {
@@ -80,9 +76,7 @@ public class GeoSpatialConfig {
         return instance;
     }
 
-    public void init(final String initStringSchemaDescription, final List<String> geoSpatialDatatypeConfigs) {
-
-        initSchemaDescription(initStringSchemaDescription);
+    public void init(final List<String> geoSpatialDatatypeConfigs) {  
         initDatatypes(geoSpatialDatatypeConfigs);
     }
    
@@ -147,103 +141,6 @@ public class GeoSpatialConfig {
    
    public List<GeoSpatialDatatypeConfiguration> getDatatypeConfigs() {
        return datatypeConfigs;
-   }
-
-    // TODO: this is legacy and should be removed at some point
-    public SchemaDescription getSchemaDescription() {
-          return schemaDescription;
-       }
-
-   /**
-    * Initializes the schema description based on an init string.
-    * A schema string such as DOUBLE#5;DOUBLE;5;0#LONG;2;0 describes
-    * three dimensions:
-    * 
-    * - DOUBLE#100000   -> type=DOUBLE, precision=5, no range shift
-    * - DOUBLE#100000#0 -> type=DOUBLE, precision=5, range shift according to min value 0
-    * - LONG#1#0   -> type=LONG, precision=0 (leave value unmodified), range shift according to min value 0
-    * 
-    * If no schema description string is given (or the given string is empty), 
-    * the default schema description is returned.
-    */
-    // TODO: this is legacy and should be removed at some point
-   private void initSchemaDescription(String initString) {
-     
-
-      if (initString==null || initString.isEmpty()) {
-   
-         schemaDescription = defaultSchemaDescription();
-
-      } else {
-         
-         final List<SchemaFieldDescription> sfd = 
-               new ArrayList<SchemaFieldDescription>();
-         
-         final String[] components = initString.split(COMPONENT_SEPARATOR);
-         for (int i=0; i<components.length; i++) {
-            
-            final String component = components[i].trim();
-            final String[] fields = component.split(FIELD_SEPARATOR);
-
-            if (fields.length<2 || fields.length>3) {
-               throw new IllegalArgumentException(
-                  "Invalid number of fields in component #" + i + ": " + fields.length);
-            }
-            
-            final String field0Str = fields[0].trim();
-            final String field1Str = fields[1].trim();
-            final String field2Str = fields.length==3? fields[2] : null;
-            
-            final Datatype datatype;
-            if (field0Str.equalsIgnoreCase("DOUBLE")) {
-               datatype = Datatype.DOUBLE;
-            } else if (field0Str.equalsIgnoreCase("LONG")) {
-               datatype = Datatype.LONG;               
-            } else {
-               throw new IllegalArgumentException(
-                     "First field must be DOUBLE or LONG, but is: " + field0Str);
-            }
-
-            final Long precision;
-            try {
-               precision = Long.valueOf(field1Str);
-            } catch (NumberFormatException e) {
-               throw new IllegalArgumentException(
-                     "Second field must be an integer value, but is: " + field1Str);               
-            }
-            
-            final Long minValue;
-            if (field2Str==null) {
-               minValue = null;
-            } else {
-               minValue = Long.valueOf(field2Str);
-            }
-            
-            sfd.add(new SchemaFieldDescription(datatype, precision, minValue));
-         }
-         
-         schemaDescription = new SchemaDescription(sfd);
-         
-      }
-      
-
-   }
-   
-   /**
-    * The default schema is a fixed, three-dimensional datatype
-    * made up of latitude, longitude and time.
-    */
-   // TODO: this is legacy and should be replaced at some point
-   private SchemaDescription defaultSchemaDescription() {
-      
-      final List<SchemaFieldDescription> sfd = 
-            new ArrayList<SchemaFieldDescription>();
-
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* latitude */
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* longitude */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
-      
-      return new SchemaDescription(sfd);
    }
 
 }

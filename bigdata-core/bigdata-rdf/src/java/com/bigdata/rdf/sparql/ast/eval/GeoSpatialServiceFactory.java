@@ -102,6 +102,8 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.ChunkConsumerIterator;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
+import com.bigdata.service.GeoSpatialConfig;
+import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
@@ -714,7 +716,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.geoSpatialCounters = geoSpatialCounters;
 
             // for use in this thread only
-            this.litExt = new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation());
+            // TODO: inject concrete datatype we're looking for
+            final GeoSpatialDatatypeConfiguration datatypeConfig =
+                    GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
+            this.litExt = 
+                new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
 
             this.numTasks = numTasks;
             this.minDatapointsPerTask = minDatapointsPerTask;
@@ -891,13 +897,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              * Compose the surrounding filter. The filter is based on the outer range.
              */
             final GeoSpatialFilterBase filter;
+            // TODO: inject concrete datatype we're looking for
+            final GeoSpatialDatatypeConfiguration datatypeConfig =
+                    GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
             switch (query.getSearchFunction()) {
             case IN_CIRCLE: 
                {
+
                   filter = new GeoSpatialInCircleFilter(
                      query.getSpatialCircleCenter(),  query.getSpatialCircleRadius(), query.getSpatialUnit(), 
                      outerRangeUpperLeftWithTime.getTimestamp(), outerRangeLowerRightWithTime.getTimestamp(), 
-                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation()), geoSpatialCounters);
+                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig), geoSpatialCounters);
                   
                }
                break;
@@ -906,7 +916,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                {
                   filter = new GeoSpatialInRectangleFilter(
                      outerRangeUpperLeftWithTime, outerRangeLowerRightWithTime,
-                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation()), geoSpatialCounters);
+                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig), geoSpatialCounters);
                   
                }
                break;
@@ -977,7 +987,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final GeoSpatialServiceCallResolver resolver = 
                   new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
                         timeVar, locationAndTimeVar, subjectPos, objectPos, vf, 
-                        new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation()));
+                        new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig));
             
             // and construct the sub range task
             return new GeoSpatialServiceCallSubRangeTask(

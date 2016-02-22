@@ -61,7 +61,7 @@ public class GeoSpatialDatatypeConfiguration {
      * if the uri is null or empty or in case the JSON array does not describe a set of
      * valid fields.
      */
-    public GeoSpatialDatatypeConfiguration(String uri, JSONArray fieldsJson) {
+    public GeoSpatialDatatypeConfiguration(final String uri, final JSONArray fieldsJson) {
         
         if (uri==null || uri.isEmpty())
             throw new IllegalArgumentException("URI parameter must not be null or empty");
@@ -117,15 +117,36 @@ public class GeoSpatialDatatypeConfiguration {
         
     }
     
+    /**
+     * Alternative constructor (to ease writing test cases)
+     * 
+     * @param uri
+     * @param fields
+     */
+    public GeoSpatialDatatypeConfiguration(
+        final String uri, final List<GeoSpatialDatatypeFieldConfiguration> fields) {
+        
+        this.uri = uri;
+        this.fields = fields;
+        
+    }
+    
     public String getUri() {
         return uri;
     }
     
     /**
-     * Returns the list of fields defining the datatype. Never null.
+     * @return the list of fields defining the datatype (never null)
      */
     public List<GeoSpatialDatatypeFieldConfiguration> getFields() {
         return fields;
     }
+    
+    /**
+     * @return the number of dimensions (i.e., fields) of the configuration
+     */
+    public int getNumDimensions() {
+        return fields.size();
+     }
 
 }

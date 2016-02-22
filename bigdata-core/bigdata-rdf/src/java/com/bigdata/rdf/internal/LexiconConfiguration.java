@@ -127,19 +127,11 @@ public class LexiconConfiguration<V extends BigdataValue>
      * <code>true</code> if geospatial support is enabled
      */
     private final boolean geoSpatial;
-    
-
-
+        
     /**
-     * Optional configuration string for the geospatial facilities.
-     */
-    private final String geoSpatialConfig;
-    
-    /**
-     * Optional configuration of geospatial datatypes
+     * Configuration of geospatial datatypes.
      */
     final List<String> geoSpatialDatatypeConfigs;
-
     
     /**
      * <code>true</code> if textual literals will be inlined.
@@ -260,11 +252,6 @@ public class LexiconConfiguration<V extends BigdataValue>
        return geoSpatial;
     }
 
-    @Override
-    public String getGeoSpatialConfig() {
-       
-       return geoSpatialConfig;
-    }
     
     @Override
     public List<String> getGeoSpatialDatatypeConfigs() {
@@ -368,7 +355,6 @@ public class LexiconConfiguration<V extends BigdataValue>
             final BigdataValueFactory valueFactory,//
             final IInlineURIFactory uriFactory,//
             final boolean geoSpatial,
-            final String geoSpatialConfig,
             final List<String> geoSpatialDatatypeConfigs
             ) {
 
@@ -397,7 +383,6 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.valueFactory = valueFactory;
         this.uriFactory = uriFactory;
         this.geoSpatial = geoSpatial;
-        this.geoSpatialConfig = geoSpatialConfig;
         this.geoSpatialDatatypeConfigs = geoSpatialDatatypeConfigs;
         
         /*

@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service;
 
+import java.util.List;
+
 import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -157,6 +159,24 @@ public class GeoSpatialDatatypeFieldConfiguration {
                 
     }
     
+    /**
+     * Alternative constructor (to ease writing test cases). If used without test cases,
+     * please use with care -- this constructor does not implement input validation.
+     * 
+     * @param uri
+     * @param fields
+     */
+    public GeoSpatialDatatypeFieldConfiguration(
+        final ValueType valueType, final Long minValue, 
+        final long multiplier, final ServiceMapping serviceMapping,
+        final String customServiceMapping) {
+        
+        this.valueType = valueType;
+        this.minValue = minValue;
+        this.multiplier = multiplier;
+        this.serviceMapping = serviceMapping;
+        this.customServiceMapping = customServiceMapping;
+    }
 
     public ValueType getValueType() {
         return valueType;

@@ -67,7 +67,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config1);
         
-        conf.init(null, datatypeConfigs);
+        conf.init(datatypeConfigs);
         
         final List<GeoSpatialDatatypeConfiguration> parsedDatatypeConfigs = conf.getDatatypeConfigs();
         assertEquals(parsedDatatypeConfigs.size(),1);
@@ -140,7 +140,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         datatypeConfigs.add(config2);
         datatypeConfigs.add(config3);
         
-        conf.init(null, datatypeConfigs);
+        conf.init(datatypeConfigs);
         
         // run tests
         final List<GeoSpatialDatatypeConfiguration> parsedDatatypeConfigs = conf.getDatatypeConfigs();
@@ -217,7 +217,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(null, datatypeConfigs);
+            conf.init(datatypeConfigs);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }
@@ -238,7 +238,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(null, datatypeConfigs);
+            conf.init(datatypeConfigs);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }
@@ -259,7 +259,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(null, datatypeConfigs);
+            conf.init(datatypeConfigs);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }
@@ -280,7 +280,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(null, datatypeConfigs);
+            conf.init(datatypeConfigs);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }
@@ -301,7 +301,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(null, datatypeConfigs);
+            conf.init(datatypeConfigs);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }
@@ -324,7 +324,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(null, datatypeConfigs);
+            conf.init(datatypeConfigs);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }

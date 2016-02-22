@@ -584,9 +584,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                   AbstractTripleStore.Options.GEO_SPATIAL,
                   AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
 
-            geoSpatialConfig = getProperty(
-                  AbstractTripleStore.Options.GEO_SPATIAL_CONFIG,
-                  AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_CONFIG);
 
             /**
              * We have configuration strings of the form 
@@ -596,6 +593,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * ...
              * 
              * We read this configuration up to the first index that is not defined.
+             * If no explicit configuration is provided, we fallback on our single
+             * latitude-longitude-time default.
              */
             geoSpatialDatatypeConfigs = new LinkedList<String>();
             boolean finished = false;
@@ -608,8 +607,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 } else {
                     finished = true; // we're done
                 }
-                
             }
+
+            // in case there is no (or no valid) config provided, we fallback on the default
+            if (geoSpatialDatatypeConfigs.isEmpty()) {
+                log.info("No GeoSpatial datatype configuration provided. Falling back on default.");
+                geoSpatialDatatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG);
+            }
+            
                 
             
             // Resolve the vocabulary.
@@ -664,7 +669,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
                     rejectInvalidXSDValues, xFactory, vocab, valueFactory,
-                    uriFactory, geoSpatial, geoSpatialConfig, geoSpatialDatatypeConfigs);
+                    uriFactory, geoSpatial, geoSpatialDatatypeConfigs);
 
         }
         
@@ -959,11 +964,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final private boolean geoSpatial;
 
     /**
-     * Configuration string for the GeoSpatial search facilities
-     */
-    final private String geoSpatialConfig;
-
-    /**
      * Configuration for geo spatial datatype configurations.
      */
     final private List<String> geoSpatialDatatypeConfigs;
@@ -1005,14 +1005,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
        
        return geoSpatial;
        
-    }
-    
-    /**
-     * Return the configuration string for the GeoSpatial service.
-     */
-    final public String getGeoSpatialConfig() {
-       
-       return geoSpatialConfig;
     }
     
     final public List<String> getGeoSpatialDatatypeConfigs() {

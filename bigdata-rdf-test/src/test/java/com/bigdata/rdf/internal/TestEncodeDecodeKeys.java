@@ -65,6 +65,8 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.service.GeoSpatialConfig;
+import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
@@ -699,6 +701,9 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
+        // TODO: inject concrete datatype we're looking for
+        final GeoSpatialDatatypeConfiguration datatypeConfig =
+            GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
                 public BigdataURI resolve(URI uri) {
@@ -706,7 +711,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                     buri.setIV(newTermId(VTE.URI));
                     return buri;
                 }
-            });
+            }, datatypeConfig);
         
         final BigdataLiteral[] dt = {
            vf.createLiteral("2#2#1", GeoSpatial.DATATYPE),
@@ -749,6 +754,9 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
+        // TODO: inject concrete datatype we're looking for
+        final GeoSpatialDatatypeConfiguration datatypeConfig =
+            GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
                 public BigdataURI resolve(URI uri) {
@@ -756,7 +764,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                     buri.setIV(newTermId(VTE.URI));
                     return buri;
                 }
-            });
+            }, datatypeConfig);
         
         final BigdataLiteral[] dt = {
            vf.createLiteral("8#8#1", GeoSpatial.DATATYPE)
