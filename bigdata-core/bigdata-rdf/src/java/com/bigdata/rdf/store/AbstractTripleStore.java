@@ -1311,7 +1311,7 @@ abstract public class AbstractTripleStore extends
 
         String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG =
             "{\"config\": "
-            + "{ \"uri\": \"<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral>\", "
+            + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral\", "
             + "\"fields\": [ "
             + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
             + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "

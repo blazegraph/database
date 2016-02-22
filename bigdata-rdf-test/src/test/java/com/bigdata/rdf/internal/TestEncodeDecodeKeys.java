@@ -714,12 +714,12 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
             }, datatypeConfig);
         
         final BigdataLiteral[] dt = {
-           vf.createLiteral("2#2#1", GeoSpatial.DATATYPE),
-           vf.createLiteral("3#3#1", GeoSpatial.DATATYPE),
-           vf.createLiteral("4#4#1", GeoSpatial.DATATYPE),
-           vf.createLiteral("5#5#1", GeoSpatial.DATATYPE),
-           vf.createLiteral("6#6#1", GeoSpatial.DATATYPE),
-           vf.createLiteral("7#7#1", GeoSpatial.DATATYPE),
+           vf.createLiteral("2#2#1", GeoSpatial.DEFAULT_DATATYPE),
+           vf.createLiteral("3#3#1", GeoSpatial.DEFAULT_DATATYPE),
+           vf.createLiteral("4#4#1", GeoSpatial.DEFAULT_DATATYPE),
+           vf.createLiteral("5#5#1", GeoSpatial.DEFAULT_DATATYPE),
+           vf.createLiteral("6#6#1", GeoSpatial.DEFAULT_DATATYPE),
+           vf.createLiteral("7#7#1", GeoSpatial.DEFAULT_DATATYPE),
         };
         
         final IV<?, ?>[] e = new IV[dt.length];
@@ -767,7 +767,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
             }, datatypeConfig);
         
         final BigdataLiteral[] dt = {
-           vf.createLiteral("8#8#1", GeoSpatial.DATATYPE)
+           vf.createLiteral("8#8#1", GeoSpatial.DEFAULT_DATATYPE)
         };
         
         final IV<?, ?>[] e = new IV[dt.length];

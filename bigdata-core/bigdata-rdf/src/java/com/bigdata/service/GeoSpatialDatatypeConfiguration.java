@@ -35,6 +35,8 @@ import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
 
@@ -50,7 +52,7 @@ public class GeoSpatialDatatypeConfiguration {
     final static private Logger log = Logger.getLogger(GeoSpatialDatatypeConfiguration.class);
 
     // URI of the datatype, e.g. <http://my.custom.geospatial.coordinate>
-    private final String uri;
+    private final URI uri;
 
     // ordered list of fields defining the datatype
     private List<GeoSpatialDatatypeFieldConfiguration> fields;
@@ -61,12 +63,16 @@ public class GeoSpatialDatatypeConfiguration {
      * if the uri is null or empty or in case the JSON array does not describe a set of
      * valid fields.
      */
-    public GeoSpatialDatatypeConfiguration(final String uri, final JSONArray fieldsJson) {
+    public GeoSpatialDatatypeConfiguration(final String uriStr, final JSONArray fieldsJson) {
         
-        if (uri==null || uri.isEmpty())
+        if (uriStr==null || uriStr.isEmpty())
             throw new IllegalArgumentException("URI parameter must not be null or empty");
         
-        this.uri = uri;
+        try {
+            this.uri = new URIImpl(uriStr);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid URI in geospatial datatype config: " + uriStr);
+        }
         
         fields = new ArrayList<GeoSpatialDatatypeFieldConfiguration>();
         
@@ -124,14 +130,14 @@ public class GeoSpatialDatatypeConfiguration {
      * @param fields
      */
     public GeoSpatialDatatypeConfiguration(
-        final String uri, final List<GeoSpatialDatatypeFieldConfiguration> fields) {
+        final String uriString, final List<GeoSpatialDatatypeFieldConfiguration> fields) {
         
-        this.uri = uri;
+        this.uri = new URIImpl(uriString);
         this.fields = fields;
         
     }
     
-    public String getUri() {
+    public URI getUri() {
         return uri;
     }
     

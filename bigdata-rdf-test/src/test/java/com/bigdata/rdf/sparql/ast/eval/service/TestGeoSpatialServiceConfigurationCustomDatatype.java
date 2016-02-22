@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on September 10, 2015
+ * Created on February 22, 2016
  */
 package com.bigdata.rdf.sparql.ast.eval.service;
 
@@ -36,24 +36,24 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Data driven test suite testing configurability of GeoSpatial service.
- * The query set is a subset of queries from {@link TestGeoSpatialServiceEvaluation},
- * with possible modifications to account for the changed configuration.
+ * The few tests in this class replicate examples from {@link TestGeoSpatialServiceConfiguration}
+ * with a custom datatype instead of using the built-in datatype.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQLTestCase {
+public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * 
      */
-    public TestGeoSpatialServiceConfiguration() {
+    public TestGeoSpatialServiceConfigurationCustomDatatype() {
     }
 
     /**
      * @param name
      */ 
-    public TestGeoSpatialServiceConfiguration(String name) {
+    public TestGeoSpatialServiceConfigurationCustomDatatype(String name) {
         super(name);
     }
 
@@ -76,10 +76,10 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
     public void testInRectangleQuery01() throws Exception {
        
        new TestHelper(
-          "geo-rectangle01",
-          "geo-rectangle01.rq", 
-          "geo-grid101010.nt",
-          "geo-rectangle01.srx").runTest();
+          "geo-rectangle01-custom-dt",
+          "geo-rectangle01-custom-dt.rq", 
+          "geo-grid101010-custom-dt.nt",
+          "geo-rectangle01-custom-dt.srx").runTest();
        
     }
     
@@ -107,10 +107,10 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
     public void testInCircleQuery02() throws Exception {
        
        new TestHelper(
-          "geo-circle02",
-          "geo-circle02.rq", 
-          "geo-grid101010.nt",
-          "geo-circle0203.srx").runTest();
+          "geo-circle02-custom-dt",
+          "geo-circle02-custom-dt.rq", 
+          "geo-grid101010-custom-dt.nt",
+          "geo-circle0203-custom-dt.srx").runTest();
        
     }
     
@@ -136,16 +136,16 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
      * 
      * is evaluated over data
      * 
-     * <http://s0> <http://p> "0#0#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s1> <http://p> "1.1#1.1#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s2> <http://p> "2.22#2.22#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s3> <http://p> "3.333#3.333#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6> <http://p> "6.666666#6.6666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6b> <http://p> "6.66667#6.6666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6c> <http://p> "6.66667#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s0> <http://p> "0#0#0"^^<http://my.custom.datatype> .
+     * <http://s1> <http://p> "1.1#1.1#0"^^<http://my.custom.datatype> .
+     * <http://s2> <http://p> "2.22#2.22#0"^^<http://my.custom.datatype> .
+     * <http://s3> <http://p> "3.333#3.333#0"^^<http://my.custom.datatype> .
+     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://my.custom.datatype> .
+     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://my.custom.datatype> .
+     * <http://s6> <http://p> "6.666666#6.6666666#0"^^<http://my.custom.datatype> .
+     * <http://s6b> <http://p> "6.66667#6.6666666#0"^^<http://my.custom.datatype> .
+     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://my.custom.datatype> .
+     * <http://s6c> <http://p> "6.66667#6.66667#0"^^<http://my.custom.datatype> .
      * 
      * With the given precision, the query is equivalent to
      * 
@@ -164,16 +164,16 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
      * 
      * and the data is equivalent to 
      * 
-     * <http://s0> <http://p> "0#0#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s1> <http://p> "1.1#1.1#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s2> <http://p> "2.22#2.22#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s3> <http://p> "3.333#3.333#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6> <http://p> "6.666666#6.666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6b> <http://p> "6.66667#6.666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
-     * <http://s6d> <http://p> "6.66667#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s0> <http://p> "0#0#0"^^<http://my.custom.datatype> .
+     * <http://s1> <http://p> "1.1#1.1#0"^^<http://my.custom.datatype> .
+     * <http://s2> <http://p> "2.22#2.22#0"^^<http://my.custom.datatype> .
+     * <http://s3> <http://p> "3.333#3.333#0"^^<http://my.custom.datatype> .
+     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://my.custom.datatype> .
+     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://my.custom.datatype> .
+     * <http://s6> <http://p> "6.666666#6.666666#0"^^<http://my.custom.datatype> .
+     * <http://s6b> <http://p> "6.66667#6.666666#0"^^<http://my.custom.datatype> .
+     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://my.custom.datatype> .
+     * <http://s6d> <http://p> "6.66667#6.66667#0"^^<http://my.custom.datatype> .
      *  
      * Consequently, only subjects s0 and s6a, s6b, and s6d are *not* contained in the
      * result, while all others are.
@@ -181,10 +181,10 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
     public void testInRectangleQuery08mod() throws Exception {
        
        new TestHelper(
-          "geo-rectangle08",
-          "geo-rectangle08mod.rq", 
-          "geo-rectangle08.nt",
-          "geo-rectangle08mod.srx").runTest();
+          "geo-rectangle08-custom-dt",
+          "geo-rectangle08mod-custom-dt.rq", 
+          "geo-rectangle08-custom-dt.nt",
+          "geo-rectangle08mod-custom-dt.srx").runTest();
        
     }
     
@@ -219,13 +219,20 @@ public class TestGeoSpatialServiceConfiguration extends AbstractDataDrivenSPARQL
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".0",
            "{\"config\": "
-           + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral\", "
+           + "{ \"uri\": \"http://my.custom.datatype\", "
            + "\"fields\": [ "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
            + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"TIME\"  } "
            + "]}}");
 
+        
+        // TODO: see if we can get rid of this
+        // we also need to include a custom vocabulary class defining the custom datatype
+        properties.setProperty(
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.VOCABULARY_CLASS,
+           "com.bigdata.rdf.sparql.ast.eval.service.GeoSpatialTestVocabulary");
+        
         return properties;
 
     }

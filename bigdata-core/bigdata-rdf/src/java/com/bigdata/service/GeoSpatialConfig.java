@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openrdf.model.URI;
 
 /**
  * Singleton class providing access to the GeoSpatial index configuration.
@@ -91,7 +92,7 @@ public class GeoSpatialConfig {
          * We expect a JSON config string of the following format (example):
          * 
          * {"config": { 
-         *   "uri": "<http://my.custom.datatype2.uri>", 
+         *   "uri": "http://my.custom.datatype2.uri", 
          *   "fields": [ 
          *     { "valueType": "DOUBLE", "multiplier": "100000", "serviceMapping": "LATITUDE" }, 
          *     { "valueType": "DOUBLE", "multiplier": "100000", "serviceMapping": "LONGITUDE" }, 
@@ -123,10 +124,10 @@ public class GeoSpatialConfig {
             }
            
             // validate that there are no duplicate URIs used for the datatypeConfigs
-            final Set<String> uris = new HashSet<String>();
+            final Set<URI> uris = new HashSet<URI>();
             for (int i=0; i<datatypeConfigs.size(); i++) {
                 
-                final String curUri = datatypeConfigs.get(i).getUri();
+                final URI curUri = datatypeConfigs.get(i).getUri();
                 
                 if (uris.contains(curUri)) {
                     throw new IllegalArgumentException("Duplicate URI used for geospatial datatype config: " + curUri);

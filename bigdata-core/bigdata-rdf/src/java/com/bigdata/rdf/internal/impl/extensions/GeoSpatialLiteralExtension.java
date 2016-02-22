@@ -50,7 +50,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
-import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
  * Special encoding for GeoSpatial datatypes. We encode literals of the form
@@ -85,7 +84,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    private static final transient Logger log = Logger
          .getLogger(GeoSpatialLiteralExtension.class);
 
-   private final URI datatypeURI = GeoSpatial.DATATYPE;
+   private final URI datatypeURI;
    
    private final BigdataURI datatype;
    
@@ -102,7 +101,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public GeoSpatialLiteralExtension(
        final IDatatypeURIResolver resolver, final GeoSpatialDatatypeConfiguration config) {
 
-       this.datatype = resolver.resolve(datatypeURI);
+       this.datatypeURI = config.getUri();
+       this.datatype = resolver.resolve(config.getUri());
        this.datatypeConfig = config; 
        this.kb = KeyBuilder.newInstance();
    }

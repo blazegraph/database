@@ -132,11 +132,12 @@ public interface GeoSpatial {
     */
    final String NAMESPACE = "http://www.bigdata.com/rdf/geospatial#";
    
+
    /**
     * The datatype to be used for GeoSpatial literals.
     */
-   final URI DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
-
+   final URI DEFAULT_DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
+   
    /**
     * The name of the search function, pointing to a {@link GeoFunction}.
     */

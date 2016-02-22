@@ -120,6 +120,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestGeoSpatialServiceEvaluation.class);
         suite.addTestSuite(TestGeoSpatialServiceEvaluationQuads.class);
         suite.addTestSuite(TestGeoSpatialServiceConfiguration.class);
+        suite.addTestSuite(TestGeoSpatialServiceConfigurationCustomDatatype.class);
         
         return suite;
         

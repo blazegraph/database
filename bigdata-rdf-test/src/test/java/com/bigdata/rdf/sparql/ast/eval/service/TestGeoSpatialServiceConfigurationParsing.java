@@ -59,7 +59,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
 
     public void testAcceptSingleDatatypeConfig() {
         
-        final String config1Uri = "<http://my.custom.datatype1.uri>";
+        final String config1Uri = "http://my.custom.datatype1.uri";
         
         final String config1 = sampleConfigComplete(config1Uri);
 
@@ -73,7 +73,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         assertEquals(parsedDatatypeConfigs.size(),1);
         
         final GeoSpatialDatatypeConfiguration parsedDatatypeConfig = parsedDatatypeConfigs.get(0);
-        assertEquals(parsedDatatypeConfig.getUri(), config1Uri);
+        assertEquals(parsedDatatypeConfig.getUri().stringValue(), config1Uri);
         
         final List<GeoSpatialDatatypeFieldConfiguration> fields = parsedDatatypeConfig.getFields();
         assertEquals(fields.size(), 5);
@@ -122,9 +122,9 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
     
     public void testAcceptMultipleDatatypeConfigs() {
         
-        final String config1Uri = "<http://my.custom.datatype1.uri>";
-        final String config2Uri = "<http://my.custom.datatype2.uri>";
-        final String config3Uri = "<http://my.custom.datatype3.uri>";
+        final String config1Uri = "http://my.custom.datatype1.uri";
+        final String config2Uri = "http://my.custom.datatype2.uri";
+        final String config3Uri = "http://my.custom.datatype3.uri";
         
         /**
          * Three times exactly the same configuration, just different URIs
@@ -151,11 +151,11 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
             final GeoSpatialDatatypeConfiguration parsedDatatypeConfig = parsedDatatypeConfigs.get(i);
             
             if (i==0) {
-                assertEquals(parsedDatatypeConfig.getUri(), config1Uri);
+                assertEquals(parsedDatatypeConfig.getUri().stringValue(), config1Uri);
             } else if (i==1) {
-                assertEquals(parsedDatatypeConfig.getUri(), config2Uri);
+                assertEquals(parsedDatatypeConfig.getUri().stringValue(), config2Uri);
             } else if (i==2) {
-                assertEquals(parsedDatatypeConfig.getUri(), config3Uri);
+                assertEquals(parsedDatatypeConfig.getUri().stringValue(), config3Uri);
             }
             
             final List<GeoSpatialDatatypeFieldConfiguration> fields = parsedDatatypeConfig.getFields();
@@ -207,7 +207,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
     
     public void testRejectConfigWithNoFields() {
         
-        final String config1Uri = "<http://my.custom.datatype1.uri>";
+        final String config1Uri = "http://my.custom.datatype1.uri";
         
         final String config1 = sampleConfigNoFields(config1Uri);
 
@@ -228,7 +228,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
     
     public void testRejectSyntacticallyInvalidConfig() {
         
-        final String config1Uri = "<http://my.custom.datatype1.uri>";
+        final String config1Uri = "http://my.custom.datatype1.uri";
         
         final String config1 = sampleConfigSyntacticallyInvalid(config1Uri);
 
@@ -249,7 +249,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
 
     public void testRejectMissingDatatypeConfiguration() {
         
-        final String configUri = "<http://my.custom.datatype1.uri>";
+        final String configUri = "http://my.custom.datatype1.uri";
         
         final String config = sampleConfigWithMissingValueType(configUri);
 
@@ -270,7 +270,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
     
     public void testRejectMissingServiceMappingConfiguration() {
         
-        final String configUri = "<http://my.custom.datatype1.uri>";
+        final String configUri = "http://my.custom.datatype1.uri";
         
         final String config = sampleConfigWithMissingServiceMapping(configUri);
 
@@ -291,7 +291,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
     
     public void testRejectMappingConflict() {
         
-        final String configUri = "<http://my.custom.datatype1.uri>";
+        final String configUri = "http://my.custom.datatype1.uri";
         
         final String config = sampleConfigWithMappingConflict(configUri);
 
@@ -310,9 +310,31 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
     }
 
+    public void testRejectInvalidUri() {
+        
+        final String configUri = "this is not a valid uri";
+        
+        final String config = sampleConfigWithMappingConflict(configUri);
+
+        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
+        final List<String> datatypeConfigs = new ArrayList<String>();
+        datatypeConfigs.add(config);
+        
+        
+        try {
+            conf.init(datatypeConfigs);
+        } catch (IllegalArgumentException e) {
+            return; // expected !
+        }
+        
+        throw new RuntimeException("Expected to run into exception, but did not.");
+        
+    }
+
+    
     public void testRejectUriConflict() {
 
-        final String configUri = "<http://my.custom.datatype1.uri>";
+        final String configUri = "http://my.custom.datatype1.uri";
         
         final String config1 = sampleConfigWithMappingConflict(configUri);
         final String config2 = sampleConfigWithMappingConflict(configUri); // same URI -> invalid!
