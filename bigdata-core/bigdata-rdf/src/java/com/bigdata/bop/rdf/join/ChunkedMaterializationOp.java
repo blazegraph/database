@@ -301,8 +301,11 @@ public class ChunkedMaterializationOp extends PipelineOp {
         final int initialCapacity = required == null ? chunkIn.length
                 : ((required.length == 0) ? 1 : chunkIn.length * required.length);
 
-        // in the following map we store, for each IV, the constant that was
-        // associated with this IV; we later use these constants canonically
+        /**
+         * In the following map we store, for each IV, the constant that was
+         * associated with this IV; we later use these constants canonically.
+         * -> see https://jira.blazegraph.com/browse/BLZG-1591
+         */
         final Map<IV<?, ?>, IConstant<?>> idToConstMap = 
             new HashMap<IV<?, ?>, IConstant<?>>(initialCapacity);
         
@@ -469,6 +472,10 @@ public class ChunkedMaterializationOp extends PipelineOp {
      *            set as a side-effect.
      * @param terms
      *            A map from {@link IV}s to {@link BigdataValue}s.
+     *            
+     * @param idsToConstMap mapping from IVs to the constant value containing the IV;
+     *                      this map will be used to replace the binding set values 
+     *                      for inline IVs
      * 
      * @throws IllegalStateException
      *             if the {@link IBindingSet} was not materialized with the
@@ -515,6 +522,14 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 }
 
+                /**
+                 * As per https://jira.blazegraph.com/browse/BLZG-1591, we distinguish 
+                 * between inline IVs (which have already been resolved as a side effect
+                 * of the preceding getTerms() call) and for which we thus can substitute
+                 * in a canonical version of the constant from which it was derived
+                 * and non-inline IVs (the old code path) for which we conditionally 
+                 * set the IV cache.
+                 */
                 if (iv.isInline()) {
                     
                     final IConstant<?> cVal = idsToConstMap.get(iv);
@@ -564,6 +579,14 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 final BigdataValue value = terms.get(iv);
                 
+                /**
+                 * As per https://jira.blazegraph.com/browse/BLZG-1591, we distinguish 
+                 * between inline IVs (which have already been resolved as a side effect
+                 * of the preceding getTerms() call) and for which we thus can substitute
+                 * in a canonical version of the constant from which it was derived
+                 * and non-inline IVs (the old code path) for which we conditionally 
+                 * set the IV cache.
+                 */
                 if (iv.isInline()) {
                     
                     final IConstant<?> cVal = idsToConstMap.get(iv);
