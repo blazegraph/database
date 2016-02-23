@@ -23,9 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.PrintStream;
+import java.io.InputStream;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -35,7 +37,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.properties.PropertiesFormat;
@@ -43,11 +44,11 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.store.DataLoader.MyLoadStats;
-import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * 
@@ -112,7 +113,6 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 		/*
 		 * Pass through to the SPARQL end point REST API.
 		 * 
-		 * Note: This also handles CANCEL QUERY, which is a POST.
 		 */
 		m_restServlet.doPost(req, resp);
 
@@ -127,12 +127,11 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	 * @param req
 	 * @param resp
 	 * @throws IOException
-	 */
-
-	/*
+	 *
 	 * The properties for invoking the DataLoader via the SERVLET are below.
 	 * This file should be POSTED to the SERVLET.
 	 * 
+	 * <pre>
 	  <?xml version="1.0" encoding="UTF-8" standalone="no"?> 
 	  <!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd"> 
 	  <properties>
@@ -180,6 +179,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	  <!-- --> 
 	  <entry key="fileOrDirs">file1,dir1,file2,dir2</entry>
 	  </properties>
+	  </pre>
 	 */
 
 	private void doBulkLoad(HttpServletRequest req, HttpServletResponse resp)
@@ -189,12 +189,6 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 			// Service must be writable.
 			return;
 		}
-
-		final BigdataRDFContext context = getBigdataRDFContext();
-
-		final IIndexManager indexManager = context.getIndexManager();
-		
-		final PrintStream os = new PrintStream(resp.getOutputStream());
 
 		/*
 		 * Read the request entity, which must be some kind of Properties
@@ -249,16 +243,23 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 
 		}
 
-		// RDF Format
-		final RDFFormat rdfFormat = RDFFormat.valueOf(props.getProperty(
-				"format", "rdf/xml"));
+		// The namespace of the KB instance. Defaults to "kb". -->
+		final String namespace = props.getProperty("namespace",
+				BigdataSail.Options.DEFAULT_NAMESPACE);
+		
+		/**
+		 * Zero or more files or directories containing the data to be
+		 * loaded. This should be a comma delimited list. The files must be
+		 * readable by the web application.
+		 */
+		final String fileOrDirs = props.getProperty("fileOrDirs");
 
-		// baseURI
-		final String baseURI = props.getProperty("baseURI");
-
-		// defaultGraph  -- Required if namespace is in quads mode
-		final String defaultGraph = props.getProperty("defaultGraph");
-
+		if (fileOrDirs == null) {
+			// Required property
+			throw new RuntimeException(
+					"fileOrDirs is required for the DataLoader");
+		}
+		
 		// Path to the configuration file for the database instance. Must be
 		// readable by the web application
 		final String propertyFile = props.getProperty("propertyFile");
@@ -268,68 +269,35 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 			throw new RuntimeException(
 					"propertyFile is required for the DataLoader");
 		}
-
-		// Suppress all stdout messages (Optional)
-		final boolean quiet = getBooleanProperty(props, "quiet", true);
-
-		// Integer to show additional messages detailing the load performance.
-		// Higher
-		// is more verbose. (Optional)
-
-		final int verbose = getIntProperty(props, "verbose", 0);
-
-		// Compute the RDF(S)+ closure. (Optional)
-		final boolean closure = getBooleanProperty(props, "closure", false);
-
-		/**
-		 * Files will be renamed to either <code>.good</code> or
-		 * <code>.fail</code> as they are processed. The files will remain in
-		 * the same directory.
-		 */
-		final boolean durableQueues = getBooleanProperty(props,
-				"durableQueues", true);
-
-		// The namespace of the KB instance. Defaults to "kb". -->
-		final String namespace = props.getProperty("namespace",
-				BigdataSail.Options.DEFAULT_NAMESPACE);
-
-		/**
-		 * Zero or more files or directories containing the data to be loaded.
-		 * This should be a comma delimited list. The files must be readable by
-		 * the web application.
-		 */
-		final String fileOrDirs = props.getProperty("fileOrDirs");
-
-		if (fileOrDirs == null) {
-			// Required property
-			throw new RuntimeException(
-					"fileOrDirs is required for the DataLoader");
-		}
-
-		if (log.isInfoEnabled()) {
-
-			log.info("DataLoader called ( rdfFormat = " + rdfFormat
-					+ " ; baseURI = " + baseURI + " ; defaultGraph = "
-					+ defaultGraph + " ; quiet = " + quiet + " ; verbose = "
-					+ verbose + " ; " + "durableQueues = " + durableQueues
-					+ " ; namespace = " + namespace + "propertyFile = "
-					+ propertyFile + " ; fileOrDirs = " + fileOrDirs + " )");
-
-		}
 		
 
-		Properties properties = DataLoader.processProperties(propertyFile,
-				quiet, verbose, durableQueues);
+        final AbstractTripleStore kb = (AbstractTripleStore) getBigdataRDFContext().getIndexManager()
+        		.getResourceLocator().locate(namespace, ITx.UNISOLATED);
 
-		AbstractTripleStore kb = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+        //Parse the passed properties files and create a new CreateKB API Task
+   		if (kb == null) {
+   				
+   			final Properties kbProps = new Properties(); 
 
-		if (kb == null) {
+			final InputStream is = new FileInputStream(propertyFile);
+            try {
+                kbProps.load(is);
+            } finally {
+                if (is != null) {
+                    is.close();
+                }
+            }
 
-			kb = new LocalTripleStore(indexManager, namespace,
-					Long.valueOf(ITx.UNISOLATED), properties);
+            //Submit a task to create the KB and block on the execution.
+			try {
+				submitApiTask(new RestApiCreateKBTask(req, resp, namespace,
+						kbProps)).get();
+			} catch (Throwable t) {
+				BigdataRDFServlet.launderThrowable(t, resp,
+						"DATALOADER-SERVLET: Exception creating " + namespace
+								+ " with properties: " + propertyFile);
 
-			kb.create();
+			}
 
 			if (log.isInfoEnabled()) {
 				log.info("Created namespace:  " + namespace);
@@ -337,74 +305,237 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 
 		}
 
-		final DataLoader dataLoader = new DataLoader(properties, kb, os);
+		try {
 
-		final MyLoadStats totals = dataLoader.newLoadStats();
+			submitApiTask(
+					new DataLoaderTask(req, resp, namespace, ITx.UNISOLATED,
+							 props)).get();
 
-		final String[] fileToLoad = fileOrDirs.split(",");
+		} catch (Throwable t) {
 
-		for (int i = 0; i < fileToLoad.length; i++) {
-
-			final File nextFile = new File(fileToLoad[i]);
-
-			if (!nextFile.exists()) {
-				if (log.isInfoEnabled()) {
-					log.info(nextFile.getName() + " does not exist.  Skipping.");
-				}
-				continue;
-			}
-
-			if (nextFile.isHidden()) {
-				if (log.isInfoEnabled()) {
-					log.info(nextFile.getName() + " is hidden.  Skipping.");
-				}
-				continue;
-			}
-
-			dataLoader.loadFiles(totals, 0/* depth */, nextFile, baseURI,
-					rdfFormat, defaultGraph, DataLoader.getFilenameFilter(),
-					true/* endOfBatch */
-			);
+			BigdataRDFServlet.launderThrowable(
+					t,
+					resp,
+					"DATALOADER-SERVLET: " + namespace );
 
 		}
-
-		dataLoader.endSource();
-
-		if (!quiet)
-			os.println("Load: " + totals);
-
-		if (dataLoader.getClosureEnum() == ClosureEnum.None && closure) {
-
-			if (verbose > 0)
-				dataLoader.logCounters(dataLoader.getDatabase());
-
-			if (!quiet)
-				os.println("Computing closure.");
-
-			if (log.isInfoEnabled())
-			    log.info("Computing closure.");
-
-			final ClosureStats stats = dataLoader.doClosure();
-
-			if (!quiet)
-				os.println("Closure: " + stats.toString());
-
-			if (log.isInfoEnabled())
-				log.info("Closure: " + stats.toString());
-
-		}
-
-		kb.commit(); // database commit
-
-		totals.commit(); // Note: durable queues pattern.
-
-		if (verbose > 1)
-			dataLoader.logCounters(dataLoader.getDatabase());
 		
-		os.flush();
+		buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN,
+				"DATALOADER-SERVLET: Loaded " + namespace
+						+ " with properties: " + propertyFile);
+		
 	}
+	
+	/**
+	 * {@link AbstractRestApiTask} to invoke the {@link DataLoader} in a way
+	 * that supports concurrency. See BLZG-1768.
+	 * 
+	 */
+	private static class DataLoaderTask extends AbstractRestApiTask<Void> {
+		
+		/**
+		 * Namespace on which to operate
+		 */
+		private final String namespace;
 
-	private boolean getBooleanProperty(final Properties props,
+		/**
+		 * Properties file for the build loader
+		 */
+		private final Properties props;
+		
+        /**
+         * 
+         * Create a new {@link AbstractRestApiTask} that invokes the {@link DataLoader}.
+         * 
+         * @param req
+         * 			 The {@link HttpServletRequest} used for the request
+         * 
+         * @param namesapce
+         * 			  The namespace to use for the load.  It must already exist.
+         * 
+         * @param timestamp
+         *            The timestamp used to obtain a mutable connection.
+         *            
+         * @param  properties
+         * 			  The properties to use for the bulk load. 
+         */
+        public DataLoaderTask(final HttpServletRequest req,
+                final HttpServletResponse resp, final String namespace,
+                final long timestamp, 
+                final Properties props) {
+            super(req, resp, namespace, timestamp);
+            this.namespace = namespace;
+            this.props = props;
+        }
+        
+        @Override
+        public boolean isReadOnly() {
+            return false;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+        	// TODO:   See https://jira.blazegraph.com/browse/BLZG-1774
+        	// final PrintStream os = new PrintStream(resp.getOutputStream());
+
+			// RDF Format
+			final RDFFormat rdfFormat = RDFFormat.valueOf(props.getProperty(
+					"format", "rdf/xml"));
+
+			// baseURI
+			final String baseURI = props.getProperty("baseURI");
+
+			// defaultGraph -- Required if namespace is in quads mode
+			final String defaultGraph = props.getProperty("defaultGraph");
+
+			// Suppress all stdout messages (Optional)
+			final boolean quiet = getBooleanProperty(props, "quiet", true);
+
+			// Integer to show additional messages detailing the load
+			// performance.
+			// Higher is more verbose. (Optional)
+
+			final int verbose = getIntProperty(props, "verbose", 0);
+
+			// Compute the RDF(S)+ closure. (Optional)
+			final boolean closure = getBooleanProperty(props, "closure", false);
+
+			/**
+			 * Files will be renamed to either <code>.good</code> or
+			 * <code>.fail</code> as they are processed. The files will remain
+			 * in the same directory.
+			 */
+			final boolean durableQueues = getBooleanProperty(props,
+					"durableQueues", true);
+
+			// Validated in the doBulkLoad method.
+			final String fileOrDirs = props.getProperty("fileOrDirs");
+
+			// Path to the configuration file for the database instance. Must be
+			// readable by the web application
+			// Validated in the doBulkLoad method.
+			final String propertyFile = props.getProperty("propertyFile");			
+
+			if (log.isInfoEnabled()) {
+
+				log.info("DataLoader called ( rdfFormat = " + rdfFormat
+						+ " ; baseURI = " + baseURI + " ; defaultGraph = "
+						+ defaultGraph + " ; quiet = " + quiet
+						+ " ; verbose = " + verbose + " ; "
+						+ "durableQueues = " + durableQueues
+						+ " ; namespace = " + namespace + "propertyFile = "
+						+ propertyFile + " ; fileOrDirs = " + fileOrDirs + " )");
+
+			}
+
+			final Properties properties = DataLoader.processProperties(
+					propertyFile, quiet, verbose, durableQueues);
+
+			final long begin = System.currentTimeMillis();
+            
+            BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
+
+            try {
+
+                conn = getConnection();
+
+                final AtomicLong nmodified = new AtomicLong(0L);
+                
+                AbstractTripleStore kb = conn.getSailConnection().getTripleStore();
+                
+        		final DataLoader dataLoader = new DataLoader(properties, kb);
+        		//final DataLoader dataLoader = new DataLoader(properties, kb, os);
+
+        		final MyLoadStats totals = dataLoader.newLoadStats();
+
+        		final String[] fileToLoad = fileOrDirs.split(",");
+
+        		for (int i = 0; i < fileToLoad.length; i++) {
+
+        			final File nextFile = new File(fileToLoad[i]);
+
+        			if (!nextFile.exists()) {
+        				if (log.isInfoEnabled()) {
+        					log.info(nextFile.getName() + " does not exist.  Skipping.");
+        				}
+        				continue;
+        			}
+
+        			if (nextFile.isHidden()) {
+        				if (log.isInfoEnabled()) {
+        					log.info(nextFile.getName() + " is hidden.  Skipping.");
+        				}
+        				continue;
+        			}
+
+        			dataLoader.loadFiles(totals, 0/* depth */, nextFile, baseURI,
+        					rdfFormat, defaultGraph, DataLoader.getFilenameFilter(),
+        					true/* endOfBatch */
+        			);
+
+        		}
+
+        		dataLoader.endSource();
+
+//        		if (!quiet)
+//        			os.println("Load: " + totals);
+
+        		if (dataLoader.getClosureEnum() == ClosureEnum.None && closure) {
+
+        			if (verbose > 0)
+        				dataLoader.logCounters(dataLoader.getDatabase());
+
+//        			if (!quiet)
+//        				os.println("Computing closure.");
+
+        			if (log.isInfoEnabled())
+        			    log.info("Computing closure.");
+
+        			final ClosureStats stats = dataLoader.doClosure();
+
+//        			if (!quiet)
+//        				os.println("Closure: " + stats.toString());
+
+        			if (log.isInfoEnabled())
+        				log.info("Closure: " + stats.toString());
+
+        		}
+
+                conn.commit();
+                //Set success immediately after the commit point
+                success = true;
+
+        		totals.commit(); // Note: durable queues pattern.
+
+        		if (verbose > 1)
+        			dataLoader.logCounters(dataLoader.getDatabase());
+        		
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                reportModifiedCount(nmodified.get(), elapsed);
+                
+                return (Void) null;
+                
+            } finally {
+
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+                    
+                    conn.close();
+
+                }
+
+            }
+
+        }
+        
+    }
+	
+	private static boolean getBooleanProperty(final Properties props,
 			final String property, final boolean defaultValue) {
 
 		final String propVal = props.getProperty(property);
@@ -420,7 +551,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 
 	}
 
-	private int getIntProperty(final Properties props, final String property,
+	private static int getIntProperty(final Properties props, final String property,
 			final int defaultValue) {
 
 		final String propVal = props.getProperty(property);
