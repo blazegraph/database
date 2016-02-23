@@ -80,7 +80,7 @@ public class GeoSpatialConfig {
     public void init(final List<String> geoSpatialDatatypeConfigs) {  
         initDatatypes(geoSpatialDatatypeConfigs);
     }
-   
+    
     private void initDatatypes(List<String> geoSpatialDatatypeConfigs) {
        
         datatypeConfigs = new ArrayList<GeoSpatialDatatypeConfiguration>();
@@ -140,8 +140,19 @@ public class GeoSpatialConfig {
     }
 
    
-   public List<GeoSpatialDatatypeConfiguration> getDatatypeConfigs() {
-       return datatypeConfigs;
-   }
+    public GeoSpatialDatatypeConfiguration getConfigurationForDatatype(URI datatypeUri) {
+        for (int i=0; i<datatypeConfigs.size(); i++) {
+            final GeoSpatialDatatypeConfiguration cur = datatypeConfigs.get(i);
+            if (cur.getUri().equals(datatypeUri)) {
+                return cur;
+            }
+        }
+        
+        return null; // not found/registered
+    }
+    
+    public List<GeoSpatialDatatypeConfiguration> getDatatypeConfigs() {
+        return datatypeConfigs;
+    }
 
 }

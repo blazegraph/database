@@ -104,10 +104,10 @@ import com.bigdata.relation.accesspath.ChunkConsumerIterator;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
-import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialCounters;
+import com.bigdata.service.geospatial.GeoSpatialSearchException;
 import com.bigdata.service.geospatial.IGeoSpatialQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialQuery;
@@ -357,9 +357,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             assertObjectIsVariable(sp);
             
+         } else if (uri.equals(GeoSpatial.SEARCH_DATATYPE)) {
+
+             assertObjectIsUriOrVariable(sp);
+
          } else {
             
-            assertObjectIsLiteralOrVariable(sp);
+             assertObjectIsLiteralOrVariable(sp);
             
          }
       }
@@ -389,15 +393,32 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
    }
 
+   private void assertObjectIsUriOrVariable(final StatementPatternNode sp) {
+
+       final TermNode o = sp.o();
+
+       boolean isNotUri= !o.isConstant()
+             || !(((ConstantNode) o).getValue() instanceof URI);
+       boolean isNotVariable = !o.isVariable();
+
+       if (isNotUri && isNotVariable) {
+
+          throw new IllegalArgumentException(
+                "Object is not uri or variable: " + sp);
+
+       }
+
+   }
+   
    private void assertObjectIsLiteralOrVariable(final StatementPatternNode sp) {
 
       final TermNode o = sp.o();
 
-      boolean isNotLiterale = !o.isConstant()
+      boolean isNotLiteral = !o.isConstant()
             || !(((ConstantNode) o).getValue() instanceof Literal);
       boolean isNotVariable = !o.isVariable();
 
-      if (isNotLiterale && isNotVariable) {
+      if (isNotLiteral && isNotVariable) {
 
          throw new IllegalArgumentException(
                "Object is not literal or variable: " + sp);
@@ -433,6 +454,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final IVariable<?> timeVar;
       private final IVariable<?> locationAndTimeVar;
       private final TermNode predicate;
+      private final TermNode searchDatatype;
       private final TermNode context;
       private final TermNode spatialCircleCenter;
       private final TermNode spatialCircleRadius;
@@ -501,6 +523,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          searchFunction = sp.o();
 
          TermNode predicate = null;
+         TermNode searchDatatype = null;
          TermNode context = null;
          TermNode spatialCircleCenter = null;
          TermNode spatialCircleRadius = null;
@@ -523,6 +546,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             if (GeoSpatial.PREDICATE.equals(p)) {
                predicate = meta.o();
+            } else if (GeoSpatial.SEARCH_DATATYPE.equals(p)) {
+                searchDatatype = meta.o();
             } else if (GeoSpatial.CONTEXT.equals(p)) {
             	context = meta.o();
             } else if (GeoSpatial.SPATIAL_CIRCLE_CENTER.equals(p)) {
@@ -553,6 +578,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.vars = new IVariable[] { searchVar };
 
          this.predicate = predicate;
+         this.searchDatatype = searchDatatype;
          this.context = context;
          this.spatialCircleCenter = spatialCircleCenter;
          this.spatialCircleRadius = spatialCircleRadius;
@@ -592,7 +618,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          // iterate over the incoming binding set, issuing search requests
          // for all bindings in the binding set
-         return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction,
+         return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction, searchDatatype,
                searchVar, predicate, context, spatialCircleCenter, spatialCircleRadius,
                spatialRectangleSouthWest, spatialRectangleNorthEast, spatialUnit,
                timeStart, timeEnd, locationVar, timeVar, locationAndTimeVar, defaults, kb, this);
@@ -675,12 +701,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private GlobalAnnotations globals;
          final private BigdataValueFactory vf;
          
-         final private  GeoSpatialLiteralExtension<BigdataValue> litExt;
-         
          private final int numTasks;
          private final int minDatapointsPerTask;
          private final int threadLocalBufferCapacity;
-
+         
          private final BaseJoinStats stats;
          
          /**
@@ -714,13 +738,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             this.executor = executor;
             this.geoSpatialCounters = geoSpatialCounters;
-
-            // for use in this thread only
-            // TODO: inject concrete datatype we're looking for
-            final GeoSpatialDatatypeConfiguration datatypeConfig =
-                    GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
-            this.litExt = 
-                new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
 
             this.numTasks = numTasks;
             this.minDatapointsPerTask = minDatapointsPerTask;
@@ -807,8 +824,19 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 
                 long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
                 
-                LiteralExtensionIV lowerBorderIV = litExt.createIV(southWestComponents);
-                LiteralExtensionIV upperBorderIV = litExt.createIV(northEastComponents);
+                // set up datatype configuration for the datatype URI
+                final GeoSpatialDatatypeConfiguration datatypeConfig =
+                    GeoSpatialConfig.getInstance().getConfigurationForDatatype(query.getSearchDatatype());
+                if (datatypeConfig==null) {
+                    throw new GeoSpatialSearchException(
+                        GeoSpatialSearchException.INVALID_PARAMETER_EXCEPTION + ": search datatype unknown.");
+                }
+                
+                final GeoSpatialLiteralExtension litExt = 
+                    new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
+                
+                final LiteralExtensionIV lowerBorderIV = litExt.createIV(southWestComponents);
+                final LiteralExtensionIV upperBorderIV = litExt.createIV(northEastComponents);
                 
                 if (log.isDebugEnabled()) {
                    
@@ -862,9 +890,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             }
 
             return subTasks;
-
          }
 
+         
 
          /**
           * Sets up a subtask for the given configuration. The method may return null
@@ -897,9 +925,20 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              * Compose the surrounding filter. The filter is based on the outer range.
              */
             final GeoSpatialFilterBase filter;
-            // TODO: inject concrete datatype we're looking for
+
+            // TODO: avoid redundant setup of geospatial datatype configuration
+            // set up datatype configuration for the datatype URI
             final GeoSpatialDatatypeConfiguration datatypeConfig =
-                    GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
+                GeoSpatialConfig.getInstance().getConfigurationForDatatype(query.getSearchDatatype());
+            if (datatypeConfig==null) {
+                throw new GeoSpatialSearchException(
+                    GeoSpatialSearchException.INVALID_PARAMETER_EXCEPTION + ": search datatype unknown.");
+            }
+            
+            final GeoSpatialLiteralExtension litExt = 
+                new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
+            
+            
             switch (query.getSearchFunction()) {
             case IN_CIRCLE: 
                {
@@ -967,6 +1006,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                return null;
             }
 
+
             // set up a big min advancer for efficient extraction of relevant values from access path
             final byte[] lowerZOrderKey = litExt.toZOrderByteArray(subRangeUpperLeftComponents);
             final byte[] upperZOrderKey = litExt.toZOrderByteArray(subRangeLowerRightComponents);
@@ -985,9 +1025,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final IBindingSet incomingBindingSet = query.getIncomingBindings();
 
             final GeoSpatialServiceCallResolver resolver = 
-                  new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
-                        timeVar, locationAndTimeVar, subjectPos, objectPos, vf, 
-                        new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig));
+                new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
+                    timeVar, locationAndTimeVar, subjectPos, objectPos, vf, 
+                    new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig));
             
             // and construct the sub range task
             return new GeoSpatialServiceCallSubRangeTask(
@@ -1000,6 +1040,18 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final Object[] lowerBorderComponents, final Object[] upperBorderComponents,
             final IGeoSpatialQuery query) {
 
+             // TODO: avoid redundant setup of geospatial datatype configuration
+             // set up datatype configuration for the datatype URI
+             final GeoSpatialDatatypeConfiguration datatypeConfig =
+                 GeoSpatialConfig.getInstance().getConfigurationForDatatype(query.getSearchDatatype());
+             if (datatypeConfig==null) {
+                 throw new GeoSpatialSearchException(
+                     GeoSpatialSearchException.INVALID_PARAMETER_EXCEPTION + ": search datatype unknown.");
+             }
+             
+             final GeoSpatialLiteralExtension litExt = 
+                 new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
+             
             // set up range scan
             final Var oVar = Var.var(); // object position variable
             final RangeNode range = new RangeNode(new VarNode(oVar),
@@ -1400,6 +1452,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       private final IBindingSet[] bindingSet;
       private final TermNode searchFunction;
+      private final TermNode searchDatatype;
       private final IVariable<?> searchVar;
       private final TermNode predicate;
       private final TermNode context;
@@ -1424,7 +1477,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       ICloseableIterator<IBindingSet> curDelegate;
 
       public GeoSpatialInputBindingsIterator(final IBindingSet[] bindingSet,
-            final TermNode searchFunction, IVariable<?> searchVar,
+            final TermNode searchFunction, final TermNode searchDatatype,
+            final IVariable<?> searchVar,
             final TermNode predicate, final TermNode context, 
             final TermNode spatialCircleCenter, final TermNode spatialCircleRadius,
             final TermNode spatialRectangleUpperLeft,
@@ -1437,6 +1491,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          this.bindingSet = bindingSet;
          this.searchFunction = searchFunction;
+         this.searchDatatype = searchDatatype;
          this.searchVar = searchVar;
          this.predicate = predicate;
          this.context = context;
@@ -1531,6 +1586,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          }
 
          final IBindingSet bs = bindingSet[nextBindingSetItr++];
+         
+         final URI searchDatatypeUri = resolveSearchDatatype(
+               this.searchDatatype, bs);
          final GeoFunction searchFunction = resolveAsGeoFunction(
                this.searchFunction, bs);
          final PointLatLon spatialCircleCenter = resolveAsPoint(
@@ -1546,7 +1604,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Long timeStart = resolveAsLong(this.timeStart, bs);
          final Long timeEnd = resolveAsLong(this.timeEnd, bs);
 
-         GeoSpatialQuery sq = new GeoSpatialQuery(searchFunction,
+         GeoSpatialQuery sq = new GeoSpatialQuery(searchFunction, searchDatatypeUri,
                bs.get(searchVar), predicate, context, spatialCircleCenter, 
                spatialCircleRadius, spatialRectangleUpperLeft, 
                spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, 
@@ -1724,13 +1782,51 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                return cAsTerm.stringValue();
 
             } else {
-               throw new FulltextSearchException(
-                     FulltextSearchException.SERVICE_VARIABLE_UNBOUND + ":"
-                           + var);
+               throw new GeoSpatialSearchException(
+                   GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
             }
          }
       }
 
+      
+      private URI resolveSearchDatatype(TermNode searchDatatype, IBindingSet bs) {
+          
+          if (searchDatatype==null) {
+              return GeoSpatial.DEFAULT_DATATYPE;
+          }
+          
+          if (searchDatatype.isConstant()) {
+              
+              final URI uri = (URI) searchDatatype.getValue();
+              return uri==null ? GeoSpatial.DEFAULT_DATATYPE : uri;
+              
+          } else {
+              
+              if (bs==null) {
+                  return null; // shouldn't happen, but just in case...
+              }
+              
+              final IVariable<?> var = (IVariable<?>) searchDatatype
+                      .getValueExpression();
+              if (bs.isBound(var)) {
+                  IConstant<?> c = bs.get(var);
+                  if (c == null || c.get() == null
+                        || !(c.get() instanceof TermId<?>)) {
+                     return null;
+                  }
+
+                  TermId<?> cAsTerm = (TermId<?>) c.get();
+                  return (URI)cAsTerm.getValue();
+
+               } else {
+                  throw new GeoSpatialSearchException(
+                      GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
+               }
+              
+          }
+          
+      }
+      
       @Override
       public void remove() {
 
@@ -2020,7 +2116,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          if (child instanceof StatementPatternNode) {      
             statementPatterns.add((StatementPatternNode)child);
          } else {
-            throw new FulltextSearchException("Nested groups are not allowed.");            
+            throw new GeoSpatialSearchException("Nested groups are not allowed.");            
          }
       }
       

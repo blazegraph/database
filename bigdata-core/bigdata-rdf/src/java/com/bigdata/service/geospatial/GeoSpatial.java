@@ -125,24 +125,37 @@ public interface GeoSpatial {
 
 
    }
-   
-   
+
+   /************************************************************************************************
+    *                                      META DECLARATIONS                                       *
+    ************************************************************************************************/
+
    /**
     * The namespace used for magic search predicates.
     */
    final String NAMESPACE = "http://www.bigdata.com/rdf/geospatial#";
    
-
    /**
-    * The datatype to be used for GeoSpatial literals.
+    * The default datatype to be used for GeoSpatial literals.
     */
    final URI DEFAULT_DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
+
+   
+   /************************************************************************************************
+    *                                      MAGIC PREDICATES                                        *
+    ************************************************************************************************/
    
    /**
     * The name of the search function, pointing to a {@link GeoFunction}.
     */
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
-   
+
+   /**
+    * The datatype for literals we're interested in. If not specified, defaults
+    * to DEFAULT_DATATYPE.
+    */
+   final URI SEARCH_DATATYPE = new URIImpl(NAMESPACE + "searchDatatype");
+
    /**
     * Pointer to the predicate used in scanned triples.
     */

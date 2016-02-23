@@ -28,6 +28,8 @@ package com.bigdata.service.geospatial;
 
 import java.util.List;
 
+import org.openrdf.model.URI;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -53,6 +55,11 @@ public interface IGeoSpatialQuery {
      */
     public GeoFunction getSearchFunction();
 
+    /**
+     * @return the datatype of literals we're searching for
+     */
+    public URI getSearchDatatype();
+    
     /**
      * @return the constant representing the search subject
      */

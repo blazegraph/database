@@ -32,6 +32,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -59,6 +60,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     
     // passed in as parameters
     final GeoFunction searchFunction;
+    final URI searchDatatype;
     final IConstant<?> subject;
     final TermNode predicate;
     final TermNode context;
@@ -82,6 +84,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
      * Constructor
      */
     public GeoSpatialQuery(final GeoFunction searchFunction,
+            final URI searchDatatype,
             final IConstant<?> subject, final TermNode predicate,
             final TermNode context, final PointLatLon spatialCircleCenter,
             final Double spatialCircleRadius,
@@ -94,6 +97,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final IBindingSet incomingBindings) {
 
         this.searchFunction = searchFunction;
+        this.searchDatatype = searchDatatype;
         this.subject = subject;
         this.predicate = predicate;
         this.context = context;
@@ -159,6 +163,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
      * as input.
      */
     private GeoSpatialQuery(final GeoFunction searchFunction,
+            final URI searchDatatype,
             final IConstant<?> subject, final TermNode predicate,
             final TermNode context, final PointLatLon spatialCircleCenter,
             final Double spatialCircleRadius,
@@ -173,6 +178,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final PointLatLonTime boundingBoxNorthEastWithTime) {
 
         this.searchFunction = searchFunction;
+        this.searchDatatype = searchDatatype;
         this.subject = subject;
         this.predicate = predicate;
         this.context = context;
@@ -197,6 +203,12 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         return searchFunction;
     }
 
+    @Override
+    public URI getSearchDatatype() {
+        return searchDatatype;
+    }
+
+    
     @Override
     public IConstant<?> getSubject() {
         return subject;
@@ -386,7 +398,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         final PointLatLonTime boundingBoxNorthEastWithTime) {
         
         return new GeoSpatialQuery(
-            searchFunction, subject, predicate, context, spatialCircleCenter,
+            searchFunction, searchDatatype, subject, predicate, context, spatialCircleCenter,
             spatialCircleRadius, spatialRectangleSouthWest, spatialRectangleNorthEast, 
             spatialUnit, timeStart, timeEnd, locationVar, timeVar,
             locationAndTimeVar, incomingBindings, boundingBoxSouthWestWithTime,

@@ -33,6 +33,7 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**
  * Data driven test suite testing configurability of GeoSpatial service.
@@ -113,6 +114,28 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
           "geo-circle0203-custom-dt.srx").runTest();
        
     }
+    
+    /**
+     * Correct rejection test with search query for datatype that is not registered.
+     * 
+     * @throws Exception
+     */
+    public void testUnknownDatatypeRejected() throws Exception {
+        
+        try {
+            new TestHelper(
+               "geo-circle02-custom-dt",
+               "geo-circle02-invalid-custom-dt.rq", 
+               "geo-grid101010-custom-dt.nt",
+               "geo-circle0203-custom-dt.srx").runTest();
+        } catch (Exception e) {
+            return; // expected
+        }
+        
+        throw new RuntimeException("Expected to run into exception.");
+        
+     }
+    
     
     /**
      * Verify precision handling, which is changed in the configuration to be 6 for
