@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -64,6 +65,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
@@ -701,9 +703,14 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        // TODO: inject concrete datatype we're looking for
-        final GeoSpatialDatatypeConfiguration datatypeConfig =
-            GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
+        /**
+         * Initialize geo spatial config with default
+         */
+        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
+        final List<String> datatypeConfigs = new ArrayList<String>();
+        datatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG);
+        conf.init(datatypeConfigs);
+        final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
                 public BigdataURI resolve(URI uri) {
@@ -754,9 +761,14 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        // TODO: inject concrete datatype we're looking for
-        final GeoSpatialDatatypeConfiguration datatypeConfig =
-            GeoSpatialConfig.getInstance().getDatatypeConfigs().get(0);
+        /**
+         * Initialize geo spatial config with default
+         */
+        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
+        final List<String> datatypeConfigs = new ArrayList<String>();
+        datatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG);
+        conf.init(datatypeConfigs);
+        final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
                 public BigdataURI resolve(URI uri) {
