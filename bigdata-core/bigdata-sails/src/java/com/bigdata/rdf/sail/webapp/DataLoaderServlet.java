@@ -22,12 +22,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -115,7 +113,6 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 		/*
 		 * Pass through to the SPARQL end point REST API.
 		 * 
-		 * Note: This also handles CANCEL QUERY, which is a POST.
 		 */
 		m_restServlet.doPost(req, resp);
 
@@ -130,12 +127,11 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	 * @param req
 	 * @param resp
 	 * @throws IOException
-	 */
-
-	/*
+	 *
 	 * The properties for invoking the DataLoader via the SERVLET are below.
 	 * This file should be POSTED to the SERVLET.
 	 * 
+	 * <pre>
 	  <?xml version="1.0" encoding="UTF-8" standalone="no"?> 
 	  <!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd"> 
 	  <properties>
@@ -183,6 +179,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 	  <!-- --> 
 	  <entry key="fileOrDirs">file1,dir1,file2,dir2</entry>
 	  </properties>
+	  </pre>
 	 */
 
 	private void doBulkLoad(HttpServletRequest req, HttpServletResponse resp)
@@ -298,7 +295,7 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 			} catch (Throwable t) {
 				BigdataRDFServlet.launderThrowable(t, resp,
 						"DATALOADER-SERVLET: Exception creating " + namespace
-								+ " with properties.");
+								+ " with properties: " + propertyFile);
 
 			}
 
@@ -322,18 +319,45 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 					"DATALOADER-SERVLET: " + namespace );
 
 		}
+		
+		buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN,
+				"DATALOADER-SERVLET: Loaded " + namespace
+						+ " with properties: " + propertyFile);
+		
 	}
 	
+	/**
+	 * {@link AbstractRestApiTask} to invoke the {@link DataLoader} in a way
+	 * that supports concurrency. See BLZG-1768.
+	 * 
+	 */
 	private static class DataLoaderTask extends AbstractRestApiTask<Void> {
 		
-		final String namespace;
+		/**
+		 * Namespace on which to operate
+		 */
+		private final String namespace;
 
-		final Properties props;
+		/**
+		 * Properties file for the build loader
+		 */
+		private final Properties props;
 		
         /**
          * 
+         * Create a new {@link AbstractRestApiTask} that invokes the {@link DataLoader}.
+         * 
+         * @param req
+         * 			 The {@link HttpServletRequest} used for the request
+         * 
+         * @param namesapce
+         * 			  The namespace to use for the load.  It must already exist.
+         * 
          * @param timestamp
          *            The timestamp used to obtain a mutable connection.
+         *            
+         * @param  properties
+         * 			  The properties to use for the bulk load. 
          */
         public DataLoaderTask(final HttpServletRequest req,
                 final HttpServletResponse resp, final String namespace,
@@ -352,10 +376,8 @@ public class DataLoaderServlet extends BigdataRDFServlet {
         @Override
         public Void call() throws Exception {
 
+        	// TODO:   See https://jira.blazegraph.com/browse/BLZG-1774
         	// final PrintStream os = new PrintStream(resp.getOutputStream());
-
-        	// FIXME:  Hack for output stream issues in DataLoader
-        	final PrintStream os = new PrintStream(new ByteArrayOutputStream());
 
 			// RDF Format
 			final RDFFormat rdfFormat = RDFFormat.valueOf(props.getProperty(
@@ -423,7 +445,8 @@ public class DataLoaderServlet extends BigdataRDFServlet {
                 
                 AbstractTripleStore kb = conn.getSailConnection().getTripleStore();
                 
-        		final DataLoader dataLoader = new DataLoader(properties, kb, os);
+        		final DataLoader dataLoader = new DataLoader(properties, kb);
+        		//final DataLoader dataLoader = new DataLoader(properties, kb, os);
 
         		final MyLoadStats totals = dataLoader.newLoadStats();
 
@@ -456,24 +479,24 @@ public class DataLoaderServlet extends BigdataRDFServlet {
 
         		dataLoader.endSource();
 
-        		if (!quiet)
-        			os.println("Load: " + totals);
+//        		if (!quiet)
+//        			os.println("Load: " + totals);
 
         		if (dataLoader.getClosureEnum() == ClosureEnum.None && closure) {
 
         			if (verbose > 0)
         				dataLoader.logCounters(dataLoader.getDatabase());
 
-        			if (!quiet)
-        				os.println("Computing closure.");
+//        			if (!quiet)
+//        				os.println("Computing closure.");
 
         			if (log.isInfoEnabled())
         			    log.info("Computing closure.");
 
         			final ClosureStats stats = dataLoader.doClosure();
 
-        			if (!quiet)
-        				os.println("Closure: " + stats.toString());
+//        			if (!quiet)
+//        				os.println("Closure: " + stats.toString());
 
         			if (log.isInfoEnabled())
         				log.info("Closure: " + stats.toString());
@@ -481,21 +504,19 @@ public class DataLoaderServlet extends BigdataRDFServlet {
         		}
 
                 conn.commit();
+                //Set success immediately after the commit point
+                success = true;
 
         		totals.commit(); // Note: durable queues pattern.
 
         		if (verbose > 1)
         			dataLoader.logCounters(dataLoader.getDatabase());
         		
-        		os.flush();
-                
-                success = true;
-
                 final long elapsed = System.currentTimeMillis() - begin;
 
                 reportModifiedCount(nmodified.get(), elapsed);
                 
-                return null;
+                return (Void) null;
                 
             } finally {
 
