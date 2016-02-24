@@ -68,7 +68,7 @@ public class InlineSuffixedIntegerURIHandler extends
 		
 		final String intVal = getPackedValueString(localName.substring(0, localName.length()
 				- this.suffix.length()));
-
+		
 		return super.createInlineIV(intVal);
 	}
 

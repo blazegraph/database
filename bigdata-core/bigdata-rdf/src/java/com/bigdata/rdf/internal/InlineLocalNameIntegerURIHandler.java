@@ -112,8 +112,18 @@ public abstract class InlineLocalNameIntegerURIHandler extends
 	 * @return
 	 */
 	public String getPackedValueString(final String intVal) {
+	
+		String longVal = null;
 		
-		return Long.toString(packValue((long)Long.parseLong(intVal)));
+		try {
+			longVal = Long.toString(packValue((long)Long.parseLong(intVal)));
+		} catch (NumberFormatException nfe) {
+			//It is not a valid number
+			//Do not inline
+			return null;
+		}
+		
+		return longVal;
 
 	}
 	

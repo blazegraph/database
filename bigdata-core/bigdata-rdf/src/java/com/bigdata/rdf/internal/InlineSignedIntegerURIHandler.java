@@ -50,6 +50,16 @@ public class InlineSignedIntegerURIHandler extends InlineURIHandler {
 	@Override
 	@SuppressWarnings("rawtypes")
 	protected AbstractLiteralIV createInlineIV(final String localName) {
+		
+		/**
+		 * {@link InlineLocalNameIntegerURIHandler#getPackedValueString()} can
+		 * return a null if there's a number format exception.
+		 * 
+		 * Handle that case here.
+		 */
+		if(localName == null) 
+			return null;
+
 		BigInteger value;
 		try {
 			value = new BigInteger(localName, 10);
