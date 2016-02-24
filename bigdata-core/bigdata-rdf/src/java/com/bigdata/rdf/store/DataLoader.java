@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -94,8 +95,11 @@ public class DataLoader {
     protected static final transient Logger log = Logger.getLogger(DataLoader.class);
 
     private final RDFParserOptions parserOptions;
+    
+
 
     /**
+     * 
      * The {@link StatementBuffer} capacity.
      */
     private final int bufferCapacity;
@@ -400,6 +404,24 @@ public class DataLoader {
      */
     public static interface Options extends RDFParserOptions.Options {
 
+		/**
+		 * 
+		 * Java property to override the default GZIP buffer size used for
+		 * {@link GZipInputStream} and {@link GZipOutputStream}.
+		 * 
+		 * This specifies the size in Bytes to use. The default is 65535.
+		 * 
+		 * -Dcom.bigdata.journal.DataLoader.gzipBufferSize=65535
+		 * 
+		 * See BLZG-1777
+		 * 
+		 */
+
+		static final String GZIP_BUFFER_SIZE = DataLoader.class
+				.getClass().getName() + ".gzipBufferSize";
+		
+		static final int DEFAULT_GZIP_BUFFER_SIZE = 65535;
+
         /**
          * Optional property specifying whether and when the {@link DataLoader}
          * will {@link ITripleStore#commit()} the database (default
@@ -408,9 +430,9 @@ public class DataLoader {
          * Note: commit semantics vary depending on the specific backing store.
          * See {@link ITripleStore#commit()}.
          */
-        String COMMIT = DataLoader.class.getName()+".commit";
+        static final String COMMIT = DataLoader.class.getName()+".commit";
         
-        String DEFAULT_COMMIT = CommitEnum.Batch.toString();
+        static final String DEFAULT_COMMIT = CommitEnum.Batch.toString();
 
         /**
          * Optional property specifying the capacity of the
@@ -426,9 +448,9 @@ public class DataLoader {
 		 * will increase the GC burden and could require a larger heap, but the
 		 * net throughput might also increase.
          */
-        String BUFFER_CAPACITY = DataLoader.class.getName()+".bufferCapacity";
+        static final String BUFFER_CAPACITY = DataLoader.class.getName()+".bufferCapacity";
         
-        String DEFAULT_BUFFER_CAPACITY = "100000";
+        static final String DEFAULT_BUFFER_CAPACITY = "100000";
 
 		/**
 		 * Optional property specifying the capacity of blocking queue used by
@@ -441,9 +463,9 @@ public class DataLoader {
 		 * 
 		 * @see BLZG-1552
 		 */
-		String QUEUE_CAPACITY = DataLoader.class.getName() + ".queueCapacity";
+		static final String QUEUE_CAPACITY = DataLoader.class.getName() + ".queueCapacity";
 
-		String DEFAULT_QUEUE_CAPACITY = "10";
+		static final String DEFAULT_QUEUE_CAPACITY = "10";
 
         /**
          * Optional property controls whether and when the RDFS(+) closure is
@@ -465,9 +487,9 @@ public class DataLoader {
          * @see InferenceEngine
          * @see InferenceEngine.Options
          */
-        String CLOSURE = DataLoader.class.getName()+".closure";
+        static final String CLOSURE = DataLoader.class.getName()+".closure";
         
-        String DEFAULT_CLOSURE = ClosureEnum.Batch.toString();
+        static final String DEFAULT_CLOSURE = ClosureEnum.Batch.toString();
 
         /**
          * 
@@ -496,12 +518,12 @@ public class DataLoader {
          * flushes the {@link DataLoader} when statement identifiers are
          * enabled. </strong>
          */
-        String FLUSH = DataLoader.class.getName()+".flush";
+        static final String FLUSH = DataLoader.class.getName()+".flush";
         
         /**
          * The default value (<code>true</code>) for {@link #FLUSH}.
          */
-        String DEFAULT_FLUSH = "true";
+        static final String DEFAULT_FLUSH = "true";
         
         /**
 		 * When <code>true</code>, the loader will not break on unresolvable
@@ -515,12 +537,12 @@ public class DataLoader {
 		 * @see BLZG-1531 (Add option to make the DataLoader robust to files
 		 *      that cause rio to throw a fatal exception)
 		 */
-        String IGNORE_INVALID_FILES = DataLoader.class.getName()+".ignoreInvalidFiles";
+        static final String IGNORE_INVALID_FILES = DataLoader.class.getName()+".ignoreInvalidFiles";
         
         /**
          * The default value (<code>false</code>) for {@link #IGNORE_INVALID_FILES)
          */
-        String DEFAULT_IGNORE_INVALID_FILES = "false";
+        static final String DEFAULT_IGNORE_INVALID_FILES = "false";
 
         /**
 		 * When <code>true</code>, the data loader will rename each file as it
@@ -532,24 +554,24 @@ public class DataLoader {
 		 * 
 		 * @see BLZG-1534 (durable queues)
 		 */
-		String DURABLE_QUEUES = DataLoader.class.getName() + ".durableQueues";
+		static final String DURABLE_QUEUES = DataLoader.class.getName() + ".durableQueues";
 
 		/**
 		 * The default value (<code>false</code>) for {@link #DURABLE_QUEUES)
 		 */
-		String DEFAULT_DURABLE_QUEUES = "false";
+		static final String DEFAULT_DURABLE_QUEUES = "false";
 
 		/**
 		 * When true, runs DumpJournal after each commit (with the -pages option) to obtain a distribution of the BTree index page sizes.
 		 * 
 		 * @see BLZG-1535 (support dump journal in data loader)
 		 */
-		String DUMP_JOURNAL = DataLoader.class.getName() + ".dumpJournal";
+		static final String DUMP_JOURNAL = DataLoader.class.getName() + ".dumpJournal";
 
 		/**
 		 * The default value (<code>false</code>) for {@link #DUMP_JOURNAL)
 		 */
-		String DEFAULT_DUMP_JOURNAL = "false";
+		static final String DEFAULT_DUMP_JOURNAL = "false";
 
 		/**
 		 * When greater than ZERO (0), significant information may be reported
@@ -560,12 +582,12 @@ public class DataLoader {
 		 * the assertion buffers each time it reports on the incremental parser
 		 * performance.
 		 */
-		String VERBOSE = DataLoader.class.getName() + ".verbose";
+		static final String VERBOSE = DataLoader.class.getName() + ".verbose";
 
 		/**
 		 * The default value (<code>0</code>) for {@link #VERBOSE)
 		 */
-		String DEFAULT_VERBOSE = "0";
+		static final String DEFAULT_VERBOSE = "0";
 
     }
 
@@ -1309,11 +1331,12 @@ public class DataLoader {
 
             if (n.endsWith(".gz")) {
 
-                is = new GZIPInputStream(is);
+                is = new GZIPInputStream(is, getGzipBuffer());
 
             } else if (n.endsWith(".zip")) {
 
-                is = new ZipInputStream(is);
+				is = new ZipInputStream(new BufferedInputStream(is,
+						getGzipBuffer()));
 
             }
 
@@ -1848,6 +1871,28 @@ public class DataLoader {
         return stats;
         
     }
+
+    /**
+     * Utility to return the gzip buffer either from the 
+     * default or the {@link Options#GZIP_BUFFER_SIZE} 
+     * 
+     * See BLZG-1777
+     * 
+     * @return
+     * 			int with the buffer size
+     */
+	private static int getGzipBuffer() {
+
+		final String s = System.getProperty(Options.GZIP_BUFFER_SIZE);
+
+		if (s == null || s.isEmpty()) {
+			return Options.DEFAULT_GZIP_BUFFER_SIZE;
+		} else {
+			return Integer.parseInt(s);
+		}
+
+	}
+
 
     /**
 	 * Utility method may be used to create and/or load RDF data into a local
