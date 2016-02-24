@@ -1,0 +1,3 @@
+<http://s>
+  <http://begin> "-0523-12-31+01:00"^^<http://www.w3.org/2001/XMLSchema#date> ;
+  <http://end> "-0486-12-30+01:00"^^<http://www.w3.org/2001/XMLSchema#date> .
