@@ -34,7 +34,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <groupId>com.blazegraph</groupId>
   <artifactId>vocabularies</artifactId>
   <version>2.1.0-master-SNAPSHOT</version>
-  <name>Blazegraph RDF Properties</name>
+  <name>Blazegraph Vocabularies</name>
   <description>Blazegraph Custom Vocabularies and Inline URI Handlers for commonly used data sets.</description>
   <reporting>
     <plugins>
