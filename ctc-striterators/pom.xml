@@ -95,7 +95,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
+      <version>${junit4.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
