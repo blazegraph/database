@@ -1,0 +1,4 @@
+<http://example.org/graph> {
+   <http://s> <http://begin> "-523-12-31+01:00"^^<http://www.w3.org/2001/XMLSchema#date> .
+   <http://s> <http://end> "-486-12-30+01:00"^^<http://www.w3.org/2001/XMLSchema#date> .
+}

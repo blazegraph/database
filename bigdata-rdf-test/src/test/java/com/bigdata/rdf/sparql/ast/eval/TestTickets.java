@@ -1899,11 +1899,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
    }
    
    /**
-
     * BLZG-852: MINUS and UNION.
-
     */
-
    public void test_ticket_852a() throws Exception {
 
       new TestHelper(
@@ -1917,11 +1914,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
 
    /**
-
     * BLZG-852: MINUS and UNION.
-
     */
-
    public void test_ticket_852b() throws Exception {
 
       new TestHelper(
@@ -1931,5 +1925,31 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
           "ticket_bg852b.srx"// resultFileURL
          ).runTest();   
    }
+   
+   /**
+    * BLZG-1748: Regressions in date comparison
+    */
+   public void test_ticket_1748a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1748a",// testURI,
+           "ticket_bg1748a.rq",// queryFileURL
+           "ticket_bg1748.trig",// dataFileURL
+           "ticket_bg1748.srx"// resultFileURL
+          ).runTest();   
+    }
+   
+   /**
+    * BLZG-1748: Regressions in date comparison
+    */
+   public void test_ticket_1748b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1748b",// testURI,
+           "ticket_bg1748b.rq",// queryFileURL
+           "ticket_bg1748.trig",// dataFileURL
+           "ticket_bg1748.srx"// resultFileURL
+          ).runTest();   
+    }
 
 }
