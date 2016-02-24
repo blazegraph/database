@@ -4897,8 +4897,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             extendFile(convertFromAddr(extent - currentExtent));
             
         } else if (extent < currentExtent) {
-            throw new IllegalArgumentException(
-                    "Cannot shrink RWStore extent: currentExtent="
+        	//See https://github.com/SYSTAP/db-enterprise/issues/12
+        	//TODO:  Determine if there is a more graceful way to handle this.
+            // throw new IllegalArgumentException(
+        	log.warn("Cannot shrink RWStore extent: currentExtent="
                             + currentExtent + ", fileSize=" + m_fileSize
                             + ", newValue=" + extent);
         }
