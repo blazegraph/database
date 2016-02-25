@@ -32,6 +32,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -199,13 +200,13 @@ public class LexiconConfiguration<V extends BigdataValue>
      * extension to the {@link IExtension}.
      */
     @SuppressWarnings("rawtypes")
-    private final Map<IV, IExtension<BigdataValue>> iv2ext;
+    private final Map<IV, IExtension<? extends BigdataValue>> iv2ext;
 
     /**
      * Mapping from the string value of the datatype URI for a registered
      * extension to the {@link IExtension}.
      */
-    private final Map<String, IExtension<BigdataValue>> datatype2ext;
+    private final Map<String, IExtension<? extends BigdataValue>> datatype2ext;
     
     /**
      * The set of inline datatypes that should be included in the text index 
@@ -400,9 +401,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 		 * synchronization.
 		 */
 
-        iv2ext = new LinkedHashMap<IV, IExtension<BigdataValue>>();
+        iv2ext = new LinkedHashMap<IV, IExtension<? extends BigdataValue>>();
 
-        datatype2ext = new LinkedHashMap<String, IExtension<BigdataValue>>();
+        datatype2ext = new LinkedHashMap<String, IExtension<? extends BigdataValue>>();
 
     }
 
@@ -412,8 +413,13 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         xFactory.init(resolver, (ILexiconConfiguration<BigdataValue>) this/* config */);
 
-        for (IExtension<BigdataValue> extension : xFactory.getExtensions()) {
+        @SuppressWarnings("rawtypes")
+        final Iterator<IExtension<? extends BigdataValue>> itr = xFactory.getExtensions();
 
+        while(itr.hasNext()) {
+            
+            final IExtension<?> extension = itr.next();
+            
 //            final BigdataURI datatype = extension.getDatatype();
         	for (BigdataURI datatype : extension.getDatatypes()) {
 
@@ -454,7 +460,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         final IV datatypeIV = iv.getExtensionIV();
 
         // Find the IExtension from the datatype IV.
-        final IExtension<BigdataValue> ext = iv2ext.get(datatypeIV);
+        final IExtension<? extends BigdataValue> ext = iv2ext.get(datatypeIV);
 
         if (ext == null)
             throw new RuntimeException("Unknown extension: " + datatypeIV);
@@ -690,7 +696,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     private AbstractInlineIV<BigdataLiteral, ?> createExtensionIV(
             final Literal value, final URI datatype) {
 
-        final IExtension<BigdataValue> xFactory =
+        final IExtension<? extends BigdataValue> xFactory =
             datatype2ext.get(datatype.stringValue());
 
         try {

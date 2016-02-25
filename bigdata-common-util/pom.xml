@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-common-util</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
   <name>Blazegraph Common Utilities</name>
   <description>Blazegraph utilities common across artifacts</description>
   <build>

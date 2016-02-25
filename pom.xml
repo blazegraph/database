@@ -30,7 +30,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-parent</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
   <packaging>pom</packaging>
   <name>Blazegraph Database Platform</name>
   <description>Blazegraph™ DB is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for customers such as EMC, Syapse, Wikidata Query Service, the British Museum, and many others.  GPU acceleration and High Availability (HA) are available in the Enterprise edition.  It contains war, jar, deb, rpm, and tar.gz deployment artifacts.</description>

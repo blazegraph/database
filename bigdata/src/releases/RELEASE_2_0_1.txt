@@ -1,0 +1,54 @@
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a minor release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
+
+Blazegraph Features (http://www.blazegraph.com/product/)
+
+2.0.1 provides bug fixes for the 2.0.0 release.  It is recommended that all users upgrade to 2.0.1.  
+
+Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
+
+Starting points:
+
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+    Blazegraph Support:  https://www.blazegraph.com/support/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TDF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+    
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BLAZEGRAPH_RELEASE_2_0_1 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_0_1
+
+Release Notes - Blazegraph Database - Version BLAZEGRAPH_2_0_1
+
+** Bug
+    * [BLZG-1736] - Remove Junit 3 Dependency
+    * [BLZG-1738] - Inconsistent update with INSERT/DELETE
+    * [BLZG-1739] - blazegraph-artifacts pom not published to maven central
+    * [BLZG-1740] - Queries that fail to evaluate are not finalized.
+    * [BLZG-1747] - Persistent "Unknown extension" issue in WIkidata Query Service
+    * [BLZG-1748] - Regressions in date comparison 
+    * [BLZG-1753] - Insert problem using subqueries and having clause
+    * [BLZG-1768] - DataLoaderServlet Needs to Use submitApiTask pattern
+    * [BLZG-1770] - DataLoaderServlet has incorrect error handling pattern
+    * [BLZG-1777] - DataLoader should improve Gzip and Zip processing configuration options
+
+
+** Improvement
+    * [BLZG-1732] - Improve SnapshotTask GZIP Configuration
+

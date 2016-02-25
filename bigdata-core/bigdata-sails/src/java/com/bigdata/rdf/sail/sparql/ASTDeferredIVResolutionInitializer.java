@@ -198,8 +198,10 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
                 } else if (value instanceof ASTIRI) {
                     iv = new TermId<BigdataValue>(VTE.URI,0);
                     bigdataValue = valueFactory.createURI(((ASTIRI)value).getValue());
-                    bigdataValue.clearInternalValue();
-                    bigdataValue.setIV(iv);
+                    if (!bigdataValue.isRealIV()) {
+                    	bigdataValue.clearInternalValue();
+                    	bigdataValue.setIV(iv);
+                    }
                     iv.setValue(bigdataValue);
                 } else if (value instanceof ASTRDFLiteral) {
                     final ASTRDFLiteral rdfNode = (ASTRDFLiteral) value;

@@ -1955,5 +1955,60 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 		}
 
 	}
+    
+    /**
+     * Variant of scenario sketched in https://jira.blazegraph.com/browse/BLZG-1738,
+     * the problem being that PropertyPathNodes in UPDATE queries are not treated properly.
+     * 
+     * @throws Exception
+     */
+    public void testTicket1738()
+            throws Exception
+    {
+        // entities used in test case
+        final URI s1 = f.createURI("http://s1");
+        
+        final URI p1 = f.createURI("http://p1");
+        final URI p2 = f.createURI("http://p2");
+        final URI p3 = f.createURI("http://p3");
+        
+        final URI o1 = f.createURI("http://o1");
+        final URI o2 = f.createURI("http://o2");
+
+        // bootstrap repository with two triples
+        final StringBuilder bootstrap = new StringBuilder();
+        bootstrap.append(getNamespaceDeclarations());
+        bootstrap.append("INSERT { <http://s1> <http://p1> <http://o1> . <http://s1> <http://p2> <http://o2> } WHERE { }");
+
+        m_repo.prepareUpdate("DROP ALL").evaluate();
+        m_repo.prepareUpdate(bootstrap.toString()).evaluate();
+
+        // assert repo is properly initialized
+        assertTrue("Repo setup problem: missing statement", hasStatement(s1, p1, o1, true));
+        assertTrue("Repo setup problem: missing statement", hasStatement(s1, p2, o2, true));
+
+        // now execute an INSERT + DELETE
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE { ?s <http://p1> ?o1 } "
+                   + "INSERT { ?s <http://p3> ?o2 } "
+                   + "WHERE { "
+                   + "  ?s <http://p1> ?o1 ."
+                   + "  ?s <http://p2> | <http://p3> ?o2 "
+                   + "}");
+        
+        m_repo.prepareUpdate(update.toString()).evaluate();
+        
+        
+        // this one has been deleted
+        assertFalse("Problem in UPDATE: unexpected statement", hasStatement(s1, p1, o1, true));
+
+        // this one has been added (main effect to be covered by this test case)
+        assertTrue("Problem in UPDATE: missing statement (test case main cause)", hasStatement(s1, p3, o2, true));
+
+        // this one is still present
+        assertTrue("Problem in UPDATE: missing statement", hasStatement(s1, p2, o2, true));
+
+    }
 
 }

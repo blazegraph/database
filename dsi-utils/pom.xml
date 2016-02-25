@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>dsi-utils</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
   <name>Blazegraph DSI Utils</name>
   <description>Blazegraph Modifications to the DSI utils.  This are forked from a version under LGPLv2.1.</description>
   <packaging>jar</packaging>
@@ -131,7 +131,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
+      <version>${junit4.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

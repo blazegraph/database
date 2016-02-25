@@ -1,7 +1,10 @@
 package com.bigdata.rdf.internal;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
@@ -26,16 +29,15 @@ import com.bigdata.service.GeoSpatialConfig;
  */
 public class DefaultExtensionFactory implements IExtensionFactory {
 
-    private final Collection<IExtension> extensions;
-    
-    private volatile IExtension[] extensionsArray;
+    private final List<IExtension<? extends BigdataValue>> extensions;
     
     public DefaultExtensionFactory() {
         
-        extensions = new LinkedList<IExtension>(); 
+        extensions = new LinkedList<IExtension<? extends BigdataValue>>(); 
             
     }
     
+    @Override
     public void init(final IDatatypeURIResolver resolver,
             final ILexiconConfiguration<BigdataValue> config) {
 
@@ -70,26 +72,35 @@ public class DefaultExtensionFactory implements IExtensionFactory {
         }
         
         _init(resolver, config, extensions);
-
-		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         
     }
     
     /**
      * Give subclasses a chance to add extensions.
+     * 
+     * @param resolver
+     *            {@link IDatatypeURIResolver} from
+     *            {@link #init(IDatatypeURIResolver, ILexiconConfiguration)}.
+     * @param config
+     *            The {@link ILexiconConfiguration} from
+     *            {@link #init(IDatatypeURIResolver, ILexiconConfiguration)}.
+     * 
+     * @param extensions
+     *            The extensions that have already been registered.
+     * 
+     * @see #init(IDatatypeURIResolver, ILexiconConfiguration)
      */
     protected void _init(final IDatatypeURIResolver resolver,
             final ILexiconConfiguration<BigdataValue> config,
-            final Collection<IExtension> extensions) {
+            final Collection<IExtension<? extends BigdataValue>> extensions) {
 
     	// noop
     	
     }
     
-    public IExtension[] getExtensions() {
-        
-        return extensionsArray;
-        
+    @Override
+    public Iterator<IExtension<? extends BigdataValue>> getExtensions() {
+        return Collections.unmodifiableList(extensions).iterator();
     }
     
 }

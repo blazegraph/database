@@ -27,12 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-sails-test</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
   <packaging>jar</packaging>
   <name>Blazegraph Sail Tests</name>
   <description>Blazegraph(TM) SAIL Test Suites</description>
