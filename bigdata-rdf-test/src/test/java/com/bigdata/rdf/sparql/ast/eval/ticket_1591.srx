@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='s'/>
+        <variable name='o'/>
+    </head>
+    <results>
+        <result>
+            <binding name='s'><uri>http://s1</uri></binding>
+            <binding name='o'><uri>http://test.com/P12</uri></binding>
+        </result>
+        <result>
+            <binding name='s'><uri>http://s2</uri></binding>
+            <binding name='o'><uri>http://test.com/P13</uri></binding>
+        </result>
+        <result>
+            <binding name='s'><uri>http://s3</uri></binding>
+            <binding name='o'><uri>http://test.com/P14</uri></binding>
+        </result>
+        <result>
+            <binding name='s'><uri>http://s4</uri></binding>
+            <binding name='o'><uri>http://test.com/P14</uri></binding>
+        </result>
+        <result>
+            <binding name='s'><uri>http://s5</uri></binding>
+            <binding name='o'><uri>http://test.com/P15</uri></binding>
+        </result>
+
+    </results>
+</sparql>
