@@ -26,6 +26,7 @@ mkdir -p "${GITHUB_PAGES}/${DEST_DIR}"
 echo cp -rf "${BASE_DIR}"/../target/site/apidocs/* "${GITHUB_PAGES}/${DEST_DIR}"
 cp -rf "${BASE_DIR}"/../target/site/apidocs/* "${GITHUB_PAGES}/${DEST_DIR}"
 cd $"${GITHUB_PAGES}"
+git pull
 git add --all
 git commit -m "Update for Blazegraph Database Javadocs"
 git push origin master
