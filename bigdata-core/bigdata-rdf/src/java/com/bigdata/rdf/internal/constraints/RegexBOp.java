@@ -52,6 +52,10 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     private static final long serialVersionUID = 1357420268214930143L;
     
     private static final transient Logger log = Logger.getLogger(RegexBOp.class);
+    
+    private static final boolean debug = log.isDebugEnabled();
+
+    private static final boolean info = log.isInfoEnabled();
 
     public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
         
@@ -93,7 +97,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
             
         } catch (Exception ex) {
         
-            if (log.isInfoEnabled()) {
+            if (info) {
                 log.info("could not create pattern for: " + pattern + ", " + flags);
             }
             
@@ -165,7 +169,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         @SuppressWarnings("rawtypes")
         final IV flags = arity() > 2 ? get(2).get(bs) : null;
 
-        if (log.isDebugEnabled()) {
+        if (debug) {
             log.debug("regex var: " + var);
             log.debug("regex pattern: " + pattern);
             log.debug("regex flags: " + flags);
@@ -187,13 +191,14 @@ public class RegexBOp extends XSDBooleanIVValueExpression
      */
     private boolean accept(final Value arg, final Value parg, final Value farg) {
 
-        if (log.isDebugEnabled()) {
+        if (debug) {
             log.debug("regex var: " + arg);
             log.debug("regex pattern: " + parg);
             log.debug("regex flags: " + farg);
         }
 
-        if (QueryEvaluationUtil.isSimpleLiteral(arg)) {
+        //BLZG-1200 changed to isPlainLiteral
+        if (QueryEvaluationUtil.isPlainLiteral(arg)) {
 
             final String text = ((Literal) arg).getLabel();
 
@@ -234,6 +239,10 @@ public class RegexBOp extends XSDBooleanIVValueExpression
             }
 
         } else {
+        	
+        	if(debug) {
+        		log.debug("Unknown type:  " + arg);
+        	}
 
             throw new SparqlTypeErrorException();
 
@@ -244,13 +253,14 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     private static Pattern getPattern(final Value parg, final Value farg)
             throws IllegalArgumentException {
         
-        if (log.isDebugEnabled()) {
+        if (debug) {
             log.debug("regex pattern: " + parg);
             log.debug("regex flags: " + farg);
         }
         
-        if (QueryEvaluationUtil.isSimpleLiteral(parg)
-                && (farg == null || QueryEvaluationUtil.isSimpleLiteral(farg))) {
+        //BLZG-1200 Literals with language types are not included in REGEX
+        if (QueryEvaluationUtil.isPlainLiteral(parg)
+                && (farg == null || QueryEvaluationUtil.isPlainLiteral(farg))) {
 
             final String ptn = ((Literal) parg).getLabel();
             String flags = "";
