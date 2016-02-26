@@ -1197,7 +1197,14 @@ public class ASTDeferredIVResolution {
                         }
                         final DTE dte = DTE.valueOf(dataType);
                         if (dte != null) {
-                            iv = IVUtility.decode(label, dte.name());
+                        	// Check if lexical form is empty, and keep FullyInlineTypedLiteralIV
+                        	// holding corresponding data type as iv for the new value
+                        	// @see https://jira.blazegraph.com/browse/BLZG-1716 (SPARQL Update parser fails on invalid numeric literals)
+                        	if (label.isEmpty()) {
+                        		iv = ivs[i];
+                        	} else {
+                        		iv = IVUtility.decode(label, dte.name());
+                        	}
                         } else {
                             iv = TermId.mockIV(VTE.valueOf(v));
                         }

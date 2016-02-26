@@ -349,6 +349,16 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private BigdataValue getBigdataValue(final String value, final DTE dte) {
+    	// Check if lexical form is empty, and provide bigdata value
+    	// with FullyInlineTypedLiteralIV holding corresponding data type
+    	// @see https://jira.blazegraph.com/browse/BLZG-1716 (SPARQL Update parser fails on invalid numeric literals)
+    	if (value.isEmpty()) {
+    		BigdataLiteral bigdataValue = valueFactory.createLiteral(value, dte.getDatatypeURI());
+    		IV iv = new FullyInlineTypedLiteralIV<BigdataLiteral>("", null, dte.getDatatypeURI());
+			bigdataValue.setIV(iv);
+			iv.setValue(bigdataValue);
+			return bigdataValue;
+    	}
         final IV iv = IVUtility.decode(value, dte.name());
         BigdataValue bigdataValue;
         if (!iv.hasValue() && iv instanceof AbstractLiteralIV) {
