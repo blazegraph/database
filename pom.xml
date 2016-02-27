@@ -336,6 +336,76 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         </repository>
       </repositories>
     </profile>
+    <profile>
+      <!-- Profile for just building the development artifacts -->
+      <id>Development</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <modules>
+        <module>junit-ext</module>
+        <module>ctc-striterators</module>
+        <module>lgpl-utils</module>
+        <module>dsi-utils</module>
+        <module>system-utils</module>
+        <module>rdf-properties</module>
+        <module>sparql-grammar</module>
+        <module>bigdata-util</module>
+        <module>bigdata-common-util</module>
+        <module>bigdata-statics</module>
+        <module>bigdata-cache</module>
+        <module>bigdata-client</module>
+        <module>bigdata-ganglia</module>
+        <module>bigdata-gas</module>
+        <module>bigdata-core/</module>
+        <module>bigdata-war-html</module>
+        <module>bigdata-blueprints</module>
+        <module>bigdata-runtime</module>
+        <module>bigdata-core-test/</module>
+        <module>bigdata-rdf-test/</module>
+        <module>bigdata-sails-test/</module>
+      </modules>
+    </profile>
+    <profile>
+      <!-- profile to build for deployment -->
+      <id>Deployment</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>junit-ext</module>
+        <module>ctc-striterators</module>
+        <module>lgpl-utils</module>
+        <module>dsi-utils</module>
+        <module>system-utils</module>
+        <module>rdf-properties</module>
+        <module>sparql-grammar</module>
+        <module>bigdata-util</module>
+        <module>bigdata-common-util</module>
+        <module>bigdata-statics</module>
+        <module>bigdata-cache</module>
+        <module>bigdata-client</module>
+        <module>bigdata-ganglia</module>
+        <module>bigdata-gas</module>
+        <module>bigdata-core/</module>
+        <module>bigdata-war-html</module>
+        <module>bigdata-blueprints</module>
+        <module>bigdata-runtime</module>
+        <module>bigdata-core-test/</module>
+        <module>bigdata-rdf-test/</module>
+        <module>bigdata-sails-test/</module>
+        <module>blazegraph-artifacts/</module>
+        <!-- Moved to blazegraph-artifacts
+    <module>blazegraph-war</module>
+    <module>bigdata-war</module>
+    <module>bigdata-jar</module>
+    <module>blazegraph-jar</module>
+    <module>blazegraph-deb/</module>
+    <module>blazegraph-rpm/</module>
+    <module>blazegraph-tgz/</module>
+    -->
+      </modules>
+    </profile>
   </profiles>
   <build>
     <plugins>
@@ -388,37 +458,4 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </extension>
     </extensions>
   </build>
-  <modules>
-    <module>junit-ext</module>
-    <module>ctc-striterators</module>
-    <module>lgpl-utils</module>
-    <module>dsi-utils</module>
-    <module>system-utils</module>
-    <module>rdf-properties</module>
-    <module>sparql-grammar</module>
-    <module>bigdata-util</module>
-    <module>bigdata-common-util</module>
-    <module>bigdata-statics</module>
-    <module>bigdata-cache</module>
-    <module>bigdata-client</module>
-    <module>bigdata-ganglia</module>
-    <module>bigdata-gas</module>
-    <module>bigdata-core/</module>
-    <module>bigdata-war-html</module>
-    <module>bigdata-blueprints</module>
-    <module>bigdata-runtime</module>
-    <module>bigdata-core-test/</module>
-    <module>bigdata-rdf-test/</module>
-    <module>bigdata-sails-test/</module>
-    <module>blazegraph-artifacts/</module>
-    <!-- Moved to blazegraph-artifacts
-    <module>blazegraph-war</module>
-    <module>bigdata-war</module>
-    <module>bigdata-jar</module>
-    <module>blazegraph-jar</module>
-    <module>blazegraph-deb/</module>
-    <module>blazegraph-rpm/</module>
-    <module>blazegraph-tgz/</module>
-    -->
-  </modules>
 </project>
