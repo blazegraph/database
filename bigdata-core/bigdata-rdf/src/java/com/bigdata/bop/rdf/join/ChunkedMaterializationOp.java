@@ -28,8 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.rdf.join;
 
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -244,9 +243,10 @@ public class ChunkedMaterializationOp extends PipelineOp {
                     stats.chunksIn.increment();
                     stats.unitsIn.add(a.length);
 
-                    resolveChunk(vars, lex, a, materializeInlineIVs);
+                    final IBindingSet[] aOut = 
+                        resolveChunk(vars, lex, a, materializeInlineIVs);
 
-                    sink.add(a);
+                    sink.add(aOut);
 
                 }
 
@@ -275,18 +275,19 @@ public class ChunkedMaterializationOp extends PipelineOp {
      *            materialize all variable bindings.
      * @param lex
      *            The lexicon reference.
-     * @param chunk
+     * @param chunkIn
      *            The chunk of solutions whose variables will be materialized.
+     *            
+     * @return a new binding set in which the chunks have been resolved
      */
-    static void resolveChunk(final IVariable<?>[] required,
+    static IBindingSet[] resolveChunk(final IVariable<?>[] required,
             final LexiconRelation lex,//
-            final IBindingSet[] chunk,//
-            final boolean materializeInlineIVs//
-    ) {
+            final IBindingSet[] chunkIn,//
+            final boolean materializeInlineIVs) {
 
         if (log.isInfoEnabled())
-            log.info("Fetched chunk: size=" + chunk.length + ", chunk="
-                    + Arrays.toString(chunk));
+            log.info("Fetched chunk: size=" + chunkIn.length + ", chunk="
+                    + Arrays.toString(chunkIn));
 
         /*
          * Create a collection of the distinct term identifiers used in this
@@ -297,12 +298,18 @@ public class ChunkedMaterializationOp extends PipelineOp {
          * Estimate the capacity of the hash map based on the #of variables to
          * materialize per solution and the #of solutions.
          */
-        final int initialCapacity = required == null ? chunk.length
-                : ((required.length == 0) ? 1 : chunk.length * required.length);
+        final int initialCapacity = required == null ? chunkIn.length
+                : ((required.length == 0) ? 1 : chunkIn.length * required.length);
 
-        final Collection<IV<?, ?>> ids = new HashSet<IV<?, ?>>(initialCapacity);
-
-        for (IBindingSet solution : chunk) {
+        /**
+         * In the following map we store, for each IV, the constant that was
+         * associated with this IV; we later use these constants canonically.
+         * -> see https://jira.blazegraph.com/browse/BLZG-1591
+         */
+        final Map<IV<?, ?>, IConstant<?>> idToConstMap = 
+            new HashMap<IV<?, ?>, IConstant<?>>(initialCapacity);
+        
+        for (IBindingSet solution : chunkIn) {
 
             final IBindingSet bindingSet = solution;
 
@@ -333,8 +340,9 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     if (iv.needsMaterialization() || materializeInlineIVs) {
 
-                        ids.add(iv);
-
+                        if (!idToConstMap.containsKey(iv)) {
+                            idToConstMap.put(iv, entry.getValue());
+                        }
                     }
 
 //                    handleIV(iv, ids, materializeInlineIVs);
@@ -363,8 +371,9 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     if (iv.needsMaterialization() || materializeInlineIVs) {
 
-                        ids.add(iv);
-
+                        if (!idToConstMap.containsKey(iv)) {
+                            idToConstMap.put(iv, c);
+                        }
                     }
 
 //                    handleIV(iv, ids, materializeInlineIVs);
@@ -379,21 +388,24 @@ public class ChunkedMaterializationOp extends PipelineOp {
         // Arrays.toString(ids.toArray()));
 
         if (log.isInfoEnabled())
-            log.info("Resolving " + ids.size() + " IVs, required="
+            log.info("Resolving " + idToConstMap.keySet().size() + " IVs, required="
                     + Arrays.toString(required));
 
-        // batch resolve term identifiers to terms.
-        final Map<IV<?, ?>, BigdataValue> terms = lex.getTerms(ids);
-
+        // batch resolve term identifiers to terms; as a side-effect, this sets the cache
+        // on the IVs that we pass in
+        final Map<IV<?, ?>, BigdataValue> terms = lex.getTerms(idToConstMap.keySet());
+        
         /*
-         * Resolve the IVs.
+         * Resolve the duplicates
          */
-        for (IBindingSet e : chunk) {
+        final IBindingSet[] chunkOut = new IBindingSet[chunkIn.length];
+        for (int i=0; i<chunkIn.length; i++) {
 
-            getBindingSet(required, e, terms);
+            chunkOut[i] = getBindingSet(required, chunkIn[i], terms, idToConstMap);
 
         }
-
+        
+        return chunkOut;
     }
     
 //    /**
@@ -453,29 +465,38 @@ public class ChunkedMaterializationOp extends PipelineOp {
      * @param required
      *            The variables to be resolved -or- <code>null</code> if all
      *            variables should have been resolved.
-     * @param bindingSet
+     * @param bindingSetIn
      *            A solution whose {@link IV}s will be resolved to the
      *            corresponding {@link BigdataValue}s in the caller's
      *            <code>terms</code> map. The {@link IVCache} associations are
      *            set as a side-effect.
      * @param terms
      *            A map from {@link IV}s to {@link BigdataValue}s.
+     *            
+     * @param idsToConstMap mapping from IVs to the constant value containing the IV;
+     *                      this map will be used to replace the binding set values 
+     *                      for inline IVs
      * 
      * @throws IllegalStateException
      *             if the {@link IBindingSet} was not materialized with the
      *             {@link IBindingSet}.
      */
-    static private void getBindingSet(//
+    static private IBindingSet getBindingSet(//
             final IVariable<?>[] required,
-            final IBindingSet bindingSet,
-            final Map<IV<?, ?>, BigdataValue> terms) {
+            final IBindingSet bindingSetIn,
+            final Map<IV<?, ?>, BigdataValue> terms,
+            final Map<IV<?, ?>, IConstant<?>> idsToConstMap) {
 
-        if (bindingSet == null)
+        if (bindingSetIn == null)
             throw new IllegalArgumentException();
 
         if (terms == null)
             throw new IllegalArgumentException();
 
+        if (idsToConstMap == null)
+            throw new IllegalArgumentException();
+
+        final IBindingSet bindingSetOut = bindingSetIn.clone();
         if (required != null) {
 
             /*
@@ -485,7 +506,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
             for (IVariable<?> var : required) {
 
                 @SuppressWarnings("unchecked")
-                final IConstant<IV<?, ?>> c = bindingSet.get(var);
+                final IConstant<IV<?, ?>> c = bindingSetOut.get(var);
 
                 if (c == null) {
                     // Variable is not bound in this solution.
@@ -501,9 +522,33 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 }
 
-                final BigdataValue value = terms.get(iv);
-                
-                conditionallySetIVCache(iv,value);
+                /**
+                 * As per https://jira.blazegraph.com/browse/BLZG-1591, we distinguish 
+                 * between inline IVs (which have already been resolved as a side effect
+                 * of the preceding getTerms() call) and for which we thus can substitute
+                 * in a canonical version of the constant from which it was derived
+                 * and non-inline IVs (the old code path) for which we conditionally 
+                 * set the IV cache.
+                 */
+                if (iv.isInline()) {
+                    
+                    final IConstant<?> cVal = idsToConstMap.get(iv);
+                    if (cVal == null) {
+
+                        if (iv.needsMaterialization()) {
+                            // Not found in dictionary. This is an error.
+                            throw new RuntimeException("Could not resolve: iv=" + iv);
+
+                        } // else NOP - Value is not required.
+
+                    } else {
+                        bindingSetOut.set(var, cVal);
+                    }
+                    
+                } else {
+                    final BigdataValue value = terms.get(iv);
+                    conditionallySetIVCache(iv,value);
+                }                
 
             }
             
@@ -514,7 +559,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
              */
             
             @SuppressWarnings("rawtypes")
-            final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
+            final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSetOut
                     .iterator();
 
             while (itr.hasNext()) {
@@ -533,12 +578,39 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 final IV<?, ?> iv = (IV<?, ?>) boundValue;
 
                 final BigdataValue value = terms.get(iv);
+                
+                /**
+                 * As per https://jira.blazegraph.com/browse/BLZG-1591, we distinguish 
+                 * between inline IVs (which have already been resolved as a side effect
+                 * of the preceding getTerms() call) and for which we thus can substitute
+                 * in a canonical version of the constant from which it was derived
+                 * and non-inline IVs (the old code path) for which we conditionally 
+                 * set the IV cache.
+                 */
+                if (iv.isInline()) {
+                    
+                    final IConstant<?> cVal = idsToConstMap.get(iv);
+                    if (cVal == null) {
 
-                conditionallySetIVCache(iv, value);
+                        if (iv.needsMaterialization()) {
+                            // Not found in dictionary. This is an error.
+                            throw new RuntimeException("Could not resolve: iv=" + iv);
+
+                        } // else NOP - Value is not required.
+
+                    } else {
+                        bindingSetOut.set(entry.getKey(), idsToConstMap.get(iv));
+                    }
+                    
+                } else {
+                    conditionallySetIVCache(iv,value);
+                }
 
             }
 
         }
+        
+        return bindingSetOut;
 
 	}
 

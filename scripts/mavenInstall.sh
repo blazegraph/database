@@ -5,7 +5,7 @@ BASE_DIR=`dirname $0`
 mvn -f "${BASE_DIR}"/../pom.xml clean install -DskipTests=true -N
 
 #Only build some modules (deployers are not normally needed)
-mvn -f "${BASE_DIR}"/../pom.xml clean install -DskipTests=true --projects junit-ext,ctc-striterators,lgpl-utils,dsi-utils,system-utils,rdf-properties,sparql-grammar,bigdata-util,bigdata-common-util,bigdata-statics,bigdata-cache,bigdata-client,bigdata-ganglia,bigdata-gas,bigdata-core/,bigdata-war-html,bigdata-blueprints,bigdata-runtime,bigdata-core-test,bigdata-rdf-test,bigdata-sails-test,vocabularies
+mvn -f "${BASE_DIR}"/../pom.xml clean install -DskipTests=true 
 
 #Also package the executable jars as they are used by some external script dependencies
-mvn -f "${BASE_DIR}"/../pom.xml clean package -U -DskipTests=true --projects blazegraph-jar,bigdata-jar
+mvn -f "${BASE_DIR}"/../pom.xml clean install -P Deployment -U -DskipTests=true --projects blazegraph-jar,bigdata-jar
