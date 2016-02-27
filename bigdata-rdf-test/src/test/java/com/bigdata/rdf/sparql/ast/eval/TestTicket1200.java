@@ -61,14 +61,15 @@ public class TestTicket1200 extends AbstractDataDrivenSPARQLTestCase {
 	 * 
 	 * @throws Exception
 	 */
-  public void test_ticket_1200a() throws Exception {
-     new TestHelper("ticket-1200a",// testURI,
-           "ticket_1200a.rq",// queryFileURL
-           "ticket_1200.trig",// dataFileURL
-           "ticket_1200a.srx",// resultFileURL
-           false /* checkOrder */
-     ).runTest();
-  }   
+//BLZG-1780
+//  public void test_ticket_1200a() throws Exception {
+//     new TestHelper("ticket-1200a",// testURI,
+//           "ticket_1200a.rq",// queryFileURL
+//           "ticket_1200.trig",// dataFileURL
+//           "ticket_1200a.srx",// resultFileURL
+//           false /* checkOrder */
+//     ).runTest();
+//  }   
   
 	/**
 	 * Test for REGEX on a string literal 
