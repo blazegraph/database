@@ -1,4 +1,4 @@
 #!/bin/bash
 BASE_DIR=`dirname $0`
 
-mvn -f "${BASE_DIR}"/../pom.xml clean deploy -DskipTests=true -Plocal-deploy 
+mvn -f "${BASE_DIR}"/../pom.xml clean deploy -DskipTests=true -P local-deploy,Development
