@@ -104,6 +104,8 @@ import com.bigdata.relation.accesspath.ChunkConsumerIterator;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialCounters;
@@ -804,25 +806,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 // is quite small; need to check what's going on there...
                 
                 stats.accessPathRangeCount.add(totalPointsInRange);
-    
-                /**
-                 * The number of subtasks is calculated based on two parameters. First, there is a
-                 * minumum number of datapoints per task, which is considered a hard limit. This means,
-                 * we generate *at most* (totalPointsInRange/minDatapointsPerTask) tasks.
-                 * 
-                 * The second parameter is the numTasks parameter, which tells us the "desired"
-                 * number of tasks. 
-                 * 
-                 * The number of subranges is then defined as follows:
-                 * - If the desired number of tasks is larger than the hard limit, we choose the hard limit
-                 * - Otherwise, we choose the desired number of tasks
-                 * 
-                 * Effectively, this means choosing the smaller of the two values (MIN).
-                 */
-                final long maxTasksByDatapointRestriction = totalPointsInRange/minDatapointsPerTask;
-                final long desiredNumTasks = Math.max(numTasks, 1); /* at least one subrange */
-                
-                long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
+
                 
                 // set up datatype configuration for the datatype URI
                 final GeoSpatialDatatypeConfiguration datatypeConfig =
@@ -847,20 +831,37 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     
                 }
                 
-                // split range into nrSubRanges, equal-length pieces
-                final GeoSpatialSubRangePartitioner partitioner = 
-                   new GeoSpatialSubRangePartitioner(southWestWithTime, northEastWithTime, nrSubRanges, litExt);
+                final GeoSpatialSearchRange searchRange =
+                    new GeoSpatialSearchRange(datatypeConfig, litExt, southWestComponents, northEastComponents);
+                final GeoSpatialSearchRangePartitioner partitioner = new GeoSpatialSearchRangePartitioner(searchRange);
+
                 
                 // set up tasks for partitions
                 final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder(); // will be the same for all partitions
                 final int subjectPos = keyOrder.getPositionInIndex(SPOKeyOrder.S);
                 final int objectPos = keyOrder.getPositionInIndex(SPOKeyOrder.O);
-                for (GeoSpatialSubRangePartition partition : partitioner.getPartitions()) {
+                for (GeoSpatialSearchRange partition : partitioner.partition(numTasks, totalPointsInRange, minDatapointsPerTask)) {
                    
+                   final Object[] partitionLowerBorderComponents = partition.getLowerBorderComponents();
+                   final Object[] partitionUpperBorderComponents = partition.getUpperBorderComponents();
+                   
+                   // TODO: make this more flexible
+                   final PointLatLonTime lowerBorder = 
+                       new PointLatLonTime((Double)partitionLowerBorderComponents[0], 
+                                           (Double)partitionLowerBorderComponents[1], 
+                                           (Long)partitionLowerBorderComponents[2]);
+
+                   final PointLatLonTime upperBorder = 
+                           new PointLatLonTime((Double)partitionUpperBorderComponents[0], 
+                                               (Double)partitionUpperBorderComponents[1], 
+                                               (Long)partitionUpperBorderComponents[2]);
+
+
+
                    // set up a subtask for the partition
                    final GeoSpatialServiceCallSubRangeTask subTask = 
                       getSubTask(southWestWithTime, northEastWithTime, 
-                         partition.lowerBorder, partition.upperBorder, 
+                         lowerBorder, upperBorder, 
                          keyOrder, subjectPos, objectPos, stats, query);
                    
                    if (subTask!=null) { // if satisfiable
@@ -870,9 +871,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                    if (log.isDebugEnabled()) {
     
                       final Object[] lowerBorderComponentsPart = 
-                         PointLatLonTime.toComponentString(partition.lowerBorder);
+                         PointLatLonTime.toComponentString(lowerBorder);
                       final Object[] upperBorderComponentsPart = 
-                         PointLatLonTime.toComponentString(partition.upperBorder);
+                         PointLatLonTime.toComponentString(upperBorder);
                       
                       LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorderComponentsPart);
                       LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorderComponentsPart);
@@ -992,6 +993,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                
             }
 
+            // build the Object[] constituting the upper left and lo
+            
             // decompose sub range borders into components
             final Object[] subRangeUpperLeftComponents = 
                PointLatLonTime.toComponentString(subRangeUpperLeftWithTime);
@@ -1251,94 +1254,312 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
          }
          
+//         /**
+//          * Class providing functionality to partition a geospatial search range.
+//          * 
+//          * @author msc
+//          */
+//         public static class GeoSpatialSubRangePartitioner {
+//          
+//            private List<GeoSpatialSubRangePartition> partitions;
+//            
+//            public GeoSpatialSubRangePartitioner(
+//              final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
+//              final long numPartitions, GeoSpatialLiteralExtension<BigdataValue> litExt) {
+//
+//               
+//               
+//               partitions = new ArrayList<GeoSpatialSubRangePartition>();
+//
+//               final long lowerTimestamp = lowerBorder.getTimestamp();
+//               final long upperTimestamp = upperBorder.getTimestamp();
+//
+//               final long numPartitionsSafe = Math.max(1, numPartitions); // at least 1 partition
+//               
+//               final long diff = upperTimestamp - lowerTimestamp;
+//               final long dist = diff/numPartitionsSafe;
+//
+//               final List<Long> breakPoints = new ArrayList<Long>();
+//                  
+//
+//               long lastConsidered = -1;
+//               breakPoints.add(lowerTimestamp-1); // first point
+//
+//               // points in-between (ignoring first and last)
+//               for (long i=1; i<numPartitionsSafe; i++) {
+//                  
+//                  long breakPoint = lowerTimestamp + i*dist;
+//                  if (lastConsidered==breakPoint) {
+//                     break;
+//                  }
+//                  
+//                  if (breakPoint>lowerTimestamp && breakPoint<upperTimestamp) {
+//                     breakPoints.add(breakPoint);
+//                  }
+//                  
+//                  lastConsidered = breakPoint;
+//               }
+//               
+//               breakPoints.add(upperTimestamp); // last point
+//
+//               for (int i=0; i<breakPoints.size()-1; i++) {
+//                  partitions.add(
+//                     new GeoSpatialSubRangePartition(
+//                        new PointLatLonTime(lowerBorder.getLat(), lowerBorder.getLon(), breakPoints.get(i)+1),
+//                        new PointLatLonTime(upperBorder.getLat(), upperBorder.getLon(), breakPoints.get(i+1))));
+//               }
+//            }
+//            
+//            public List<GeoSpatialSubRangePartition> getPartitions() {
+//               return partitions;
+//            }
+//
+//         }
+//         
+//         
+//         public static class GeoSpatialSubRangePartition {
+//            
+//            final PointLatLonTime lowerBorder;
+//            final PointLatLonTime upperBorder;
+//            
+//            public GeoSpatialSubRangePartition(
+//               final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder) {
+//               
+//               this.lowerBorder = lowerBorder;
+//               this.upperBorder = upperBorder;
+//            }
+//            
+//            @Override
+//            public String toString() {
+//               
+//               StringBuffer buf = new StringBuffer();
+//               buf.append("lowerBorder=");
+//               buf.append(lowerBorder.toString());
+//               buf.append(", upperBorder=");
+//               buf.append(upperBorder.toString());
+//               
+//               return buf.toString();
+//            }
+//         }
+         
+         
          /**
-          * Class providing functionality to partition a geospatial search range.
-          * 
-          * @author msc
+          * Builds a number of partitions over a given geospatial search range, thus 
+          * splitting up the search range into fully covering smaller search ranges.
           */
-         public static class GeoSpatialSubRangePartitioner {
-          
-            private List<GeoSpatialSubRangePartition> partitions;
-            
-            public GeoSpatialSubRangePartitioner(
-              final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
-              final long numPartitions, GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         public static class GeoSpatialSearchRangePartitioner {
+             
+             private final GeoSpatialSearchRange geoSpatialSearchRange;
+             
+             public GeoSpatialSearchRangePartitioner(final GeoSpatialSearchRange geoSpatialSearchRange) {
+                 this.geoSpatialSearchRange = geoSpatialSearchRange;
+             }
+             
+                          
+             /**
+              * Computes the partitions. For now, we always partition along the lastmost dimension,
+              * e.g. for LAT+LON+TIME this would be on the TIME. TODO: rationale? does that make sense?
+             * @param minDatapointsPerTask 
+             * @param totalPointsInRange 
+             * @param numTasks 
+              */
+             public List<GeoSpatialSearchRange> partition(int numTasks, long totalPointsInRange, int minDatapointsPerTask) {
 
-               
-               
-               partitions = new ArrayList<GeoSpatialSubRangePartition>();
+                 final List<GeoSpatialSearchRange> partitions =  new ArrayList<GeoSpatialSearchRange>();
 
-               final long lowerTimestamp = lowerBorder.getTimestamp();
-               final long upperTimestamp = upperBorder.getTimestamp();
+                 final long numPartitions = computerNumberOfPartitions(numTasks, totalPointsInRange, minDatapointsPerTask);
+                 
+                 
+                 final GeoSpatialDatatypeConfiguration datatypeConfig = geoSpatialSearchRange.getDatatypeConfig();
+                 
+                 final int numDimensions = datatypeConfig.getNumDimensions();
+                 final Object[] lowerBorderComponents = geoSpatialSearchRange.getLowerBorderComponents();
+                 final Object[] upperBorderComponents = geoSpatialSearchRange.getUpperBorderComponents();
+                 
+                 assert (numDimensions == lowerBorderComponents.length && 
+                         numDimensions == upperBorderComponents.length);
 
-               final long numPartitionsSafe = Math.max(1, numPartitions); // at least 1 partition
-               
-               final long diff = upperTimestamp - lowerTimestamp;
-               final long dist = diff/numPartitionsSafe;
 
-               final List<Long> breakPoints = new ArrayList<Long>();
-                  
-
-               long lastConsidered = -1;
-               breakPoints.add(lowerTimestamp-1); // first point
-
-               // points in-between (ignoring first and last)
-               for (long i=1; i<numPartitionsSafe; i++) {
-                  
-                  long breakPoint = lowerTimestamp + i*dist;
-                  if (lastConsidered==breakPoint) {
+                 // the component we partition on is the last component in multi-dimensional index
+                 final GeoSpatialDatatypeFieldConfiguration fieldToPartitionOn = 
+                     datatypeConfig.getFields().get(numDimensions-1);
+                 
+                 
+                 final ValueType vt = fieldToPartitionOn.getValueType();
+                 
+                 
+                 // initialize the value value representing the component on which we split
+                 // -> note that we convert to long, applying the precision adjustment
+                 final long lowerComponentLongValue;
+                 final long upperComponentLongValue;
+                 switch (vt) {
+                 case LONG:
+                 {
+                     lowerComponentLongValue = (Long)lowerBorderComponents[numDimensions-1];
+                     upperComponentLongValue = (Long)upperBorderComponents[numDimensions-1];
+                     
                      break;
-                  }
-                  
-                  if (breakPoint>lowerTimestamp && breakPoint<upperTimestamp) {
-                     breakPoints.add(breakPoint);
-                  }
-                  
-                  lastConsidered = breakPoint;
-               }
-               
-               breakPoints.add(upperTimestamp); // last point
+                 } 
+                 case DOUBLE:
+                 {
+                     lowerComponentLongValue = 
+                         (Double.valueOf((Double)lowerBorderComponents[numDimensions-1]*fieldToPartitionOn.getMultiplier())).longValue();
+                     
+                     upperComponentLongValue = 
+                         (Double.valueOf((Double)upperBorderComponents[numDimensions-1]*fieldToPartitionOn.getMultiplier())).longValue();
+                     
+                     break;
+                 }
+                 default:
+                     throw new RuntimeException("Unsupported value type: " + vt);
+                 }
 
-               for (int i=0; i<breakPoints.size()-1; i++) {
-                  partitions.add(
-                     new GeoSpatialSubRangePartition(
-                        new PointLatLonTime(lowerBorder.getLat(), lowerBorder.getLon(), breakPoints.get(i)+1),
-                        new PointLatLonTime(upperBorder.getLat(), upperBorder.getLon(), breakPoints.get(i+1))));
-               }
-            }
-            
-            public List<GeoSpatialSubRangePartition> getPartitions() {
-               return partitions;
-            }
+                     
+                 final long diff = upperComponentLongValue - lowerComponentLongValue;
 
+                 final long dist = diff / numPartitions;
+
+                 final List<Long> breakPoints = new ArrayList<Long>();
+
+                 /**
+                  * Compute the break points
+                  */
+                 long lastConsidered = -1;
+                 breakPoints.add(lowerComponentLongValue -1); // -1 will be corrected below
+                 
+                 // points in-between (ignoring first and last)
+                 for (long i = 1; i < numPartitions; i++) {
+
+                     long breakPoint = lowerComponentLongValue + i * dist;
+                     if (lastConsidered == breakPoint) {
+                         break;
+                     }
+
+                     if (breakPoint > lowerComponentLongValue && breakPoint < upperComponentLongValue) {
+                         breakPoints.add(breakPoint);
+                     }
+
+                     lastConsidered = breakPoint;
+                 }
+                 breakPoints.add(upperComponentLongValue); // last point
+
+
+                 /**
+                  * Setup partitions for the given breakpoints
+                  */
+                 final int finalPosition = lowerBorderComponents.length-1;
+                 for (int i = 0; i < breakPoints.size() - 1; i++) {
+                     
+                     final Object[] breakpointLowerBorder = new Object[lowerBorderComponents.length];
+                     final Object[] breakpointUpperBorder = new Object[upperBorderComponents.length];
+                     
+                     for (int j=0; j<lowerBorderComponents.length-1; j++) {
+                         breakpointLowerBorder[j] = lowerBorderComponents[j];
+                         breakpointUpperBorder[j] = upperBorderComponents[j];
+                     }
+
+                     final long startLongVal = breakPoints.get(i) + 1;
+                     final long endLongVal = breakPoints.get(i + 1);                     
+                     switch (vt) {
+                     case LONG:
+                     {
+                         // just copy over value specified by breakpoint
+                         breakpointLowerBorder[finalPosition] = startLongVal;
+                         breakpointUpperBorder[finalPosition] = endLongVal;
+                         
+                         break;
+                     }
+                     case DOUBLE:
+                     {
+                         // apply precision adjustment
+                         breakpointLowerBorder[finalPosition] = (double)startLongVal/(double)fieldToPartitionOn.getMultiplier();
+                         breakpointUpperBorder[finalPosition] = (double)endLongVal/(double)fieldToPartitionOn.getMultiplier();
+                         
+                         break;
+                     }
+                     default:
+                         throw new RuntimeException("Unsupported value type: " + vt);
+                     }
+                     
+                     final GeoSpatialSearchRange searchRange = 
+                         new GeoSpatialSearchRange(
+                             geoSpatialSearchRange.getDatatypeConfig(), geoSpatialSearchRange.getLitExt(), 
+                             breakpointLowerBorder, breakpointUpperBorder);
+                     
+                     partitions.add(searchRange);
+                 }
+                 
+                 return partitions;
+             }
+
+                 
+             /**
+              * The number of partitions is calculated based on two parameters. First, there is a
+              * minumum number of datapoints per task, which is considered a hard limit. This means,
+              * we generate *at most* (totalPointsInRange/minDatapointsPerTask) tasks.
+              * 
+              * The second parameter is the numTasks parameter, which tells us the "desired"
+              * number of tasks. 
+              * 
+              * The number of subranges is then defined as follows:
+              * - If the desired number of tasks is larger than the hard limit, we choose the hard limit
+              * - Otherwise, we choose the desired number of tasks
+              * 
+              * Effectively, this means choosing the smaller of the two values (MIN), while
+              * making sure that the value returned is >= 1.
+              */
+             private long computerNumberOfPartitions(int numTasks, long totalPointsInRange, int minDatapointsPerTask) {
+                 
+
+                 final long maxTasksByDatapointRestriction = totalPointsInRange/minDatapointsPerTask;
+                 final long desiredNumTasks = Math.max(numTasks, 1); /* at least one subrange */
+                 
+                 long nrSubRanges = Math.min(maxTasksByDatapointRestriction, desiredNumTasks);
+                 
+                 return Math.max(1, nrSubRanges); // at least one
+             }
+             
          }
          
          
-         public static class GeoSpatialSubRangePartition {
-            
-            final PointLatLonTime lowerBorder;
-            final PointLatLonTime upperBorder;
-            
-            public GeoSpatialSubRangePartition(
-               final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder) {
-               
-               this.lowerBorder = lowerBorder;
-               this.upperBorder = upperBorder;
-            }
-            
-            @Override
-            public String toString() {
-               
-               StringBuffer buf = new StringBuffer();
-               buf.append("lowerBorder=");
-               buf.append(lowerBorder.toString());
-               buf.append(", upperBorder=");
-               buf.append(upperBorder.toString());
-               
-               return buf.toString();
-            }
+         public static class GeoSpatialSearchRange {
+             
+             final GeoSpatialDatatypeConfiguration datatypeConfig;
+             final GeoSpatialLiteralExtension<BigdataValue> litExt;
+             
+             private final Object[] lowerBorderComponents;
+             private final Object[] upperBorderComponents;
+             
+             public GeoSpatialSearchRange(
+                 final GeoSpatialDatatypeConfiguration datatypeConfig,
+                 final GeoSpatialLiteralExtension<BigdataValue> litExt,
+                 final Object[] lowerBorderComponents, final Object[] upperBorderComponents) {
+                 
+                 this.datatypeConfig = datatypeConfig;
+                 this.litExt = litExt;
+                 
+                 this.lowerBorderComponents = lowerBorderComponents;
+                 this.upperBorderComponents = upperBorderComponents;
+                 
+             }
+             
+             public GeoSpatialLiteralExtension<BigdataValue> getLitExt() {
+                 return litExt;
+             }
+             
+             public GeoSpatialDatatypeConfiguration getDatatypeConfig() {
+                 return datatypeConfig;
+             }
+             
+             public Object[] getLowerBorderComponents() {
+                 return lowerBorderComponents;
+             }
+
+             public Object[] getUpperBorderComponents() {
+                 return upperBorderComponents;
+             }
+
          }
-         
          
       }
       
