@@ -111,6 +111,7 @@ import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialCounters;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 import com.bigdata.service.geospatial.IGeoSpatialQuery;
+import com.bigdata.service.geospatial.IGeoSpatialQuery.LowerAndUpperBound;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialQuery;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
@@ -776,15 +777,21 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 /**
                  * Get the bounding boxes for the subsequent scan
                  */
-                final PointLatLonTime southWestWithTime = 
-                    query.getBoundingBoxSouthWestWithTime(); 
-                final Object[] southWestComponents = 
-                        PointLatLonTime.toComponentString(southWestWithTime);
+                
+                final Object[] southWestComponents = query.getLowerAndUpperBound().getLowerBound();
+                final Object[] northEastComponents = query.getLowerAndUpperBound().getUpperBound();
+                
+                // TODO: remove code
+//                final PointLatLonTime southWestWithTime = 
+//                    query.getBoundingBoxSouthWestWithTime(); 
+//                final Object[] southWestComponents = 
+//                        PointLatLonTime.toComponentString(southWestWithTime);
                     
-                final PointLatLonTime northEastWithTime =
-                    query.getBoundingBoxNorthEastWithTime();
-                final Object[] northEastComponents =
-                    PointLatLonTime.toComponentString(northEastWithTime);
+                // TODO: remove code
+//                final PointLatLonTime northEastWithTime =
+//                    query.getBoundingBoxNorthEastWithTime();
+//                final Object[] northEastComponents =
+//                    PointLatLonTime.toComponentString(northEastWithTime);
     
                 /**
                  * We proceed as follows:
@@ -801,9 +808,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                     continue;
                 
                 final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
-                
-                // TODO: rangeCount() returns quite strange results, e.g. for 3.3.1 we get >1M although the range
-                // is quite small; need to check what's going on there...
                 
                 stats.accessPathRangeCount.add(totalPointsInRange);
 
@@ -860,9 +864,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
                    // set up a subtask for the partition
                    final GeoSpatialServiceCallSubRangeTask subTask = 
-                      getSubTask(southWestWithTime, northEastWithTime, 
-                         lowerBorder, upperBorder, 
-                         keyOrder, subjectPos, objectPos, stats, query);
+                      getSubTask(query, lowerBorder, upperBorder,  keyOrder, subjectPos, objectPos, stats);
                    
                    if (subTask!=null) { // if satisfiable
                       subTasks.add(subTask);
@@ -914,13 +916,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           * @return the subtask or null 
           */
          protected GeoSpatialServiceCallSubRangeTask getSubTask(
-            final PointLatLonTime outerRangeUpperLeftWithTime,    /* upper left of outer (non subtask) range */
-            final PointLatLonTime outerRangeLowerRightWithTime,   /* lower right of outer (non subtask) range */
+            final IGeoSpatialQuery query,
             final PointLatLonTime subRangeUpperLeftWithTime,      /* upper left of the subtask */
             final PointLatLonTime subRangeLowerRightWithTime,     /* lower right of the subtask */
             final SPOKeyOrder keyOrder, final int subjectPos, 
-            final int objectPos, final BaseJoinStats stats, 
-            final IGeoSpatialQuery query) {
+            final int objectPos, final BaseJoinStats stats) {
             
             /**
              * Compose the surrounding filter. The filter is based on the outer range.
@@ -939,23 +939,29 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final GeoSpatialLiteralExtension litExt = 
                 new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
             
-            
+
+            // TODO: FILTERs need to be constructed dynamically
             switch (query.getSearchFunction()) {
             case IN_CIRCLE: 
                {
 
                   filter = new GeoSpatialInCircleFilter(
                      query.getSpatialCircleCenter(),  query.getSpatialCircleRadius(), query.getSpatialUnit(), 
-                     outerRangeUpperLeftWithTime.getTimestamp(), outerRangeLowerRightWithTime.getTimestamp(), 
+                     query.getTimeStart(), query.getTimeEnd(), 
                      new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig), geoSpatialCounters);
                   
                }
                break;
 
+               
             case IN_RECTANGLE: 
                {
+                  final LowerAndUpperBound bounds = query.getLowerAndUpperBound();
+                  final Object[] lowerBound = bounds.getLowerBound();
+                  final Object[] upperBound = bounds.getUpperBound();
                   filter = new GeoSpatialInRectangleFilter(
-                     outerRangeUpperLeftWithTime, outerRangeLowerRightWithTime,
+                     new PointLatLonTime((Double)lowerBound[0], (Double)lowerBound[1], query.getTimeStart()), 
+                     new PointLatLonTime((Double)upperBound[0], (Double)upperBound[1], query.getTimeEnd()),
                      new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig), geoSpatialCounters);
                   
                }
@@ -1008,7 +1014,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             if (accessPath==null) {
                return null;
             }
-
 
             // set up a big min advancer for efficient extraction of relevant values from access path
             final byte[] lowerZOrderKey = litExt.toZOrderByteArray(subRangeUpperLeftComponents);
@@ -1064,7 +1069,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final RangeBOp rangeBop = ASTRangeOptimizer.toRangeBOp(context, range, globals);
             
             // we support projection of fixed subjects into the SERVICE call
-            IConstant<?> constSubject = query.getSubject();
+            final IConstant<?> constSubject = query.getSubject();
             
             // set up the predicate
             final TermNode s = constSubject==null ? 
@@ -1254,97 +1259,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
          }
          
-//         /**
-//          * Class providing functionality to partition a geospatial search range.
-//          * 
-//          * @author msc
-//          */
-//         public static class GeoSpatialSubRangePartitioner {
-//          
-//            private List<GeoSpatialSubRangePartition> partitions;
-//            
-//            public GeoSpatialSubRangePartitioner(
-//              final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
-//              final long numPartitions, GeoSpatialLiteralExtension<BigdataValue> litExt) {
-//
-//               
-//               
-//               partitions = new ArrayList<GeoSpatialSubRangePartition>();
-//
-//               final long lowerTimestamp = lowerBorder.getTimestamp();
-//               final long upperTimestamp = upperBorder.getTimestamp();
-//
-//               final long numPartitionsSafe = Math.max(1, numPartitions); // at least 1 partition
-//               
-//               final long diff = upperTimestamp - lowerTimestamp;
-//               final long dist = diff/numPartitionsSafe;
-//
-//               final List<Long> breakPoints = new ArrayList<Long>();
-//                  
-//
-//               long lastConsidered = -1;
-//               breakPoints.add(lowerTimestamp-1); // first point
-//
-//               // points in-between (ignoring first and last)
-//               for (long i=1; i<numPartitionsSafe; i++) {
-//                  
-//                  long breakPoint = lowerTimestamp + i*dist;
-//                  if (lastConsidered==breakPoint) {
-//                     break;
-//                  }
-//                  
-//                  if (breakPoint>lowerTimestamp && breakPoint<upperTimestamp) {
-//                     breakPoints.add(breakPoint);
-//                  }
-//                  
-//                  lastConsidered = breakPoint;
-//               }
-//               
-//               breakPoints.add(upperTimestamp); // last point
-//
-//               for (int i=0; i<breakPoints.size()-1; i++) {
-//                  partitions.add(
-//                     new GeoSpatialSubRangePartition(
-//                        new PointLatLonTime(lowerBorder.getLat(), lowerBorder.getLon(), breakPoints.get(i)+1),
-//                        new PointLatLonTime(upperBorder.getLat(), upperBorder.getLon(), breakPoints.get(i+1))));
-//               }
-//            }
-//            
-//            public List<GeoSpatialSubRangePartition> getPartitions() {
-//               return partitions;
-//            }
-//
-//         }
-//         
-//         
-//         public static class GeoSpatialSubRangePartition {
-//            
-//            final PointLatLonTime lowerBorder;
-//            final PointLatLonTime upperBorder;
-//            
-//            public GeoSpatialSubRangePartition(
-//               final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder) {
-//               
-//               this.lowerBorder = lowerBorder;
-//               this.upperBorder = upperBorder;
-//            }
-//            
-//            @Override
-//            public String toString() {
-//               
-//               StringBuffer buf = new StringBuffer();
-//               buf.append("lowerBorder=");
-//               buf.append(lowerBorder.toString());
-//               buf.append(", upperBorder=");
-//               buf.append(upperBorder.toString());
-//               
-//               return buf.toString();
-//            }
-//         }
-         
          
          /**
-          * Builds a number of partitions over a given geospatial search range, thus 
+          * Builds a number of partitions over a given geospatial search range, effectively 
           * splitting up the search range into fully covering smaller search ranges.
           */
          public static class GeoSpatialSearchRangePartitioner {

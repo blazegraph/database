@@ -33,11 +33,11 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.gis.CoordinateDD;
 import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
-import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 
 /**
  * Interface representing (the configuration of) a geospatial query.
@@ -132,22 +132,11 @@ public interface IGeoSpatialQuery {
      */
     public IBindingSet getIncomingBindings();
 
-    
+
     /**
-     * Get a bounding box including timestamp representing the south-west corner point.
-     * 
-     * Note that we return south-west since for a south-west pair (lat1, lon1) and
-     * its corresponding north-east pair (lat2,lon2) it holds that lat1<=lat2 and lon1<=lon2.
+     * @return a structure containing the lower and upper bound component object defined by this query
      */
-    public PointLatLonTime getBoundingBoxSouthWestWithTime();
-    
-    /**
-     * Get a bounding box including timestamp representing the north-east corner point.
-     * 
-     * Note that we return north-east since for a north-east pair (lat1, lon1) and
-     * its corresponding north-west pair (lat2,lon2) it holds that lat1>=lat2 and lon1>=lon2.
-     */
-    public PointLatLonTime getBoundingBoxNorthEastWithTime();
+    public LowerAndUpperBound getLowerAndUpperBound();
 
     
     /**
@@ -164,5 +153,54 @@ public interface IGeoSpatialQuery {
      * @return true if the query is normalized. See
      */
     public boolean isNormalized();
+
+    /**
+     * @return true if the query is satisfiable
+     */
+    public boolean isSatisfiable();
+
+    /**
+     * Helper class encapsulating both the lower and upper bound as implied
+     * by the query, for the given datatype configuration.
+     * 
+     * @author msc
+     */
+    public static class LowerAndUpperBound {
+        private final Object[] lowerBound;
+        private final Object[] upperBound;        
+        
+        
+        public LowerAndUpperBound(final Object[] lowerBound, final Object[] upperBound) {
+            this.lowerBound = lowerBound;
+            this.upperBound = upperBound;
+        }
+
+        public Object[] getLowerBound() {
+            return lowerBound;
+        }
+
+        public Object[] getUpperBound() {
+            return upperBound;
+        }
+        
+    }
+    
+    public static class SouthWestAndNorthEastCoordinate {
+        private final CoordinateDD southWestCoord;
+        private final CoordinateDD northEastCoord;
+        
+        public SouthWestAndNorthEastCoordinate(final CoordinateDD southWestCoord, final CoordinateDD northEastCoord) {
+            this.southWestCoord = southWestCoord;
+            this.northEastCoord = northEastCoord;
+        }
+
+        public CoordinateDD getNorthEastCoord() {
+            return northEastCoord;
+        }
+        
+        public CoordinateDD getSouthWestCoord() {
+            return southWestCoord;
+        }
+    }
 
 }
