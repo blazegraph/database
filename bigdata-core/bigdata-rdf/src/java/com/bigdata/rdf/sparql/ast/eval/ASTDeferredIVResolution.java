@@ -996,7 +996,7 @@ public class ASTDeferredIVResolution {
             // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
             // At this point it is not possible to distinguish using WITH keyword from GRAPH construct,
             // as WITH scope was propagated into statement pattern
-            if (!store.isQuads() && ((sp.getScope()!=null) || Scope.NAMED_CONTEXTS.equals(sp.getScope()))) {
+            if (!store.isQuads() && (sp.getScope()!=null && !(Scope.DEFAULT_CONTEXTS.equals(sp.getScope())))) {
                 throw new QuadsOperationInTriplesModeException(
                         "Use of WITH and GRAPH constructs in query body is not supported " +
                         "in triples mode.");
