@@ -106,17 +106,16 @@ import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialCounters;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 import com.bigdata.service.geospatial.IGeoSpatialQuery;
-import com.bigdata.service.geospatial.IGeoSpatialQuery.LowerAndUpperBound;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialQuery;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
-import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
@@ -1984,6 +1983,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       
       protected final GeoSpatialLiteralExtension<BigdataValue> litExt;
 
+      protected final GeoSpatialDatatypeConfiguration datatypeConfig;
+
       // position of the subject in the tuples
       protected int objectPos = -1;
 
@@ -1998,11 +1999,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       // counters objects
       GeoSpatialCounters geoSpatialCounters;
       
+      
       public GeoSpatialFilterBase(
          final GeoSpatialLiteralExtension<BigdataValue> litExt,
          final GeoSpatialCounters geoSpatialCounters) {
          
          this.litExt = litExt;
+         this.datatypeConfig = litExt.getDatatypeConfig();
          this.geoSpatialCounters = geoSpatialCounters;
       }      
       
@@ -2089,9 +2092,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       final private double spatialPointLat;
       final private double spatialPointLon;      
       final private Double distanceInMeters;
-
-      final private Long timeMin;
-      final private Long timeMax;
+      
+      final private int idxOfLat;
+      final private int idxOfLon;
+      
+      final boolean latLonIndicesValid;
 
       public GeoSpatialInCircleFilter(
          final PointLatLon spatialPoint, Double distance,
@@ -2104,13 +2109,20 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.spatialPointLat = spatialPoint.getLat();
          this.spatialPointLon = spatialPoint.getLon();
          this.distanceInMeters = CoordinateUtility.unitsToMeters(distance, unit);
-         this.timeMin = timeMin;
-         this.timeMax = timeMax;         
+
+         this.idxOfLat = datatypeConfig.idxOfField(ServiceMapping.LATITUDE);
+         this.idxOfLon = datatypeConfig.idxOfField(ServiceMapping.LONGITUDE);
+
+         latLonIndicesValid = idxOfLat>=0 && idxOfLon>=0;
       }
 
       @Override
       @SuppressWarnings("rawtypes")      
       protected boolean isValidInternal(final ITuple tuple) {
+          
+          // TODO: think about this special case
+          if (!latLonIndicesValid)
+              return false; // something's wrong here, reject all tuples
 
           // Note: this is possibly called over and over again, so we choose a
           //       low-level implementation to get best performance out of it
@@ -2124,7 +2136,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             final double lat;
             final double lon;
-            final long time;
             if (oIV instanceof LiteralExtensionIV) {
                 
                final LiteralExtensionIV lit = (LiteralExtensionIV) oIV;
@@ -2132,9 +2143,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                long[] longArr = litExt.asLongArray(lit);
                final Object[] components = litExt.longArrAsComponentArr(longArr);
 
-               lat = (double)components[0];
-               lon = (double)components[1];
-               time = (long)components[2];
+               lat = (double)components[idxOfLat];
+               lon = (double)components[idxOfLon];
                
             } else {
                 
@@ -2143,8 +2153,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             }
 
             return 
-               CoordinateUtility.distanceInMeters(lat, spatialPointLat, lon, spatialPointLon) <= distanceInMeters &&
-               timeMin <= time && time <= timeMax;
+               CoordinateUtility.distanceInMeters(lat, spatialPointLat, lon, spatialPointLon) <= distanceInMeters;
                     
          } catch (Exception e) {
          

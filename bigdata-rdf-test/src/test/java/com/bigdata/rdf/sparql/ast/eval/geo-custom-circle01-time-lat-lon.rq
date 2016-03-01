@@ -2,7 +2,7 @@ PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
 
 SELECT * WHERE {
   SERVICE geo:search {
-    ?res geo:searchDatatype <http://my.custom.datatype> .
+    ?res geo:searchDatatype <http://my.custom.datatype/time-lat-lon> .
     ?res geo:search "inCircle" .
     ?res geo:predicate <http://p> .
     ?res geo:spatialCircleCenter "4#4" .

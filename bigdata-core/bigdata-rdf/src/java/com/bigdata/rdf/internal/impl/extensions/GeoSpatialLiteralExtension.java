@@ -590,4 +590,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public int getNumDimensions() {
        return datatypeConfig.getNumDimensions();
    }
+   
+   public GeoSpatialDatatypeConfiguration getDatatypeConfig() {
+       return datatypeConfig;
+   }
 }

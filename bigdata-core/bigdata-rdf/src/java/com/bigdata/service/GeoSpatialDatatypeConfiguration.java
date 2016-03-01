@@ -149,6 +149,28 @@ public class GeoSpatialDatatypeConfiguration {
     }
     
     /**
+     * Computes the index of a field with a given (predefined) service mapping.
+     * Returns -1 if no such component present in the datatype or the mapping
+     * that is passed in is null.
+     * 
+     * @param mapping
+     * @return
+     */
+    public int idxOfField(ServiceMapping mapping) {
+        if (mapping!=null) {
+        
+            for (int i=0; i<getFields().size(); i++) {
+                if (mapping == fields.get(i).getServiceMapping()) {
+                    return i;
+                }
+                
+            }
+        }
+        
+        return -1; // fallback
+    }
+    
+    /**
      * @return the number of dimensions (i.e., fields) of the configuration
      */
     public int getNumDimensions() {

@@ -33,7 +33,6 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**
  * Data driven test suite testing configurability of GeoSpatial service.
@@ -59,62 +58,168 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
     }
 
     /**
-     * Verify rectangle search with simple query:
-     * 
-     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
-     * 
-     * SELECT ?res WHERE {
-     *   SERVICE geo:search {
-     *     ?res geo:search "inRectangle" .
-     *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialRectangleSouthWest "2#2" .
-     *     ?res geo:spatialRectangleNorthEast "3#6" .
-     *     ?res geo:timeStart "4" .
-     *     ?res geo:timeEnd "4" .
-     *   }
-     * } 
+     * Rectangle query over lat+lon+time datatype and database containing
+     * lat+lon+time only data.
      */    
-    public void testInRectangleQuery01() throws Exception {
+    public void testCustomDatatypeRect01LatLonTime() throws Exception {
        
        new TestHelper(
-          "geo-rectangle01-custom-dt",
-          "geo-rectangle01-custom-dt.rq", 
-          "geo-grid101010-custom-dt.nt",
-          "geo-rectangle01-custom-dt.srx").runTest();
+          "geo-custom-rect01-lat-lon-time",
+          "geo-custom-rect01-lat-lon-time.rq", 
+          "geo-custom-grid101010-lat-lon-time.nt",
+          "geo-custom-rect01-lat-lon-time.srx").runTest();
        
     }
     
     /**
-     * Compared to the circle01* queries, the query
-     * 
-     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
-     * 
-     * SELECT * WHERE {
-     *   SERVICE geo:search {
-     *     ?res geo:search "inCircle" .
-     *     ?res geo:predicate <http://p> .
-     *     ?res geo:spatialCircleCenter "4#4" .
-     *     ?res geo:spatialCircleRadius "112" . #km
-     *     ?res geo:timeStart "5" .
-     *     ?res geo:timeEnd "5" .
-     *   }
-     * } 
-     * 
-     * extends the radius such that the point's neighbors in the east, west,
-     * south, and nord are matched now.
-     * 
-     * @throws Exception
-     */
-    public void testInCircleQuery02() throws Exception {
+     * Rectangle query over lat+lon+time datatype and database containing mixed data.
+     */    
+    public void testCustomDatatypeRect01LatLonTimeMixedData() throws Exception {
        
        new TestHelper(
-          "geo-circle02-custom-dt",
-          "geo-circle02-custom-dt.rq", 
-          "geo-grid101010-custom-dt.nt",
-          "geo-circle0203-custom-dt.srx").runTest();
+          "geo-custom-rect01-lat-lon-time-mixeddata",
+          "geo-custom-rect01-lat-lon-time.rq", 
+          "geo-custom-grid101010-mixed.nt",
+          "geo-custom-rect01-lat-lon-time.srx").runTest();
        
     }
     
+    /**
+     * Rectangle query over lat+time+lon datatype and database containing
+     * lat+time+lon only data.
+     */    
+    public void testCustomDatatypeRect01LatTimeLon() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-rect01-lat-time-lon",
+          "geo-custom-rect01-lat-time-lon.rq", 
+          "geo-custom-grid101010-lat-time-lon.nt",
+          "geo-custom-rect01-lat-time-lon.srx").runTest();
+       
+    }
+    
+    /**
+     * Rectangle query over lat+lon+time datatype and database containing mixed data.
+     */    
+    public void testCustomDatatypeRect01LatTimeLonMixedData() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-rect01-lat-time-lon-mixeddata",
+          "geo-custom-rect01-lat-time-lon.rq", 
+          "geo-custom-grid101010-mixed.nt",
+          "geo-custom-rect01-lat-time-lon.srx").runTest();
+       
+    }    
+    
+    /**
+     * Rectangle query over lat+time+lon datatype and database containing
+     * lat+time+lon only data.
+     */    
+    public void testCustomDatatypeRect01TimeLatLon() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-rect01-time-lat-lon",
+          "geo-custom-rect01-time-lat-lon.rq", 
+          "geo-custom-grid101010-time-lat-lon.nt",
+          "geo-custom-rect01-time-lat-lon.srx").runTest();
+       
+    }
+    
+    /**
+     * Rectangle query over time+lat+lon datatype and database containing mixed data.
+     */    
+    public void testCustomDatatypeRect01TimeLatLonMixedData() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-rect01-time-lat-lon-mixeddata",
+          "geo-custom-rect01-time-lat-lon.rq", 
+          "geo-custom-grid101010-mixed.nt",
+          "geo-custom-rect01-time-lat-lon.srx").runTest();
+       
+    }   
+    
+    /**
+     * Circle query over lat+lon+time datatype and database containing
+     * lat+lon+time only data.
+     */    
+    public void testCustomDatatypeCircle01LatLonTime() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-circle01-lat-lon-time",
+          "geo-custom-circle01-lat-lon-time.rq", 
+          "geo-custom-grid101010-lat-lon-time.nt",
+          "geo-custom-circle01-lat-lon-time.srx").runTest();
+       
+    }
+    
+    /**
+     * Circle query over lat+lon+time datatype and database containing mixed data.
+     */    
+    public void testCustomDatatypeCircle01LatLonTimeMixedData() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-circle01-lat-lon-time-mixeddata",
+          "geo-custom-circle01-lat-lon-time.rq", 
+          "geo-custom-grid101010-mixed.nt",
+          "geo-custom-circle01-lat-lon-time.srx").runTest();
+       
+    }
+    
+    /**
+     * Circle query over lat+time+lon datatype and database containing
+     * lat+time+lon only data.
+     */    
+    public void testCustomDatatypeCircle01LatTimeLon() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-circle01-lat-time-lon",
+          "geo-custom-circle01-lat-time-lon.rq", 
+          "geo-custom-grid101010-lat-time-lon.nt",
+          "geo-custom-circle01-lat-time-lon.srx").runTest();
+       
+    }
+    
+    /**
+     * Rectangle query over lat+lon+time datatype and database containing mixed data.
+     */    
+    public void testCustomDatatypeCircle01LatTimeLonMixedData() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-circle01-lat-time-lon-mixeddata",
+          "geo-custom-circle01-lat-time-lon.rq", 
+          "geo-custom-grid101010-mixed.nt",
+          "geo-custom-circle01-lat-time-lon.srx").runTest();
+       
+    }    
+    
+    /**
+     * Circle query over lat+time+lon datatype and database containing
+     * lat+time+lon only data.
+     */    
+    public void testCustomDatatypeCircle01TimeLatLon() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-circle01-time-lat-lon",
+          "geo-custom-circle01-time-lat-lon.rq", 
+          "geo-custom-grid101010-time-lat-lon.nt",
+          "geo-custom-circle01-time-lat-lon.srx").runTest();
+       
+    }
+    
+    /**
+     * Circle query over time+lat+lon datatype and database containing mixed data.
+     */    
+    public void testCustomDatatypeCircle01TimeLatLonMixedData() throws Exception {
+       
+       new TestHelper(
+          "geo-custom-circle01-time-lat-lon-mixeddata",
+          "geo-custom-circle01-time-lat-lon.rq", 
+          "geo-custom-grid101010-mixed.nt",
+          "geo-custom-circle01-time-lat-lon.srx").runTest();
+       
+    } 
+
+
     /**
      * Correct rejection test with search query for datatype that is not registered.
      * 
@@ -124,9 +229,9 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
         
         try {
             new TestHelper(
-               "geo-circle02-custom-dt",
-               "geo-circle02-invalid-custom-dt.rq", 
-               "geo-grid101010-custom-dt.nt",
+               "geo-custom-invalid-dt",
+               "geo-custom-invalid-dt.rq", 
+               "geo-custom-grid101010-mixed.nt",
                "geo-circle0203-custom-dt.srx").runTest();
         } catch (Exception e) {
             return; // expected
@@ -135,8 +240,8 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
         throw new RuntimeException("Expected to run into exception.");
         
      }
-    
-    
+
+
     /**
      * Verify precision handling, which is changed in the configuration to be 6 for
      * the first component and 5 for the second one. See 
@@ -159,16 +264,16 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
      * 
      * is evaluated over data
      * 
-     * <http://s0> <http://p> "0#0#0"^^<http://my.custom.datatype> .
-     * <http://s1> <http://p> "1.1#1.1#0"^^<http://my.custom.datatype> .
-     * <http://s2> <http://p> "2.22#2.22#0"^^<http://my.custom.datatype> .
-     * <http://s3> <http://p> "3.333#3.333#0"^^<http://my.custom.datatype> .
-     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://my.custom.datatype> .
-     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://my.custom.datatype> .
-     * <http://s6> <http://p> "6.666666#6.6666666#0"^^<http://my.custom.datatype> .
-     * <http://s6b> <http://p> "6.66667#6.6666666#0"^^<http://my.custom.datatype> .
-     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://my.custom.datatype> .
-     * <http://s6c> <http://p> "6.66667#6.66667#0"^^<http://my.custom.datatype> .
+     * <http://s0> <http://p> "0#0#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s1> <http://p> "1.1#1.1#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s2> <http://p> "2.22#2.22#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s3> <http://p> "3.333#3.333#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6> <http://p> "6.666666#6.6666666#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6b> <http://p> "6.66667#6.6666666#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6c> <http://p> "6.66667#6.66667#0"^^<http://my.custom.datatype/lat-lon-time> .
      * 
      * With the given precision, the query is equivalent to
      * 
@@ -187,30 +292,30 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
      * 
      * and the data is equivalent to 
      * 
-     * <http://s0> <http://p> "0#0#0"^^<http://my.custom.datatype> .
-     * <http://s1> <http://p> "1.1#1.1#0"^^<http://my.custom.datatype> .
-     * <http://s2> <http://p> "2.22#2.22#0"^^<http://my.custom.datatype> .
-     * <http://s3> <http://p> "3.333#3.333#0"^^<http://my.custom.datatype> .
-     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://my.custom.datatype> .
-     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://my.custom.datatype> .
-     * <http://s6> <http://p> "6.666666#6.666666#0"^^<http://my.custom.datatype> .
-     * <http://s6b> <http://p> "6.66667#6.666666#0"^^<http://my.custom.datatype> .
-     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://my.custom.datatype> .
-     * <http://s6d> <http://p> "6.66667#6.66667#0"^^<http://my.custom.datatype> .
+     * <http://s0> <http://p> "0#0#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s1> <http://p> "1.1#1.1#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s2> <http://p> "2.22#2.22#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s3> <http://p> "3.333#3.333#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6> <http://p> "6.666666#6.666666#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6b> <http://p> "6.66667#6.666666#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://my.custom.datatype/lat-lon-time> .
+     * <http://s6d> <http://p> "6.66667#6.66667#0"^^<http://my.custom.datatype/lat-lon-time> .
      *  
      * Consequently, only subjects s0 and s6a, s6b, and s6d are *not* contained in the
      * result, while all others are.
      */
-    public void testInRectangleQuery08mod() throws Exception {
+    public void testCustomDatatypePrecision() throws Exception {
        
        new TestHelper(
-          "geo-rectangle08-custom-dt",
-          "geo-rectangle08mod-custom-dt.rq", 
-          "geo-rectangle08-custom-dt.nt",
-          "geo-rectangle08mod-custom-dt.srx").runTest();
+          "geo-custom-precisiontest",
+          "geo-custom-precisiontest.rq", 
+          "geo-custom-precisiontest.nt",
+          "geo-custom-precisiontest.srx").runTest();
        
     }
-    
+
     
     @Override
     public Properties getProperties() {
@@ -242,16 +347,64 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".0",
            "{\"config\": "
-           + "{ \"uri\": \"http://my.custom.datatype\", "
+           + "{ \"uri\": \"http://my.custom.datatype/lat-lon-time\", "
            + "\"fields\": [ "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
            + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"TIME\"  } "
            + "]}}");
-
         
-        // TODO: see if we can get rid of this
-        // we also need to include a custom vocabulary class defining the custom datatype
+        properties.setProperty(
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".1",
+           "{\"config\": "
+           + "{ \"uri\": \"http://my.custom.datatype/time-lat-lon\", "
+           + "\"fields\": [ "
+           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"TIME\"  }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
+           + "]}}");
+        
+        properties.setProperty(
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".2",
+           "{\"config\": "
+           + "{ \"uri\": \"http://my.custom.datatype/lat-time-lon\", "
+           + "\"fields\": [ "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
+           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"TIME\"  }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
+           + "]}}");
+        
+        // TODO: come up with tests for this one
+        properties.setProperty(
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".3",
+           "{\"config\": "
+           + "{ \"uri\": \"http://my.custom.datatype/lat-lon\", "
+           + "\"fields\": [ "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
+           + "]}}");
+
+        // TODO: come up with tests for this one
+        properties.setProperty(
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".4",
+           "{\"config\": "
+           + "{ \"uri\": \"http://my.custom.datatype/lat-lon-coord\", "
+           + "\"fields\": [ "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
+           + "{ \"valueType\": \"LONG\", \"serviceMapping\": \"COORD_SYSTEM\" } "
+           + "]}}");
+        
+        // TODO: come up with tests for this one
+        properties.setProperty(
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".5",
+           "{\"config\": "
+           + "{ \"uri\": \"http://my.custom.datatype/time-coord\", "
+           + "\"fields\": [ "
+           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"serviceMapping\" : \"TIME\"  }, "
+           + "{ \"valueType\": \"LONG\", \"serviceMapping\": \"COORD_SYSTEM\" } "
+           + "]}}");
+        
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.VOCABULARY_CLASS,
            "com.bigdata.rdf.sparql.ast.eval.service.GeoSpatialTestVocabulary");

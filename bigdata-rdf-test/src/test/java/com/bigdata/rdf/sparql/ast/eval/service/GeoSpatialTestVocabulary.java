@@ -62,7 +62,12 @@ public class GeoSpatialTestVocabulary extends BigdataCoreVocabulary_v20151210 {
         super.addValues();
         addDecl(
             new BaseVocabularyDecl(
-                new URIImpl("http://my.custom.datatype")
+                new URIImpl("http://my.custom.datatype/lat-lon-time"),
+                new URIImpl("http://my.custom.datatype/time-lat-lon"),
+                new URIImpl("http://my.custom.datatype/lat-time-lon"),
+                new URIImpl("http://my.custom.datatype/lat-lon"),
+                new URIImpl("http://my.custom.datatype/lat-lon-coord"),
+                new URIImpl("http://my.custom.datatype/time-coord")                
             )
         );
     }
