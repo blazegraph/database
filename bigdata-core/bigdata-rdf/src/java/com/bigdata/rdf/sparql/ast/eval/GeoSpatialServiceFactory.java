@@ -60,6 +60,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.BaseJoinStats;
+import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.Annotations;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -780,33 +781,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 
                 final Object[] southWestComponents = query.getLowerAndUpperBound().getLowerBound();
                 final Object[] northEastComponents = query.getLowerAndUpperBound().getUpperBound();
-                
-                // TODO: remove code
-//                final PointLatLonTime southWestWithTime = 
-//                    query.getBoundingBoxSouthWestWithTime(); 
-//                final Object[] southWestComponents = 
-//                        PointLatLonTime.toComponentString(southWestWithTime);
-                    
-                // TODO: remove code
-//                final PointLatLonTime northEastWithTime =
-//                    query.getBoundingBoxNorthEastWithTime();
-//                final Object[] northEastComponents =
-//                    PointLatLonTime.toComponentString(northEastWithTime);
-    
-                /**
-                 * We proceed as follows:
-                 * 
-                 * 1.) Estimate the number of total points in the search range
-                 * 2.) Based on the config parameter telling us how many points to process per thread, we obtain the #subtasks
-                 * 3.) Knowing the number of subtasks, we split the range into #subtasks equal-length subranges
-                 * 4.) For each of these subranges, we set up a subtask to process the subrange
-                 */
+
+
                 final AccessPath<ISPO> accessPath = 
                     getAccessPath(southWestComponents, northEastComponents, query);
                 
                 if (accessPath==null) // known unsatisfiable, e.g. if predicate unknown
                     continue;
                 
+                // estimate the total number of points in the search range
                 final long totalPointsInRange = accessPath.rangeCount(false/* exact */);
                 
                 stats.accessPathRangeCount.add(totalPointsInRange);
@@ -835,32 +818,23 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     
                 }
                 
-                final GeoSpatialSearchRange searchRange =
-                    new GeoSpatialSearchRange(datatypeConfig, litExt, southWestComponents, northEastComponents);
-                final GeoSpatialSearchRangePartitioner partitioner = new GeoSpatialSearchRangePartitioner(searchRange);
+
 
                 
                 // set up tasks for partitions
                 final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder(); // will be the same for all partitions
                 final int subjectPos = keyOrder.getPositionInIndex(SPOKeyOrder.S);
                 final int objectPos = keyOrder.getPositionInIndex(SPOKeyOrder.O);
+                
+                // set up the search range and a partitioner
+                final GeoSpatialSearchRange searchRange =
+                    new GeoSpatialSearchRange(datatypeConfig, litExt, southWestComponents, northEastComponents);
+                final GeoSpatialSearchRangePartitioner partitioner = new GeoSpatialSearchRangePartitioner(searchRange);
                 for (GeoSpatialSearchRange partition : partitioner.partition(numTasks, totalPointsInRange, minDatapointsPerTask)) {
                    
-                   final Object[] partitionLowerBorderComponents = partition.getLowerBorderComponents();
-                   final Object[] partitionUpperBorderComponents = partition.getUpperBorderComponents();
+                   final Object[] lowerBorder = partition.getLowerBorderComponents();
+                   final Object[] upperBorder = partition.getUpperBorderComponents();
                    
-                   // TODO: make this more flexible
-                   final PointLatLonTime lowerBorder = 
-                       new PointLatLonTime((Double)partitionLowerBorderComponents[0], 
-                                           (Double)partitionLowerBorderComponents[1], 
-                                           (Long)partitionLowerBorderComponents[2]);
-
-                   final PointLatLonTime upperBorder = 
-                           new PointLatLonTime((Double)partitionUpperBorderComponents[0], 
-                                               (Double)partitionUpperBorderComponents[1], 
-                                               (Long)partitionUpperBorderComponents[2]);
-
-
 
                    // set up a subtask for the partition
                    final GeoSpatialServiceCallSubRangeTask subTask = 
@@ -872,20 +846,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                    
                    if (log.isDebugEnabled()) {
     
-                      final Object[] lowerBorderComponentsPart = 
-                         PointLatLonTime.toComponentString(lowerBorder);
-                      final Object[] upperBorderComponentsPart = 
-                         PointLatLonTime.toComponentString(upperBorder);
-                      
-                      LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorderComponentsPart);
-                      LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorderComponentsPart);
+                      LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorder);
+                      LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorder);
     
                       log.debug("[InnerRange] Scanning from " + lowerBorderIVPart.getDelegate().integerValue() 
                             + " / " + litExt.toComponentString(0, 2, lowerBorderIVPart) 
-                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(lowerBorderComponentsPart)));
+                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(lowerBorder)));
                       log.debug("[InnerRange]            to " + upperBorderIVPart.getDelegate().integerValue() 
                             + " / " +  litExt.toComponentString(0, 2, upperBorderIVPart) 
-                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorderComponentsPart)));
+                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorder)));
                    }
     
                 }
@@ -917,8 +886,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           */
          protected GeoSpatialServiceCallSubRangeTask getSubTask(
             final IGeoSpatialQuery query,
-            final PointLatLonTime subRangeUpperLeftWithTime,      /* upper left of the subtask */
-            final PointLatLonTime subRangeLowerRightWithTime,     /* lower right of the subtask */
+            final Object[] lowerBorder, final Object[] upperBorder,
             final SPOKeyOrder keyOrder, final int subjectPos, 
             final int objectPos, final BaseJoinStats stats) {
             
@@ -927,27 +895,20 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              */
             final GeoSpatialFilterBase filter;
 
-            // TODO: avoid redundant setup of geospatial datatype configuration
             // set up datatype configuration for the datatype URI
-            final GeoSpatialDatatypeConfiguration datatypeConfig =
-                GeoSpatialConfig.getInstance().getConfigurationForDatatype(query.getSearchDatatype());
-            if (datatypeConfig==null) {
-                throw new GeoSpatialSearchException(
-                    GeoSpatialSearchException.INVALID_PARAMETER_EXCEPTION + ": search datatype unknown.");
-            }
-            
-            final GeoSpatialLiteralExtension litExt = 
+            final GeoSpatialDatatypeConfiguration datatypeConfig = query.getDatatypeConfig();
+            final GeoSpatialLiteralExtension<BigdataValue> litExt = 
                 new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
             
-
-            // TODO: FILTERs need to be constructed dynamically
             switch (query.getSearchFunction()) {
             case IN_CIRCLE: 
                {
-
+                  // for circle queries, the filter retains those values that are indeed in the
+                  // circle (the z-order borders we're using for scanning report values that are
+                  // not inside this circle)
                   filter = new GeoSpatialInCircleFilter(
-                     query.getSpatialCircleCenter(),  query.getSpatialCircleRadius(), query.getSpatialUnit(), 
-                     query.getTimeStart(), query.getTimeEnd(), 
+                     query.getSpatialCircleCenter(),  query.getSpatialCircleRadius(), 
+                     query.getSpatialUnit(), query.getTimeStart(), query.getTimeEnd(), 
                      new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig), geoSpatialCounters);
                   
                }
@@ -956,14 +917,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                
             case IN_RECTANGLE: 
                {
-                  final LowerAndUpperBound bounds = query.getLowerAndUpperBound();
-                  final Object[] lowerBound = bounds.getLowerBound();
-                  final Object[] upperBound = bounds.getUpperBound();
+                  // for a rectangle query, the z-order lower and upper border exactly coincide
+                  // with what we're looking for, so we set up a dummy filter for that case
                   filter = new GeoSpatialInRectangleFilter(
-                     new PointLatLonTime((Double)lowerBound[0], (Double)lowerBound[1], query.getTimeStart()), 
-                     new PointLatLonTime((Double)upperBound[0], (Double)upperBound[1], query.getTimeEnd()),
                      new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig), geoSpatialCounters);
-                  
                }
                break;
 
@@ -999,25 +956,16 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                
             }
 
-            // build the Object[] constituting the upper left and lo
-            
-            // decompose sub range borders into components
-            final Object[] subRangeUpperLeftComponents = 
-               PointLatLonTime.toComponentString(subRangeUpperLeftWithTime);
-            final Object[] subRangeLowerRightComponents = 
-               PointLatLonTime.toComponentString(subRangeLowerRightWithTime);
-
             // get the access path for the sub range
-            final AccessPath<ISPO> accessPath = 
-               getAccessPath(subRangeUpperLeftComponents, subRangeLowerRightComponents, query);
+            final AccessPath<ISPO> accessPath = getAccessPath(lowerBorder, upperBorder, query);
             
             if (accessPath==null) {
                return null;
             }
 
             // set up a big min advancer for efficient extraction of relevant values from access path
-            final byte[] lowerZOrderKey = litExt.toZOrderByteArray(subRangeUpperLeftComponents);
-            final byte[] upperZOrderKey = litExt.toZOrderByteArray(subRangeLowerRightComponents);
+            final byte[] lowerZOrderKey = litExt.toZOrderByteArray(lowerBorder);
+            final byte[] upperZOrderKey = litExt.toZOrderByteArray(upperBorder);
             
             final Advancer<SPO> bigMinAdvancer = 
                new ZOrderIndexBigMinAdvancer(
@@ -1048,15 +996,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final Object[] lowerBorderComponents, final Object[] upperBorderComponents,
             final IGeoSpatialQuery query) {
 
-             // TODO: avoid redundant setup of geospatial datatype configuration
-             // set up datatype configuration for the datatype URI
-             final GeoSpatialDatatypeConfiguration datatypeConfig =
-                 GeoSpatialConfig.getInstance().getConfigurationForDatatype(query.getSearchDatatype());
-             if (datatypeConfig==null) {
-                 throw new GeoSpatialSearchException(
-                     GeoSpatialSearchException.INVALID_PARAMETER_EXCEPTION + ": search datatype unknown.");
-             }
-             
+             // set up datatype configuration and literal extension object for the datatype URI
+             final GeoSpatialDatatypeConfiguration datatypeConfig = query.getDatatypeConfig();
              final GeoSpatialLiteralExtension litExt = 
                  new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
              
@@ -1274,17 +1215,29 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              
                           
              /**
-              * Computes the partitions. For now, we always partition along the lastmost dimension,
-              * e.g. for LAT+LON+TIME this would be on the TIME. TODO: rationale? does that make sense?
-             * @param minDatapointsPerTask 
-             * @param totalPointsInRange 
-             * @param numTasks 
+              * Computes the partitions based on the configuration. For now, we always partition along the
+              * last dimension, e.g. for a ternary datatype such as LAT+LON+TIME we would partition on TIME.
+              * 
+              * The number of partitions is computed by computeNumberOfPartitions() with the given parameters,
+              * see the documentation of the latter method for a detailed explanation.
+              * 
+              * @param numTasks desired number of access path tasks generated per thread in case the range 
+              *                 is large enough to be split, see {@link PipelineJoin.Annotations.NUM_TASKS_PER_THREAD}
+              * @param minDatapointsPerTask the minimum number of data points assigned to a a given task, which
+              *                             essentially should be the threshold on which parallelization starts 
+              *                             to pay out, see {@link PipelineJoin.Annotations.MIN_DATAPOINTS_PER_TASK}
+              * @param totalPointsInRange the estimated number of total points in the range.
+              * 
+              * @return the partitions, fully and exactly covering this search range
+              * 
+              * TODO: what's the rational for choosing the last component? wouldn't the one with the most significant
+              *       bit make more sense? would need some experimental validation to figure that out...
               */
              public List<GeoSpatialSearchRange> partition(int numTasks, long totalPointsInRange, int minDatapointsPerTask) {
 
                  final List<GeoSpatialSearchRange> partitions =  new ArrayList<GeoSpatialSearchRange>();
 
-                 final long numPartitions = computerNumberOfPartitions(numTasks, totalPointsInRange, minDatapointsPerTask);
+                 final long numPartitions = computeNumberOfPartitions(numTasks, totalPointsInRange, minDatapointsPerTask);
                  
                  
                  final GeoSpatialDatatypeConfiguration datatypeConfig = geoSpatialSearchRange.getDatatypeConfig();
@@ -1303,7 +1256,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                  
                  
                  final ValueType vt = fieldToPartitionOn.getValueType();
-                 
                  
                  // initialize the value value representing the component on which we split
                  // -> note that we convert to long, applying the precision adjustment
@@ -1342,7 +1294,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   * Compute the break points
                   */
                  long lastConsidered = -1;
-                 breakPoints.add(lowerComponentLongValue -1); // -1 will be corrected below
+                 breakPoints.add(lowerComponentLongValue -1); // one value on the left -> will add +1 below
                  
                  // points in-between (ignoring first and last)
                  for (long i = 1; i < numPartitions; i++) {
@@ -1376,7 +1328,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                      }
 
                      final long startLongVal = breakPoints.get(i) + 1;
-                     final long endLongVal = breakPoints.get(i + 1);                     
+                     final long endLongVal = breakPoints.get(i + 1);             
+                     
+                     // TODO: should encapsulate this as an "asLongValue" in the GeoSpatialLiteralExtension,
+                     //       the code doesn't belong here...
                      switch (vt) {
                      case LONG:
                      {
@@ -1424,8 +1379,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
               * 
               * Effectively, this means choosing the smaller of the two values (MIN), while
               * making sure that the value returned is >= 1.
-              */
-             private long computerNumberOfPartitions(int numTasks, long totalPointsInRange, int minDatapointsPerTask) {
+              * 
+              * @param numTasks desired number of access path tasks generated per thread in case the range 
+              *                 is large enough to be split, see {@link PipelineJoin.Annotations.NUM_TASKS_PER_THREAD}
+              * @param minDatapointsPerTask the minimum number of data points assigned to a a given task, which
+              *                             essentially should be the threshold on which parallelization starts 
+              *                             to pay out, see {@link PipelineJoin.Annotations.MIN_DATAPOINTS_PER_TASK}
+              * @param totalPointsInRange the estimated number of total points in the range.
+              *
+              * @return the resulting number of partitions
+              **/
+             private long computeNumberOfPartitions(int numTasks, long totalPointsInRange, int minDatapointsPerTask) {
                  
 
                  final long maxTasksByDatapointRestriction = totalPointsInRange/minDatapointsPerTask;
@@ -2207,22 +2171,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
    public static class GeoSpatialInRectangleFilter extends GeoSpatialFilterBase {
 
       private static final long serialVersionUID = -314581671447912352L;
-
-      @SuppressWarnings("unused") // unused for now, but may become important
-      private final PointLatLonTime lowerBorder;
-      
-      @SuppressWarnings("unused") // unused for now, but may become important
-      private final PointLatLonTime upperBorder;
       
       public GeoSpatialInRectangleFilter(
-         final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
          final GeoSpatialLiteralExtension<BigdataValue> litExt,
          final GeoSpatialCounters geoSpatialCounters) {
          
          super(litExt, geoSpatialCounters);
-         
-         this.lowerBorder = lowerBorder;
-         this.upperBorder = upperBorder;
       }
       
       @SuppressWarnings("rawtypes")
