@@ -33,9 +33,9 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.internal.gis.CoordinateDD;
 import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 
@@ -160,6 +160,12 @@ public interface IGeoSpatialQuery {
     public boolean isSatisfiable();
 
     /**
+     * @return the datatype configuration associated with the query
+     */
+    public GeoSpatialDatatypeConfiguration getDatatypeConfig();
+    
+    
+    /**
      * Helper class encapsulating both the lower and upper bound as implied
      * by the query, for the given datatype configuration.
      * 
@@ -183,24 +189,6 @@ public interface IGeoSpatialQuery {
             return upperBound;
         }
         
-    }
-    
-    public static class SouthWestAndNorthEastCoordinate {
-        private final CoordinateDD southWestCoord;
-        private final CoordinateDD northEastCoord;
-        
-        public SouthWestAndNorthEastCoordinate(final CoordinateDD southWestCoord, final CoordinateDD northEastCoord) {
-            this.southWestCoord = southWestCoord;
-            this.northEastCoord = northEastCoord;
-        }
-
-        public CoordinateDD getNorthEastCoord() {
-            return northEastCoord;
-        }
-        
-        public CoordinateDD getSouthWestCoord() {
-            return southWestCoord;
-        }
     }
 
 }

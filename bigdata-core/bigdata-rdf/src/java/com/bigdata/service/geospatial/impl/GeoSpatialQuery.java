@@ -28,7 +28,6 @@ package com.bigdata.service.geospatial.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -48,7 +47,6 @@ import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 import com.bigdata.service.geospatial.IGeoSpatialQuery;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
-import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 
 /**
  * Implementation of the {@link IGeoSpatialQuery} interface.
@@ -122,6 +120,11 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.incomingBindings = incomingBindings;
         
         this.datatypeConfig = GeoSpatialConfig.getInstance().getConfigurationForDatatype(searchDatatype);
+        
+        if (this.datatypeConfig==null) {
+            throw new GeoSpatialSearchException(
+                "Unknown datatype configuration for geospatial search query.");
+        }
 
         computeLowerAndUpperBoundingBoxIfNotSet();
     }
@@ -430,6 +433,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         return true;
     }
 
+    @Override
+    public GeoSpatialDatatypeConfiguration getDatatypeConfig() {
+        return datatypeConfig;
+    }
     
     /**
      * Set the query's internal bounding box, if required.
