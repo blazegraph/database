@@ -44,6 +44,8 @@ public class TestTicket1200 extends AbstractDataDrivenSPARQLTestCase {
    	/**
 	 * Test for REGEX on a non-string literal (Inline IPv4)
 	 * 
+	 * {@link BLZG-1780}
+	 * 
 	 * <pre>
 	 * prefix : <http://www.bigdata.com/> 
 	 * prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
@@ -61,15 +63,14 @@ public class TestTicket1200 extends AbstractDataDrivenSPARQLTestCase {
 	 * 
 	 * @throws Exception
 	 */
-//BLZG-1780
-//  public void test_ticket_1200a() throws Exception {
-//     new TestHelper("ticket-1200a",// testURI,
-//           "ticket_1200a.rq",// queryFileURL
-//           "ticket_1200.trig",// dataFileURL
-//           "ticket_1200a.srx",// resultFileURL
-//           false /* checkOrder */
-//     ).runTest();
-//  }   
+  public void test_ticket_1200a() throws Exception {
+     new TestHelper("ticket-1200a",// testURI,
+           "ticket_1200a.rq",// queryFileURL
+           "ticket_1200.trig",// dataFileURL
+           "ticket_1200a.srx",// resultFileURL
+           false /* checkOrder */
+     ).runTest();
+  }   
   
 	/**
 	 * Test for REGEX on a string literal 

@@ -645,25 +645,33 @@ public class FunctionRegistry {
 
 				checkArgs(args,
 						ValueExpressionNode.class, ValueExpressionNode.class);
-
+				
 				final IValueExpression<? extends IV> var =
 					AST2BOpUtility.toVE(context,globals, args[0]);
 				
 				final IValueExpression<? extends IV> pattern =
 					AST2BOpUtility.toVE(context,globals, args[1]);
-
+				
+			//	final boolean matchNonString = false;
+				
+				final RegexBOp regex;
+				
 				if (args.length == 2) {
 
-					return new RegexBOp(var, pattern);
+					regex = new RegexBOp(var, pattern);
 
 				} else {
 
 					final IValueExpression<? extends IV> flags =
 						AST2BOpUtility.toVE(context,globals, args[2]);
 
-					return new RegexBOp(var, pattern, flags);
+					regex = new RegexBOp(var, pattern, flags);
 
 				}
+				
+				//regex.setProperty(, value)
+				
+				return regex;
 
 			}
 		});

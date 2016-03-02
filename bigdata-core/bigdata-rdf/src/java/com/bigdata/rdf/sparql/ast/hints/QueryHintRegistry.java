@@ -189,6 +189,13 @@ public class QueryHintRegistry {
          */
         add(new DefaultGraphDistinctFilterHint());
         
+        /*
+         * Automatically convert non-String Literals to strings for SPARQL REGEX
+         * 
+         * {@see BLZG-1780}
+         */
+        add(new RegexMatchNonStringHint());
+        
     }
 
 }
