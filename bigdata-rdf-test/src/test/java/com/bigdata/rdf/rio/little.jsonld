@@ -1,0 +1,21 @@
+[ {
+  "@id" : "http://www.bigdata.com/Bryan",
+  "@type" : [ "http://xmlns.com/foaf/0.1/Person" ],
+  "http://xmlns.com/foaf/0.1/knows" : [ {
+    "@id" : "http://www.bigdata.com/Mike"
+  } ]
+}, {
+  "@id" : "http://www.bigdata.com/Mike",
+  "@type" : [ "http://xmlns.com/foaf/0.1/Person" ],
+  "http://xmlns.com/foaf/0.1/knows" : [ {
+    "@id" : "http://www.bigdata.com/Bryan"
+  } ]
+}, {
+  "@id" : "http://www.bigdata.com/queryHints#Query",
+  "http://www.bigdata.com/queryHints#analytic" : [ {
+    "@value" : "true"
+  } ],
+  "http://www.bigdata.com/queryHints#constructDistinctSPO" : [ {
+    "@value" : "false"
+  } ]
+} ]
