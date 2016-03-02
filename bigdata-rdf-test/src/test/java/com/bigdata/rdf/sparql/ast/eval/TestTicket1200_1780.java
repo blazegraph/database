@@ -31,12 +31,12 @@ package com.bigdata.rdf.sparql.ast.eval;
  * 
  * @author <a href="mailto:beebs@blazegraph.com">Brad Bebee</a>
  */
-public class TestTicket1200 extends AbstractDataDrivenSPARQLTestCase {
+public class TestTicket1200_1780 extends AbstractDataDrivenSPARQLTestCase {
 
-   public TestTicket1200() {
+   public TestTicket1200_1780() {
    }
 
-   public TestTicket1200(String name) {
+   public TestTicket1200_1780(String name) {
       super(name);
    }
   
@@ -68,6 +68,33 @@ public class TestTicket1200 extends AbstractDataDrivenSPARQLTestCase {
            "ticket_1200a.rq",// queryFileURL
            "ticket_1200.trig",// dataFileURL
            "ticket_1200a.srx",// resultFileURL
+           false /* checkOrder */
+     ).runTest();
+  }   
+  
+	/**
+	 * 
+	 * Test that the query without the query hint fails.
+	 * 
+	 * {@See BLZG-1780}
+	 * 
+	 * prefix : <http://www.bigdata.com/> prefix rdf:
+	 * <http://www.w3.org/1999/02/22-rdf-syntax-ns#> prefix rdfs:
+	 * <http://www.w3.org/2000/01/rdf-schema#> prefix foaf:
+	 * <http://xmlns.com/foaf/0.1/> prefix xsd:
+	 * <http://www.w3.org/2001/XMLSchema#> PREFIX hint:
+	 * <http://www.bigdata.com/queryHints#>
+	 * 
+	 * select ?s where { ?s :hasAddress ?address . FILTER(REGEX(?address,
+	 * '^10.*', 'i')) }
+	 * 
+	 * @throws Exception
+	 */
+  public void test_ticket_1780a() throws Exception {
+     new TestHelper("ticket-1780a",// testURI,
+           "ticket_1780a.rq",// queryFileURL
+           "ticket_1200.trig",// dataFileURL
+           "ticket_1780a.srx",// resultFileURL
            false /* checkOrder */
      ).runTest();
   }   

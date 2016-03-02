@@ -155,7 +155,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestTicket1087.class);
         
         //BLZG-1200 SPARQL REGEX Literals
-        suite.addTestSuite(TestTicket1200.class);
+        suite.addTestSuite(TestTicket1200_1780.class);
 
         // test static analysis for quads constructs in triples mode, raising
         // an early exception when accessing named graphs in triples mode
