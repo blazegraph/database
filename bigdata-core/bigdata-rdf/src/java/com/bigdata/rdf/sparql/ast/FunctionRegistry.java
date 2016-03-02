@@ -652,8 +652,6 @@ public class FunctionRegistry {
 				final IValueExpression<? extends IV> pattern =
 					AST2BOpUtility.toVE(context,globals, args[1]);
 				
-			//	final boolean matchNonString = false;
-				
 				final RegexBOp regex;
 				
 				if (args.length == 2) {
@@ -668,8 +666,6 @@ public class FunctionRegistry {
 					regex = new RegexBOp(var, pattern, flags);
 
 				}
-				
-				//regex.setProperty(, value)
 				
 				return regex;
 
