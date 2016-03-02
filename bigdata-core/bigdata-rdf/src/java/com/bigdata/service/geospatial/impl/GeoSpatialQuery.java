@@ -420,14 +420,16 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
          
         }
         
-        if (timeStart>timeEnd) {
-            
-            log.info("Search rectangle start time (" + timeStart + ") is larger than end time (" 
-                        + timeEnd +  ". Search request will give no results.");
+        if (timeStart!=null && timeEnd!=null) {
+            if (timeStart>timeEnd) {
                 
-            return false;
+                log.info("Search rectangle start time (" + timeStart + ") is larger than end time (" 
+                            + timeEnd +  ". Search request will give no results.");
+                    
+                return false;
+            }
         }
-
+        
         // TODO: add custom mappings here
         
         return true;

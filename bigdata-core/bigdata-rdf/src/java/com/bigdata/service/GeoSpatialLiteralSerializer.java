@@ -33,11 +33,24 @@ package com.bigdata.service;
  * 
  * @author msc
  */
-// TODO: make use of this interface
-public interface GeoSpatialDatatypeSerializer {
+public interface GeoSpatialLiteralSerializer {
     
-    public Object[] toComponents(final String literalString);
+    /**
+     * Decomposes a string[] into an array of strings identifying the
+     * individual components.
+     * 
+     * @param literalString
+     * @return
+     */
+    public String[] toComponents(final String literalString);
     
+    /**
+     * Recomposes the components into a string, should typically use
+     * the object's toString() method.
+     * 
+     * @param components
+     * @return
+     */
     public String fromComponents(final Object[] components);
 
 }

@@ -51,6 +51,7 @@ public class GeoSpatialConfig {
 
     private final static String JSON_STR_CONFIG = "config";
     private final static String JSON_STR_URI = "uri";
+    private final static String JSON_STR_LITERALSERIALIZER = "literalSerializer";
     private final static String JSON_STR_FIELDS = "fields";
 
     /**
@@ -93,6 +94,7 @@ public class GeoSpatialConfig {
          * 
          * {"config": { 
          *   "uri": "http://my.custom.datatype2.uri", 
+         *   "literalSerializer": "com.bigdata.service.GeoSpatialLiteralSerializer",
          *   "fields": [ 
          *     { "valueType": "DOUBLE", "multiplier": "100000", "serviceMapping": "LATITUDE" }, 
          *     { "valueType": "DOUBLE", "multiplier": "100000", "serviceMapping": "LONGITUDE" }, 
@@ -112,10 +114,12 @@ public class GeoSpatialConfig {
                 final JSONObject json = new JSONObject(configStr);
                 final JSONObject topLevelNode = (JSONObject)json.get(JSON_STR_CONFIG);
                 final String uri = (String)topLevelNode.get(JSON_STR_URI);
+                final String literalSerializer = topLevelNode.has(JSON_STR_LITERALSERIALIZER) ?
+                        (String)topLevelNode.get(JSON_STR_LITERALSERIALIZER) : null;
                 final JSONArray fields = (JSONArray)topLevelNode.get(JSON_STR_FIELDS);
 
                 // delegate to GeoSpatialDatatypeConfiguration for construction
-                datatypeConfigs.add(new GeoSpatialDatatypeConfiguration(uri, fields));
+                datatypeConfigs.add(new GeoSpatialDatatypeConfiguration(uri, literalSerializer, fields));
                 
             } catch (JSONException e) {
                 

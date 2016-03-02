@@ -45,6 +45,7 @@ import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
+import com.bigdata.service.GeoSpatialDefaultLiteralSerializer;
 import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
@@ -774,7 +775,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
        fieldConfig.add(field3Config);
        
        final GeoSpatialDatatypeConfiguration config =
-           new GeoSpatialDatatypeConfiguration(STR_DATATYPE_LAT_LON_TIME, fieldConfig);
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_TIME, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
             
       return getGSLiteralExtension(vf, config);
    }
@@ -800,7 +802,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
        fieldConfig.add(field2Config);
            
        final GeoSpatialDatatypeConfiguration config =
-           new GeoSpatialDatatypeConfiguration(STR_DATATYPE_LAT_LON_DOUBLE, fieldConfig);
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_DOUBLE, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
                 
        return getGSLiteralExtension(vf, config);       
       
@@ -827,7 +830,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
        fieldConfig.add(field2Config);
                
        final GeoSpatialDatatypeConfiguration config =
-           new GeoSpatialDatatypeConfiguration(STR_DATATYPE_LAT_LON_LONG, fieldConfig);
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_LONG, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
                     
        return getGSLiteralExtension(vf, config);             
 
@@ -855,7 +859,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
        fieldConfig.add(field2Config);
                    
        final GeoSpatialDatatypeConfiguration config =
-           new GeoSpatialDatatypeConfiguration(STR_DATATYPE_LAT_LON_LONG_MIN, fieldConfig);
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_LONG_MIN, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
        
        return getGSLiteralExtension(vf, config);             
       

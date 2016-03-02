@@ -50,6 +50,8 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.GeoSpatialLiteralSerializer;
+import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**
  * Special encoding for GeoSpatial datatypes. We encode literals of the form
@@ -78,13 +80,12 @@ import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
 public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExtension<V> {
 
    private static final int BASE_SIZE = Double.SIZE / 8;
-   private static final String COMPONENT_SEPARATOR = "#";
 
    @SuppressWarnings("unused")
    private static final transient Logger log = Logger
          .getLogger(GeoSpatialLiteralExtension.class);
 
-   private final URI datatypeURI;
+   private final GeoSpatialLiteralSerializer litSerializer;
    
    private final BigdataURI datatype;
    
@@ -101,9 +102,9 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public GeoSpatialLiteralExtension(
        final IDatatypeURIResolver resolver, final GeoSpatialDatatypeConfiguration config) {
 
-       this.datatypeURI = config.getUri();
        this.datatype = resolver.resolve(config.getUri());
        this.datatypeConfig = config; 
+       this.litSerializer = config.getLiteralSerializer();
        this.kb = KeyBuilder.newInstance();
    }
 
@@ -165,7 +166,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          throw new IllegalArgumentException("Value not a literal");
 
       // delegate, splitting the value into its components
-      return createIV(value.stringValue().split(COMPONENT_SEPARATOR));
+      return createIV(litSerializer.toComponents(value.stringValue()));
    }
 
    /**
@@ -367,9 +368,11 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       // xsd:integer (G->C)
       final long[] componentsAsLongArr = asLongArray(iv);
       
+      // convert long array to components array
+      final Object[] componentArr = longArrAsComponentArr(componentsAsLongArr);
+      
       // set up the component and merge them into a string (C->B)
-      final String litStr = 
-         longArrAsComponentString(0, componentsAsLongArr.length-1, componentsAsLongArr);
+      final String litStr = litSerializer.fromComponents(componentArr);
       
       // setup a literal carrying the component string (B->A)
       return (V) vf.createLiteral(litStr, datatype);
@@ -405,13 +408,34 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
    /**
     * Helper function that converts the components from (and including)
-    * startPos to (and including) endPos into its string representation.
+    * startPos to (and including) endPos into an internal component 
+    * string, separated by #.
     */
    @SuppressWarnings("rawtypes")
-   public String toComponentString(int startPos, int endPos, LiteralExtensionIV iv) {
+   public String toComponentStringInternal(LiteralExtensionIV iv, int... args) {
       
       long[] longArr = asLongArray(iv);
-      return longArrAsComponentString(startPos, endPos, longArr);
+      
+      final Object[] componentArr = longArrAsComponentArr(longArr);
+        
+      final StringBuffer buf = new StringBuffer();
+      for (int i=0; i<args.length; i++) {
+           
+          if (i>0)
+              buf.append("#");
+           
+          if (args[i]<0) {
+              buf.append("?");
+          } else if (args[i]<componentArr.length) {
+              buf.append(componentArr[args[i]]);
+          } else {
+              throw new GeoSpatialSearchException(
+                  "Accessing index " + args[i] + " is out of range.");
+          }
+      }
+      
+    
+      return buf.toString();
    }
    
    /**
@@ -502,30 +526,6 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    /**
     * Converts a a Long[] reflecting the long values of the individual 
-    * components back into a component string representing the literal.
-    * 
-    * Implements a wrapper around step C->B.
-    */
-   public String longArrAsComponentString(int startPos, int endPos, final long[] arr) {
-      
-      final Object[] componentArr = longArrAsComponentArr(arr);
-      
-      final StringBuffer buf = new StringBuffer();
-      for (int i=startPos; i<=endPos; i++) {
-         
-         if (i>startPos)
-            buf.append(COMPONENT_SEPARATOR);
-         
-         buf.append(componentArr[i]);
-         
-      }
-      
-      return buf.toString();
-   }
-
-   
-   /**
-    * Converts a a Long[] reflecting the long values of the individual 
     * components back into a component array representing the literal.
     * 
     * Implements step C->B.
@@ -539,15 +539,11 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
                + " components for datatype.");
       }
          
-      final StringBuffer buf = new StringBuffer();
       final Object[] componentArr = new Object[arr.length];
       for (int i=0; i<arr.length; i++) {
 
          final GeoSpatialDatatypeFieldConfiguration fieldConfig = datatypeConfig.getFields().get(i);
          final double precisionAdjustment = fieldConfig.getMultiplier();
-         
-         if (i>0)
-            buf.append(COMPONENT_SEPARATOR);
          
          switch (fieldConfig.getValueType()) {
          case DOUBLE:

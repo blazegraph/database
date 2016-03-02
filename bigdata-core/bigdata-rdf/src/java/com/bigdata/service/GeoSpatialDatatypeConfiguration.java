@@ -53,6 +53,8 @@ public class GeoSpatialDatatypeConfiguration {
 
     // URI of the datatype, e.g. <http://my.custom.geospatial.coordinate>
     private final URI uri;
+    
+    private final GeoSpatialLiteralSerializer literalSerializer;
 
     // ordered list of fields defining the datatype
     private List<GeoSpatialDatatypeFieldConfiguration> fields;
@@ -63,7 +65,8 @@ public class GeoSpatialDatatypeConfiguration {
      * if the uri is null or empty or in case the JSON array does not describe a set of
      * valid fields.
      */
-    public GeoSpatialDatatypeConfiguration(final String uriStr, final JSONArray fieldsJson) {
+    public GeoSpatialDatatypeConfiguration(
+        final String uriStr, final String literalSerializerClass, final JSONArray fieldsJson) {
         
         if (uriStr==null || uriStr.isEmpty())
             throw new IllegalArgumentException("URI parameter must not be null or empty");
@@ -72,6 +75,36 @@ public class GeoSpatialDatatypeConfiguration {
             this.uri = new URIImpl(uriStr);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid URI in geospatial datatype config: " + uriStr);
+        }
+        
+        if (literalSerializerClass==null || literalSerializerClass.isEmpty()) {
+            literalSerializer = new GeoSpatialDefaultLiteralSerializer();
+        } else {
+            try {
+                Class<?> literalSerializerClazz = Class.forName(literalSerializerClass);
+                try {
+                    
+                    final Object instance = literalSerializerClazz.newInstance();
+                    if (!(instance instanceof GeoSpatialLiteralSerializer)) {
+                        throw new IllegalArgumentException("Literal serializer class " 
+                                + literalSerializerClass + 
+                                " does not implement GeoSpatialLiteralSerializer interface.");
+                    }
+                    
+                    literalSerializer = (GeoSpatialLiteralSerializer)instance;
+                    
+                } catch (Exception e) {
+                    throw new IllegalArgumentException(
+                            "Literal serializer class " + literalSerializerClass + 
+                            " could not be instantiated: " + e.getMessage());
+                }
+                
+            } catch (ClassNotFoundException e) {
+                throw new IllegalArgumentException(
+                    "Literal serializer class not found: " + literalSerializerClass);
+
+            }
+            
         }
         
         fields = new ArrayList<GeoSpatialDatatypeFieldConfiguration>();
@@ -130,15 +163,33 @@ public class GeoSpatialDatatypeConfiguration {
      * @param fields
      */
     public GeoSpatialDatatypeConfiguration(
-        final String uriString, final List<GeoSpatialDatatypeFieldConfiguration> fields) {
+        final String uriString, final GeoSpatialLiteralSerializer literalSerializer, 
+        final List<GeoSpatialDatatypeFieldConfiguration> fields) {
         
+        if (uriString==null || uriString.isEmpty()) {
+            throw new IllegalArgumentException("URI string must not be null or empty.");
+        }
+
+        if (literalSerializer==null) {
+            throw new IllegalArgumentException("Literal serializer must not be null.");
+        }
+        
+        if (fields==null) {
+            throw new IllegalArgumentException("Fields must not be null.");
+        }
+
         this.uri = new URIImpl(uriString);
+        this.literalSerializer = literalSerializer;
         this.fields = fields;
         
     }
     
     public URI getUri() {
         return uri;
+    }
+    
+    public GeoSpatialLiteralSerializer getLiteralSerializer() {
+        return literalSerializer;
     }
     
     /**

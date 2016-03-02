@@ -116,7 +116,6 @@ import com.bigdata.service.geospatial.IGeoSpatialQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialQuery;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
-import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -810,10 +809,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 
                 if (log.isDebugEnabled()) {
                    
-                   log.debug("[OuterRange] Scanning from " + lowerBorderIV.getDelegate().integerValue() 
-                         + " / " + litExt.toComponentString(0, 2, lowerBorderIV));
-                   log.debug("[OuterRange]            to " + upperBorderIV.getDelegate().integerValue()
-                         + " / " +  litExt.toComponentString(0, 2, upperBorderIV));
+                    // TODO: fix this code
+//                   log.debug("[OuterRange] Scanning from " + lowerBorderIV.getDelegate().integerValue() 
+//                         + " / " + litExt.toComponentString(0, 2, lowerBorderIV));
+//                   log.debug("[OuterRange]            to " + upperBorderIV.getDelegate().integerValue()
+//                         + " / " +  litExt.toComponentString(0, 2, upperBorderIV));
     
                 }
                 
@@ -845,15 +845,16 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                    
                    if (log.isDebugEnabled()) {
     
-                      LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorder);
-                      LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorder);
-    
-                      log.debug("[InnerRange] Scanning from " + lowerBorderIVPart.getDelegate().integerValue() 
-                            + " / " + litExt.toComponentString(0, 2, lowerBorderIVPart) 
-                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(lowerBorder)));
-                      log.debug("[InnerRange]            to " + upperBorderIVPart.getDelegate().integerValue() 
-                            + " / " +  litExt.toComponentString(0, 2, upperBorderIVPart) 
-                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorder)));
+                       // TODO: fix this code
+//                      LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorder);
+//                      LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorder);
+//    
+//                      log.debug("[InnerRange] Scanning from " + lowerBorderIVPart.getDelegate().integerValue() 
+//                            + " / " + litExt.toComponentString(0, 2, lowerBorderIVPart) 
+//                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(lowerBorder)));
+//                      log.debug("[InnerRange]            to " + upperBorderIVPart.getDelegate().integerValue() 
+//                            + " / " +  litExt.toComponentString(0, 2, upperBorderIVPart) 
+//                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorder)));
                    }
     
                 }
@@ -1454,6 +1455,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private Var<?> locationAndTimeVar;
          final private int subjectPos;
          final private int objectPos;
+         
+         final private int latIdx;
+         final private int lonIdx;
+         final private int timeIdx;
+         final private int coordSystemIdx;
+         
+         
          final private BigdataValueFactory vf;
          final private GeoSpatialLiteralExtension<BigdataValue> litExt;
          
@@ -1477,7 +1485,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.objectPos = objectPos;
             this.vf = vf;
             this.litExt = litExt;
-            
             reportsObjectComponents =
                locationVar!=null || timeVar!=null || locationAndTimeVar!=null;
             
@@ -1485,7 +1492,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                reportsObjectComponents ? 
                Math.max(objectPos, subjectPos) + 1: 
                subjectPos + 1;
-            
+
+            final GeoSpatialDatatypeConfiguration datatypeConfig = litExt.getDatatypeConfig();
+            latIdx = datatypeConfig.idxOfField(ServiceMapping.LATITUDE);
+            lonIdx = datatypeConfig.idxOfField(ServiceMapping.LONGITUDE);
+            timeIdx = datatypeConfig.idxOfField(ServiceMapping.TIME);
+            coordSystemIdx = datatypeConfig.idxOfField(ServiceMapping.COORD_SYSTEM);
          }
               
          /**
@@ -1511,10 +1523,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                
                if (locationVar!=null) {
                   
+                  //
                   // wrap positions 0 + 1 (lat + lon) into a literal
                   final BigdataLiteral locationLit = 
                      vf.createLiteral(
-                        litExt.toComponentString(0,1,(LiteralExtensionIV)ivs[objectPos]));
+                        litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], latIdx, lonIdx));
                   
                   bs.set(locationVar, 
                      new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) locationLit)));
@@ -1525,7 +1538,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   // wrap positions 2 of the index into a literal
                   final BigdataLiteral timeLit = 
                         vf.createLiteral(
-                           Long.valueOf(litExt.toComponentString(2,2,(LiteralExtensionIV)ivs[objectPos])));
+                           Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos]), timeIdx));
                   
                   bs.set(timeVar, 
                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) timeLit)));
