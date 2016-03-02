@@ -1382,8 +1382,8 @@ function showQueryExplanation(data) {
 
    //See http://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
    //BLZG-1466: Adds a download link for the query explain
-   $('#query-explanation-download').show().html('<a href = \"data:text/text;charset=utf-8,' 
-        + encodeURIComponent(data) + '\" download = \"explain.txt\">Download Query Explanation</a>');
+   $('#query-explanation-download').show().html('<a href = \"data:text/html;charset=utf-8,' 
+        + encodeURIComponent(data) + '\" download = \"explain.html\">Download Query Explanation</a>');
    $('#query-explanation').html(data)
    $('#query-explanation').show();
 }
