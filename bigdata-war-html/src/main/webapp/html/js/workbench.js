@@ -1111,10 +1111,15 @@ function submitQuery(e) {
       error: queryResultsError
    };
 
-   $('#query-response').show().html('Query running...');
-   $('#query-pagination').hide();
+   if(!$('#query-explain').is(':checked')) {
+     $('#query-response').show().html('Query running...');
+     $('#query-pagination').hide();
 
-   $.ajax(url, settings);
+     $.ajax(url, settings);
+   } else {
+     $('#query-response').show().html('Query results skipped with Explain mode.');
+     $('#query-pagination').hide();
+   }
 
    $('#query-explanation').empty();
    if($('#query-explain').is(':checked')) {
@@ -1125,6 +1130,7 @@ function submitQuery(e) {
          success: showQueryExplanation,
          error: queryResultsError
       };
+      $('#query-explanation').show().html('Query running in Explain mode.');;
       $.ajax(url, settings);
    } else {
       $('#query-explanation').hide();
