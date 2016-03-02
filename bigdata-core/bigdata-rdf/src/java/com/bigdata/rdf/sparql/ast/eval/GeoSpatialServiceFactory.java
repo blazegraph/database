@@ -1538,7 +1538,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   // wrap positions 2 of the index into a literal
                   final BigdataLiteral timeLit = 
                         vf.createLiteral(
-                           Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos]), timeIdx));
+                           Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], timeIdx)));
                   
                   bs.set(timeVar, 
                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) timeLit)));
