@@ -1122,6 +1122,7 @@ function submitQuery(e) {
    }
 
    $('#query-explanation').empty();
+   $('#query-explanation-download').empty();
    if($('#query-explain').is(':checked')) {
       settings = {
          type: 'POST',
@@ -1134,12 +1135,14 @@ function submitQuery(e) {
       $.ajax(url, settings);
    } else {
       $('#query-explanation').hide();
+      $('#query-explanation-download').hide();
    }
 }
 
 function clearQueryResponse() {
    $('#query-response, #query-explanation').empty('');
-   $('#query-response, #query-pagination, #query-explanation, #query-export-container').hide();
+   $('#query-response, #query-explanation-download').empty('');
+   $('#query-response, #query-pagination, #query-explanation, #query-explanation-download, #query-export-container').hide();
 }
 
 function showQueryExportModal() {
@@ -1376,7 +1379,13 @@ function showQueryResults(data) {
 }
 
 function showQueryExplanation(data) {
-   $('#query-explanation').html(data).show();
+
+   //See http://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
+   //BLZG-1466: Adds a download link for the query explain
+   $('#query-explanation-download').show().html('<a href = \"data:text/text;charset=utf-8,' 
+        + encodeURIComponent(data) + '\" download = \"explain.txt\">Download Query Explanation</a>');
+   $('#query-explanation').html(data)
+   $('#query-explanation').show();
 }
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
