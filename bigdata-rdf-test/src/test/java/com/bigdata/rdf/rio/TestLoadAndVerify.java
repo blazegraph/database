@@ -129,6 +129,17 @@ public class TestLoadAndVerify extends AbstractRIOTestCase {
     }
     
     /**
+     * Test with the "little.jsonld" data set.
+     */
+    public void test_loadAndVerify_little_jsonld() throws Exception {
+        
+        final String resource = "/com/bigdata/rdf/rio/little.ttl";
+
+        doLoadAndVerifyTest(resource, parallel);
+
+    }
+    
+    /**
      * Test with the "little.trig" data set (iff in quads mode).
      */
     public void test_loadAndVerify_little_trig_quadsMode() throws Exception {
