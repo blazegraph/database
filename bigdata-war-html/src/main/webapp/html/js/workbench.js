@@ -1111,12 +1111,18 @@ function submitQuery(e) {
       error: queryResultsError
    };
 
-   $('#query-response').show().html('Query running...');
-   $('#query-pagination').hide();
+   if(!$('#query-explain').is(':checked')) {
+     $('#query-response').show().html('Query running...');
+     $('#query-pagination').hide();
 
-   $.ajax(url, settings);
+     $.ajax(url, settings);
+   } else {
+     $('#query-response').show().html('Query results skipped with Explain mode.');
+     $('#query-pagination').hide();
+   }
 
    $('#query-explanation').empty();
+   $('#query-explanation-download').empty();
    if($('#query-explain').is(':checked')) {
       settings = {
          type: 'POST',
@@ -1125,15 +1131,18 @@ function submitQuery(e) {
          success: showQueryExplanation,
          error: queryResultsError
       };
+      $('#query-explanation').show().html('Query running in Explain mode.');;
       $.ajax(url, settings);
    } else {
       $('#query-explanation').hide();
+      $('#query-explanation-download').hide();
    }
 }
 
 function clearQueryResponse() {
    $('#query-response, #query-explanation').empty('');
-   $('#query-response, #query-pagination, #query-explanation, #query-export-container').hide();
+   $('#query-response, #query-explanation-download').empty('');
+   $('#query-response, #query-pagination, #query-explanation, #query-explanation-download, #query-export-container').hide();
 }
 
 function showQueryExportModal() {
@@ -1370,7 +1379,13 @@ function showQueryResults(data) {
 }
 
 function showQueryExplanation(data) {
-   $('#query-explanation').html(data).show();
+
+   //See http://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
+   //BLZG-1466: Adds a download link for the query explain
+   $('#query-explanation-download').show().html('<a href = \"data:text/html;charset=utf-8,' 
+        + encodeURIComponent(data) + '\" download = \"explain.html\">Download Query Explanation</a>');
+   $('#query-explanation').html(data)
+   $('#query-explanation').show();
 }
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
