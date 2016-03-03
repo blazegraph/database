@@ -77,11 +77,10 @@ import com.bigdata.rdf.sparql.ast.eval.ASTDeferredIVResolution;
  * to be on. If you would like to turn off inference, make sure to do so in
  * {@link #getProperties()}.
  * 
- * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  * 
- * @see https://jira.blazegraph.com/browse/BLZG-1755
- * 		Date literals in complex FILTER not properly resolved
+ * @see https://jira.blazegraph.com/browse/BLZG-1785
+ * 		Wrong result from FILTER expression with || and NOT IN
  */
 public class TestTicket1785 extends QuadsTestCase {
 	
