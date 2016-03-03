@@ -1963,4 +1963,60 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
           ).runTest();   
     }
 
+   /**
+    * BLZG-1267a: Unable to bind result of EXISTS operator
+    * -> query with exists evaluating to true
+    */
+   public void test_ticket_1267a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267a",   // testURI,
+           "ticket_bg1267a.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267a.srx"// resultFileURL
+          ).runTest();   
+    }
+
+   /**
+    * BLZG-1267b: Unable to bind result of EXISTS operator
+    * -> query with exists evaluating to false
+    */
+   public void test_ticket_1267b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267b",   // testURI,
+           "ticket_bg1267b.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1267c: Unable to bind result of EXISTS operator
+    * -> query with two EXISTS that compare equal
+    */
+   public void test_ticket_1267c() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267c",   // testURI,
+           "ticket_bg1267c.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267c.srx"// resultFileURL
+           ).runTest();    
+    }
+   
+   /**
+    * BLZG-1267d: Unable to bind result of EXISTS operator
+    * -> query with two NOT EXISTS that compare unequal
+    */
+   public void test_ticket_1267d() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267d",   // testURI,
+           "ticket_bg1267d.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267d.srx"// resultFileURL
+           ).runTest();    
+   }
+
 }

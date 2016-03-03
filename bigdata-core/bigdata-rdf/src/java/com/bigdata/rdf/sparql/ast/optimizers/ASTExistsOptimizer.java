@@ -33,9 +33,11 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
 import com.bigdata.rdf.sparql.ast.IGraphPatternContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -210,10 +212,38 @@ public class ASTExistsOptimizer implements IASTOptimizer {
                 rewrite(sa, exogenousVars, subquery, subquery.getWhereClause());
                 
             }
+            
+            /**
+             * https://jira.blazegraph.com/browse/BLZG-1267: Unable to bind result 
+             * of EXISTS operator -> we also need to setup subqueries for value
+             * expression nodes in assignment nodes.
+             */
+            if (child instanceof AssignmentNode) {
+
+                final AssignmentNode bind = (AssignmentNode)child;
+                /**
+                 * BLZG-1475: there are cases where we have nested FILTER
+                 * EXISTS or FILTER NOT EXISTS expressions; in such cases, we
+                 * rewrite the inner expressions first
+                 */
+                final IValueExpressionNode vexp = bind.getValueExpressionNode();
+                if (vexp!=null) {
+                   final Object gpGroup = 
+                      child.get(0).getProperty(Annotations.GRAPH_PATTERN, null);
+                   if (gpGroup instanceof GraphPatternGroup) {
+                      rewrite(sa, exogenousVars, query,
+                            (GraphPatternGroup<IGroupMemberNode>) gpGroup);
+                   }
+                }
+                
+                // rewrite filter.
+                rewrite(sa, exogenousVars, query, p, bind, vexp);
+            }
 
         }
 
     }
+
 
     /**
      * Look for {@link ExistsNode} or {@link NotExistsNode} in FILTER. If we
@@ -221,8 +251,8 @@ public class ASTExistsOptimizer implements IASTOptimizer {
      * 
      * @param p
      *            The group in which the filter was found (aka the parent).
-     * @param filter
-     *            The FILTER in which an {@link ExistsNode} or
+     * @param filterOrAssignment
+     *            The FILTER or BIND node in which an {@link ExistsNode} or
      *            {@link NotExistsNode} might appears.
      * @param ve
      *            Part of the value expression for that filter.
@@ -231,7 +261,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
             final Set<IVariable<?>> exogenousVars,
             final QueryBase query,
             final GraphPatternGroup<IGroupMemberNode> p,
-            final FilterNode filter,
+            final GroupMemberValueExpressionNodeBase filterOrAssignment,
             final IValueExpressionNode ve) {
 
         if (ve instanceof SubqueryFunctionNodeBase) {
@@ -259,7 +289,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
                     
                     // delegate pipelined hash join annotation to subquery
                     final String pipelinedHashJoinHint = 
-                        filter.getQueryHint(QueryHints.PIPELINED_HASH_JOIN);
+                        filterOrAssignment.getQueryHint(QueryHints.PIPELINED_HASH_JOIN);
                     if (pipelinedHashJoinHint!=null) {
                        subquery.setQueryHint(
                           QueryHints.PIPELINED_HASH_JOIN, pipelinedHashJoinHint);
@@ -339,7 +369,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
             if (child instanceof IValueExpressionNode) {
 
                 // Recursion.
-                rewrite(sa, exogenousVars, query, p, filter,
+                rewrite(sa, exogenousVars, query, p, filterOrAssignment,
                         (IValueExpressionNode) child);
 
             }
