@@ -107,6 +107,15 @@ public class InHashBOp extends InBOp {
         
     }
 
+    /**
+     * Extends {@link com.bigdata.bop.BOpBase#__replaceArg(int, BOp) BOpBase.__replaceArg} method to reflect args changes in cached IVs set.
+     */
+    @Override
+    public void __replaceArg(int index, BOp newArg) {
+    	super.__replaceArg(index, newArg);
+    	init();
+    }
+    
     private void init() {
 
         valueExpr = getValueExpression();
