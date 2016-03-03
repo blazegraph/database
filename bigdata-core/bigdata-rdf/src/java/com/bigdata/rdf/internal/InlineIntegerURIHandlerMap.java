@@ -32,7 +32,6 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
-import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -40,6 +39,8 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * namespace.  This is used in conjunction with the {@link InlineLocalNameIntegerURIHandler}. 
  * 
  * Currently, up to 32 different URI handlers are supported for a given namespace.
+ * 
+ * For an example, see {@see com.blazegraph.vocabulary.pubchem.PubChemInlineURIFactory}.
  * 
  * @author beebs
  *
@@ -111,6 +112,7 @@ public class InlineIntegerURIHandlerMap extends InlineLocalNameIntegerURIHandler
 	 * Select the best Integer Handler.  Uses the same logic as {@link InlineURIFactory}.
 	 * 
 	 */
+	@SuppressWarnings("rawtypes")
 	@Override
 	protected AbstractLiteralIV createInlineIV(final String localName) {
 
@@ -155,7 +157,6 @@ public class InlineIntegerURIHandlerMap extends InlineLocalNameIntegerURIHandler
 
 				final InlineURIHandler handler = floorEntry.getValue();
 
-				@SuppressWarnings("rawtypes")
 				final AbstractLiteralIV iv = handler.createInlineIV(localName);
 
 				if (iv != null) {

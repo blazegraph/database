@@ -28,23 +28,23 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Utility IV to generate IVs for URIs in the form of http://example./org/value/0000513
+ * Utility IV to generate IVs for URIs in the form of http://example.org/value/0000513
  * where the localName is in integer printed with fixed width padding.
  * 
  * You should extend this class with implementation for specific instances of URIs that follow
  * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_000234 would be
- * create as
+ * created as:
+ * <code>
+ * InlineFixedWidthIntegerURIHandler handler = new InlineFixedWidthIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/",6);
+ * </code> 
  * 
- * InlineFixedWidthIntegerURIHandler handler = new InlineFixedWidth("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/",6);
- * 
- * 
+ * @author beebs
  */
 
 
 public class InlineFixedWidthIntegerURIHandler extends
 		InlineSignedIntegerURIHandler {
 
-	private String prefix = null;
 	private int fixedWidth = 0;
 
 	public InlineFixedWidthIntegerURIHandler(final String namespace, final int fixedWidth) {

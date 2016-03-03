@@ -26,33 +26,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.blazegraph.vocab.pubchem;
 
-/**
- * 
- * Use the vocabulary by adding a property to your journal file per below.
- * 
- * com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass=com.blazegraph.vocab.pubchem.PubChemVocabulary
- * 
- */
-import com.bigdata.rdf.internal.InlineIPv4URIHandler;
-import com.bigdata.rdf.internal.InlineUUIDURIHandler;
-import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.vocab.BaseVocabularyDecl;
-import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151210;
-import com.bigdata.rdf.vocab.decls.DCAllVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.OWLVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.RDFSVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.RDFVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.SKOSVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.XMLSchemaVocabularyDecl;
 
 /**
- * A {@link Vocabulary} covering the PubChem data from https://pubchem.ncbi.nlm.nih.gov/rdf/.
  * 
+ * A {@link Vocabulary} covering the PubChem data from {@link https://pubchem.ncbi.nlm.nih.gov/rdf/}.
+ * Use the vocabulary by adding a property to your journal file per below.
+ * 
+ * <code>
+ * com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass=com.blazegraph.vocab.pubchem.PubChemVocabulary
+ * </code>
+ * 
+ * @author beebs
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
+ * 
  */
 public class PubChemVocabulary extends BigdataCoreVocabulary_v20151210 {
 

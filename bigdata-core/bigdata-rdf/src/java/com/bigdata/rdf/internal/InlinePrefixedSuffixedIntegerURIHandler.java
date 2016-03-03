@@ -28,16 +28,20 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Utility IV to generate IVs for URIs in the form of http://example./org/value/STRPREFIX1234234513STRSUFFIC
+ * Utility IV to generate IVs for URIs in the form of http://example.org/value/STRPREFIX1234234513STRSUFFIX
  * where the localName of the URI is a string  prefix followed by an integer  value followed by a string suffix.
  * 
  * You should extend this class with implementation for specific instances of URIs that follow
  * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_000123_SUFFIX would be
  * created as
- * 
+ *
+ * <code>
  * InlinePrefixedSuffixedIntegerURIHandler handler = new InlinePrefixedSuffixedIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_","_SUFFIX");
+ * </code>
  * 
  * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
+ * 
+ * @author beebs
  * 
  */
 

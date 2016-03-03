@@ -28,17 +28,18 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Utility IV to generate IVs for URIs in the form of http://example./org/value/STRPREFIX1234234513
+ * Utility IV to generate IVs for URIs in the form of http://example.org/value/STRPREFIX1234234513
  * where the localName of the URI is a string  prefix followed by an integer  value.
  * 
  * You should extend this class with implementation for specific instances of URIs that follow
  * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_1234234 would be
- * create as
- * 
+ * created as
+ * <code> 
  * InlinePrefixedIntegerURIHandler handler = new InlinePrefixedIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_");
- * 
+ * <code> 
  * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
+ * @author beebs
  */
 
 public class InlinePrefixedIntegerURIHandler extends
@@ -46,11 +47,8 @@ public class InlinePrefixedIntegerURIHandler extends
 
 	private String prefix = null;
 
-	public String getPrefix() {
-		return prefix;
-	}
-
 	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix) {
+		
 		super(namespace);
 		this.prefix = prefix;
 	}
@@ -78,4 +76,9 @@ public class InlinePrefixedIntegerURIHandler extends
 			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
 		return this.prefix + getUnpackedValueFromString(super.getLocalNameFromDelegate(delegate));
 	}
+
+	public String getPrefix() {
+		return prefix;
+	}
+
 }

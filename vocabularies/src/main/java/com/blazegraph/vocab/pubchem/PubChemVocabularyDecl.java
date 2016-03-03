@@ -38,9 +38,7 @@ import com.bigdata.rdf.util.VocabBuilder;
 import com.bigdata.rdf.vocab.VocabularyDecl;
 
 /**
- * Vocabulary declarations covering the PubChem data from https://pubchem.ncbi.nlm.nih.gov/rdf/.
- * This is by no means complete, but just a first version based on namespaces listed
- * at the homepage. Partially extracted using the {@link VocabBuilder}.
+ * Vocabulary declarations covering the PubChem data from {@link https://pubchem.ncbi.nlm.nih.gov/rdf/}.
  * 
  * @author <a href="ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$

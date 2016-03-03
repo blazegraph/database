@@ -23,29 +23,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.blazegraph.vocab.pubchem;
 
-import java.util.Map;
-
-import org.openrdf.model.URI;
-
 import com.bigdata.rdf.internal.InlineIntegerURIHandlerMap;
 import com.bigdata.rdf.internal.InlinePrefixedFixedWidthIntegerURIHandler;
 import com.bigdata.rdf.internal.InlinePrefixedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlinePrefixedSuffixedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlineURIFactory;
 import com.bigdata.rdf.internal.InlineURIHandler;
-import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
-import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
-import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
- * InlineURIFactory for the {@link PubChemVocabularyDecl}
+ * {@link InlineURIFactory} for the {@link PubChemVocabularyDecl} to load the PubChem data from {@link https://pubchem.ncbi.nlm.nih.gov/rdf/}.
  * 
- * Include by adding the line below to your namespace properties.
+ * Include by adding the line below to your namespace properties.  It is intended to be used with {@link PubChemVocabulary}.
  * 
- * com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass=com.blazegraph.
- * vocab.pubchem.
- * com.bigdata.rdf.store.AbstractTripleStore.inlineURIFactory=com.
- * blazegraph.vocab.pubchem.PubChemInlineURIFactory
+ * <code> 
+ * com.bigdata.rdf.store.AbstractTripleStore.inlineURIFactory=com.blazegraph.vocab.pubchem.PubChemInlineURIFactory
+ * </code>
  * 
  * 
  * @author beebs

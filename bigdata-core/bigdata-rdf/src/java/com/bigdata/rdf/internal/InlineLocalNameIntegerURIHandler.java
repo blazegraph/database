@@ -33,16 +33,20 @@ package com.bigdata.rdf.internal;
  * different prefixed or suffixed inline handlers.  
  * 
  * For example:
- * 
+ * <code> 
  *   http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/ 
  *   descriptor:CID5606223_Compound_Identifier , 
  *   descriptor:CID5606223_Covalent_Unit_Count , 
  *   descriptor:CID5606223_Defined_Atom_Stereo_Count ,
- *   
+ * </code>  
+ * 
  *   Each of these can be supported as a different {@link InlinePrefixedSuffixedIntegerURIHandler} at the
- *   name space http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/.
+ *   namespace http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/.
  *   
- *   It current supports up to 32 different inline values for a single namespace URI.
+ *   It current supports up to 32 different inline values for a single namespace URI.  It is used
+ *   in conjunction with the {@link InlineIntegerURIHandlerMap}.
+ *   
+ *   For an example, see {@see com.blazegraph.vocab.pubchem.PubchemInlineURIFactory}.
  *   
  *   The max inline integer value that can supported in this scheme is 2^57 - 1, which is 2^5 less
  *   than the Java {@link Long.MAX_VALUE}.  
@@ -53,15 +57,31 @@ package com.bigdata.rdf.internal;
 public abstract class InlineLocalNameIntegerURIHandler extends
 		InlineSignedIntegerURIHandler {
 	
-	//The ID to pack.  From 0 to the MAX_IDS
+	/**
+	 * The ID to pack.  From 0 to the MAX_IDS
+	 */
 	protected int packedId = 0;
 	
-	//Up to 32 different values for a single URI.
+	/**
+	 * Maximum nubmer of IDs 
+	 * 
+	 * Up to 32 different values for a single URI.
+	 */
 	private static final int MAX_IDS = 32 - 1;
 	
+	/**
+	 * 
+	 * The bitmask used.
+	 * 
+	 */
 	private static final long ID_MASK = 32L << 58;
 	
-	//2^57 -1
+	/**
+	 *
+	 * The maximum int value supported with packing.
+	 * 2^57 -1
+	 * 
+	 */
 	private static final long MAX_VALUE = 144115188075856000L;
 
 	public InlineLocalNameIntegerURIHandler(String namespace) {
@@ -128,7 +148,7 @@ public abstract class InlineLocalNameIntegerURIHandler extends
 	}
 	
 	/**
-	 * Convenience method to unpacking a value from a string. 
+	 * Convenience method for unpacking a value from a string. 
 	 * 
 	 * @param s
 	 * @return
@@ -137,6 +157,12 @@ public abstract class InlineLocalNameIntegerURIHandler extends
 		return Long.toString(unpackValue((long)Long.parseLong(s)));
 	}
 	
+	/**
+	 * Convenience method to unpack a long value from a string. 
+	 * 
+	 * @param s
+	 * @return
+	 */
 	public long getUnpackedValueFromString(final String s) {
 		return unpackValue((long)Long.parseLong(s));
 	}
