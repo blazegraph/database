@@ -39,6 +39,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
+import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -725,8 +726,12 @@ public class ASTDeferredIVResolution {
                         entry.setValue(new Constant(newIV));
                     }
                 });
-            } else if (value instanceof TermId) {
-                defer(((TermId)value).getValue(), new Handler(){
+            } else if (value instanceof AbstractIV) {
+            	// See BLZG-1788 (Typed literals in VALUES clause not matching data)
+            	// Changed from TermId to AbstractIV, as there are other types of IVs,
+            	// which could require resolution against the store
+            	// (for ex. FullyInlineTypedLiteralIV which represents typed literal)
+                defer(((AbstractIV)value).getValue(), new Handler(){
                     @Override
                     public void handle(final IV newIV) {
                         entry.setValue(new Constant(newIV));

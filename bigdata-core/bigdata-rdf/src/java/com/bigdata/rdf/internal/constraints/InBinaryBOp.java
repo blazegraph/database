@@ -25,6 +25,7 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -131,6 +132,22 @@ public class InBinaryBOp extends InBOp {
         return tmp;
 
     }
+    
+    /**
+     * Extends {@link com.bigdata.bop.CoreBaseBOp#mutation() CoreBaseBOp.mutation} method to reflect args changes in cached IVs set.
+     */
+    @Override
+    public void mutation() {
+    	super.mutation();
+    	if (set != null) {
+            synchronized (this) {
+                if (set != null) {
+                    // clearing cached set is guarded by double-checked locking pattern.
+                    set = null;
+                }
+            }
+        }
+    }
 
     private void init() {
 
@@ -142,13 +159,20 @@ public class InBinaryBOp extends InBOp {
 
     public boolean accept(final IBindingSet bindingSet) {
 
-        if (valueExpr == null) {
+    	final IV[] _set;
+        if (valueExpr == null || set==null) {
             synchronized (this) {
-                if (valueExpr == null) {
+                if (valueExpr == null || set==null) {
                     // init() is guarded by double-checked locking pattern.
                     init();
                 }
+                // "set" is pulled into a local variable in this double-checked locking pattern
+                // to avoid the possibility that set is resolved to non-null
+                // and then cleared to null before it is used in accept()
+                _set = set;                    
             }
+        } else {
+        	_set = set;
         }
 
         // get the as-bound value for that value expression.
@@ -158,7 +182,7 @@ public class InBinaryBOp extends InBOp {
             throw new SparqlTypeErrorException.UnboundVarException();
 
         // lookup the bound value in the set of values.
-        final int pos = Arrays.binarySearch(set, v);
+        final int pos = Arrays.binarySearch(_set, v);
 
         // true iff the bound value was found in the set.
         final boolean found = pos >= 0;
