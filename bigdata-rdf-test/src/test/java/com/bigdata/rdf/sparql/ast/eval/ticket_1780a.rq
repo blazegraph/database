@@ -9,7 +9,6 @@ PREFIX hint: <http://www.bigdata.com/queryHints#>
 
 select ?s
 where {
-  hint:Query hint:regexMatchNonString true .
   ?s :hasAddress ?address .
   FILTER(REGEX(?address, '^10.*', 'i'))
 }
