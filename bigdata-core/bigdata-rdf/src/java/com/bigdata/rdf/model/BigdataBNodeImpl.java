@@ -195,6 +195,12 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 
 			return getIV().equals(((BigdataValue) o).getIV());
 
+        } else if ((o instanceof BigdataBNode) //
+				&& isStatementIdentifier() && ((BigdataBNode)o).isStatementIdentifier()
+				) {
+
+			return getStatement().equals(((BigdataBNode) o).getStatement());
+
         }
 
 		return id.equals(o.getID());
