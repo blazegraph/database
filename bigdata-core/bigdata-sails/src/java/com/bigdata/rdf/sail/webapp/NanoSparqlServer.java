@@ -37,7 +37,6 @@ import java.util.concurrent.TimeoutException;
 import javax.servlet.ServletContextListener;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
