@@ -24,8 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.SocketException;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -35,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 import javax.servlet.ServletContextListener;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -49,6 +52,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.util.config.NicUtil;
+import com.bigdata.util.httpd.Config;
 
 /**
  * Utility class provides a simple SPARQL end point with a REST API.
@@ -566,14 +570,7 @@ public class NanoSparqlServer {
 
             final int actualPort = getLocalPort(server);
 
-            String hostAddr = NicUtil.getIpAddress("default.nic", "default",
-                    true/* loopbackOk */);
-
-            if (hostAddr == null) {
-
-                hostAddr = "localhost";
-
-            }
+            String hostAddr =  getHost();
 
             serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
                     .toExternalForm();
@@ -587,6 +584,30 @@ public class NanoSparqlServer {
             
         }
         
+    }
+    
+    /**
+     * Utility method to get the host for the currently running NSS.
+     * If {@link NicUtil} returns a null pointer, it is set to the
+     * value of {@link Config#DEFAULT_HOST}.
+     * 
+     * @return The hostname for the running instance.
+     * 
+     * @throws SocketException
+     * @throws IOException
+     */
+    protected static String getHost() throws SocketException, IOException {
+
+    	String hostAddr = NicUtil.getIpAddress("default.nic", "default",
+                true/* loopbackOk */);
+
+        if (hostAddr == null) {
+
+            hostAddr = Config.DEFAULT_HOST;
+
+        }
+        
+        return hostAddr;
     }
     
     /**
