@@ -61,7 +61,7 @@ public class TestBackupServlet<S extends IIndexManager> extends
 
 		return ProxySuiteHelper.suiteWhenStandalone(
 				TestBackupServlet.class, "test_backup01",
-				Collections.singleton(BufferMode.DiskRW), TestMode.quads);
+				Collections.singleton(BufferMode.DiskRW));
 	}
 	
 	
