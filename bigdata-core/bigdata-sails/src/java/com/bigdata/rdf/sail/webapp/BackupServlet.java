@@ -34,7 +34,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.BasicSnapshotFactory;
 import com.bigdata.journal.ISnapshotResult;
 import com.bigdata.journal.Journal;
-import com.bigdata.util.NV;
 
 /**
  * Request an online backup of the journal (non-HA Mode). The backup will be
@@ -67,7 +66,6 @@ public class BackupServlet extends BigdataRDFServlet {
     private static final Logger log = Logger.getLogger(BackupServlet.class);
     
     private static final boolean debug = log.isDebugEnabled();
-    private static final boolean info = log.isDebugEnabled();
     
 	/**
 	 * 
@@ -154,12 +152,12 @@ public class BackupServlet extends BigdataRDFServlet {
 			final BasicSnapshotFactory snapfact = new BasicSnapshotFactory(
 					file, compress);
 
-			if (log.isDebugEnabled()) {
+			if (debug) {
 				log.debug("Snapshot requested.  Writing backup to "
 						+ snapfact.getFile());
 			}
 
-			System.err.println("Snapshot requested.  Writing backup to "
+			log.warn("Snapshot requested.  Writing backup to "
 					+ snapfact.getFile());
 
 			final Future<ISnapshotResult> f = ((Journal) getIndexManager())
@@ -192,8 +190,6 @@ public class BackupServlet extends BigdataRDFServlet {
 		} else {
 			buildAndCommitResponse(res, HTTP_OK, MIME_TEXT_PLAIN, "Backup created at " + file + ".\n");
 		}
-		
-		//TODO:  Should we send a response with an XML or JSON document?
 
 	}
 
