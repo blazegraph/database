@@ -103,7 +103,8 @@ public class TestBackupServlet<S extends IIndexManager> extends
 		
 		doLoadFile();
 
-		final String fileStr = System.getProperty("java.io.tmpdir") + UUID.randomUUID() + ".jnl";
+		final String fileStr = System.getProperty("java.io.tmpdir")
+				+ File.separator + UUID.randomUUID() + ".jnl";
 
 		final File randomFile = new File(fileStr);
 		
@@ -111,8 +112,10 @@ public class TestBackupServlet<S extends IIndexManager> extends
 		
 		final RemoteRepositoryManager mgr = m_repo.getRemoteRepositoryManager();
 
+		//Test with default configuration
 		mgr.onlineBackup(fileStr, false, true);
 
+		//The size of the uncompressed file
 		long uncomp_size = randomFile.length();
 		
 		assertTrue(randomFile.exists());
@@ -124,7 +127,9 @@ public class TestBackupServlet<S extends IIndexManager> extends
 		//Test with gzip
 		mgr.onlineBackup(fileStr, true, true);
 
+		//Check if compressed
 		assertTrue(uncomp_size > randomFile.length());
+
 		assertTrue(randomFile.exists());
 		
 		
@@ -148,6 +153,7 @@ public class TestBackupServlet<S extends IIndexManager> extends
 		assertTrue(randomFile.exists());
 		
 		randomFile.delete();
+		
 
 		assertTrue(!randomFile.exists());
 
