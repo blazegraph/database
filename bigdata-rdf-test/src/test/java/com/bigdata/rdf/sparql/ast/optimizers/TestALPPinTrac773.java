@@ -162,12 +162,17 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 					@Override
 
 
-					protected void estimateCardinalities(StatementPatternNode sp, final IV<?, ?> s, final IV<?, ?> p,
-							final IV<?, ?> o, final IV<?, ?> c, final AST2BOpContext ctx) {
+					protected void estimateCardinalities(
+							StatementPatternNode sp, final IV<?, ?> s,
+							final IV<?, ?> p, final IV<?, ?> o,
+							final IV<?, ?> c, final AST2BOpContext ctx,
+							final int exogenousBindingsAdjustmentFactor) {
 						if (o != null)
-						    sp.setProperty(Annotations.ESTIMATED_CARDINALITY, 26l);
-						else 
-							sp.setProperty(Annotations.ESTIMATED_CARDINALITY, 3135l);
+							sp.setProperty(Annotations.ESTIMATED_CARDINALITY,
+									26l);
+						else
+							sp.setProperty(Annotations.ESTIMATED_CARDINALITY,
+									3135l);
 					}
 					
 				},
