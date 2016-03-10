@@ -27,13 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.List;
+
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -2018,5 +2023,45 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_bg1267d.srx"// resultFileURL
            ).runTest();    
    }
+   
+   /**
+    * BLZG-1817: reordering inside complex subqueries that will
+    * be translated into NSIs.
+    */
+   public void test_ticket_1817() throws Exception {
+
+       final ASTContainer ast = new TestHelper(
+                                   "ticket_bg1817",   // testURI,
+                                   "ticket_bg1817.rq",// queryFileURL
+                                   "ticket_bg1817.ttl",// dataFileURL
+                                   "ticket_bg1817.srx"// resultFileURL
+                                   ).runTest();    
+       
+       // assert that ?b wdt:P31 ?tgt_class is placed in front of ?a ?p ?b .
+       final List<StatementPatternNode> spns = 
+               BOpUtility.toList(ast.getOptimizedAST(), StatementPatternNode.class);
+       
+       int idxOfB = -1;
+       int idxOfA = -1;       
+       for (int i=0; i<spns.size(); i++) {
+           
+           final StatementPatternNode spn = spns.get(i);
+           
+           final TermNode subjectTN = spn.get(0);
+           if (subjectTN instanceof VarNode) {
+               final VarNode subjectVN = (VarNode)subjectTN;
+               final String varName = ((Var<?>)subjectVN.get(0)).getName();
+               if ("a".equals(varName)) {
+                   idxOfA = i;
+               } else if ("b".equals(varName)) {
+                   idxOfB = i;
+               }
+           }
+           
+       }
+       
+       assertTrue(idxOfB<idxOfA);
+   }
+   
 
 }
