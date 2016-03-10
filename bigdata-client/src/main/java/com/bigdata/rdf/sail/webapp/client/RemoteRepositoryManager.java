@@ -574,6 +574,20 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         return baseServiceURL + "/namespace/" + ConnectOptions.urlEncode(namespace);
     }
 
+    
+    /**
+     * Returns the SPARQL endpoint URL for the given namespace or the default SPARQL
+     * endpoint in case namespace is null.
+     * 
+     * @param namespace
+     * @return the namespace 
+     */
+    private String getSparqlEndpointUrlForNamespaceOrDefault(final String namespace) {
+        
+        return namespace==null ?
+                baseServiceURL + "/sparql" : 
+                getRepositoryBaseURLForNamespace(namespace) + "/sparql";
+    }
     /**
      * Obtain a flyweight {@link RemoteRepository} for the default namespace
      * associated with the remote service.
@@ -952,6 +966,241 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
     }
 
+    /**********************************************************************
+     ************************** Mapgraph Servlet **************************
+     **********************************************************************/
+    private final String COMPUTE_MODE = "computeMode";
+    private final String MAPGRAPH = "mapgraph";
+    private final String MAPGRAPH_RESET = "reset";
+    private final String MAPGRAPH_PUBLISH = "publish";
+    private final String MAPGRAPH_DROP = "drop";
+    private final String CHECK_PUBLISHED = "checkPublished";
+
+    enum ComputeMode {
+        CPU,
+        GPU;
+    }
+    
+    /**
+     * Publishes the given namespace to the mapgraph runtime. If
+     * the namespace if already published, no action is performed.
+     * The return value is false in the latter case, true otherwise.
+     * If the namespace that is passed in is null, the default
+     * namespace will be used.
+     * 
+     * @return true if the namespace was not yet published already, 
+     *         false otherwise (i.e., in case no action has been taken)
+     * @throws NoGPUAccelerationAvailableException
+     */
+    public boolean publishNamespaceToMapgraph(final String namespace)
+    throws Exception {
+        
+        assertMapgraphRuntimeAvailable();
+
+        if (namespacePublishedToMapgraph(namespace))
+            return false; // nothing to be done
+        
+        
+        final String repositoryUrl = 
+            getSparqlEndpointUrlForNamespaceOrDefault(namespace);
+        
+        final ConnectOptions opts = 
+                newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_PUBLISH);
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+            
+        return true;
+
+    }
+
+    /**
+     * Drops the given namespace from the mapgraph runtime. If
+     * the namespace was not registered in the runtime, no action is
+     * performed. The return value is false in the latter case, true otherwise.
+     * If the namespace that is passed in is null, the default
+     * namespace will be used.
+     * 
+     * @return true if the namespace was published before and has been dropped, 
+     *         false otherwise (i.e., in case no action has been taken)
+     * @throws NoGPUAccelerationAvailableException
+     */
+    public boolean dropNamespaceFromMapgraph(final String namespace)
+    throws Exception {
+
+        assertMapgraphRuntimeAvailable();
+
+        if (!namespacePublishedToMapgraph(namespace))
+            return false; // nothing to be done
+        
+        final String repositoryUrl = 
+                getSparqlEndpointUrlForNamespaceOrDefault(namespace);
+
+        final ConnectOptions opts = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_DROP);
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+        
+        return true;
+    }
+
+    
+    /**
+     * Checks whether the given namespace has been published. If null is passed
+     * in, the method performs a check for the default namespace.
+     * 
+     * @return true if the namespace is registered for acceleration,
+     *         false otherwise
+     * @throws NoGPUAccelerationAvailableException
+     */
+    public boolean namespacePublishedToMapgraph(final String namespace)
+    throws Exception {
+        
+        assertMapgraphRuntimeAvailable();
+
+        if (namespacePublishedToMapgraph(namespace))
+            return false; // nothing to be done
+        
+        
+        final String repositoryUrl = 
+            getSparqlEndpointUrlForNamespaceOrDefault(namespace);
+        
+        final ConnectOptions opts = 
+                newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(CHECK_PUBLISHED, "");
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+                    
+        return Boolean.parseBoolean(response.getResponseBody());
+        
+    }
+    
+    /**
+     * Resets the mapgraph runtime for the compute mode. If compute mode is null, the
+     * runtime will be reset while maintaining the compute mode that was previously enabled.
+     * 
+     * @param computeMode the desired compute mode
+     */
+    public void resetMapgraphRuntime(final ComputeMode computeMode)
+    throws Exception {
+
+        assertMapgraphRuntimeAvailable();
+
+        final String repositoryUrl = 
+                getSparqlEndpointUrlForNamespaceOrDefault(null /* default namespace */);
+
+        /**
+         * First reset the runtime
+         */
+        final ConnectOptions optsReset = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener responseReset = null;
+
+        // Setup the request entity.
+        {
+
+            optsReset.addRequestParam(MAPGRAPH, MAPGRAPH_RESET);
+            optsReset.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(responseReset = doConnect(optsReset));
+
+        } finally {
+
+            if (responseReset != null)
+                responseReset.abort();
+
+        }
+        
+        /**
+         * Second, set the compute mode
+         */
+        final ConnectOptions optsComputeMode = 
+                newConnectOptions(baseServiceURL + "/backup", UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener responseComputeMode = null;
+
+        // Setup the request entity.
+        {
+
+            optsComputeMode.addRequestParam(COMPUTE_MODE, computeMode.toString());
+            optsComputeMode.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(responseComputeMode = doConnect(optsComputeMode));
+
+        } finally {
+
+            if (responseComputeMode != null)
+                responseComputeMode.abort();
+
+        }
+    }
+    
+    private void assertMapgraphRuntimeAvailable() {
+        if (true) // TODO
+            throw new NoGPUAccelerationAvailable();
+    }
+
+
+    
     /**
      * Return the effective configuration properties for the named data set.
      * <p>
