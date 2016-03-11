@@ -68,7 +68,7 @@ public class MapgraphServletProxy extends BigdataRDFServlet {
 			hasWarnedGpu = true;
 		}
 		
-		resp.sendError(501 /* not implemented */);
+		resp.sendError(HTTP_NOTIMPLEMENTED /* not implemented */);
 	}
 	
 	public static String getDefaultProvider() {
