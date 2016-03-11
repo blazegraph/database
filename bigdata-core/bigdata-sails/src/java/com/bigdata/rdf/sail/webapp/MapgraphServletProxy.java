@@ -67,6 +67,8 @@ public class MapgraphServletProxy extends BigdataRDFServlet {
 			log.warn("Running without GPU Acceleration.   See https://www.blazegraph.com/product/gpu-accelerated/.");
 			hasWarnedGpu = true;
 		}
+		
+		resp.sendError(501 /* not implemented */);
 	}
 	
 	public static String getDefaultProvider() {
