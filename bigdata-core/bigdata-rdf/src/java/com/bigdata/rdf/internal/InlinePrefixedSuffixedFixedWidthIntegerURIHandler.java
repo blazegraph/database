@@ -28,57 +28,74 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Utility IV to generate IVs for URIs in the form of http://example.org/value/STRPREFIX1234234513
- * where the localName of the URI is a string  prefix followed by an integer  value.
+ * Utility IV to generate IVs for URIs in the form of http://example.org/value/STRPREFIX1234234513STRSUFFIX
+ * where the localName of the URI is a string  prefix followed by a fixed width integer  value followed by a string suffix.
  * 
  * You should extend this class with implementation for specific instances of URIs that follow
- * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_1234234 would be
+ * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_000234_SUFFIX would be
  * created as
+ * 
  * <code> 
- * InlinePrefixedIntegerURIHandler handler = new InlinePrefixedIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_");
- * <code> 
+ * InlinePrefixedSuffixedFixedWidthIntegerURIHandler handler = new InlinePrefixedSuffixedFixedWidthIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_","_SUFFIX",6)
+ * </code> 
  * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
  * @author beebs
+ * 
  */
 
-public class InlinePrefixedIntegerURIHandler extends
-		InlineLocalNameIntegerURIHandler implements IPrefixedURIHandler {
+public class InlinePrefixedSuffixedFixedWidthIntegerURIHandler extends
+		InlineLocalNameIntegerURIHandler implements IPrefixedURIHandler, ISuffixedURIHandler {
 
 	private String prefix = null;
+	private String suffix = null;
+	private int width = 0;
 
-	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix) {
-		
+	public InlinePrefixedSuffixedFixedWidthIntegerURIHandler(final String namespace,
+			final String prefix, final String suffix, final int width) {
 		super(namespace);
 		this.prefix = prefix;
+		this.suffix = suffix;
+		this.width = width;
 	}
 
-	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix, final int id) {
+	public InlinePrefixedSuffixedFixedWidthIntegerURIHandler(final String namespace,
+			final String prefix, final String suffix, final int width, final int id) {
 		super(namespace);
 		this.prefix = prefix;
+		this.suffix = suffix;
+		this.width = width;
 		this.packedId = id;
 	}
 
 	@Override
 	@SuppressWarnings("rawtypes")
 	protected AbstractLiteralIV createInlineIV(String localName) {
-		if (!localName.startsWith(this.prefix)) {
+		if (!localName.startsWith(this.prefix) || !localName.endsWith(suffix)) {
 			return null;
 		}
-		
-		final String intValue = getPackedValueString(localName.substring(this.prefix.length(), localName.length()));
+
+		final String intValue = localName.substring(this.prefix.length(),
+				localName.length() - this.suffix.length());
 				
-		return super.createInlineIV(intValue);
+		return super.createInlineIV(getPackedValueString(intValue));
 	}
 
 	@Override
 	public String getLocalNameFromDelegate(
 			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		return this.prefix + getUnpackedValueFromString(super.getLocalNameFromDelegate(delegate));
+		final String intStr = super.getLocalNameFromDelegate(delegate);
+
+		final int intVal = (int) getUnpackedValueFromString(intStr);
+
+		return this.prefix  + String.format("%0" + width + "d", intVal) + suffix;
 	}
 
 	public String getPrefix() {
 		return prefix;
 	}
 
+	public String getSuffix() {
+		return suffix;
+	}
 }

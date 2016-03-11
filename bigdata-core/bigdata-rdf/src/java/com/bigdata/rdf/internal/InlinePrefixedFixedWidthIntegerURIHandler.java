@@ -29,33 +29,37 @@ import com.bigdata.rdf.model.BigdataLiteral;
 /**
  * 
  * Utility IV to generate IVs for URIs in the form of http://example.org/value/STRPREFIX1234234513
- * where the localName of the URI is a string  prefix followed by an integer  value.
+ * where the localName of the URI is a string  prefix followed by an integer value with fixed width.
  * 
  * You should extend this class with implementation for specific instances of URIs that follow
  * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_1234234 would be
  * created as
- * <code> 
- * InlinePrefixedIntegerURIHandler handler = new InlinePrefixedIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_");
- * <code> 
+ * 
+ * <code>
+ * InlinePrefixedFixedWidthIntegerURIHandler handler = new InlinePrefixedFixedWidthIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_", 7);
+ * </code>
+ * 
  * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
  * @author beebs
  */
 
-public class InlinePrefixedIntegerURIHandler extends
+public class InlinePrefixedFixedWidthIntegerURIHandler extends
 		InlineLocalNameIntegerURIHandler implements IPrefixedURIHandler {
 
 	private String prefix = null;
+	private int width = 0;
 
-	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix) {
-		
+	public InlinePrefixedFixedWidthIntegerURIHandler(final String namespace, final String prefix, final int width) {
 		super(namespace);
 		this.prefix = prefix;
+		this.width = width;
 	}
 
-	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix, final int id) {
+	public InlinePrefixedFixedWidthIntegerURIHandler(final String namespace, final String prefix, final int width, final int id) {
 		super(namespace);
 		this.prefix = prefix;
+		this.width = width;
 		this.packedId = id;
 	}
 
@@ -65,20 +69,26 @@ public class InlinePrefixedIntegerURIHandler extends
 		if (!localName.startsWith(this.prefix)) {
 			return null;
 		}
-		
+	
 		final String intValue = getPackedValueString(localName.substring(this.prefix.length(), localName.length()));
-				
+		
 		return super.createInlineIV(intValue);
 	}
 
 	@Override
 	public String getLocalNameFromDelegate(
 			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		return this.prefix + getUnpackedValueFromString(super.getLocalNameFromDelegate(delegate));
-	}
 
+		final String intStr = super.getLocalNameFromDelegate(delegate);
+
+		final int intVal = (int) getUnpackedValueFromString(intStr);
+
+		final String localName = this.prefix + String.format("%0" + width + "d", intVal);
+
+		return localName;
+	}
+	
 	public String getPrefix() {
 		return prefix;
 	}
-
 }

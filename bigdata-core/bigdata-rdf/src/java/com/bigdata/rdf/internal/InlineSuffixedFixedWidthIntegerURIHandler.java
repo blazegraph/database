@@ -28,62 +28,74 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Utility IV to generate IVs for URIs in the form of
- * http://example.org/value/STRPREFIX1234234513 where the localName of the URI
- * is a string prefix followed by an integer value.
+ * Utility IV to generate IVs for URIs in the form of http://example.org/value/1234234513STRSUFFIX
+ * where the localName of the URI is a string  suffix followed by an integer value with fixed width.
  * 
- * You should extend this class with implementation for specific instances of
- * URIs that follow this form such as:
- * http://rdf.ncbi.nlm.nih.gov/pubchem/compound/1234234_CID would be created as
+ * You should extend this class with implementation for specific instances of URIs that follow
+ * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/1234234_CID would be
+ * created as:
  * 
  * <code>
- * InlineSuffixedIntegerURIHandler handler = new InlineSuffixedIntegerURIHandler( "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","_CID");
+ * InlineSuffixedFixedWidthIntegerURIHandler handler = new InlineSuffixedFixedWidthIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","_CID", 7);
  * </code>
  * 
  * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
  * @author beebs
+ * 
  */
 
-public class InlineSuffixedIntegerURIHandler extends
+public class InlineSuffixedFixedWidthIntegerURIHandler extends
 		InlineLocalNameIntegerURIHandler implements ISuffixedURIHandler {
 
 	private String suffix = null;
+	private int width = 0;
 
-	public InlineSuffixedIntegerURIHandler(final String namespace, final String suffix) {
+	public InlineSuffixedFixedWidthIntegerURIHandler(final String namespace,
+			final String suffix, final int width) {
 		super(namespace);
 		this.suffix = suffix;
+		this.width = width;
 	}
 
-	public InlineSuffixedIntegerURIHandler(final String namespace,
-			final String suffix, final int id) {
+	public InlineSuffixedFixedWidthIntegerURIHandler(final String namespace,
+			final String suffix, final int width, final int id) {
 		super(namespace);
 		this.suffix = suffix;
+		this.width = width;
 		this.packedId = id;
 	}
 
 	@Override
 	@SuppressWarnings("rawtypes")
-	protected AbstractLiteralIV createInlineIV(final String localName) {
+	protected AbstractLiteralIV createInlineIV(String localName) {
 		if (!localName.endsWith(this.suffix)) {
 			return null;
 		}
+	
+		final String intValue =localName.substring(0, localName.length() - this.suffix.length());
 		
-		final String intVal = getPackedValueString(localName.substring(0, localName.length()
-				- this.suffix.length()));
-		
-		return super.createInlineIV(intVal);
+		return super.createInlineIV(getPackedValueString(intValue));
 	}
 
 	@Override
 	public String getLocalNameFromDelegate(
-			final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
 
-		return getUnpackedValueFromString(super
-				.getLocalNameFromDelegate(delegate)) + this.suffix;
+		final String intStr = super.getLocalNameFromDelegate(delegate);
+
+		final int intVal = (int) getUnpackedValueFromString(intStr);
+
+		final String localName = String.format("%0" + width + "d", intVal) + this.suffix;
+
+		return localName;
 	}
 
 	public String getSuffix() {
 		return suffix;
+	}
+
+	public void setSuffix(String suffix) {
+		this.suffix = suffix;
 	}
 }
