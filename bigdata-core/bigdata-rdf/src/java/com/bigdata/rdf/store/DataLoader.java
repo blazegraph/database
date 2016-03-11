@@ -465,7 +465,8 @@ public class DataLoader {
 		 */
 		static final String QUEUE_CAPACITY = DataLoader.class.getName() + ".queueCapacity";
 
-		static final String DEFAULT_QUEUE_CAPACITY = "10";
+		//BLZG-1816  Disable by default to avoid concurrency issues
+		static final String DEFAULT_QUEUE_CAPACITY = "0";
 
         /**
          * Optional property controls whether and when the RDFS(+) closure is
