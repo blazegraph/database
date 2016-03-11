@@ -969,14 +969,15 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     /**********************************************************************
      ************************** Mapgraph Servlet **************************
      **********************************************************************/
-    private final String COMPUTE_MODE = "computeMode";
-    private final String MAPGRAPH = "mapgraph";
-    private final String MAPGRAPH_RESET = "reset";
-    private final String MAPGRAPH_PUBLISH = "publish";
-    private final String MAPGRAPH_DROP = "drop";
-    private final String CHECK_PUBLISHED = "checkPublished";
+    static private final String COMPUTE_MODE = "computeMode";
+    static private final String MAPGRAPH = "mapgraph";
+    static private final String MAPGRAPH_RESET = "reset";
+    static private final String MAPGRAPH_PUBLISH = "publish";
+    static private final String MAPGRAPH_DROP = "drop";
+    static private final String MAPGRAPH_CHECK_RUNTIME_AVAILABLE = "runtimeAvailable";
+    static private final String CHECK_PUBLISHED = "checkPublished";
 
-    enum ComputeMode {
+    public enum ComputeMode {
         CPU,
         GPU;
     }
@@ -1092,10 +1093,6 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     throws Exception {
         
         assertMapgraphRuntimeAvailable();
-
-        if (namespacePublishedToMapgraph(namespace))
-            return false; // nothing to be done
-        
         
         final String repositoryUrl = 
             getSparqlEndpointUrlForNamespaceOrDefault(namespace);
@@ -1108,7 +1105,56 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         // Setup the request entity.
         {
 
-            opts.addRequestParam(CHECK_PUBLISHED, "");
+            opts.setAcceptHeader("Accept: text/plain");
+            opts.addRequestParam(MAPGRAPH, CHECK_PUBLISHED);
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+            final String responseBody = response.getResponseBody();
+            
+            return responseBody!=null && responseBody.contains("true");
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+                    
+        
+    }
+    
+    /**
+     * Resets the mapgraph runtime for the compute mode.
+     * 
+     * @param computeMode the desired compute mode
+     */
+    public void resetMapgraphRuntime(final ComputeMode computeMode)
+    throws Exception {
+
+        assertMapgraphRuntimeAvailable();
+
+        if (computeMode==null) {
+            throw new IllegalArgumentException("Compute mode must not be null");
+        }
+
+        final String repositoryUrl = 
+                getSparqlEndpointUrlForNamespaceOrDefault(null /* default namespace */);
+
+        final ConnectOptions opts = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_RESET);
+            opts.addRequestParam(COMPUTE_MODE, computeMode.toString());
             opts.method = "POST";
         }
 
@@ -1122,80 +1168,89 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                 response.abort();
 
         }
-                    
-        return Boolean.parseBoolean(response.getResponseBody());
+
+    }
+    
+    /**
+     * Returns the current status report for mapgraph.
+     * 
+     * @return the status report as human-readable string
+     * @throws Exception
+     */
+    public String getMapgraphStatus() throws Exception {
+        
+        String repositoryUrl = baseServiceURL + "/status";
+        
+        /**
+         * First reset the runtime
+         */
+        final ConnectOptions opts = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, "");
+            opts.method = "GET";
+        }
+
+        try {
+
+            response = doConnect(opts);
+            return response.getResponseBody();
+            
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
         
     }
     
     /**
-     * Resets the mapgraph runtime for the compute mode. If compute mode is null, the
-     * runtime will be reset while maintaining the compute mode that was previously enabled.
-     * 
-     * @param computeMode the desired compute mode
+     * Checks whether the mapgraph runtime is available.
+     * @return
      */
-    public void resetMapgraphRuntime(final ComputeMode computeMode)
-    throws Exception {
-
-        assertMapgraphRuntimeAvailable();
+    public boolean mapgraphRuntimeAvailable() throws Exception {
 
         final String repositoryUrl = 
-                getSparqlEndpointUrlForNamespaceOrDefault(null /* default namespace */);
+            getSparqlEndpointUrlForNamespaceOrDefault(null /* default namespace */);
 
         /**
          * First reset the runtime
          */
-        final ConnectOptions optsReset = 
+        final ConnectOptions opts = 
             newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
 
-        JettyResponseListener responseReset = null;
+        JettyResponseListener response = null;
 
         // Setup the request entity.
         {
 
-            optsReset.addRequestParam(MAPGRAPH, MAPGRAPH_RESET);
-            optsReset.method = "POST";
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_CHECK_RUNTIME_AVAILABLE);
+            opts.method = "POST";
         }
 
         try {
 
-            checkResponseCode(responseReset = doConnect(optsReset));
-
+            response = doConnect(opts);
+            
+            return response.getStatus()==200 /* HTTP OK */;
+            
         } finally {
 
-            if (responseReset != null)
-                responseReset.abort();
+            if (response != null)
+                response.abort();
 
         }
-        
-        /**
-         * Second, set the compute mode
-         */
-        final ConnectOptions optsComputeMode = 
-                newConnectOptions(baseServiceURL + "/backup", UUID.randomUUID(), null/* tx */);
 
-        JettyResponseListener responseComputeMode = null;
-
-        // Setup the request entity.
-        {
-
-            optsComputeMode.addRequestParam(COMPUTE_MODE, computeMode.toString());
-            optsComputeMode.method = "POST";
-        }
-
-        try {
-
-            checkResponseCode(responseComputeMode = doConnect(optsComputeMode));
-
-        } finally {
-
-            if (responseComputeMode != null)
-                responseComputeMode.abort();
-
-        }
     }
     
-    private void assertMapgraphRuntimeAvailable() {
-        if (true) // TODO
+    void assertMapgraphRuntimeAvailable() throws Exception {
+        if (!mapgraphRuntimeAvailable()) 
             throw new NoGPUAccelerationAvailable();
     }
 
