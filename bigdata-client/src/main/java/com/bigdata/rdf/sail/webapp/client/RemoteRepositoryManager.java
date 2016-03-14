@@ -46,6 +46,7 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.http.HttpMethod;
+import org.openrdf.model.Resource;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
@@ -60,6 +61,7 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.sparql.query.InsertBindingSetCursor;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
@@ -1890,6 +1892,105 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         }
 
+    }
+    
+    public ContextsResult contextsResults(final ConnectOptions opts, final UUID queryId) throws IOException, Exception {
+    	
+    	FutureTask<Void> ft = null;
+    	
+    	JettyResponseListener resp = null;
+    	
+    	ContextsResult contextsResult = null;
+    	
+        try {
+        	
+        	resp = doConnect(opts);
+
+            checkResponseCode(resp);         
+            
+            ContextsResult tmp = new ContextsResult(resp.getInputStream()){
+            
+            	private final AtomicBoolean notDone = new AtomicBoolean(true);
+
+	            @Override
+	            public boolean hasNext() throws QueryEvaluationException {
+	
+	                final boolean hasNext = super.hasNext();
+	
+	                if (hasNext == false) {
+	
+	                    notDone.set(false);
+	
+	                }
+	
+	                return hasNext;
+	
+	            }
+
+	            @Override
+	            public void handleClose() throws QueryEvaluationException {
+	
+	                try {
+	
+	                    super.handleClose();
+	
+	                } finally {
+	
+	                    if (notDone.compareAndSet(true, false)) {
+	
+	                        try {
+	                            cancel(queryId);
+	                        } catch (Exception ex) {
+	                            log.warn(ex);
+	                        }
+	
+	                    }
+	
+	                }
+
+	            };
+
+            };;
+            
+            // Wrap as FutureTask so we can cancel.
+            ft = new FutureTask<Void>(tmp, null/* result */);
+            
+            executor.execute(ft);
+            
+            return (contextsResult = tmp);
+  
+          } finally {
+                    	
+        	if (resp != null && contextsResult == null) {
+                /*
+                 * Error handling code path. We have an http response listener
+                 * but we were not able to setup the tuple query result
+                 * listener.
+                 */
+                if (ft != null) {
+                    /*
+                     * We submitted the task to parse the response. Since the
+                     * code is not returning normally (tqrImpl:=null) we cancel
+                     * the FutureTask for the background parse of that response.
+                     */
+                    ft.cancel(true/* mayInterruptIfRunning */);
+                }
+                // Abort the http response handling.
+                resp.abort();
+                try {
+                    /*
+                     * POST back to the server to cancel the request in case it
+                     * is still running on the server.
+                     */
+                    cancel(queryId);
+                } catch (Exception ex) {
+                    log.warn(ex);
+                }
+             
+        	}
+                    
+        }
+    	
     }
 
     /**

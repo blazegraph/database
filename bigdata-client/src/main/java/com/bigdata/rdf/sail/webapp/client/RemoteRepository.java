@@ -25,7 +25,6 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import info.aduna.io.IOUtil;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.InputStream;
 import java.io.Reader;
@@ -158,10 +157,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     /**
      * Post a GraphML file to the blueprints layer of the remote bigdata instance.
      */
-    public long postGraphML(final String path) throws Exception {
-        
-        // TODO Allow client to specify UUID for postGraphML. See #1254.
-        final UUID uuid = UUID.randomUUID();
+    public long postGraphML(final String path, final UUID uuid) throws Exception {
         
         final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, uuid, tx);
 
@@ -199,6 +195,14 @@ public class RemoteRepository extends RemoteRepositoryBase {
             
         }
         
+    }
+    
+    /**
+     * Post a GraphML file to the blueprints layer of the remote bigdata instance.
+     */    
+    public long postGraphML(final String path) throws Exception {
+    	
+    	return postGraphML(path, UUID.randomUUID());
     }
     
     /**
@@ -549,6 +553,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
     * read/write transactions. Fused views are used in scale-out to model shards
     * and are also used in full read/write transaction support.
     * 
+    * @param uuid
+    * 			The {@link UUID} used to identify this query.
+    * 
     * @param exact
     *           if <code>true</code> then an exact range count is requested,
     *           otherwise a fast range count is requested.
@@ -568,7 +575,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
     *      not encoded/decoded according to openrdf semantics (REST API) </a>
     */
-   public long rangeCount(final boolean exact, final Resource s, final URI p,
+   public long rangeCount(final UUID uuid, final boolean exact, final Resource s, final URI p,
          final Value o, final Resource... c) throws Exception {
 
       if (c == null) {
@@ -578,8 +585,6 @@ public class RemoteRepository extends RemoteRepositoryBase {
          throw new IllegalArgumentException();
       }
 
-      // TODO Allow client to specify UUID for ESTCARD. See #1254.
-      final UUID uuid = UUID.randomUUID();
       final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("ESTCARD");
@@ -616,6 +621,44 @@ public class RemoteRepository extends RemoteRepositoryBase {
         }
 
     }
+   
+   /**
+    * Perform a range count on the statement indices for a given triple (quad)
+    * pattern.
+    * <p>
+    * Note: fast range counts are *fast*. They require two key probes into the
+    * indices. Exact range counts are only fast when the indices do not support
+    * isolation or fused views. Isolation is used if the namespace supports full
+    * read/write transactions. Fused views are used in scale-out to model shards
+    * and are also used in full read/write transaction support.
+    * 
+    * 
+    * @param exact
+    *           if <code>true</code> then an exact range count is requested,
+    *           otherwise a fast range count is requested.
+    * @param s
+    *           the subject (can be null)
+    * @param p
+    *           the predicate (can be null)
+    * @param o
+    *           the object (can be null)
+    * @param c
+    *           the context (can be null)
+    * 
+    * @return the range count
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1127"> Add REST API method
+    *      for exact range counts </a>
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   
+   public long rangeCount(final boolean exact, final Resource s, final URI p,
+	         final Value o, final Resource... c) throws Exception {
+	   
+	   return rangeCount(UUID.randomUUID(), exact, s,  p, o, c);
+	   
+   }
     
    /**
     * Perform a fast range count on the statement indices. This reports an
@@ -633,20 +676,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
     
     /**
     * Return a list of contexts in use in a remote quads database.
-    * 
-    * FIXME This should be a streaming response for scalability. That will
-    * require us to change the return type for the method. E.g., to something
-    * that implements {@link Closeable}. Callers will then have to invoke
-    * {@link Closeable#close()} to avoid leaking resources. (This change could
-    * be made when making the CONTEXTS an operation that can be given a UUID
-    * for cancellation by the client.)
     */
-    public Collection<Resource> getContexts() throws Exception {
+    public ContextsResult getContexts(UUID uuid) throws Exception {
     	
-        // TODO Allow client to specify UUID for CONTEXTS. See #1254.
-        final UUID uuid = UUID.randomUUID();
-
-        final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
+    	final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("CONTEXTS");
 
@@ -655,13 +688,11 @@ public class RemoteRepository extends RemoteRepositoryBase {
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
-            checkResponseCode(resp = doConnect(opts));
+            ContextsResult result = mgr.contextsResults(opts, uuid);
             
-            final ContextsResult result = contextsResults(resp);
-            
-            return result.contexts;
-            
-        } finally {
+            return result;
+  
+          } finally {
             
         	if (resp != null)
         		resp.abort();
@@ -670,6 +701,16 @@ public class RemoteRepository extends RemoteRepositoryBase {
     	
     }
     
+    /**
+     * Return a list of contexts in use in a remote quads database.
+     * 
+    */
+    
+    public ContextsResult getContexts() throws Exception {
+    	
+    	return getContexts(UUID.randomUUID());
+    	
+    }
 
     /**
      * Adds RDF data to the remote repository.
