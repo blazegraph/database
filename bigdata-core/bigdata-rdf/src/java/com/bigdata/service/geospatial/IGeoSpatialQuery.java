@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.geospatial;
 
 import java.util.List;
+import java.util.Map;
 
 import org.openrdf.model.URI;
 
@@ -117,6 +118,13 @@ public interface IGeoSpatialQuery {
      */
     public Long getCoordSystem();
     
+    
+    /**
+     * @return the custom fields
+     */
+    public Map<String, LowerAndUpperValue> getCustomFieldsConstraints();
+    
+    
     /**
      * @return the variable to which the location will be bound (if defined)
      */
@@ -196,4 +204,13 @@ public interface IGeoSpatialQuery {
         
     }
 
+    public static class LowerAndUpperValue {
+        final public Long lowerValue;
+        final public Long upperValue;
+        
+        public  LowerAndUpperValue(final Long lowerValue, final Long upperValue) {
+            this.lowerValue = lowerValue;
+            this.upperValue = upperValue;
+        }
+    }
 }

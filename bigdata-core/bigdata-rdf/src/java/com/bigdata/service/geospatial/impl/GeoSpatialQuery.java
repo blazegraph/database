@@ -28,7 +28,9 @@ package com.bigdata.service.geospatial.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
@@ -74,6 +76,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     private final Long timeStart;
     private final Long timeEnd;
     private final Long coordSystem;
+    private final Map<String, LowerAndUpperValue> customFieldsConstraints;
     private final IVariable<?> locationVar;
     private final IVariable<?> timeVar;
     private final IVariable<?> locationAndTimeVar;
@@ -99,9 +102,9 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final PointLatLon spatialRectangleNorthEast, 
             final UNITS spatialUnit, final Long timeStart, 
             final Long timeEnd, final Long coordSystem,
-            final IVariable<?> locationVar, final IVariable<?> timeVar,
-            final IVariable<?> locationAndTimeVar,
-            final IBindingSet incomingBindings) {
+            final Map<String, LowerAndUpperValue> customFieldsConstraints,
+            final IVariable<?> locationVar, final IVariable<?> timeVar, 
+            final IVariable<?> locationAndTimeVar, final IBindingSet incomingBindings) {
 
         this.searchFunction = searchFunction;
         this.searchDatatype = searchDatatype;
@@ -116,6 +119,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.timeStart = timeStart;
         this.timeEnd = timeEnd;
         this.coordSystem = coordSystem;
+        this.customFieldsConstraints = customFieldsConstraints;
         this.locationVar = locationVar;
         this.timeVar = timeVar;
         this.locationAndTimeVar = locationAndTimeVar;
@@ -147,7 +151,9 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final PointLatLon spatialRectangleNorthEast, 
             final UNITS spatialUnit,
             final Long timeStart, final Long timeEnd,
-            final Long coordSystem, final IVariable<?> locationVar, 
+            final Long coordSystem, 
+            final Map<String, LowerAndUpperValue> customFieldsConstraints,
+            final IVariable<?> locationVar, 
             final IVariable<?> timeVar,
             final IVariable<?> locationAndTimeVar,
             final IBindingSet incomingBindings,
@@ -156,10 +162,52 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
 
         this(searchFunction, searchDatatype, subject, predicate, context, spatialCircleCenter,
              spatialCircleRadius, spatialRectangleSouthWest, spatialRectangleNorthEast,  spatialUnit,
-             timeStart, timeEnd, coordSystem, locationVar, timeVar, locationAndTimeVar, incomingBindings);
+             timeStart, timeEnd, coordSystem, customFieldsConstraints, locationVar, timeVar, 
+             locationAndTimeVar, incomingBindings);
         
         this.lowerBoundingBox = lowerBoundingBox;
         this.upperBoundingBox = upperBoundingBox;
+    }
+    
+    
+    /**
+     * Constructs a validated custom fields constraints from the parsed user input. Throws
+     * an exception if the input arity does not match or is invalid (i.e., a lower bound is 
+     * specified to be larger than an upper bound).
+     * 
+     * @param customFields the custom field definitions
+     * @param customFieldsLowerBounds the lower bounds for the custom fields definition (needs to have same arity)
+     * @param customFieldsUpperBounds the upper bounds for the custom fields definition (needs to have same arity)
+     * @return
+     */
+    public static Map<String, LowerAndUpperValue> toValidatedCustomFieldsConstraints(
+        final String[] customFields, final Long[] customFieldsLowerBounds, final Long[] customFieldsUpperBounds) {
+        
+        final  Map<String, LowerAndUpperValue> customFieldsConstraints = new HashMap<String, LowerAndUpperValue>();
+        
+        if (customFields.length!=customFieldsLowerBounds.length)
+            throw new GeoSpatialSearchException(
+                "Nr of custom fields = " + customFields.length + 
+                " differs from number of lower bounds = " + customFieldsLowerBounds.length);
+        
+        if (customFields.length!=customFieldsUpperBounds.length)
+            throw new GeoSpatialSearchException(
+                "Nr of custom fields = " + customFields.length + 
+                " differs from number of upper bounds = " + customFieldsUpperBounds.length);
+
+        for (int i=0; i<customFields.length; i++) {
+            
+            if (customFieldsLowerBounds[i]>customFieldsUpperBounds[i]) {
+                throw new GeoSpatialSearchException(
+                    "Lower bound for field " + customFields[i] + " must not be larger than upper bound.");
+            }
+            
+            customFieldsConstraints.put(
+                customFields[i], 
+                new LowerAndUpperValue(customFieldsLowerBounds[i],customFieldsUpperBounds[i]));
+        }
+        
+        return customFieldsConstraints;
     }
 
     @Override
@@ -229,6 +277,11 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         return coordSystem;
     }
 
+
+    @Override
+    public Map<String, LowerAndUpperValue> getCustomFieldsConstraints() {
+        return customFieldsConstraints;
+    }
     
     @Override
     public IVariable<?> getLocationVar() {
@@ -310,8 +363,20 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                 break;
             }
             case CUSTOM:
+            {
+                final String customServiceMapping = field.getCustomServiceMapping();
+                if (!customFieldsConstraints.containsKey(customServiceMapping)) {
+                    throw new GeoSpatialSearchException(
+                        "Custom field " + customServiceMapping + " not specified in query, but required.");
+                }
+                
+                final LowerAndUpperValue v = customFieldsConstraints.get(customServiceMapping);
+                lowerBound[i] = v.lowerValue;
+                upperBound[i] = v.upperValue;
+                
+                break;
+            }
             default:
-                // TODO: implement
                 throw new IllegalArgumentException("Cases not yet implemented");            
             }
         }
@@ -368,7 +433,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                    searchFunction, searchDatatype, subject, predicate, context, 
                    spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                    spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
-                   locationVar, timeVar, locationAndTimeVar, incomingBindings,
+                   customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, incomingBindings,
                    new CoordinateDD(lowerBoundingBox.northSouth, Math.nextAfter(-180.0,0) /** -179.999... */), 
                    new CoordinateDD(upperBoundingBox.northSouth, upperBoundingBox.eastWest));
             normalizedQueries.add(query1);
@@ -378,7 +443,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                        searchFunction, searchDatatype, subject, predicate, context, 
                        spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                        spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
-                       locationVar, timeVar, locationAndTimeVar, incomingBindings,
+                       customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, incomingBindings,
                        new CoordinateDD(lowerBoundingBox.northSouth, lowerBoundingBox.eastWest), 
                        new CoordinateDD(upperBoundingBox.northSouth, 180.0));
            normalizedQueries.add(query2);
@@ -524,5 +589,6 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }  // else: no geospatial component
         
     }
+
 
 }

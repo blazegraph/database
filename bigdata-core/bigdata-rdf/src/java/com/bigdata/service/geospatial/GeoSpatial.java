@@ -75,6 +75,8 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
  */
 public interface GeoSpatial {
 
+    public static String CUSTOM_FIELDS_SEPARATOR = "#";
+    
    /**
     * Enum for implemented geo functions.
     */
@@ -207,6 +209,21 @@ public interface GeoSpatial {
     * End time of the time interval to scan for.
     */
    final URI COORD_SYSTEM = new URIImpl(NAMESPACE + "coordSystem");
+   
+   /**
+    * #-separated list of custom fields to be queries, e.g. myField1#myField2
+    */
+   final URI CUSTOM_FIELDS = new URIImpl(NAMESPACE + "customFields");
+   
+   /**
+    * Lower bounds for custom fields, e.g. 10#20
+    */
+   final URI CUSTOM_FIELDS_LOWER_BOUNDS = new URIImpl(NAMESPACE + "customFieldsLowerBounds");
+
+   /**
+    * Upper bounds for custom fields, e.g. 11#5000
+    */
+   final URI CUSTOM_FIELDS_UPPER_BOUNDS = new URIImpl(NAMESPACE + "customFieldsLowerBounds");
 
    /**
     * Output variable; if set, this variable is bound to the locations component of the search result.

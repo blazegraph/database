@@ -466,6 +466,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final TermNode timeStart;
       private final TermNode timeEnd;
       private final TermNode coordSystem;
+      private final TermNode customFields;
+      private final TermNode customFieldsLowerBounds;
+      private final TermNode customFieldsUpperBounds;
       
       private IVariable<?>[] vars;
       private final GeoSpatialDefaults defaults;
@@ -533,9 +536,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          TermNode spatialRectangleSouthWest = null;
          TermNode spatialRectangleNorthEast = null;
          TermNode spatialUnit = null;
-         TermNode coordSystem = null;
          TermNode timeStart = null;
          TermNode timeEnd = null;
+         TermNode coordSystem = null;
+         TermNode customFields = null;
+         TermNode customFieldsLowerBounds = null;
+         TermNode customFieldsUpperBounds = null;
          IVariable<?> locationVar = null;
          IVariable<?> timeVar = null;
          IVariable<?> locationAndTimeVar = null;
@@ -570,6 +576,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                timeEnd = meta.o();
             } else if (GeoSpatial.COORD_SYSTEM.equals(p)) {
                 coordSystem = meta.o();
+            } else if (GeoSpatial.CUSTOM_FIELDS.equals(p)) {
+                customFields = meta.o();
+            } else if (GeoSpatial.CUSTOM_FIELDS_LOWER_BOUNDS.equals(p)) {
+                customFieldsLowerBounds = meta.o();
+            } else if (GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS.equals(p)) {
+                customFieldsUpperBounds = meta.o();
             } else if (GeoSpatial.LOCATION_VALUE.equals(p)) {
                locationVar = oVar;
             } else if (GeoSpatial.TIME_VALUE.equals(p)) {
@@ -594,6 +606,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
          this.coordSystem = coordSystem;
+         this.customFields = customFields;
+         this.customFieldsLowerBounds = customFieldsLowerBounds;
+         this.customFieldsUpperBounds = customFieldsUpperBounds;
          this.locationVar = locationVar;
          this.timeVar = timeVar;
          this.locationAndTimeVar = locationAndTimeVar;
@@ -628,7 +643,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction, searchDatatype,
                searchVar, predicate, context, spatialCircleCenter, spatialCircleRadius,
                spatialRectangleSouthWest, spatialRectangleNorthEast, spatialUnit,
-               timeStart, timeEnd, coordSystem, locationVar, timeVar, locationAndTimeVar, defaults, kb, this);
+               timeStart, timeEnd, coordSystem, customFields, customFieldsLowerBounds,
+               customFieldsUpperBounds, locationVar, timeVar, locationAndTimeVar, defaults, kb, this);
 
       }
 
@@ -1583,6 +1599,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final TermNode timeStart;
       private final TermNode timeEnd;
       private final TermNode coordSystem;
+      private final TermNode customFields;
+      private final TermNode customFieldsLowerBounds;
+      private final TermNode customFieldsUpperBounds;
       private final IVariable<?> locationVar;
       private final IVariable<?> timeVar;
       private final IVariable<?> locationAndTimeVar;
@@ -1605,7 +1624,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final TermNode spatialRectangleLowerRight,
             final TermNode spatialUnit, final TermNode timeStart,
             final TermNode timeEnd, final TermNode coordSystem,
-            final IVariable<?> locationVar,
+            final TermNode customFields, final TermNode customFieldsLowerBounds,
+            final TermNode customFieldsUpperBounds, final IVariable<?> locationVar,
             final IVariable<?> timeVar, final IVariable<?> locationAndTimeVar,
             final GeoSpatialDefaults defaults, final AbstractTripleStore kb,
             final GeoSpatialServiceCall serviceCall) {
@@ -1624,6 +1644,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
          this.coordSystem = coordSystem;
+         this.customFields = customFields;
+         this.customFieldsLowerBounds = customFieldsLowerBounds;
+         this.customFieldsUpperBounds = customFieldsUpperBounds;
          this.locationVar = locationVar;
          this.timeVar = timeVar;
          this.locationAndTimeVar = locationAndTimeVar;
@@ -1726,12 +1749,19 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Long coordSystem = resolveAsLong(this.coordSystem, bs);
          final Long timeStart = resolveAsLong(this.timeStart, bs);
          final Long timeEnd = resolveAsLong(this.timeEnd, bs);
+         
+         final String[] customFields = resolveAsStringArr(this.customFields, bs);
+         final Long[] customFieldsLowerBounds = resolveAsLongArr(this.customFieldsLowerBounds, bs);
+         final Long[] customFieldsUpperBounds = resolveAsLongArr(this.customFieldsUpperBounds, bs);
+         
 
          GeoSpatialQuery sq = new GeoSpatialQuery(searchFunction, searchDatatypeUri,
                bs.get(searchVar), predicate, context, spatialCircleCenter, 
                spatialCircleRadius, spatialRectangleUpperLeft, 
-               spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, 
-               coordSystem, locationVar, timeVar, locationAndTimeVar, bs);
+               spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, coordSystem, 
+               GeoSpatialQuery.toValidatedCustomFieldsConstraints(
+                   customFields, customFieldsLowerBounds, customFieldsUpperBounds), 
+               locationVar, timeVar, locationAndTimeVar, bs);
 
          curDelegate = serviceCall.search(sq, kb);
 
@@ -1910,7 +1940,28 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             }
          }
       }
+      
+      private String[] resolveAsStringArr(TermNode termNode, IBindingSet bs) {
+          
+          final String toSplit = resolveAsString(termNode, bs);
+          
+          if (toSplit==null)
+              return new String[0];
+          
+          return toSplit.split(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
+      }
+      
+      private Long[] resolveAsLongArr(TermNode termNode, IBindingSet bs) {
 
+          final String[] stringArr = resolveAsStringArr(termNode, bs);
+          
+          final Long[] longArr = new Long[stringArr.length];
+          for (int i=0; i<stringArr.length; i++) {
+              longArr[i] = Long.valueOf(stringArr[i]);
+          }
+          
+          return longArr;
+      }
       
       private URI resolveSearchDatatype(TermNode searchDatatype, IBindingSet bs) {
           
