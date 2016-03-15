@@ -202,7 +202,12 @@ public interface GeoSpatial {
     * End time of the time interval to scan for.
     */
    final URI TIME_END = new URIImpl(NAMESPACE + "timeEnd");
-   
+
+   /**
+    * End time of the time interval to scan for.
+    */
+   final URI COORD_SYSTEM = new URIImpl(NAMESPACE + "coordSystem");
+
    /**
     * Output variable; if set, this variable is bound to the locations component of the search result.
     */

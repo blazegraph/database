@@ -113,6 +113,11 @@ public interface IGeoSpatialQuery {
     public Long getTimeEnd();
 
     /**
+     * @return the coordinate system ID
+     */
+    public Long getCoordSystem();
+    
+    /**
      * @return the variable to which the location will be bound (if defined)
      */
     public IVariable<?> getLocationVar();

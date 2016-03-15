@@ -122,6 +122,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestGeoSpatialServiceConfiguration.class);
         suite.addTestSuite(TestGeoSpatialServiceConfigurationCustomDatatype.class);
         suite.addTestSuite(TestGeoSpatialCustomSerializer.class);
+        suite.addTestSuite(TestGeoSpatialCoordSystem.class);
         
         return suite;
         
