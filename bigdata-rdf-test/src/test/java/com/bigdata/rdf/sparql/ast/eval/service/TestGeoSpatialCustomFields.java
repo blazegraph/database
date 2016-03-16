@@ -138,10 +138,89 @@ public class TestGeoSpatialCustomFields extends AbstractDataDrivenSPARQLTestCase
         
     }
     
+    
+    /**
+     * Simple basic test case for (x,y,z) index, with just the field
+     * order definition inverted in the query.
+     */
+    public void testCustomFieldsXYZ03() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyz03",
+           "geo-customfields-xyz03.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyz03.srx").runTest();
+        
+    }
+    
+    /**
+     * Simple basic test case for (TIME,x,y,z) index, with just the field
+     * order definition inverted in the query.
+     */
+    public void testCustomFieldsTimeXYZ03() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-txyz03",
+           "geo-customfields-txyz03.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-txyz03.srx").runTest();
+        
+    }
 
-    // TODO: test cases with shifts for the custom fields...
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, with just the field
+     * order definition inverted in the query.
+     */
+    public void testCustomFieldsXYZLatLonTime03() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt03",
+           "geo-customfields-xyzllt03.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt03.srx").runTest();
+        
+    }
 
+    /**
+     * Test mixing up service keywords for different datatypes.
+     */
+    public void testCustomFieldsMixed01() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-mixed01",
+           "geo-customfields-mixed01.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-mixed01.srx").runTest();
+        
+    }
+    
+    /**
+     * Test bindings injection in custom fields values from outside.
+     */
+    public void testCustomFieldsBindingInjection01() throws Exception {
+
+        new TestHelper(
+           "geo-customfields-bindinginjection01",
+           "geo-customfields-bindinginjection01.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-bindinginjection01.srx").runTest();
+
+    }
   
+    
+    /**
+     * Test bindings injection in custom fields values from outside.
+     */
+    public void testCustomFieldsBindingInjection02() throws Exception {
+
+        new TestHelper(
+           "geo-customfields-bindinginjection02",
+           "geo-customfields-bindinginjection02.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-bindinginjection02.srx").runTest();
+
+    }
+    
     @Override
     public Properties getProperties() {
 
@@ -193,9 +272,9 @@ public class TestGeoSpatialCustomFields extends AbstractDataDrivenSPARQLTestCase
            "{\"config\": "
            + "{ \"uri\": \"http://my.custom.datatype/x-y-z-lat-lon-time\", "
            + "\"fields\": [ "
-           + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"1000\", \"serviceMapping\": \"x\" }, "
-           + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"1000\", \"serviceMapping\": \"y\" }, "
-           + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"1000\", \"serviceMapping\": \"z\" }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-1000\", \"multiplier\": \"10\", \"serviceMapping\": \"x\" }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-10\", \"multiplier\": \"100\", \"serviceMapping\": \"y\" }, "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-2\", \"multiplier\": \"1000\", \"serviceMapping\": \"z\" }, "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
            + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\": \"TIME\" } "
