@@ -285,12 +285,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         return timeEnd;
     }
 
-
     @Override
     public Long getCoordSystem() {
         return coordSystem;
     }
-
 
     @Override
     public Map<String, LowerAndUpperValue> getCustomFieldsConstraints() {
@@ -306,7 +304,6 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     public IVariable<?> getTimeVar() {
         return timeVar;
     }
-
 
     @Override
     public IVariable<?> getLatVar() {
@@ -337,7 +334,6 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     public IBindingSet getIncomingBindings() {
         return incomingBindings;
     }
-
 
     
     @Override

@@ -138,6 +138,93 @@ public class TestGeoSpatialCustomFields extends AbstractDataDrivenSPARQLTestCase
         
     }
     
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, where we 
+     * additionally extract a single value from the index.
+     */
+    public void testCustomFieldsXYZLatLonTime02b() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt02b",
+           "geo-customfields-xyzllt02b.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt02b.srx").runTest();
+        
+    }
+    
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, where we 
+     * additionally extract a single value from the index.
+     */
+    public void testCustomFieldsXYZLatLonTime02c() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt02c",
+           "geo-customfields-xyzllt02c.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt02c.srx").runTest();
+        
+    }
+    
+    
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, where we 
+     * additionally extract a single value from the index.
+     */
+    public void testCustomFieldsXYZLatLonTime02d() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt02d",
+           "geo-customfields-xyzllt02d.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt02d.srx").runTest();
+        
+    }
+    
+    
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, where we 
+     * additionally extract a single value from the index.
+     */
+    public void testCustomFieldsXYZLatLonTime02e() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt02e",
+           "geo-customfields-xyzllt02e.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt02e.srx").runTest();
+        
+    }
+    
+    
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, where we 
+     * additionally extract a single value from the index.
+     */
+    public void testCustomFieldsXYZLatLonTime02f() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt02f",
+           "geo-customfields-xyzllt02f.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt02f.srx").runTest();
+        
+    }
+    
+    
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, where we 
+     * additionally extract a single value from the index.
+     */
+    public void testCustomFieldsXYZLatLonTime02g() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt02g",
+           "geo-customfields-xyzllt02g.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt02g.srx").runTest();
+        
+    }
     
     /**
      * Simple basic test case for (x,y,z) index, with just the field
@@ -181,6 +268,35 @@ public class TestGeoSpatialCustomFields extends AbstractDataDrivenSPARQLTestCase
         
     }
 
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index.
+     * Circle query.
+     */
+    public void testCustomFieldsXYZLatLonTime04() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt04",
+           "geo-customfields-xyzllt04.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt04.srx").runTest();
+        
+    }
+    
+
+    /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index.
+     * Rectangle query.
+     */
+    public void testCustomFieldsXYZLatLonTime05() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt05",
+           "geo-customfields-xyzllt05.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt05.srx").runTest();
+        
+    }
+    
     /**
      * Test mixing up service keywords for different datatypes.
      */

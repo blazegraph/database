@@ -73,7 +73,8 @@ public class GeoSpatialTestVocabulary extends BigdataCoreVocabulary_v20151210 {
                 new URIImpl("http://www.opengis.net/ont/geosparql#wktLiteral"),
                 new URIImpl("http://my.custom.datatype/x-y-z"),
                 new URIImpl("http://my.custom.datatype/x-y-z-lat-lon-time"),
-                new URIImpl("http://my.custom.datatype/time-x-y-z")
+                new URIImpl("http://my.custom.datatype/time-x-y-z"),
+                new URIImpl("http://my.custom.datatype/x-y-z-lat-lon-time-coord")
             )
         );
     }
