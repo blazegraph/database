@@ -892,7 +892,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
                     timeVar, locationAndTimeVar, latVar, lonVar, coordSystemVar, 
                     customFieldsVar, subjectPos, objectPos, vf, 
-                    new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig));
+                    new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig),
+                    query.getCustomFieldsConstraints().keySet());
             
             // and construct the sub range task
             return new GeoSpatialServiceCallSubRangeTask(
@@ -1374,6 +1375,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private int lonIdx;
          final private int timeIdx;
          final private int coordSystemIdx;
+         final private int[] idxsOfCustomFields;
          
          
          final private BigdataValueFactory vf;
@@ -1389,7 +1391,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final Var<?> locationVar, final Var<?> timeVar, final Var<?> locationAndTimeVar, 
             final Var<?> latVar, final Var<?> lonVar, final Var<?> coordSystemVar, 
             final Var<?> customFieldsVar, final int subjectPos, final int objectPos, 
-            final BigdataValueFactory vf, final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+            final BigdataValueFactory vf, final GeoSpatialLiteralExtension<BigdataValue> litExt,
+            final Set<String> customFieldStrings) {
             
             this.var = var;
             this.incomingBindingSet = incomingBindingSet;
@@ -1418,6 +1421,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             lonIdx = datatypeConfig.idxOfField(ServiceMapping.LONGITUDE);
             timeIdx = datatypeConfig.idxOfField(ServiceMapping.TIME);
             coordSystemIdx = datatypeConfig.idxOfField(ServiceMapping.COORD_SYSTEM);
+            idxsOfCustomFields = datatypeConfig.idxsOfCustomFields(customFieldStrings);
          }
               
          /**
@@ -1438,71 +1442,54 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final IBindingSet bs = incomingBindingSet.clone();
             bs.set(var, new Constant<IV>(ivs[subjectPos]));
 
-            // handle request for return of index components
+            // handle request for binding index components
             if (reportsObjectComponents) {
                
-               if (locationVar!=null) {
-                  
-                  final BigdataLiteral locationLit = 
-                     vf.createLiteral(
-                        litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], latIdx, lonIdx));
-                  
-                  bs.set(locationVar, 
-                     new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) locationLit)));
-               }
-
-               if (timeVar!=null) {
-                  
-                  final BigdataLiteral timeLit = 
-                        vf.createLiteral(
-                           Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], timeIdx)));
-                  
-                  bs.set(timeVar, 
-                        new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) timeLit)));
-               }
-               
-               if (latVar!=null) {
-                   
-                   final BigdataLiteral latLit = 
-                         vf.createLiteral(
-                            Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], latIdx)));
-                   
-                   bs.set(latVar, 
-                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) latLit)));
-               }
-               
-               if (lonVar!=null) {
-                   
-                   final BigdataLiteral lonLit = 
-                         vf.createLiteral(
-                            Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], lonIdx)));
-                   
-                   bs.set(lonVar, 
-                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) lonLit)));
-               }
-               
-               if (coordSystemVar!=null) {
-                   
-                   final BigdataLiteral coordSystemLit = 
-                         vf.createLiteral(
-                            Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], coordSystemIdx)));
-                   
-                   bs.set(coordSystemVar, 
-                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) coordSystemLit)));
-               }
-
-               if (customFieldsVar!=null) {
-                   // TODO: custom fields to variable mapping, using GeoSpatial.CUSTOM_FIELDS_SEPARATOR as separator          
-               }
-               
-               if (locationAndTimeVar!=null) {
-                  bs.set(locationAndTimeVar, new Constant<IV>(ivs[objectPos]));
-               }
+               conditionallyBindVariableToIdxComponents(locationVar, ivs, bs, null, latIdx, lonIdx);
+               conditionallyBindVariableToIdxComponents(timeVar, ivs, bs, ValueType.LONG, timeIdx);
+               conditionallyBindVariableToIdxComponents(latVar, ivs, bs, ValueType.DOUBLE, latIdx);
+               conditionallyBindVariableToIdxComponents(lonVar, ivs, bs, ValueType.DOUBLE, lonIdx);
+               conditionallyBindVariableToIdxComponents(coordSystemVar, ivs, bs, ValueType.LONG, coordSystemIdx);
+               conditionallyBindVariableToIdxComponents(customFieldsVar, ivs, bs, null, idxsOfCustomFields);
+               conditionallyBindVariableToIdxComponents(locationAndTimeVar, ivs, bs, null, latIdx, lonIdx, timeIdx);
 
             }
             
             return bs;
 
+         }
+
+         /**
+          * If var differs from null, the variable is bind to a concatenation of the
+          * values identified by idxs; if var is null, no action is performed.
+          */
+         private void conditionallyBindVariableToIdxComponents(
+            final Var<?> var, final IV[] ivs, final IBindingSet bs, 
+            final ValueType vt, final int... idxs) {
+            
+            if (var!=null) {
+                  
+                  final BigdataLiteral lit;
+                  
+                  if (ValueType.DOUBLE==vt) {
+                  
+                      lit = vf.createLiteral(
+                          Double.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
+                  
+                  } else if (ValueType.LONG==vt) {
+                      
+                      lit = vf.createLiteral(
+                          Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
+
+                  } else { // vt==null or unknown
+                  
+                      lit = vf.createLiteral(
+                        litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs));
+                  
+                  }
+                  bs.set(var, 
+                     new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) lit)));
+            }
          }
       }
    }
@@ -1937,8 +1924,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          if (object instanceof IVariable<?>) {
             
             if (predicate.equals(GeoSpatial.PREDICATE)
-               || predicate.equals(GeoSpatial.CONTEXT)
                || predicate.equals(GeoSpatial.SEARCH)
+               || predicate.equals(GeoSpatial.SEARCH_DATATYPE)
+               || predicate.equals(GeoSpatial.CONTEXT)
                || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_CENTER)
                || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_RADIUS)
                || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST) 
@@ -1947,10 +1935,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                || predicate.equals(GeoSpatial.TIME_START)
                || predicate.equals(GeoSpatial.TIME_END)
                || predicate.equals(GeoSpatial.COORD_SYSTEM)
-               || predicate.equals(GeoSpatial.TIME_VALUE)
-               || predicate.equals(GeoSpatial.LOCATION_VALUE)
-               || predicate.equals(GeoSpatial.LOCATION_AND_TIME_VALUE)) {
-               
+               || predicate.equals(GeoSpatial.CUSTOM_FIELDS)
+               || predicate.equals(GeoSpatial.CUSTOM_FIELDS_LOWER_BOUNDS)
+               || predicate.equals(GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS)) {
+                
                requiredBound.add((IVariable<?>)object); // the subject var is what we return                  
             }
          }

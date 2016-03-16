@@ -51,6 +51,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
 import com.bigdata.service.GeoSpatialLiteralSerializer;
+import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**
@@ -422,7 +423,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       for (int i=0; i<args.length; i++) {
            
           if (i>0)
-              buf.append("#");
+              buf.append(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
            
           if (args[i]<0) {
               buf.append("?");

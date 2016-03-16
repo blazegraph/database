@@ -519,7 +519,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         
         if (lowerBoundingBox!=null && upperBoundingBox!=null) {
             
-            // latitude south west range must be smaller or equal it north east
+            // latitude south west range must be smaller or equal than north east
             if (lowerBoundingBox.northSouth>upperBoundingBox.northSouth) {
                 if (log.isInfoEnabled()) {
                    log.info("Search rectangle upper left latitude (" + lowerBoundingBox.northSouth + 
@@ -542,7 +542,17 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             }
         }
         
-        // TODO: add custom mappings here
+        final Map<String, LowerAndUpperValue> cfcs = getCustomFieldsConstraints();
+        for (final String key : cfcs.keySet()) {
+            final LowerAndUpperValue val = cfcs.get(key);
+            if (val.lowerValue>val.upperValue) {
+                log.info("Custom field's " + key + " lower range (" + val.lowerValue+ ") is "
+                        + "larger than its upper range (" + val.upperValue + ". Search "
+                        + "request will give no results.");
+                
+                return false;
+            }
+        }
         
         return true;
     }

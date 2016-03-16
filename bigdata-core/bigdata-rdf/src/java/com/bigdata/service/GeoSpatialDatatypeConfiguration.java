@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -207,7 +208,7 @@ public class GeoSpatialDatatypeConfiguration {
      * @param mapping
      * @return
      */
-    public int idxOfField(ServiceMapping mapping) {
+    public int idxOfField(final ServiceMapping mapping) {
         if (mapping!=null) {
         
             for (int i=0; i<getFields().size(); i++) {
@@ -219,6 +220,33 @@ public class GeoSpatialDatatypeConfiguration {
         }
         
         return -1; // fallback
+    }
+    
+    public int[] idxsOfCustomFields(final Set<String> customFields) {
+        
+        if (customFields==null) {
+            return new int[0];
+        }
+        
+        final int[] ret = new int[customFields.size()];
+        Arrays.fill(ret, -1); // pre-initialize
+        
+        int ctr=0;
+        for (int i=0; i<getFields().size(); i++) {
+            
+            final GeoSpatialDatatypeFieldConfiguration field = fields.get(i);
+
+            for (final String customField : customFields) {
+                
+                if (ServiceMapping.CUSTOM == field.getServiceMapping() &&
+                    customField!=null && customField.equals(field.getCustomServiceMapping())) {
+                    
+                    ret[ctr++] = i;
+                }
+            }
+        }
+        
+        return ret;
     }
     
     /**

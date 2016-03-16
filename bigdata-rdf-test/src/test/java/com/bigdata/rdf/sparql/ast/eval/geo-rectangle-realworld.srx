@@ -10,7 +10,7 @@
   <results>    
     <result>
         <binding name="event"><uri>http://www.example.com/Oktoberfest-2013</uri></binding>
-        <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">48.13188#11.54965#1379714400</literal></binding>
+        <binding name="locationAndTime"><literal>48.13188#11.54965#1379714400</literal></binding>
     </result>
   </results>
 </sparql>
