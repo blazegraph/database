@@ -236,8 +236,29 @@ public interface GeoSpatial {
    final URI TIME_VALUE = new URIImpl(NAMESPACE + "timeValue");
    
    /**
+    * Output variable; if set, this variable is bound to the latitude component of the search result.
+    */
+   final URI LAT_VALUE = new URIImpl(NAMESPACE + "latValue");
+
+   /**
+    * Output variable; if set, this variable is bound to the longitude component of the search result.
+    */
+   final URI LON_VALUE = new URIImpl(NAMESPACE + "lonValue");
+
+   /**
+    * Output variable; if set, this variable is bound to the longitude component of the search result.
+    */
+   final URI COORD_SYSTEM_VALUE = new URIImpl(NAMESPACE + "coordSystemValue");
+   
+   /**
+    * Output variable; if set, this variable is bound to the values for the custom fields,
+    * separated by CUSTOM_FIELDS_SEPARATOR (in case there are multiple custom fields)
+    */
+   final URI CUSTOM_FIELDS_VALUES = new URIImpl(NAMESPACE + "customFieldsValues");
+   
+   /**
     * Output variable; if set, this variable is bound to a combined representation of the
-    * locations + time component of the search result.
+    * locations + time component of the search result, separated through the CUSTOM_FIELDS_SEPARATOR.
     */
    final URI LOCATION_AND_TIME_VALUE = new URIImpl(NAMESPACE + "locationAndTimeValue");
    

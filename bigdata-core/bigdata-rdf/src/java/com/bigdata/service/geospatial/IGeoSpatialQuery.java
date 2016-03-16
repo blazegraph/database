@@ -134,6 +134,26 @@ public interface IGeoSpatialQuery {
      * @return the variable to which the time will be bound (if defined)
      */
     public IVariable<?> getTimeVar();
+    
+    /**
+     * @return the variable to which the latitude will be bound (if defined)
+     */
+    public IVariable<?> getLatVar();
+
+    /**
+     * @return the variable to which the longitude will be bound (if defined)
+     */
+    public IVariable<?> getLonVar();
+    
+    /**
+     * @return the variable to which the coordinate system component will be bound (if defined)
+     */
+    public IVariable<?> getCoordSystemVar();
+    
+    /**
+     * @return the variable to which the custom fields will be bound (if defined)
+     */
+    public IVariable<?> getCustomFieldsVar();
 
     /**
      * @return the variable to which the location+time will be bound (if defined)

@@ -447,31 +447,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     */
    private static class GeoSpatialServiceCall implements BigdataServiceCall {
       
-      
-      
       private final IServiceOptions serviceOptions;
-      private final TermNode searchFunction;
-      private final IVariable<?> searchVar;
-      private final IVariable<?> locationVar;
-      private final IVariable<?> timeVar;
-      private final IVariable<?> locationAndTimeVar;
-      private final TermNode predicate;
-      private final TermNode searchDatatype;
-      private final TermNode context;
-      private final TermNode spatialCircleCenter;
-      private final TermNode spatialCircleRadius;
-      private final TermNode spatialRectangleSouthWest;
-      private final TermNode spatialRectangleNorthEast;
-      private final TermNode spatialUnit;
-      private final TermNode timeStart;
-      private final TermNode timeEnd;
-      private final TermNode coordSystem;
-      private final TermNode customFields;
-      private final TermNode customFieldsLowerBounds;
-      private final TermNode customFieldsUpperBounds;
+      
+      final GeoSpatialServiceCallConfiguration gssConfig;
       
       private IVariable<?>[] vars;
-      private final GeoSpatialDefaults defaults;
       private final AbstractTripleStore kb;
       private final GeoSpatialCounters geoSpatialCounters;
       
@@ -491,7 +471,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       
       
       public GeoSpatialServiceCall(final IVariable<?> searchVar,
-            final Map<URI, StatementPatternNode> statementPatterns,
+            final Map<URI, StatementPatternNode> sps,
             final IServiceOptions serviceOptions,
             final GeoSpatialDefaults dflts, final AbstractTripleStore kb,
             final int maxParallel, final int numTasks,
@@ -503,7 +483,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          if (searchVar == null)
             throw new IllegalArgumentException();
 
-         if (statementPatterns == null)
+         if (sps == null)
             throw new IllegalArgumentException();
 
          if (serviceOptions == null)
@@ -514,104 +494,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          this.serviceOptions = serviceOptions;
 
-         this.defaults = dflts;
-         
-         this.searchVar = searchVar;
-
-         /*
-          * Unpack the "search" magic predicate:
-          * 
-          * [?searchVar bd:search objValue]
-          */
-         final StatementPatternNode sp = statementPatterns
-               .get(GeoSpatial.SEARCH);
-
-         searchFunction = sp.o();
-
-         TermNode predicate = null;
-         TermNode searchDatatype = null;
-         TermNode context = null;
-         TermNode spatialCircleCenter = null;
-         TermNode spatialCircleRadius = null;
-         TermNode spatialRectangleSouthWest = null;
-         TermNode spatialRectangleNorthEast = null;
-         TermNode spatialUnit = null;
-         TermNode timeStart = null;
-         TermNode timeEnd = null;
-         TermNode coordSystem = null;
-         TermNode customFields = null;
-         TermNode customFieldsLowerBounds = null;
-         TermNode customFieldsUpperBounds = null;
-         IVariable<?> locationVar = null;
-         IVariable<?> timeVar = null;
-         IVariable<?> locationAndTimeVar = null;
-
-         for (StatementPatternNode meta : statementPatterns.values()) {
-
-            final URI p = (URI) meta.p().getValue();
-            
-            final IVariable<?> oVar = 
-               meta.o().isVariable() ? 
-               (IVariable<?>) meta.o().getValueExpression() : null;
-
-            if (GeoSpatial.PREDICATE.equals(p)) {
-               predicate = meta.o();
-            } else if (GeoSpatial.SEARCH_DATATYPE.equals(p)) {
-                searchDatatype = meta.o();
-            } else if (GeoSpatial.CONTEXT.equals(p)) {
-            	context = meta.o();
-            } else if (GeoSpatial.SPATIAL_CIRCLE_CENTER.equals(p)) {
-               spatialCircleCenter = meta.o();
-            } else if (GeoSpatial.SPATIAL_CIRCLE_RADIUS.equals(p)) {
-               spatialCircleRadius = meta.o();
-            } else if (GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST.equals(p)) {
-               spatialRectangleSouthWest = meta.o();
-            } else if (GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST.equals(p)) {
-               spatialRectangleNorthEast = meta.o();
-            } else if (GeoSpatial.SPATIAL_UNIT.equals(p)) {
-               spatialUnit = meta.o();
-            } else if (GeoSpatial.TIME_START.equals(p)) {
-               timeStart = meta.o();
-            } else if (GeoSpatial.TIME_END.equals(p)) {
-               timeEnd = meta.o();
-            } else if (GeoSpatial.COORD_SYSTEM.equals(p)) {
-                coordSystem = meta.o();
-            } else if (GeoSpatial.CUSTOM_FIELDS.equals(p)) {
-                customFields = meta.o();
-            } else if (GeoSpatial.CUSTOM_FIELDS_LOWER_BOUNDS.equals(p)) {
-                customFieldsLowerBounds = meta.o();
-            } else if (GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS.equals(p)) {
-                customFieldsUpperBounds = meta.o();
-            } else if (GeoSpatial.LOCATION_VALUE.equals(p)) {
-               locationVar = oVar;
-            } else if (GeoSpatial.TIME_VALUE.equals(p)) {
-               timeVar = oVar;
-            } else if (GeoSpatial.LOCATION_AND_TIME_VALUE.equals(p)) {
-               locationAndTimeVar = oVar;
-            } 
-
-         }
+         this.gssConfig = 
+             new GeoSpatialServiceCallConfiguration(dflts, searchVar, sps);
 
          // for now: a single variable containing the result
          this.vars = new IVariable[] { searchVar };
-
-         this.predicate = predicate;
-         this.searchDatatype = searchDatatype;
-         this.context = context;
-         this.spatialCircleCenter = spatialCircleCenter;
-         this.spatialCircleRadius = spatialCircleRadius;
-         this.spatialRectangleSouthWest = spatialRectangleSouthWest;
-         this.spatialRectangleNorthEast = spatialRectangleNorthEast;
-         this.spatialUnit = spatialUnit;
-         this.timeStart = timeStart;
-         this.timeEnd = timeEnd;
-         this.coordSystem = coordSystem;
-         this.customFields = customFields;
-         this.customFieldsLowerBounds = customFieldsLowerBounds;
-         this.customFieldsUpperBounds = customFieldsUpperBounds;
-         this.locationVar = locationVar;
-         this.timeVar = timeVar;
-         this.locationAndTimeVar = locationAndTimeVar;
          this.kb = kb;
          
          geoSpatialCounters =
@@ -640,11 +527,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          // iterate over the incoming binding set, issuing search requests
          // for all bindings in the binding set
-         return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction, searchDatatype,
-               searchVar, predicate, context, spatialCircleCenter, spatialCircleRadius,
-               spatialRectangleSouthWest, spatialRectangleNorthEast, spatialUnit,
-               timeStart, timeEnd, coordSystem, customFields, customFieldsLowerBounds,
-               customFieldsUpperBounds, locationVar, timeVar, locationAndTimeVar, defaults, kb, this);
+         return new GeoSpatialInputBindingsIterator(incomingBs, gssConfig, kb, this);
 
       }
 
@@ -996,6 +879,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             // set up a value resolver
             final Var<?> locationVar = varFromIVar(query.getLocationVar());
             final Var<?> timeVar = varFromIVar(query.getTimeVar());
+            final Var<?> latVar = varFromIVar(query.getLatVar());
+            final Var<?> lonVar = varFromIVar(query.getLonVar());
+            final Var<?> coordSystemVar = varFromIVar(query.getCoordSystemVar());
+            final Var<?> customFieldsVar = varFromIVar(query.getCustomFieldsVar());
             final Var<?> locationAndTimeVar = varFromIVar(query.getLocationAndTimeVar());
             
             final Var<?> var = Var.var(vars[0].getName());
@@ -1003,7 +890,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             final GeoSpatialServiceCallResolver resolver = 
                 new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
-                    timeVar, locationAndTimeVar, subjectPos, objectPos, vf, 
+                    timeVar, locationAndTimeVar, latVar, lonVar, coordSystemVar, 
+                    customFieldsVar, subjectPos, objectPos, vf, 
                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig));
             
             // and construct the sub range task
@@ -1474,6 +1362,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private Var<?> locationVar;
          final private Var<?> timeVar;
          final private Var<?> locationAndTimeVar;
+         final private Var<?> latVar;
+         final private Var<?> lonVar;
+         final private Var<?> coordSystemVar;
+         final private Var<?> customFieldsVar;
+         
          final private int subjectPos;
          final private int objectPos;
          
@@ -1494,18 +1387,24 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          
          public GeoSpatialServiceCallResolver(final Var<?> var, final IBindingSet incomingBindingSet,
             final Var<?> locationVar, final Var<?> timeVar, final Var<?> locationAndTimeVar, 
-            final int subjectPos, final int objectPos, final BigdataValueFactory vf,
-            final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+            final Var<?> latVar, final Var<?> lonVar, final Var<?> coordSystemVar, 
+            final Var<?> customFieldsVar, final int subjectPos, final int objectPos, 
+            final BigdataValueFactory vf, final GeoSpatialLiteralExtension<BigdataValue> litExt) {
             
             this.var = var;
             this.incomingBindingSet = incomingBindingSet;
             this.locationVar = locationVar;
             this.timeVar = timeVar;
             this.locationAndTimeVar = locationAndTimeVar;
+            this.latVar = latVar;
+            this.lonVar = lonVar;
+            this.coordSystemVar = coordSystemVar;
+            this.customFieldsVar = customFieldsVar;
             this.subjectPos = subjectPos;
             this.objectPos = objectPos;
             this.vf = vf;
             this.litExt = litExt;
+            
             reportsObjectComponents =
                locationVar!=null || timeVar!=null || locationAndTimeVar!=null;
             
@@ -1544,8 +1443,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                
                if (locationVar!=null) {
                   
-                  //
-                  // wrap positions 0 + 1 (lat + lon) into a literal
                   final BigdataLiteral locationLit = 
                      vf.createLiteral(
                         litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], latIdx, lonIdx));
@@ -1556,7 +1453,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
                if (timeVar!=null) {
                   
-                  // wrap positions 2 of the index into a literal
                   final BigdataLiteral timeLit = 
                         vf.createLiteral(
                            Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], timeIdx)));
@@ -1564,7 +1460,41 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   bs.set(timeVar, 
                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) timeLit)));
                }
+               
+               if (latVar!=null) {
+                   
+                   final BigdataLiteral latLit = 
+                         vf.createLiteral(
+                            Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], latIdx)));
+                   
+                   bs.set(latVar, 
+                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) latLit)));
+               }
+               
+               if (lonVar!=null) {
+                   
+                   final BigdataLiteral lonLit = 
+                         vf.createLiteral(
+                            Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], lonIdx)));
+                   
+                   bs.set(lonVar, 
+                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) lonLit)));
+               }
+               
+               if (coordSystemVar!=null) {
+                   
+                   final BigdataLiteral coordSystemLit = 
+                         vf.createLiteral(
+                            Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], coordSystemIdx)));
+                   
+                   bs.set(coordSystemVar, 
+                         new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) coordSystemLit)));
+               }
 
+               if (customFieldsVar!=null) {
+                   // TODO: custom fields to variable mapping, using GeoSpatial.CUSTOM_FIELDS_SEPARATOR as separator          
+               }
+               
                if (locationAndTimeVar!=null) {
                   bs.set(locationAndTimeVar, new Constant<IV>(ivs[objectPos]));
                }
@@ -1586,28 +1516,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          ICloseableIterator<IBindingSet> {
 
       private final IBindingSet[] bindingSet;
-      private final TermNode searchFunction;
-      private final TermNode searchDatatype;
-      private final IVariable<?> searchVar;
-      private final TermNode predicate;
-      private final TermNode context;
-      private final TermNode spatialCircleCenter;
-      private final TermNode spatialCircleRadius;
-      private final TermNode spatialRectangleUpperLeft;
-      private final TermNode spatialRectangleLowerRight;
-      private final TermNode spatialUnit;
-      private final TermNode timeStart;
-      private final TermNode timeEnd;
-      private final TermNode coordSystem;
-      private final TermNode customFields;
-      private final TermNode customFieldsLowerBounds;
-      private final TermNode customFieldsUpperBounds;
-      private final IVariable<?> locationVar;
-      private final IVariable<?> timeVar;
-      private final IVariable<?> locationAndTimeVar;
-      
-
-      final GeoSpatialDefaults defaults;
+      private final GeoSpatialServiceCallConfiguration gssConfig;
       final AbstractTripleStore kb;
       final GeoSpatialServiceCall serviceCall;
 
@@ -1616,41 +1525,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       ICloseableIterator<IBindingSet> curDelegate;
 
       public GeoSpatialInputBindingsIterator(final IBindingSet[] bindingSet,
-            final TermNode searchFunction, final TermNode searchDatatype,
-            final IVariable<?> searchVar,
-            final TermNode predicate, final TermNode context, 
-            final TermNode spatialCircleCenter, final TermNode spatialCircleRadius,
-            final TermNode spatialRectangleUpperLeft,
-            final TermNode spatialRectangleLowerRight,
-            final TermNode spatialUnit, final TermNode timeStart,
-            final TermNode timeEnd, final TermNode coordSystem,
-            final TermNode customFields, final TermNode customFieldsLowerBounds,
-            final TermNode customFieldsUpperBounds, final IVariable<?> locationVar,
-            final IVariable<?> timeVar, final IVariable<?> locationAndTimeVar,
-            final GeoSpatialDefaults defaults, final AbstractTripleStore kb,
-            final GeoSpatialServiceCall serviceCall) {
+            final GeoSpatialServiceCallConfiguration gssConfig,
+            final AbstractTripleStore kb, final GeoSpatialServiceCall serviceCall) {
 
          this.bindingSet = bindingSet;
-         this.searchFunction = searchFunction;
-         this.searchDatatype = searchDatatype;
-         this.searchVar = searchVar;
-         this.predicate = predicate;
-         this.context = context;
-         this.spatialCircleCenter = spatialCircleCenter;
-         this.spatialCircleRadius = spatialCircleRadius;
-         this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
-         this.spatialRectangleLowerRight = spatialRectangleLowerRight;
-         this.spatialUnit = spatialUnit;
-         this.timeStart = timeStart;
-         this.timeEnd = timeEnd;
-         this.coordSystem = coordSystem;
-         this.customFields = customFields;
-         this.customFieldsLowerBounds = customFieldsLowerBounds;
-         this.customFieldsUpperBounds = customFieldsUpperBounds;
-         this.locationVar = locationVar;
-         this.timeVar = timeVar;
-         this.locationAndTimeVar = locationAndTimeVar;
-         this.defaults = defaults;
+         this.gssConfig = gssConfig;
          this.kb = kb;
          this.serviceCall = serviceCall;
 
@@ -1732,36 +1611,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          final IBindingSet bs = bindingSet[nextBindingSetItr++];
          
-         final URI searchDatatypeUri = resolveSearchDatatype(
-               this.searchDatatype, bs);
-         final GeoFunction searchFunction = resolveAsGeoFunction(
-               this.searchFunction, bs);
-         final PointLatLon spatialCircleCenter = resolveAsPoint(
-               this.spatialCircleCenter, bs);
-         final Double spatialCircleRadius = resolveAsDouble(
-               this.spatialCircleRadius, bs);
-         final PointLatLon spatialRectangleUpperLeft = resolveAsPoint(
-               this.spatialRectangleUpperLeft, bs);
-         final PointLatLon spatialRectangleLowerRight = resolveAsPoint(
-               this.spatialRectangleLowerRight, bs);
-         final UNITS spatialUnit = resolveAsSpatialDistanceUnit(
-               this.spatialUnit, bs);
-         final Long coordSystem = resolveAsLong(this.coordSystem, bs);
-         final Long timeStart = resolveAsLong(this.timeStart, bs);
-         final Long timeEnd = resolveAsLong(this.timeEnd, bs);
-         
-         final String[] customFields = resolveAsStringArr(this.customFields, bs);
-         final Long[] customFieldsLowerBounds = resolveAsLongArr(this.customFieldsLowerBounds, bs);
-         final Long[] customFieldsUpperBounds = resolveAsLongArr(this.customFieldsUpperBounds, bs);
-         
-
-         GeoSpatialQuery sq = new GeoSpatialQuery(searchFunction, searchDatatypeUri,
-               bs.get(searchVar), predicate, context, spatialCircleCenter, 
-               spatialCircleRadius, spatialRectangleUpperLeft, 
-               spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, coordSystem, 
-               GeoSpatialQuery.toValidatedCustomFieldsConstraints(
-                   customFields, customFieldsLowerBounds, customFieldsUpperBounds), 
-               locationVar, timeVar, locationAndTimeVar, bs);
+         final GeoSpatialQuery sq = gssConfig.toGeoSpatialQuery(bs);
 
          curDelegate = serviceCall.search(sq, kb);
 
@@ -1774,233 +1624,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       }
 
-      private GeoFunction resolveAsGeoFunction(TermNode termNode, IBindingSet bs) {
-
-         String geoFunctionStr = resolveAsString(termNode, bs);
-
-         // try override with system default, if not set
-         if (geoFunctionStr == null) {
-            geoFunctionStr = defaults.getDefaultFunction();
-         }
-
-         if (geoFunctionStr != null && !geoFunctionStr.isEmpty()) {
-
-            try {
-
-               return GeoFunction.forName(geoFunctionStr);
-
-            } catch (NumberFormatException e) {
-
-               // illegal, ignore and proceed
-               if (log.isInfoEnabled()) {
-                  log.info("Illegal geo function: " + geoFunctionStr
-                        + " -> will be ignored, using default.");
-
-               }
-
-            }
-         }
-
-         return GeoSpatial.Options.DEFAULT_GEO_FUNCTION; // fallback
-
-      }
-
-      private UNITS resolveAsSpatialDistanceUnit(TermNode termNode,
-            IBindingSet bs) {
-
-         String spatialUnitStr = resolveAsString(termNode, bs);
-
-         // try override with system default, if not set
-         if (spatialUnitStr == null) {
-            spatialUnitStr = defaults.getDefaultSpatialDistanceUnit();
-         }
-
-         if (spatialUnitStr != null && !spatialUnitStr.isEmpty()) {
-
-            try {
-
-               return UNITS.valueOf(spatialUnitStr);
-
-            } catch (NumberFormatException e) {
-
-               // illegal, ignore and proceed
-               if (log.isInfoEnabled()) {
-                  log.info("Illegal spatial unit: " + spatialUnitStr
-                        + " -> will be ignored, using default.");
-
-               }
-
-            }
-         }
-
-         return GeoSpatial.Options.DEFAULT_GEO_SPATIAL_UNIT; // fallback
-
-      }
-
-      private Double resolveAsDouble(TermNode termNode, IBindingSet bs) {
-
-         String s = resolveAsString(termNode, bs);
-         if (s == null || s.isEmpty()) {
-            return null;
-         }
-
-         try {
-            return Double.valueOf(s);
-         } catch (NumberFormatException e) {
-
-            // illegal, ignore and proceed
-            if (log.isInfoEnabled()) {
-               log.info("Illegal double value: " + s
-                     + " -> will be ignored, using default.");
-
-            }
-         }
-
-         return null; // could not parse
-      }
-
-      private Long resolveAsLong(TermNode termNode, IBindingSet bs) {
-
-         String s = resolveAsString(termNode, bs);
-         if (s == null || s.isEmpty()) {
-            return null;
-         }
-
-         try {
-            return Long.valueOf(s);
-         } catch (NumberFormatException e) {
-
-            // illegal, ignore and proceed
-            if (log.isInfoEnabled()) {
-               log.info("Illegal double value: " + s
-                     + " -> will be ignored, using default.");
-
-            }
-         }
-
-         return null; // could not parse
-      }
-
-      private PointLatLon resolveAsPoint(TermNode termNode, IBindingSet bs) {
-
-         String pointAsStr = resolveAsString(termNode, bs);
-         if (pointAsStr == null || pointAsStr.isEmpty()) {
-            return null;
-         }
-
-         try {
-
-            return new PointLatLon(pointAsStr);
-
-         } catch (NumberFormatException e) {
-
-            // illegal, ignore and proceed
-            if (log.isInfoEnabled()) {
-               log.info("Illegal point value: " + pointAsStr
-                     + " -> will be ignored, using default.");
-
-            }
-         }
-
-         return null; // could not parse
-      }
-
-      private String resolveAsString(TermNode termNode, IBindingSet bs) {
-
-         if (termNode == null) { // term node not set explicitly
-            return null;
-         }
-
-         if (termNode.isConstant()) {
-
-            final Literal lit = (Literal) termNode.getValue();
-            return lit == null ? null : lit.stringValue();
-
-         } else {
-
-            if (bs == null) {
-               return null; // shouldn't happen, but just in case...
-            }
-
-            final IVariable<?> var = (IVariable<?>) termNode
-                  .getValueExpression();
-            if (bs.isBound(var)) {
-               IConstant<?> c = bs.get(var);
-               if (c == null || c.get() == null
-                     || !(c.get() instanceof TermId<?>)) {
-                  return null;
-               }
-
-               TermId<?> cAsTerm = (TermId<?>) c.get();
-               return cAsTerm.stringValue();
-
-            } else {
-               throw new GeoSpatialSearchException(
-                   GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
-            }
-         }
-      }
-      
-      private String[] resolveAsStringArr(TermNode termNode, IBindingSet bs) {
-          
-          final String toSplit = resolveAsString(termNode, bs);
-          
-          if (toSplit==null)
-              return new String[0];
-          
-          return toSplit.split(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
-      }
-      
-      private Long[] resolveAsLongArr(TermNode termNode, IBindingSet bs) {
-
-          final String[] stringArr = resolveAsStringArr(termNode, bs);
-          
-          final Long[] longArr = new Long[stringArr.length];
-          for (int i=0; i<stringArr.length; i++) {
-              longArr[i] = Long.valueOf(stringArr[i]);
-          }
-          
-          return longArr;
-      }
-      
-      private URI resolveSearchDatatype(TermNode searchDatatype, IBindingSet bs) {
-          
-          if (searchDatatype==null) {
-              return GeoSpatial.DEFAULT_DATATYPE;
-          }
-          
-          if (searchDatatype.isConstant()) {
-              
-              final URI uri = (URI) searchDatatype.getValue();
-              return uri==null ? GeoSpatial.DEFAULT_DATATYPE : uri;
-              
-          } else {
-              
-              if (bs==null) {
-                  return null; // shouldn't happen, but just in case...
-              }
-              
-              final IVariable<?> var = (IVariable<?>) searchDatatype
-                      .getValueExpression();
-              if (bs.isBound(var)) {
-                  IConstant<?> c = bs.get(var);
-                  if (c == null || c.get() == null
-                        || !(c.get() instanceof TermId<?>)) {
-                     return null;
-                  }
-
-                  TermId<?> cAsTerm = (TermId<?>) c.get();
-                  return (URI)cAsTerm.getValue();
-
-               } else {
-                  throw new GeoSpatialSearchException(
-                      GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
-               }
-              
-          }
-          
-      }
-      
       @Override
       public void remove() {
 
@@ -2334,6 +1957,461 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       }
 
       return requiredBound;
+   }
+   
+   /**
+    * Wrapper class representing a geospatial service call configuration.
+    * 
+    * @author msc
+    */
+   public static class GeoSpatialServiceCallConfiguration {
+       
+       private GeoSpatialDefaults defaults = null;
+       
+       private TermNode searchFunction = null;
+       private TermNode predicate = null;
+       private TermNode searchDatatype = null;
+       private TermNode context = null;
+       private TermNode spatialCircleCenter = null;
+       private TermNode spatialCircleRadius = null;
+       private TermNode spatialRectangleSouthWest = null;
+       private TermNode spatialRectangleNorthEast = null;
+       private TermNode spatialUnit = null;
+       private TermNode timeStart = null;
+       private TermNode timeEnd = null;
+       private TermNode coordSystem = null;
+       private TermNode customFields = null;
+       private TermNode customFieldsLowerBounds = null;
+       private TermNode customFieldsUpperBounds = null;
+
+       private IVariable<?> searchVar = null;
+       private IVariable<?> locationVar = null;
+       private IVariable<?> locationAndTimeVar = null;
+       private IVariable<?> timeVar = null;
+       private IVariable<?> latVar = null;
+       private IVariable<?> lonVar = null;
+       private IVariable<?> coordSystemVar = null;
+       private IVariable<?> customFieldsVar = null;
+       
+       public GeoSpatialServiceCallConfiguration(
+           final GeoSpatialDefaults defaults, final IVariable<?> searchVar, 
+           final Map<URI, StatementPatternNode> sps) {
+           
+           this.defaults = defaults;
+           this.searchVar = searchVar;
+
+           if (sps.containsKey(GeoSpatial.SEARCH)) {
+               this.searchFunction = sps.get(GeoSpatial.SEARCH).o();
+           } else {
+               throw new GeoSpatialSearchException(
+                   "Search function must be defined in service call");
+           }
+               
+           if (sps.containsKey(GeoSpatial.PREDICATE)) {
+               this.predicate = sps.get(GeoSpatial.PREDICATE).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.SEARCH_DATATYPE)) {
+               this.searchDatatype = sps.get(GeoSpatial.SEARCH_DATATYPE).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.CONTEXT)) {
+               this.context = sps.get(GeoSpatial.CONTEXT).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.SPATIAL_CIRCLE_CENTER)) {
+               this.spatialCircleCenter = sps.get(GeoSpatial.SPATIAL_CIRCLE_CENTER).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.SPATIAL_CIRCLE_RADIUS)) {
+               this.spatialCircleRadius = sps.get(GeoSpatial.SPATIAL_CIRCLE_RADIUS).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST)) {
+               this.spatialRectangleSouthWest = 
+                   sps.get(GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST)) {
+               this.spatialRectangleNorthEast = 
+                   sps.get(GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.SPATIAL_UNIT)) {
+               this.spatialUnit = sps.get(GeoSpatial.SPATIAL_UNIT).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.TIME_START)) {
+               this.timeStart = sps.get(GeoSpatial.TIME_START).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.TIME_END)) {
+               this.timeEnd = sps.get(GeoSpatial.TIME_END).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.COORD_SYSTEM)) {
+               this.coordSystem = sps.get(GeoSpatial.COORD_SYSTEM).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.CUSTOM_FIELDS)) {
+               this.customFields = sps.get(GeoSpatial.CUSTOM_FIELDS).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.CUSTOM_FIELDS_LOWER_BOUNDS)) {
+               this.customFieldsLowerBounds = 
+                   sps.get(GeoSpatial.CUSTOM_FIELDS_LOWER_BOUNDS).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS)) {
+               this.customFieldsUpperBounds = 
+                   sps.get(GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS).o();
+           }
+
+           if (sps.containsKey(GeoSpatial.LOCATION_VALUE)) {
+               
+               final StatementPatternNode sp = sps.get(GeoSpatial.LOCATION_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "locationValue property must be a variable");
+               }
+
+               this.locationVar = (IVariable<?>) sp.o().getValueExpression();
+           }
+           
+           if (sps.containsKey(GeoSpatial.TIME_VALUE)) {
+               
+               final StatementPatternNode sp = sps.get(GeoSpatial.TIME_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "timeValue property must be a variable");
+               }
+
+               this.timeVar = (IVariable<?>) sp.o().getValueExpression();
+           }
+           
+           
+           if (sps.containsKey(GeoSpatial.LAT_VALUE)) {
+               
+               final StatementPatternNode sp = sps.get(GeoSpatial.LAT_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "latValue property must be a variable");
+               }
+
+               this.latVar = (IVariable<?>) sp.o().getValueExpression();
+           }
+
+           if (sps.containsKey(GeoSpatial.LON_VALUE)) {
+               
+               final StatementPatternNode sp = sps.get(GeoSpatial.LON_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                      "lonValue property must be a variable");
+               }
+
+               this.lonVar = (IVariable<?>) sp.o().getValueExpression();
+           }
+
+           if (sps.containsKey(GeoSpatial.COORD_SYSTEM_VALUE)) {
+               
+               final StatementPatternNode sp = sps.get(GeoSpatial.COORD_SYSTEM_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "coordSystemValue property must be a variable");
+               }
+
+               this.coordSystemVar = (IVariable<?>) sp.o().getValueExpression();
+           }
+           
+           if (sps.containsKey(GeoSpatial.CUSTOM_FIELDS_VALUES)) {
+               
+               final StatementPatternNode sp = sps.get(GeoSpatial.CUSTOM_FIELDS_VALUES);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "customFieldsValues property must be a variable");
+               }
+
+               this.coordSystemVar = (IVariable<?>) sp.o().getValueExpression();
+           }
+           
+           if (sps.containsKey(GeoSpatial.LOCATION_AND_TIME_VALUE)) {
+               
+               final StatementPatternNode sp = sps.get(GeoSpatial.LOCATION_AND_TIME_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "locationAndTimeValue property must be a variable");
+               }
+
+               this.locationAndTimeVar = (IVariable<?>) sp.o().getValueExpression();
+           }
+       }
+       
+       /**
+        * Converts the configuration into a query over the given binding set
+        * @param bs
+        */
+       public GeoSpatialQuery toGeoSpatialQuery(final IBindingSet bs) {
+           
+           final URI searchDatatypeUri = resolveSearchDatatype(
+                   this.searchDatatype, bs);
+             final GeoFunction searchFunction = resolveAsGeoFunction(
+                   this.searchFunction, bs);
+             final PointLatLon spatialCircleCenter = resolveAsPoint(
+                   this.spatialCircleCenter, bs);
+             final Double spatialCircleRadius = resolveAsDouble(
+                   this.spatialCircleRadius, bs);
+             final PointLatLon spatialRectangleUpperLeft = resolveAsPoint(
+                   this.spatialRectangleSouthWest, bs);
+             final PointLatLon spatialRectangleLowerRight = resolveAsPoint(
+                   this.spatialRectangleNorthEast, bs);
+             final UNITS spatialUnit = resolveAsSpatialDistanceUnit(
+                   this.spatialUnit, bs);
+             final Long coordSystem = resolveAsLong(this.coordSystem, bs);
+             final Long timeStart = resolveAsLong(this.timeStart, bs);
+             final Long timeEnd = resolveAsLong(this.timeEnd, bs);
+             
+             final String[] customFields = resolveAsStringArr(this.customFields, bs);
+             final Long[] customFieldsLowerBounds = resolveAsLongArr(this.customFieldsLowerBounds, bs);
+             final Long[] customFieldsUpperBounds = resolveAsLongArr(this.customFieldsUpperBounds, bs);
+
+             final GeoSpatialQuery sq = 
+                 new GeoSpatialQuery(searchFunction, searchDatatypeUri,
+                     bs.get(searchVar), predicate, context, spatialCircleCenter, 
+                     spatialCircleRadius, spatialRectangleUpperLeft, 
+                     spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, coordSystem, 
+                     GeoSpatialQuery.toValidatedCustomFieldsConstraints(
+                         customFields, customFieldsLowerBounds, customFieldsUpperBounds), 
+                     locationVar, timeVar, locationAndTimeVar, latVar, lonVar,
+                     coordSystemVar, customFieldsVar, bs);
+
+             return sq;
+       }
+       
+       GeoFunction resolveAsGeoFunction(final TermNode termNode, final IBindingSet bs) {
+
+           String geoFunctionStr = resolveAsString(termNode, bs);
+
+           // try override with system default, if not set
+           if (geoFunctionStr == null) {
+              geoFunctionStr = defaults.getDefaultFunction();
+           }
+
+           if (geoFunctionStr != null && !geoFunctionStr.isEmpty()) {
+
+              try {
+
+                 return GeoFunction.forName(geoFunctionStr);
+
+              } catch (NumberFormatException e) {
+
+                 // illegal, ignore and proceed
+                 if (log.isInfoEnabled()) {
+                    log.info("Illegal geo function: " + geoFunctionStr
+                          + " -> will be ignored, using default.");
+
+                 }
+
+              }
+           }
+
+           return GeoSpatial.Options.DEFAULT_GEO_FUNCTION; // fallback
+
+        }
+
+        UNITS resolveAsSpatialDistanceUnit(final TermNode termNode, final IBindingSet bs) {
+
+           String spatialUnitStr = resolveAsString(termNode, bs);
+
+           // try override with system default, if not set
+           if (spatialUnitStr == null) {
+              spatialUnitStr = defaults.getDefaultSpatialDistanceUnit();
+           }
+
+           if (spatialUnitStr != null && !spatialUnitStr.isEmpty()) {
+
+              try {
+
+                 return UNITS.valueOf(spatialUnitStr);
+
+              } catch (NumberFormatException e) {
+
+                 // illegal, ignore and proceed
+                 if (log.isInfoEnabled()) {
+                    log.info("Illegal spatial unit: " + spatialUnitStr
+                          + " -> will be ignored, using default.");
+
+                 }
+
+              }
+           }
+
+           return GeoSpatial.Options.DEFAULT_GEO_SPATIAL_UNIT; // fallback
+
+        }
+
+        Double resolveAsDouble(final TermNode termNode, final IBindingSet bs) {
+
+           String s = resolveAsString(termNode, bs);
+           if (s == null || s.isEmpty()) {
+              return null;
+           }
+
+           try {
+              return Double.valueOf(s);
+           } catch (NumberFormatException e) {
+
+              // illegal, ignore and proceed
+              if (log.isInfoEnabled()) {
+                 log.info("Illegal double value: " + s
+                       + " -> will be ignored, using default.");
+
+              }
+           }
+
+           return null; // could not parse
+        }
+
+        Long resolveAsLong(final TermNode termNode, final IBindingSet bs) {
+
+           String s = resolveAsString(termNode, bs);
+           if (s == null || s.isEmpty()) {
+              return null;
+           }
+
+           try {
+              return Long.valueOf(s);
+           } catch (NumberFormatException e) {
+
+              // illegal, ignore and proceed
+              if (log.isInfoEnabled()) {
+                 log.info("Illegal double value: " + s
+                       + " -> will be ignored, using default.");
+
+              }
+           }
+
+           return null; // could not parse
+        }
+
+        PointLatLon resolveAsPoint(final TermNode termNode, final IBindingSet bs) {
+
+           String pointAsStr = resolveAsString(termNode, bs);
+           if (pointAsStr == null || pointAsStr.isEmpty()) {
+              return null;
+           }
+
+           try {
+
+              return new PointLatLon(pointAsStr);
+
+           } catch (NumberFormatException e) {
+
+              // illegal, ignore and proceed
+              if (log.isInfoEnabled()) {
+                 log.info("Illegal point value: " + pointAsStr
+                       + " -> will be ignored, using default.");
+
+              }
+           }
+
+           return null; // could not parse
+        }
+
+        String resolveAsString(final TermNode termNode, final IBindingSet bs) {
+
+           if (termNode == null) { // term node not set explicitly
+              return null;
+           }
+
+           if (termNode.isConstant()) {
+
+              final Literal lit = (Literal) termNode.getValue();
+              return lit == null ? null : lit.stringValue();
+
+           } else {
+
+              if (bs == null) {
+                 return null; // shouldn't happen, but just in case...
+              }
+
+              final IVariable<?> var = (IVariable<?>) termNode
+                    .getValueExpression();
+              if (bs.isBound(var)) {
+                 IConstant<?> c = bs.get(var);
+                 if (c == null || c.get() == null
+                       || !(c.get() instanceof TermId<?>)) {
+                    return null;
+                 }
+
+                 TermId<?> cAsTerm = (TermId<?>) c.get();
+                 return cAsTerm.stringValue();
+
+              } else {
+                 throw new GeoSpatialSearchException(
+                     GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
+              }
+           }
+        }
+        
+        String[] resolveAsStringArr(final TermNode termNode, final IBindingSet bs) {
+            
+            final String toSplit = resolveAsString(termNode, bs);
+            
+            if (toSplit==null)
+                return new String[0];
+            
+            return toSplit.split(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
+        }
+        
+        Long[] resolveAsLongArr(TermNode termNode, IBindingSet bs) {
+
+            final String[] stringArr = resolveAsStringArr(termNode, bs);
+            
+            final Long[] longArr = new Long[stringArr.length];
+            for (int i=0; i<stringArr.length; i++) {
+                longArr[i] = Long.valueOf(stringArr[i]);
+            }
+            
+            return longArr;
+        }
+        
+        URI resolveSearchDatatype(final TermNode searchDatatype, final IBindingSet bs) {
+            
+            if (searchDatatype==null) {
+                return GeoSpatial.DEFAULT_DATATYPE;
+            }
+            
+            if (searchDatatype.isConstant()) {
+                
+                final URI uri = (URI) searchDatatype.getValue();
+                return uri==null ? GeoSpatial.DEFAULT_DATATYPE : uri;
+                
+            } else {
+                
+                if (bs==null) {
+                    return null; // shouldn't happen, but just in case...
+                }
+                
+                final IVariable<?> var = (IVariable<?>) searchDatatype
+                        .getValueExpression();
+                if (bs.isBound(var)) {
+                    IConstant<?> c = bs.get(var);
+                    if (c == null || c.get() == null
+                          || !(c.get() instanceof TermId<?>)) {
+                       return null;
+                    }
+
+                    TermId<?> cAsTerm = (TermId<?>) c.get();
+                    return (URI)cAsTerm.getValue();
+
+                 } else {
+                    throw new GeoSpatialSearchException(
+                        GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
+                 }
+                
+            }
+            
+        }
    }
 
 }

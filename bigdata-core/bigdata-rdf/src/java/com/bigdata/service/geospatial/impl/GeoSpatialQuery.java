@@ -80,6 +80,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     private final IVariable<?> locationVar;
     private final IVariable<?> timeVar;
     private final IVariable<?> locationAndTimeVar;
+    private final IVariable<?> latVar;
+    private final IVariable<?> lonVar;
+    private final IVariable<?> coordSystemVar;
+    private final IVariable<?> customFieldsVar;
     private final IBindingSet incomingBindings;
 
     // derived parameters
@@ -104,7 +108,9 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final Long timeEnd, final Long coordSystem,
             final Map<String, LowerAndUpperValue> customFieldsConstraints,
             final IVariable<?> locationVar, final IVariable<?> timeVar, 
-            final IVariable<?> locationAndTimeVar, final IBindingSet incomingBindings) {
+            final IVariable<?> locationAndTimeVar, final IVariable<?> latVar, 
+            final IVariable<?> lonVar, final IVariable<?> coordSystemVar, 
+            final IVariable<?> customFieldsVar, final IBindingSet incomingBindings) {
 
         this.searchFunction = searchFunction;
         this.searchDatatype = searchDatatype;
@@ -123,6 +129,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.locationVar = locationVar;
         this.timeVar = timeVar;
         this.locationAndTimeVar = locationAndTimeVar;
+        this.latVar = latVar;
+        this.lonVar = lonVar;
+        this.coordSystemVar = coordSystemVar;
+        this.customFieldsVar = customFieldsVar;
         this.incomingBindings = incomingBindings;
         
         this.datatypeConfig = GeoSpatialConfig.getInstance().getConfigurationForDatatype(searchDatatype);
@@ -156,6 +166,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final IVariable<?> locationVar, 
             final IVariable<?> timeVar,
             final IVariable<?> locationAndTimeVar,
+            final IVariable<?> latVar, 
+            final IVariable<?> lonVar, 
+            final IVariable<?> coordSystemVar, 
+            final IVariable<?> customFieldsVar,
             final IBindingSet incomingBindings,
             final CoordinateDD lowerBoundingBox,
             final CoordinateDD upperBoundingBox) {
@@ -163,7 +177,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this(searchFunction, searchDatatype, subject, predicate, context, spatialCircleCenter,
              spatialCircleRadius, spatialRectangleSouthWest, spatialRectangleNorthEast,  spatialUnit,
              timeStart, timeEnd, coordSystem, customFieldsConstraints, locationVar, timeVar, 
-             locationAndTimeVar, incomingBindings);
+             locationAndTimeVar, latVar, lonVar, coordSystemVar, customFieldsVar, incomingBindings);
         
         this.lowerBoundingBox = lowerBoundingBox;
         this.upperBoundingBox = upperBoundingBox;
@@ -293,6 +307,27 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         return timeVar;
     }
 
+
+    @Override
+    public IVariable<?> getLatVar() {
+        return latVar;
+    }
+
+    @Override
+    public IVariable<?> getLonVar() {
+        return lonVar;
+    }
+
+    @Override
+    public IVariable<?> getCoordSystemVar() {
+        return coordSystemVar;
+    }
+
+    @Override
+    public IVariable<?> getCustomFieldsVar() {
+        return customFieldsVar;
+    }
+    
     @Override
     public IVariable<?> getLocationAndTimeVar() {
         return locationAndTimeVar;
@@ -433,7 +468,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                    searchFunction, searchDatatype, subject, predicate, context, 
                    spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                    spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
-                   customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, incomingBindings,
+                   customFieldsConstraints, locationVar, timeVar, locationAndTimeVar,
+                   latVar, lonVar, coordSystemVar, customFieldsVar, incomingBindings,
                    new CoordinateDD(lowerBoundingBox.northSouth, Math.nextAfter(-180.0,0) /** -179.999... */), 
                    new CoordinateDD(upperBoundingBox.northSouth, upperBoundingBox.eastWest));
             normalizedQueries.add(query1);
@@ -443,7 +479,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                        searchFunction, searchDatatype, subject, predicate, context, 
                        spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                        spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
-                       customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, incomingBindings,
+                       customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, 
+                       latVar, lonVar, coordSystemVar, customFieldsVar, incomingBindings,
                        new CoordinateDD(lowerBoundingBox.northSouth, lowerBoundingBox.eastWest), 
                        new CoordinateDD(upperBoundingBox.northSouth, 180.0));
            normalizedQueries.add(query2);
@@ -589,6 +626,5 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }  // else: no geospatial component
         
     }
-
 
 }
