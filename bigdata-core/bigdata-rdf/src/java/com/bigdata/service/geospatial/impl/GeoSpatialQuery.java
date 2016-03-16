@@ -195,7 +195,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
      * @return
      */
     public static Map<String, LowerAndUpperValue> toValidatedCustomFieldsConstraints(
-        final String[] customFields, final Long[] customFieldsLowerBounds, final Long[] customFieldsUpperBounds) {
+        final String[] customFields, final Double[] customFieldsLowerBounds, final Double[] customFieldsUpperBounds) {
         
         final  Map<String, LowerAndUpperValue> customFieldsConstraints = new HashMap<String, LowerAndUpperValue>();
         
@@ -426,6 +426,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             upperBound[latIdx] = upperBoundingBox.northSouth;
             upperBound[lonIdx] = upperBoundingBox.eastWest;
                 
+        } else if (latIdx==-1 && lonIdx==-1) {
+            
+             // nothing to be done: no geospatial cooordinates used in z-order index
+            
         } else if (latIdx==-1 || lonIdx==-1) {
             
             throw new GeoSpatialSearchException("Latitude and longitude must either both be given or not given.");
@@ -449,7 +453,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
          * From here: the query can definitely be normalized
          * -> the next request decides whether normalization is required
          */
-        if (lowerBoundingBox.eastWest>upperBoundingBox.eastWest) {
+        if (lowerBoundingBox!=null && upperBoundingBox!=null && lowerBoundingBox.eastWest>upperBoundingBox.eastWest) {
 
            /**
             * This case is actually valid. For instance, we may have a search range from 160 to -160,
@@ -474,16 +478,16 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                    new CoordinateDD(upperBoundingBox.northSouth, upperBoundingBox.eastWest));
             normalizedQueries.add(query1);
             
-           final GeoSpatialQuery query2 = 
-                   new GeoSpatialQuery(
-                       searchFunction, searchDatatype, subject, predicate, context, 
-                       spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
-                       spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
-                       customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, 
-                       latVar, lonVar, coordSystemVar, customFieldsVar, incomingBindings,
-                       new CoordinateDD(lowerBoundingBox.northSouth, lowerBoundingBox.eastWest), 
-                       new CoordinateDD(upperBoundingBox.northSouth, 180.0));
-           normalizedQueries.add(query2);
+            final GeoSpatialQuery query2 = 
+                new GeoSpatialQuery(
+                    searchFunction, searchDatatype, subject, predicate, context, 
+                    spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
+                    spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
+                    customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, 
+                    latVar, lonVar, coordSystemVar, customFieldsVar, incomingBindings,
+                    new CoordinateDD(lowerBoundingBox.northSouth, lowerBoundingBox.eastWest), 
+                    new CoordinateDD(upperBoundingBox.northSouth, 180.0));
+            normalizedQueries.add(query2);
 
             return normalizedQueries;
             
@@ -629,7 +633,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                 break;
             }
             default:
-                throw new IllegalArgumentException("Invalid searchFunction: " + searchFunction);
+                throw new IllegalArgumentException("Search function (geo:search) must be defined.");
                 
             }
     

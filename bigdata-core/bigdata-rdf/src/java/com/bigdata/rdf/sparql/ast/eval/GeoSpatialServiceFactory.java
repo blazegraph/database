@@ -293,13 +293,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              */
 
             if (!ASTGeoSpatialSearchOptimizer.searchUris.contains(uri))
-               throw new RuntimeException("Unknown search predicate: " + uri);
+               throw new RuntimeException("Unknown geospatial magic predicate: " + uri);
 
             final TermNode s = sp.s();
 
             if (!s.isVariable())
                throw new RuntimeException(
-                     "Subject of search predicate is constant: " + sp);
+                     "Subject of geospatial search pattern must not be a constant: " + sp);
 
             final IVariable<?> searchVar = ((VarNode) s).getValueExpression();
 
@@ -353,7 +353,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                         + uri + ", searchVar=" + searchVar);
 
          if (uri.equals(GeoSpatial.PREDICATE) || uri.equals(GeoSpatial.CONTEXT)) {
+             
             assertObjectIsURI(sp);
+            
          } else if (uri.equals(GeoSpatial.LOCATION_VALUE) ||  uri.equals(GeoSpatial.TIME_VALUE) 
                   || uri.equals(GeoSpatial.LOCATION_AND_TIME_VALUE)) {
             
@@ -370,11 +372,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          }
       }
 
-      if (!uris.contains(GeoSpatial.SEARCH)) {
-         throw new RuntimeException("Required search predicate not found: "
-               + GeoSpatial.SEARCH + " for searchVar=" + searchVar);
-      }
+      // TODO: move this check somewhere else: if the index is not using lat+lon, it is ok to not specify this
+//      if (!uris.contains(GeoSpatial.SEARCH)) {
+//         throw new RuntimeException("Required search predicate not found: "
+//               + GeoSpatial.SEARCH + " for searchVar=" + searchVar);
+//      }
       
+      // TODO: get rid of this check and support unbound predicates as well
       if (!uris.contains(GeoSpatial.PREDICATE)) {
          throw new RuntimeException(
                "GeoSpatial search with unbound predicate is currenly not supported.");
@@ -820,10 +824,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
                
             case IN_RECTANGLE: 
+            case UNDEFINED:
                {
                   // for a rectangle query, the z-order lower and upper border exactly coincide
-                  // with what we're looking for, so we set up a dummy filter for that case
-                  filter = new GeoSpatialInRectangleFilter(
+                  // with what we're looking for, so we set up a dummy filter for that case;
+                  // we also use such a dummy filter if the geospatial search function is undefined
+                  // (which might be the case if we query an index without latitude and longitude)
+                  filter = new AcceptAllSolutionsFilter(
                      new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig), geoSpatialCounters);
                }
                break;
@@ -1409,7 +1416,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.litExt = litExt;
             
             reportsObjectComponents =
-               locationVar!=null || timeVar!=null || locationAndTimeVar!=null;
+               locationVar!=null || timeVar!=null || locationAndTimeVar!=null ||coordSystemVar!=null
+               ||customFieldsVar!=null || latVar!=null || lonVar!=null;
             
             extractToPosition =
                reportsObjectComponents ? 
@@ -1860,11 +1868,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     * nothing to do for the filter, since the advancer delivers exactly those
     * points that are actually in this range.
     */
-   public static class GeoSpatialInRectangleFilter extends GeoSpatialFilterBase {
+   public static class AcceptAllSolutionsFilter extends GeoSpatialFilterBase {
 
       private static final long serialVersionUID = -314581671447912352L;
       
-      public GeoSpatialInRectangleFilter(
+      public AcceptAllSolutionsFilter(
          final GeoSpatialLiteralExtension<BigdataValue> litExt,
          final GeoSpatialCounters geoSpatialCounters) {
          
@@ -1990,9 +1998,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
            if (sps.containsKey(GeoSpatial.SEARCH)) {
                this.searchFunction = sps.get(GeoSpatial.SEARCH).o();
-           } else {
-               throw new GeoSpatialSearchException(
-                   "Search function must be defined in service call");
            }
                
            if (sps.containsKey(GeoSpatial.PREDICATE)) {
@@ -2119,7 +2124,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                        "customFieldsValues property must be a variable");
                }
 
-               this.coordSystemVar = (IVariable<?>) sp.o().getValueExpression();
+               this.customFieldsVar = (IVariable<?>) sp.o().getValueExpression();
            }
            
            if (sps.containsKey(GeoSpatial.LOCATION_AND_TIME_VALUE)) {
@@ -2159,8 +2164,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              final Long timeEnd = resolveAsLong(this.timeEnd, bs);
              
              final String[] customFields = resolveAsStringArr(this.customFields, bs);
-             final Long[] customFieldsLowerBounds = resolveAsLongArr(this.customFieldsLowerBounds, bs);
-             final Long[] customFieldsUpperBounds = resolveAsLongArr(this.customFieldsUpperBounds, bs);
+             final Double[] customFieldsLowerBounds = resolveAsDoubleArr(this.customFieldsLowerBounds, bs);
+             final Double[] customFieldsUpperBounds = resolveAsDoubleArr(this.customFieldsUpperBounds, bs);
 
              final GeoSpatialQuery sq = 
                  new GeoSpatialQuery(searchFunction, searchDatatypeUri,
@@ -2177,6 +2182,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        
        GeoFunction resolveAsGeoFunction(final TermNode termNode, final IBindingSet bs) {
 
+           if (termNode==null) {
+               return GeoFunction.UNDEFINED; // no geo function defined
+           }
+           
            String geoFunctionStr = resolveAsString(termNode, bs);
 
            // try override with system default, if not set
@@ -2202,7 +2211,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
               }
            }
 
-           return GeoSpatial.Options.DEFAULT_GEO_FUNCTION; // fallback
+           return GeoFunction.UNDEFINED; // fallback
 
         }
 
@@ -2351,16 +2360,16 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             return toSplit.split(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
         }
         
-        Long[] resolveAsLongArr(TermNode termNode, IBindingSet bs) {
+        Double[] resolveAsDoubleArr(TermNode termNode, IBindingSet bs) {
 
             final String[] stringArr = resolveAsStringArr(termNode, bs);
             
-            final Long[] longArr = new Long[stringArr.length];
+            final Double[] doubleArr = new Double[stringArr.length];
             for (int i=0; i<stringArr.length; i++) {
-                longArr[i] = Long.valueOf(stringArr[i]);
+                doubleArr[i] = Double.valueOf(stringArr[i]);
             }
             
-            return longArr;
+            return doubleArr;
         }
         
         URI resolveSearchDatatype(final TermNode searchDatatype, final IBindingSet bs) {

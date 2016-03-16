@@ -56,26 +56,16 @@ public class TestGeoSpatialCoordSystem extends AbstractDataDrivenSPARQLTestCase 
     }
 
 
-    public void testCoordSystem01() throws Exception {
+    public void testInRectangleQuery01() throws Exception {
        
        new TestHelper(
-          "geo-coordSystem01",
-          "geo-coordSystem01.rq", 
-          "geo-coordSystem.nt",
-          "geo-coordSystem01.srx").runTest();
+          "geo-wktliteral01",
+          "geo-wktliteral01.rq", 
+          "geo-wktliteral01.nt",
+          "geo-wktliteral01.srx").runTest();
        
     }
-
-    public void testCoordSystem02() throws Exception {
-        
-        new TestHelper(
-           "geo-coordSystem02",
-           "geo-coordSystem02.rq", 
-           "geo-coordSystem.nt",
-           "geo-coordSystem02.srx").runTest();
-        
-     }
-
+    
     // TODO: increased test coverage, amongst others:
     //       circle query, value extration, full literal access, etc.
 
@@ -103,27 +93,19 @@ public class TestGeoSpatialCoordSystem extends AbstractDataDrivenSPARQLTestCase 
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL, "true");
 
+        // set GeoSpatial configuration: use a higher precision and range shifts; 
+        // the test accounts for this higher precision (and assert that range shifts
+        // actually do not harm the evaluation process)
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".0",
            "{\"config\": "
-           + "{ \"uri\": \"http://my.custom.datatype/lat-lon-time-coordsystem\", "
+           + "{ \"uri\": \"http://www.opengis.net/ont/geosparql#wktLiteral\", "
+           + "\"literalSerializer\": \"com.bigdata.rdf.sparql.ast.eval.service.GeoSpatialTestWKTLiteralSerializer\",  "
            + "\"fields\": [ "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
-           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
-           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"TIME\"  }, "
-           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"COORD_SYSTEM\"  } "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
            + "]}}");
-
-        properties.setProperty(
-                com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".1",
-                "{\"config\": "
-                + "{ \"uri\": \"http://my.custom.datatype/lat-lon-coordsystem\", "
-                + "\"fields\": [ "
-                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
-                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
-                + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\" : \"COORD_SYSTEM\"  } "
-                + "]}}");
-
+        
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.VOCABULARY_CLASS,
            "com.bigdata.rdf.sparql.ast.eval.service.GeoSpatialTestVocabulary");

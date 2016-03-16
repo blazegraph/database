@@ -82,7 +82,8 @@ public interface GeoSpatial {
     */
    public static enum GeoFunction {
       IN_CIRCLE("inCircle"),
-      IN_RECTANGLE("inRectangle");
+      IN_RECTANGLE("inRectangle"),
+      UNDEFINED("undefined");
       
       GeoFunction(final String name) {
          this.name = name;
@@ -114,8 +115,6 @@ public interface GeoSpatial {
        * to be used in geo service. Defaults to {@link GeoFunction#IN_CIRCLE}.
        */
       String GEO_FUNCTION = GeoSpatial.class.getName() + ".defaultGeoFunction";
-      
-      GeoFunction DEFAULT_GEO_FUNCTION = GeoFunction.IN_CIRCLE;
       
       /**
        * Option that may be set to specify a default for {@link GeoSpatial#SPATIAL_DISTANCE_UNIT},
@@ -223,7 +222,7 @@ public interface GeoSpatial {
    /**
     * Upper bounds for custom fields, e.g. 11#5000
     */
-   final URI CUSTOM_FIELDS_UPPER_BOUNDS = new URIImpl(NAMESPACE + "customFieldsLowerBounds");
+   final URI CUSTOM_FIELDS_UPPER_BOUNDS = new URIImpl(NAMESPACE + "customFieldsUpperBounds");
 
    /**
     * Output variable; if set, this variable is bound to the locations component of the search result.

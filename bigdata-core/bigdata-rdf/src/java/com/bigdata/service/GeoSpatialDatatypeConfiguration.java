@@ -40,6 +40,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
+import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**
  * Configuration of a single geospatial datatype, including value type, multiplier,
@@ -144,12 +145,25 @@ public class GeoSpatialDatatypeConfiguration {
         
         // validate that there are no duplicate service mappings used for the fields
         final Set<ServiceMapping> serviceMappings = new HashSet<ServiceMapping>();
+        final Set<String> customServiceMappings = new HashSet<String>();
         for (int i=0; i<fields.size(); i++) {
             
-            final ServiceMapping curServiceMapping = fields.get(i).getServiceMapping();
+            final GeoSpatialDatatypeFieldConfiguration field = fields.get(i);
+            final ServiceMapping curServiceMapping = field.getServiceMapping();
             
-            if (serviceMappings.contains(curServiceMapping)) {
-                throw new IllegalArgumentException("Duplicate URI used for geospatial datatype config: " + curServiceMapping);
+            if (ServiceMapping.CUSTOM.equals(curServiceMapping)) {
+                
+                final String customServiceMapping = field.getCustomServiceMapping();
+                
+                if (customServiceMappings.contains(customServiceMapping)) {
+                    throw new GeoSpatialSearchException(
+                        "Duplicate custom service mapping used for geospatial datatype config: " + customServiceMapping);                    
+                }
+                customServiceMappings.add(customServiceMapping);
+                
+            } else if (serviceMappings.contains(curServiceMapping)) {
+                throw new GeoSpatialSearchException(
+                    "Duplicate service mapping used for geospatial datatype config: " + curServiceMapping);
             }
             
             serviceMappings.add(curServiceMapping);

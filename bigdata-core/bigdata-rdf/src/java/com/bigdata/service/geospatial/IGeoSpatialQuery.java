@@ -225,10 +225,10 @@ public interface IGeoSpatialQuery {
     }
 
     public static class LowerAndUpperValue {
-        final public Long lowerValue;
-        final public Long upperValue;
+        final public Double lowerValue;
+        final public Double upperValue;
         
-        public  LowerAndUpperValue(final Long lowerValue, final Long upperValue) {
+        public  LowerAndUpperValue(final Double lowerValue, final Double upperValue) {
             this.lowerValue = lowerValue;
             this.upperValue = upperValue;
         }
