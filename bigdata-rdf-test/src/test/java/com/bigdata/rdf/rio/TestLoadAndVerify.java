@@ -133,7 +133,7 @@ public class TestLoadAndVerify extends AbstractRIOTestCase {
      */
     public void test_loadAndVerify_little_jsonld() throws Exception {
         
-        final String resource = "/com/bigdata/rdf/rio/little.ttl";
+        final String resource = "/com/bigdata/rdf/rio/little.jsonld";
 
         doLoadAndVerifyTest(resource, parallel);
 
