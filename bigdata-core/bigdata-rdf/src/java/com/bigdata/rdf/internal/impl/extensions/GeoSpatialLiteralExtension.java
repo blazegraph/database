@@ -34,7 +34,6 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -250,26 +249,57 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final long[] ret = new long[numDimensions];
 
       if (numDimensions != components.length) {
-         throw new IllegalArgumentException(
+         throw new InvalidGeoSpatialLiteralError(
             "Literal value has wrong format. Expected " + numDimensions 
-            + " components for datatype.");
+            + " components for datatype, but literal has " + components.length + " components.");
       }
       
-      for (int i = 0; i < components.length; i++) {
-         
-         final Object component = components[i];
-         final GeoSpatialDatatypeFieldConfiguration fieldConfig = datatypeConfig.getFields().get(i);
-         
-         final BigDecimal precisionAdjustment = BigDecimal.valueOf(fieldConfig.getMultiplier());
-
-         final BigDecimal componentAsBigInteger =
-               component instanceof BigDecimal ?
-               (BigDecimal)component : new BigDecimal(component.toString());
-               
-         final BigDecimal x = precisionAdjustment.multiply(componentAsBigInteger);
-
-         ret[i] = x.longValue();
-
+      try {
+          
+          for (int i = 0; i < components.length; i++) {
+             
+             final Object component = components[i];
+             final GeoSpatialDatatypeFieldConfiguration fieldConfig = datatypeConfig.getFields().get(i);
+             
+             switch (fieldConfig.getValueType()) {
+    
+             case DOUBLE:
+             {
+                 final BigDecimal precisionAdjustment = BigDecimal.valueOf(fieldConfig.getMultiplier());
+        
+                 final BigDecimal componentAsBigDecimal =
+                       component instanceof BigDecimal ?
+                       (BigDecimal)component : new BigDecimal(component.toString());
+        
+                 final BigDecimal x = precisionAdjustment.multiply(componentAsBigDecimal);
+        
+                 ret[i] = x.longValue();
+                 
+                 break;
+             }
+             case LONG:
+             {
+                 final BigInteger precisionAdjustment = BigInteger.valueOf(fieldConfig.getMultiplier());
+            
+                 final BigInteger componentAsBigInteger =
+                       component instanceof BigInteger ?
+                       (BigInteger)component : new BigInteger(component.toString());
+            
+                 final BigInteger x = precisionAdjustment.multiply(componentAsBigInteger);
+            
+                 ret[i] = x.longValue();
+                     
+                 break;
+             }
+             default:
+                 throw new IllegalArgumentException("Invalid field configuration: value type not supported.");
+             }
+          }
+          
+          } catch (Exception e) {
+              
+              throw new InvalidGeoSpatialLiteralError(e.getMessage());
+              
       }
       
       return ret;
