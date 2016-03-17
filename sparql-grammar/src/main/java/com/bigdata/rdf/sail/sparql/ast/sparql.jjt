@@ -1092,7 +1092,7 @@ void GraphNode() #void :
 void GraphNodePath() #void :
 {}
 {
-	VarOrTerm()
+	VarOrTermOrTRefP()
 |
 	TriplesNodePath()
 }

@@ -97,6 +97,9 @@ public class TestAll extends TestCase {
         // test suite for encode/decode of GeoSpatial literals
         suite.addTestSuite(TestEncodeDecodeGeoSpatialLiteralIVs.class);
         
+        // test suite for encode/decode of date time literals
+        suite.addTestSuite(TestEncodeDecodeXSDDateIVs.class);
+        
         // test suite for GeoSpatial utility
         suite.addTestSuite(TestZOrderRangeScanUtility.class);
 
@@ -165,6 +168,13 @@ public class TestAll extends TestCase {
         
         // DTEExtension.ARRAY
         suite.addTestSuite(TestEncodeDecodeLiteralArrayIVs.class);
+        
+        //Inline URI Handlers
+        suite.addTestSuite(TestInlineURIHandlers.class);
+        
+        //Test handlers for packing multiple inline URI handlers into a single
+        //namespace.
+        suite.addTestSuite(TestInlineLocalNameIntegerURIHandler.class);
         
         return suite;
         

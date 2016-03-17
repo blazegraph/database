@@ -35,8 +35,6 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.sail.SailRepository;
-import org.openrdf.sail.Sail;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -242,8 +240,21 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	public void stopTransaction(Conclusion arg0) {
 	}
 	
-	public StringBuilder dumpStore() {
-	    return ((BigdataSailRepository)repo).getDatabase().dumpStore();
+	public StringBuilder dumpStore() throws Exception {
+	    final BigdataSailRepositoryConnection cxn =
+	            super.readFromWriteConnection ? 
+	                    getWriteConnection() : getReadConnection();
+	                    
+        try {
+            if (super.readFromWriteConnection) {
+                cxn.flush();
+            }
+            return cxn.getTripleStore().dumpStore();
+        } finally {
+            if (!super.readFromWriteConnection) {
+                cxn.close();
+            }
+        }
 	}
 	
 	

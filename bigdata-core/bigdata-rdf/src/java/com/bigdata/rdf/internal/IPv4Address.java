@@ -26,7 +26,6 @@ package com.bigdata.rdf.internal;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
 import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**

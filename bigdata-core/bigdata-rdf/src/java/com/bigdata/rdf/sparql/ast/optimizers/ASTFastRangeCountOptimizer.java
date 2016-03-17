@@ -450,7 +450,7 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 		final VarNode theVar = assignmentNode.getVarNode();
 
 		// Mark the triple pattern for fast range count.
-		if (markForFastRangeCount(sp, theVar)) {
+		if (markForFastRangeCount(context, sp, theVar)) {
 
 			// in case the triple pattern has been marked (i.e., the method returns
 			// true, rewrite the projection as SELECT ?var.
@@ -473,8 +473,9 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
     * @param sp
     * @param fastRangeCountVariable
     */
-   protected boolean markForFastRangeCount(final StatementPatternNode sp,
-                                        final VarNode fastRangeCountVariable)
+   protected boolean markForFastRangeCount(final AST2BOpContext context,
+                                           final StatementPatternNode sp,
+                                           final VarNode fastRangeCountVariable)
    {
       // Mark the triple pattern with the FAST-RANGE-COUNT attribute.
       sp.setFastRangeCount(fastRangeCountVariable);

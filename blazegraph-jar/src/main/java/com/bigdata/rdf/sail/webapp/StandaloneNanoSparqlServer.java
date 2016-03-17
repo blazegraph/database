@@ -150,7 +150,8 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         awaitServerStart(server);
 
         System.out.println("\n\nWelcome to the Blazegraph(tm) Database.\n");
-        System.out.println("Go to " + Config.DEFAULT_ENDPOINT + "/ to get started.");
+        //BLZG-1812:  Updated for correction of port override.
+        System.out.println("Go to http://" + getHost() + ":" + port + "/" + Config.BLAZEGRAPH_PATH + "/ to get started.");
         
         // Wait for the service to terminate.
         server.join();

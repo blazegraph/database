@@ -139,6 +139,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <include>**/*.rdf</include>
           <include>**/*.srx</include>
           <include>**/*.trig</include>
+          <include>**/*.jsonld</include>
         </includes>
       </resource>
     </resources>

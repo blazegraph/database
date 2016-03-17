@@ -540,7 +540,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
 	public StatementBuffer(final AbstractTripleStore database, final int capacity) {
 
-		this(database, capacity, 10/* defaultQueueCapacity */);
+		//BLZG-1816:  Queues are disabled by default to avoid concurrency issues.
+		this(database, capacity, 0/* defaultQueueCapacity */);
 
 	}
 

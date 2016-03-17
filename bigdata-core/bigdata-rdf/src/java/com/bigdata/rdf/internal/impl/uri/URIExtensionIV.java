@@ -88,7 +88,10 @@ public class URIExtensionIV<V extends BigdataURI>
         if (namespaceIV == null)
             throw new IllegalArgumentException();
 
-        if (!namespaceIV.isInline())
+        if (!namespaceIV.isInline()) // must be fully inline.
+            throw new IllegalArgumentException();
+
+        if (!delegateIV.isInline()) // must be fully inline. 
             throw new IllegalArgumentException();
 
         this.delegateIV = delegateIV;
@@ -113,7 +116,7 @@ public class URIExtensionIV<V extends BigdataURI>
     }
     
     @Override
-    public Object getInlineValue() { // TODO TEST
+    public Object getInlineValue() { 
         return new URIImpl(stringValue());
     }
     
@@ -142,12 +145,8 @@ public class URIExtensionIV<V extends BigdataURI>
         }
         return false;
     }
-    
-    /*
-     * See BLZG-1591. Note that namespaceIV is not being materialized
-     * separately. This fix does not change that.  It instead it uses
-     * the cached value directly.
-     */
+
+    // See BLZG-1591
     @Override
     public String toString() {
     	if (this.namespaceIV != null && this.delegateIV != null )
@@ -155,6 +154,33 @@ public class URIExtensionIV<V extends BigdataURI>
     	else 
     		return getValue().stringValue();
     }
+    
+    ////////////////////////
+    // OpenRDF URI methods
+    ////////////////////////
+    
+    @Override
+    public String stringValue() {
+        return toString(); // See BLZG-1591
+    }
+
+    @Override
+    public String getNamespace() {// See BLZG-1591
+        if(this.namespaceIV != null)
+            return namespaceIV.getValue().stringValue();
+        return getValue().getNamespace();
+    }
+
+    @Override
+    public String getLocalName() {// See BLZG-1591
+        if(this.delegateIV!=null)
+            return delegateIV.getInlineValue().toString();
+        return getValue().getLocalName();
+    }
+    
+    //
+    // End of OpenRDF URI methods.
+    //
     
     @Override
     @SuppressWarnings("rawtypes")
@@ -213,25 +239,6 @@ public class URIExtensionIV<V extends BigdataURI>
 
 		return v;
 		
-    }
-
-	////////////////////////
-	// OpenRDF URI methods
-	////////////////////////
-	
-	@Override
-	public String stringValue() {
-        return getNamespace() + getLocalName();
-	}
-
-    @Override
-    public String getNamespace() {
-        return namespaceIV.getValue().stringValue();
-    }
-
-    @Override
-    public String getLocalName() {
-        return delegateIV.getInlineValue().toString();
     }
     
 }

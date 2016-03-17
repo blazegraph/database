@@ -480,6 +480,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-war-html</artifactId>
+      <version>${project.version}</version> 
+      <type>war</type>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
       <artifactId>lgpl-utils</artifactId>
       <version>${project.version}</version>
     </dependency>

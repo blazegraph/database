@@ -513,4 +513,12 @@ abstract public class CoreBaseBOp implements BOp {
 	
     private static final transient String ws = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
 
+    /**
+     * Invoked automatically any time a mutation operation occurs. The default
+     * implementation is a NOP.
+     */
+    protected void mutation() {
+        // NOP
+    }
+
 }

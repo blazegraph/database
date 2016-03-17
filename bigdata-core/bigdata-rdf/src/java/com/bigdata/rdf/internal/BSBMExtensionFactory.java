@@ -43,9 +43,10 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public class BSBMExtensionFactory extends DefaultExtensionFactory {
 
+    @Override
     protected void _init(final IDatatypeURIResolver resolver,
             final ILexiconConfiguration<BigdataValue> lex,
-            final Collection<IExtension> extensions) {
+            final Collection<IExtension<? extends BigdataValue>> extensions) {
 
         // Extension to inline "USD" datatypes.
         extensions.add(new USDFloatExtension<BigdataLiteral>(resolver));
