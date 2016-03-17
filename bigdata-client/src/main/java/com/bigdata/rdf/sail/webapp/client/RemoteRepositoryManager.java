@@ -506,7 +506,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     @Override
     public void close() throws Exception {
 
-        if (!m_closed) {
+        if (m_closed) {
             // Already closed.
             return;
         }
