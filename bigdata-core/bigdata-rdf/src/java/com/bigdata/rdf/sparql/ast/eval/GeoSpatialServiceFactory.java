@@ -2348,13 +2348,32 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         URI resolveSearchDatatype(final TermNode searchDatatype, final IBindingSet bs) {
             
             if (searchDatatype==null) {
-                return GeoSpatial.DEFAULT_DATATYPE;
+                final URI datatype = GeoSpatialConfig.getInstance().getDefaultDatatype();
+                
+                if (datatype==null) {
+                    throw new GeoSpatialSearchException(
+                        "No default datatype set in configuration. Please specify the datatype "
+                        + "that you want to query using magic predicate " + GeoSpatial.SEARCH_DATATYPE + ".");
+                }
+                
+                return datatype;
             }
             
             if (searchDatatype.isConstant()) {
                 
-                final URI uri = (URI) searchDatatype.getValue();
-                return uri==null ? GeoSpatial.DEFAULT_DATATYPE : uri;
+                URI uri = (URI) searchDatatype.getValue();
+                
+                if (uri==null) {
+                    
+                    uri = GeoSpatialConfig.getInstance().getDefaultDatatype();
+                    if (uri==null) {
+                        throw new GeoSpatialSearchException(
+                            "No default datatype set in configuration. Please specify the datatype "
+                            + "that you want to query using magic predicate " + GeoSpatial.SEARCH_DATATYPE + ".");
+                    }
+                }
+                
+                return uri;
                 
             } else {
                 

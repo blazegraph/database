@@ -592,6 +592,13 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                 + " but index does not contain time component.");
         }
         
+        // lookup of time component via locatioAndTime in index not containing time
+        if (locationAndTimeVar!=null && !datatypeConfig.hasTime()) {
+            throw new GeoSpatialSearchException(
+                "Requested extraction of time via " + GeoSpatial.LOCATION_AND_TIME_VALUE 
+                + " but index does not contain time component.");
+        }
+        
         // lookup of coordinate system in index not containing coordinate system identifier
         if (coordSystemVar!=null && !datatypeConfig.hasCoordSystem()) {
             throw new GeoSpatialSearchException(
@@ -600,7 +607,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }
         
         // lookup of custom fields where no custom fields are defined
-        if (customFieldsVar!=null && datatypeConfig.hasCustomFields()) {
+        if (customFieldsVar!=null && !datatypeConfig.hasCustomFields()) {
             throw new GeoSpatialSearchException(
                     "Requested extraction of custom fields via " + GeoSpatial.CUSTOM_FIELDS_VALUES 
                     + " but index does not define any custom fields.");
@@ -739,16 +746,14 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }
 
         // datatype has coord system but coord system not given in query
-        if (datatypeConfig.hasCoordSystem()) {
-            if (coordSystem==null) {
-                throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.COORD_SYSTEM + 
-                    " must be provided when querying index with time component");
-            }
+        if (datatypeConfig.hasCoordSystem() && coordSystem!=null) {
+            throw new GeoSpatialSearchException(
+                "Predicate " + GeoSpatial.COORD_SYSTEM + 
+                " must be provided when querying index with time component");
         }
         
         // coord system in query but unusable (since not present in datatype)
-        if (coordSystem!=null && datatypeConfig.hasCoordSystem()) {
+        if (coordSystem!=null && !datatypeConfig.hasCoordSystem()) {
              throw new GeoSpatialSearchException(
                   "Predicate " + GeoSpatial.COORD_SYSTEM + " specified in query, "
                   + "but datatype that is queried does not have a coordinate system component.");                

@@ -85,6 +85,13 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Return the list of geospatial datatype configurations
      */
     List<String> getGeoSpatialDatatypeConfigs();
+    
+    /**
+     * Return the geospatial default datatype (if any). The default datatype is
+     * the datatype that is queried whenever no datatype is explicitly specified
+     * within the query.
+     */
+    public String getGeoSpatialDefaultDatatype();
 
     /**
      * Return the default time zone to be used for inlining.

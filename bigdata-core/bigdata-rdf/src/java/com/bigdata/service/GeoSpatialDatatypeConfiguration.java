@@ -324,6 +324,7 @@ public class GeoSpatialDatatypeConfiguration {
                 break;
             case LONGITUDE:
                 hasLon = true;
+                break;
             case COORD_SYSTEM:
                 hasCoordSystem = true;
                 break;

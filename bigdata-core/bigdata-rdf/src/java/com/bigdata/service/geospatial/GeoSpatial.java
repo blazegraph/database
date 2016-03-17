@@ -135,12 +135,20 @@ public interface GeoSpatial {
     * The namespace used for magic search predicates.
     */
    final String NAMESPACE = "http://www.bigdata.com/rdf/geospatial#";
+
+
+   // do not use anymore -- need to be retained because it is linked by old vocabulary class
+   @Deprecated
+   final URI DEFAULT_DATATYPE= new URIImpl(NAMESPACE + "geoSpatialLiteral");
+   
    
    /**
     * The default datatype to be used for GeoSpatial literals.
     */
-   final URI DEFAULT_DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
-
+   final URI DEFAULT_DATATYPE_LAT_LON = new URIImpl(NAMESPACE + "geoSpatialLiteral/v1/lat-lon");
+   final URI DEFAULT_DATATYPE_LAT_LON_TIME = new URIImpl(NAMESPACE + "geoSpatialLiteral/v1/lat-lon-time");
+   final URI DEFAULT_DATATYPE_LAT_LON_COORD = new URIImpl(NAMESPACE + "geoSpatialLiteral/v1/lat-lon-coord");
+   
    
    /************************************************************************************************
     *                                      MAGIC PREDICATES                                        *

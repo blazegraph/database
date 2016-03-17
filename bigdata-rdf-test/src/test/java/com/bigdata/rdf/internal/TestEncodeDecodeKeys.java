@@ -40,6 +40,7 @@ import javax.xml.datatype.DatatypeFactory;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.ColorsEnumExtension.Color;
 import com.bigdata.rdf.internal.impl.AbstractIV;
@@ -65,11 +66,9 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
-import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -77,6 +76,7 @@ import com.bigdata.service.geospatial.GeoSpatial;
  * having variable component lengths while others are term identifiers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:ms@metaphacts.com">M</a>
  * @version $Id: TestEncodeDecodeKeys.java 2756 2010-05-03 22:26:18Z
  *          thompsonbry$
  * 
@@ -85,6 +85,20 @@ import com.bigdata.service.geospatial.GeoSpatial;
  */
 public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
+    final String GEO_SPATIAL_DATATYPE = "http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral";
+    
+    final URI GEO_SPATIAL_DATATYPE_URI = new URIImpl(GEO_SPATIAL_DATATYPE);
+    
+    final String GEO_SPATIAL_DATATYPE_CONFIG = 
+        "{\"config\": "
+        + "{ \"uri\": \"" + GEO_SPATIAL_DATATYPE + "\", "
+        + "\"fields\": [ "
+        + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
+        + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
+        + "{ \"valueType\": \"LONG\", \"serviceMapping\" : \"TIME\"  } "
+        + "]}}";
+    
+    
     public TestEncodeDecodeKeys() {
         super();
     }
@@ -99,6 +113,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
             for (DTE dte : DTE.values()) {
 
+                @SuppressWarnings("rawtypes")
                 final IV<?, ?> v = new AbstractIV(vte,
                         true/* inline */, false/* extension */, dte) {
 
@@ -651,8 +666,6 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        final DatatypeFactory df = DatatypeFactory.newInstance();
-
         final DerivedNumericsExtension<BigdataValue> ext = 
             new DerivedNumericsExtension<BigdataValue>(new IDatatypeURIResolver() {
                 public BigdataURI resolve(URI uri) {
@@ -708,8 +721,8 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
          */
         final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
-        datatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG);
-        conf.init(datatypeConfigs);
+        datatypeConfigs.add(GEO_SPATIAL_DATATYPE_CONFIG);
+        conf.init(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
         final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
@@ -721,12 +734,12 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
             }, datatypeConfig);
         
         final BigdataLiteral[] dt = {
-           vf.createLiteral("2#2#1", GeoSpatial.DEFAULT_DATATYPE),
-           vf.createLiteral("3#3#1", GeoSpatial.DEFAULT_DATATYPE),
-           vf.createLiteral("4#4#1", GeoSpatial.DEFAULT_DATATYPE),
-           vf.createLiteral("5#5#1", GeoSpatial.DEFAULT_DATATYPE),
-           vf.createLiteral("6#6#1", GeoSpatial.DEFAULT_DATATYPE),
-           vf.createLiteral("7#7#1", GeoSpatial.DEFAULT_DATATYPE),
+           vf.createLiteral("2#2#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("3#3#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("4#4#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("5#5#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("6#6#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("7#7#1", GEO_SPATIAL_DATATYPE_URI),
         };
         
         final IV<?, ?>[] e = new IV[dt.length];
@@ -766,8 +779,8 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
          */
         final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
-        datatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG);
-        conf.init(datatypeConfigs);
+        datatypeConfigs.add(GEO_SPATIAL_DATATYPE_CONFIG);
+        conf.init(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
         final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
@@ -779,7 +792,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
             }, datatypeConfig);
         
         final BigdataLiteral[] dt = {
-           vf.createLiteral("8#8#1", GeoSpatial.DEFAULT_DATATYPE)
+           vf.createLiteral("8#8#1", GEO_SPATIAL_DATATYPE_URI)
         };
         
         final IV<?, ?>[] e = new IV[dt.length];

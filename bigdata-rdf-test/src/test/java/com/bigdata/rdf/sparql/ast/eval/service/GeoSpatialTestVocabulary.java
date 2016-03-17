@@ -28,12 +28,12 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
-import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151210;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20160317;
 
 /**
  * Test class for GeoSpatial data type extensions.
  */
-public class GeoSpatialTestVocabulary extends BigdataCoreVocabulary_v20151210 {
+public class GeoSpatialTestVocabulary extends BigdataCoreVocabulary_v20160317 {
 
     /**
      * De-serialization ctor.

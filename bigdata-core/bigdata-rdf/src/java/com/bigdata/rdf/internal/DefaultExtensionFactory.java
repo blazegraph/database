@@ -53,7 +53,7 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	   
     	    // initialize the GeoSpatialConfig object from the lexicon configuration
     	    final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
-    	    conf.init(config.getGeoSpatialDatatypeConfigs());
+    	    conf.init(config.getGeoSpatialDatatypeConfigs(), config.getGeoSpatialDefaultDatatype());
 
     	    // register the extensions, adding one extension per datatype config
     	    final List<GeoSpatialDatatypeConfiguration> datatypeConfigs = conf.getDatatypeConfigs();

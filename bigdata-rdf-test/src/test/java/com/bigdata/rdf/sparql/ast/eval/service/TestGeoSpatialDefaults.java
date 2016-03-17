@@ -57,25 +57,65 @@ public class TestGeoSpatialDefaults extends AbstractDataDrivenSPARQLTestCase {
         super(name);
     }
     
-    
-    public void testDefaultDatatypesPresentAndQueryable01() throws Exception {
-        // TODO: implement        
+    /**
+     * Query against default datatype explicitly naming default.
+     */
+    public void testDefaultDatatypeExplicit() throws Exception {
+
+        new TestHelper(
+            "geo-defaults01",
+            "geo-defaults01.rq", 
+            "geo-defaults.nt",
+            "geo-defaults0102.srx").runTest();
+        
     }
 
-    public void testDefaultDatatypesPresentAndQueryable02() throws Exception {
-        // TODO: implement        
+    /**
+     * Query against default datatype explicitly not naming default.
+     */
+    public void testDefaultDatatypeImplicit() throws Exception {
+
+        new TestHelper(
+            "geo-defaults02",
+            "geo-defaults02.rq", 
+            "geo-defaults.nt",
+            "geo-defaults0102.srx").runTest();
     }
     
-    public void testDefaultDatatypesPresentAndQueryable03() throws Exception {
-        // TODO: implement        
+    /**
+     * Non-geospatial ?s ?p ?o query retrieving ?s
+     * @throws Exception
+     */
+    public void testNonGeoSpatialQuery01() throws Exception {
+
+        new TestHelper(
+            "geo-defaults03",
+            "geo-defaults03.rq", 
+            "geo-defaults.nt",
+            "geo-defaults03.srx").runTest();
     }
     
-    public void testDefaultGeospatialUnit() throws Exception {
-        // TODO: implement
+    /**
+     * Non-geospatial ?s ?p ?o query with FILTER retrieving ?s and ?o
+     * @throws Exception
+     */
+    public void testNonGeoSpatialQuery02() throws Exception {
+
+        new TestHelper(
+            "geo-defaults04",
+            "geo-defaults04.rq", 
+            "geo-defaults.nt",
+            "geo-defaults04.srx").runTest();
     }
 
-    public void testDefaultGeospatialDatatype() throws Exception {
-        // TODO: implement
+
+    public void testNonDefaultDatatype() throws Exception {
+
+        new TestHelper(
+            "geo-defaults05",
+            "geo-defaults05.rq", 
+            "geo-defaults.nt",
+            "geo-defaults05.srx").runTest();
     }
 
     
@@ -96,13 +136,15 @@ public class TestGeoSpatialDefaults extends AbstractDataDrivenSPARQLTestCase {
                 NoAxioms.class.getName());
 
         // no persistence.
-        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-                BufferMode.Transient.toString());
+        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE, BufferMode.Transient.toString());
 
         // enable GeoSpatial index with default configuration
-        properties.setProperty(
-           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL, "true");
+        properties.setProperty(com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL, "true");
 
+        properties.setProperty(
+            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE,
+            "http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral/v1/lat-lon");
+        
         return properties;
 
     }

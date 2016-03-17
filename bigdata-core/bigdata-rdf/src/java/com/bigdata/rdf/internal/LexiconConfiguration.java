@@ -134,6 +134,11 @@ public class LexiconConfiguration<V extends BigdataValue>
     final List<String> geoSpatialDatatypeConfigs;
     
     /**
+     * The geospatial default datatype.
+     */
+    final String geoSpatialDefaultDatatype;
+    
+    /**
      * <code>true</code> if textual literals will be inlined.
      *
      * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
@@ -260,6 +265,11 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
     
     @Override
+    public String getGeoSpatialDefaultDatatype() {
+        return geoSpatialDefaultDatatype;
+    }
+    
+    @Override
     public boolean isInlineDateTimes() {
         return inlineDateTimes;
     }
@@ -355,8 +365,8 @@ public class LexiconConfiguration<V extends BigdataValue>
             final BigdataValueFactory valueFactory,//
             final IInlineURIFactory uriFactory,//
             final boolean geoSpatial,
-            final List<String> geoSpatialDatatypeConfigs
-            ) {
+            final List<String> geoSpatialDatatypeConfigs,
+            final String geoSpatialDefaultDatatype) {
 
         if (blobsThreshold < 0)
             throw new IllegalArgumentException();
@@ -384,6 +394,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.uriFactory = uriFactory;
         this.geoSpatial = geoSpatial;
         this.geoSpatialDatatypeConfigs = geoSpatialDatatypeConfigs;
+        this.geoSpatialDefaultDatatype = geoSpatialDefaultDatatype;
         
         /*
          * TODO Make this configurable.

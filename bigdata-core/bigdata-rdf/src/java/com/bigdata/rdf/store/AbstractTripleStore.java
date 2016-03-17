@@ -142,7 +142,7 @@ import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
-import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151210;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20160317;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -685,7 +685,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151210.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20160317.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -1303,21 +1303,51 @@ abstract public class AbstractTripleStore extends
         String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
       
         String DEFAULT_GEO_SPATIAL = "false";
+        
+        /**
+         * Whether or not to include the built-in datatypes or not.
+         */
+        String GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES = AbstractTripleStore.class.getName() + ".geoSpatialIncludeBuiltinDatatypes";
+      
+        String DEFAULT_GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES = "true";
 
         /**
-         * GeoSpatial datatype configuration.        
+         * Return the geospatial default datatype (if any). The default datatype is the datatype that is queried
+         * whenever no datatype is explicitly specified within the query.
+         */
+        String GEO_SPATIAL_DEFAULT_DATATYPE = AbstractTripleStore.class.getName() + ".geoSpatialDefaultDatatype";
+        
+        String DEFAULT_GEO_SPATIAL_DEFAULT_DATATYPE = null; // none
+
+        
+        /**
+         * GeoSpatial builtin datatype definitions. Do *NOT* modify these definitions -> doing so will break
+         * existing systems that make use of these built-in datatypes.
          */
         String GEO_SPATIAL_DATATYPE_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialDatatypeConfig";
 
-        String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG =
+        /**
+         * ATTENTION: Do NEVER modify the definitions below -> they are important in order to maintain
+         *            binary compatibility at database level.
+         */
+        final String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON = 
+                "{\"config\": "
+                + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral/v1/lat-lon\", "
+                + "\"fields\": [ "
+                + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
+                + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
+                + "]}}";        
+        
+        final String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON_TIME = 
             "{\"config\": "
-            + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral\", "
+            + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral/v1/lat-lon-time\", "
             + "\"fields\": [ "
             + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
             + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
             + "{ \"valueType\": \"LONG\", \"serviceMapping\" : \"TIME\"  } "
             + "]}}";
-        
+        // END ATTENTION
+                
         /**
          * If this option is set to false, do not compute closure for sids.
          */

@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval.service;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
@@ -67,7 +68,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config1);
         
-        conf.init(datatypeConfigs);
+        conf.init(datatypeConfigs, "http://my.custom.datatype1.uri");
         
         final List<GeoSpatialDatatypeConfiguration> parsedDatatypeConfigs = conf.getDatatypeConfigs();
         assertEquals(parsedDatatypeConfigs.size(),1);
@@ -140,7 +141,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         datatypeConfigs.add(config2);
         datatypeConfigs.add(config3);
         
-        conf.init(datatypeConfigs);
+        conf.init(datatypeConfigs, config1Uri);
         
         // run tests
         final List<GeoSpatialDatatypeConfiguration> parsedDatatypeConfigs = conf.getDatatypeConfigs();
@@ -217,8 +218,8 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(datatypeConfigs);
-        } catch (IllegalArgumentException e) {
+            conf.init(datatypeConfigs, config1Uri);
+        } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
         
@@ -238,7 +239,7 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(datatypeConfigs);
+            conf.init(datatypeConfigs, config1Uri);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }
@@ -259,8 +260,8 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(datatypeConfigs);
-        } catch (IllegalArgumentException e) {
+            conf.init(datatypeConfigs, configUri);
+        } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
         
@@ -280,8 +281,8 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(datatypeConfigs);
-        } catch (IllegalArgumentException e) {
+            conf.init(datatypeConfigs, configUri);
+        } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
         
@@ -301,8 +302,8 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(datatypeConfigs);
-        } catch (IllegalArgumentException e) {
+            conf.init(datatypeConfigs, configUri);
+        } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
         
@@ -322,8 +323,8 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(datatypeConfigs);
-        } catch (IllegalArgumentException e) {
+            conf.init(datatypeConfigs, configUri);
+        } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
         
@@ -346,8 +347,8 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         
         try {
-            conf.init(datatypeConfigs);
-        } catch (IllegalArgumentException e) {
+            conf.init(datatypeConfigs, configUri);
+        } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
         

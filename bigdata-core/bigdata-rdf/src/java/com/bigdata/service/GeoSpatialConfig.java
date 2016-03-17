@@ -36,6 +36,9 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
 
 /**
  * Singleton class providing access to the GeoSpatial index configuration.
@@ -59,6 +62,10 @@ public class GeoSpatialConfig {
      */
     private List<GeoSpatialDatatypeConfiguration> datatypeConfigs;
 
+    
+    // the default datatype for querying
+    private URI defaultDatatype;
+    
     /**
      * The one and only singleton instance.
      */
@@ -66,7 +73,7 @@ public class GeoSpatialConfig {
 
 
     private GeoSpatialConfig() {
-        init(null);
+        init(null, null);
     }
 
     public static GeoSpatialConfig getInstance() {
@@ -78,8 +85,31 @@ public class GeoSpatialConfig {
         return instance;
     }
 
-    public void init(final List<String> geoSpatialDatatypeConfigs) {  
+    public void init(final List<String> geoSpatialDatatypeConfigs, final String defaultDatatype) {  
+        
         initDatatypes(geoSpatialDatatypeConfigs);
+        
+        if (defaultDatatype!=null && !defaultDatatype.isEmpty()) {
+
+            try {
+                this.defaultDatatype = new URIImpl(defaultDatatype);
+            } catch (Exception e) {
+                throw new InvalidGeoSpatialDatatypeConfigurationError(
+                    "Invalid default datatype (" + defaultDatatype + ") does not represent a URI.");
+            }
+            
+            boolean isRegistered = false;
+            for (final GeoSpatialDatatypeConfiguration config : datatypeConfigs) {
+                isRegistered |= config.getUri().equals(this.defaultDatatype);
+            }
+
+            if (!isRegistered) {
+                throw new InvalidGeoSpatialDatatypeConfigurationError(
+                        "Invalid default datatype (" + defaultDatatype + ") is not a registered geospatial datatype.");
+            }
+
+        } // else: ignore it (no default)
+        
     }
     
     private void initDatatypes(List<String> geoSpatialDatatypeConfigs) {
@@ -157,6 +187,10 @@ public class GeoSpatialConfig {
     
     public List<GeoSpatialDatatypeConfiguration> getDatatypeConfigs() {
         return datatypeConfigs;
+    }
+
+    public URI getDefaultDatatype() {
+        return defaultDatatype;
     }
 
 }

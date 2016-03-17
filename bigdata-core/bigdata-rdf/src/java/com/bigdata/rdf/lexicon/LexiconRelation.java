@@ -584,6 +584,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                   AbstractTripleStore.Options.GEO_SPATIAL,
                   AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
 
+            geoSpatialIncludeBuiltinDatatypes = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES,
+                    AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES));
+            
+            geoSpatialDefaultDatatype = getProperty(
+                    AbstractTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE,
+                    AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DEFAULT_DATATYPE);
+            
 
             /**
              * We have configuration strings of the form 
@@ -609,11 +617,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 }
             }
 
-            // in case there is no (or no valid) config provided, we fallback on the default
-            if (geoSpatialDatatypeConfigs.isEmpty()) {
-                log.info("No GeoSpatial datatype configuration provided. Falling back on default.");
-                geoSpatialDatatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG);
+            // also register built-in datatypes, if enabled
+            if (geoSpatialIncludeBuiltinDatatypes) {
+                log.info("Registering geospatial built-in datatypes.");
+                geoSpatialDatatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON);
+                geoSpatialDatatypeConfigs.add(AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON_TIME);
             }
+
             
                 
             
@@ -669,7 +679,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
                     rejectInvalidXSDValues, xFactory, vocab, valueFactory,
-                    uriFactory, geoSpatial, geoSpatialDatatypeConfigs);
+                    uriFactory, geoSpatial, geoSpatialDatatypeConfigs, 
+                    geoSpatialDefaultDatatype);
 
         }
         
@@ -959,9 +970,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final private TimeZone inlineDateTimesTimeZone;
     
     /**
-     * When <code>true</code>, support for GeoSpatial features is turned on.
+     * When <code>true</code>, support for GeoSpatial features is turned on,
+     * see {@link AbstractTripleStore.Options#GEO_SPATIAL}.
      */
     final private boolean geoSpatial;
+    
+    /**
+     * When <code>true</code>, register handlers for the geospatial built-in datatypes on startup,
+     * see {@link AbstractTripleStore.Options#GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES}
+     */
+    final private boolean geoSpatialIncludeBuiltinDatatypes;
+    
+    /**
+     * The default datatype for geospatial querying, 
+     * see {@link AbstractTripleStore.Options#GEO_SPATIAL_DEFAULT_DATATYPE}
+     */
+    final private String geoSpatialDefaultDatatype;
 
     /**
      * Configuration for geo spatial datatype configurations.
@@ -1005,6 +1029,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
        
        return geoSpatial;
        
+    }
+    
+    /**
+     * Return <code>true</code> if the system is configured to use the geospatial built-in datatypes
+     * (in addition to anything that might be registered as custom datatypes).
+     */
+    final public boolean useGeoSpatialIncludeBuiltinDatatypes() {
+        return geoSpatialIncludeBuiltinDatatypes;
     }
     
     final public List<String> getGeoSpatialDatatypeConfigs() {

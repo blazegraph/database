@@ -976,7 +976,8 @@ public class HashCollisionUtility {
 				vf,
 				uriFactory,
 				false, // GeoSpatial support
-				new ArrayList<String>() // GeoSpatial datatype config
+				new ArrayList<String>(), // GeoSpatial datatype config
+				null
 				);
 		
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(

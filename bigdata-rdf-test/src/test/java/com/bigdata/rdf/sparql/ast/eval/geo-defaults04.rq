@@ -1,0 +1,6 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?s ?o WHERE {
+  ?s ?p ?o
+  FILTER(STRSTARTS(?o, "0"))
+} 
