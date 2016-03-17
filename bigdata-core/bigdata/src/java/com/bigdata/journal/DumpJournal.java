@@ -134,7 +134,7 @@ public class DumpJournal {
         
 		if (args.length == 0) {
             
-            System.err.println("usage: (-history|-indices|-pages|-tuples) <filename>+");
+            System.err.println("usage: (-namespace <namespace>|-history|-indices|-pages|-tuples|-addr <address>) <filename>+");
             
             System.exit(1);
             
@@ -179,6 +179,7 @@ public class DumpJournal {
                 
                 namespaces.add(args[i + 1]);
                 
+                i++;
             }
             
             else if(arg.equals("-indices")) {

@@ -94,7 +94,7 @@ public abstract class InlineURIHandler {
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    protected URIExtensionIV createInlineIV(final URI uri) {
+	public URIExtensionIV createInlineIV(final URI uri) {
 
         /*
          * If the namespace prefix is not in the vocabulary we can't inline

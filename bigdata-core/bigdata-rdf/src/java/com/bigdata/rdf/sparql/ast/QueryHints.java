@@ -746,5 +746,22 @@ public interface QueryHints {
    boolean DEFAULT_DEFAULT_GRAPH_DISTINCT_FILTER = 
        Boolean.valueOf(System.getProperty(
            QueryHints.class.getName() + "." + DEFAULT_GRAPH_DISTINCT_FILTER, "true"));
+   
+   /**
+    * {@link https://jira.blazegraph.com/browse/BLZG-1200}
+    * 
+    * {@see https://www.w3.org/TR/sparql11-query/#func-regex}  
+    * 
+    * {@see https://www.w3.org/TR/sparql11-query/#restrictString}
+    * 
+    * By default, regex is only applied to Literal String values.   Enabling this
+    * query hint will attempt to autoconvert non-String literals into their
+    * string value.  This is the equivalent of always using the str(...) function.
+    * 
+    */
+   String REGEX_MATCH_NON_STRING = "regexMatchNonString";
+
+   boolean DEFAULT_REGEX_MATCH_NON_STRING = Boolean.valueOf(System.getProperty(
+           QueryHints.class.getName() + "." + REGEX_MATCH_NON_STRING, "false"));
 
 }

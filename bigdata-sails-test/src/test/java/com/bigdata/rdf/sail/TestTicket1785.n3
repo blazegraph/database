@@ -1,0 +1,6 @@
+@prefix wd:  <http://my.test.namespace/A#> .
+@prefix wdt: <http://my.test.namespace/B#> .
+
+
+wd:Q513 wdt:P17 wd:Q148 .
+wd:Q513 wdt:P17 wd:Q99 .

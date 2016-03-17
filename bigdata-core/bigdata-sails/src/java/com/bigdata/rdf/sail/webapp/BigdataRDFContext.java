@@ -241,13 +241,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
      */
-    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
+    static public final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
     
     /**
      * HTTP header may be used to echo back the query.
      * 
      */
     static public final String HTTP_HEADER_ECHO_BACK_QUERY = "X-ECHO-BACK-QUERY";
+    
     /**
      * The name of the parameter/attribute that contains maxQueryTime (milliseconds)
      * for remote queries execution.
@@ -260,6 +261,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * specified using this query parameter.
      */
     static final String MAX_QUERY_TIME_MILLIS = "maxQueryTimeMillis";
+    
+    /**
+     * Specifies a maximum query execution time, 
+     * in whole seconds. The value should be an integer. 
+     * A setting of 0 or a negative number indicates 
+     * unlimited query time (the default).
+     */
+    static final String TIMEOUT = "timeout";
 
     /**
      * The name of the parameter/attribute that contains baseURI for remote queries execution.
@@ -1322,49 +1331,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
              * execution. This may also be set either via setMaxQuery() or
              * setMaxQueryMillis() which set a HTTP header (in milliseconds).
              */
-            long queryTimeoutMillis = getConfig().queryTimeout;
 
-            {
-                final String s = req
-                        .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
-                if (s != null) {
-                    final long tmp = StringUtil.toLong(s);
-                    if (tmp > 0 && // != -1L && //
-                            (queryTimeoutMillis == 0/* noLimit */
-                            || //
-                            tmp < queryTimeoutMillis/* shorterLimit */)//
-                    ) {
-                        // Set based on the http header value.
-                        queryTimeoutMillis = tmp;
-                    }
-                }
-            }
-
-            {
-                final String s = req
-                        .getParameter(MAX_QUERY_TIME_MILLIS);
-                if (s != null) {
-                    /*
-                     * The maxQueryTimeMillis parameter was specified (0 implies no timeout).
-                     */
-                    final long tmp = StringUtil.toLong(s);
-                    if (tmp > 0 && // != -1L && //
-                            (queryTimeoutMillis == 0/* noLimit */
-                            || //
-                            tmp < queryTimeoutMillis/* shorterLimit */)//
-                    ) {
-                        /*
-                         * Either we do not already have a timeout from the http
-                         * header or the web.xml configuration (which implies no
-                         * timeout) or the query parameter value is less than the current
-                         * timeout. In both cases, we use the query parameter timeout
-                         * instead.
-                         */
-                        queryTimeoutMillis = tmp;
-                    }
-                }
-            }
-            
+        	final long queryTimeoutMillis = getQueryTimeout(req, getConfig().queryTimeout);
 
             if (queryTimeoutMillis > 0) {
 
@@ -2904,6 +2872,92 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		// open the body
 		current = current.node("body");
 
+	}
+	
+	/**
+	 * Utility method to calculate a query timeout parameter value.
+	 * Timeout could be set either via a HTTP header 
+	 * {@link BigdataBaseContext#HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS} or
+	 * via one of the request parameters 
+	 * {@link BigdataBaseContext#MAX_QUERY_TIME_MILLIS} or
+	 * {@link BigdataBaseContext#TIMEOUT}
+	 * The method will return the minimum value in milliseconds 
+	 * if several values are specified in request.
+	 *  
+	 * @param req
+	 * @param queryTimeoutMillis
+	 * 
+	 */
+	
+	static long getQueryTimeout(final HttpServletRequest req, long queryTimeoutMillis) {
+		
+		{
+            final String s = req
+                    .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
+            if (s != null) {
+                final long tmp = StringUtil.toLong(s);
+                if (tmp > 0 && // != -1L && //
+                        (queryTimeoutMillis == 0/* noLimit */
+                        || //
+                        tmp < queryTimeoutMillis/* shorterLimit */)//
+                ) {
+                    // Set based on the http header value.
+                    queryTimeoutMillis = tmp;
+                }
+            }
+        }
+
+        {
+            final String s = req
+                    .getParameter(MAX_QUERY_TIME_MILLIS);
+            if (s != null) {
+                /*
+                 * The maxQueryTimeMillis parameter was specified (0 implies no timeout).
+                 */
+                final long tmp = StringUtil.toLong(s);
+                if (tmp > 0 && // != -1L && //
+                        (queryTimeoutMillis == 0/* noLimit */
+                        || //
+                        tmp < queryTimeoutMillis/* shorterLimit */)//
+                ) {
+                    /*
+                     * Either we do not already have a timeout from the http
+                     * header or the web.xml configuration (which implies no
+                     * timeout) or the query parameter value is less than the current
+                     * timeout. In both cases, we use the query parameter timeout
+                     * instead.
+                     */
+                    queryTimeoutMillis = tmp;
+                }
+            } 
+        }
+
+        {	
+	
+        	final String s = req.getParameter(TIMEOUT);
+
+        	if (s != null) {
+                /*
+                 * The timeout parameter was specified (0 implies no timeout).
+                 */
+                final long tmp = StringUtil.toLong(s) * 1000L;
+                if (tmp > 0 && // != -1L && //
+                        (queryTimeoutMillis == 0/* noLimit */
+                        || //
+                        tmp < queryTimeoutMillis/* shorterLimit */)//
+                ) {
+                    /*
+                     * The timeout parameter value is less than the current
+                     * timeout. 
+                     */
+                    queryTimeoutMillis = tmp;
+                }
+            } 
+        }
+		
+		
+		return queryTimeoutMillis;
+		
 	}
 
 }
