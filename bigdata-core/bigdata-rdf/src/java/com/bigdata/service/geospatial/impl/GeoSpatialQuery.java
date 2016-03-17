@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
@@ -45,6 +46,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 import com.bigdata.service.geospatial.IGeoSpatialQuery;
@@ -141,8 +143,11 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             throw new GeoSpatialSearchException(
                 "Unknown datatype configuration for geospatial search query: " + searchDatatype);
         }
+        
+        assertConsistency();
 
         computeLowerAndUpperBoundingBoxIfNotSet();
+        
     }
     
     /**
@@ -408,7 +413,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                 break;
             }
             default:
-                throw new IllegalArgumentException("Cases not yet implemented");            
+                throw new IllegalArgumentException("Cases not implemented");            
             }
         }
         
@@ -557,6 +562,202 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         return true;
     }
 
+    void assertConsistency() {
+        
+        // TODO: implement system property or switch to disable consistency checking of queries
+
+        // simple existence checks for required properties
+        if (predicate==null) {
+            throw new GeoSpatialSearchException(GeoSpatial.PREDICATE + " must be bound but is null.");
+        }
+            
+        if (searchDatatype==null) {
+            throw new GeoSpatialSearchException(GeoSpatial.SEARCH_DATATYPE + " must be bound but is null.");
+        }
+
+        // lookup of geospatial component in non-geospatial (custom) z-order index
+        if (locationVar!=null || locationAndTimeVar!=null || latVar!=null || lonVar!=null) {
+            if (!(datatypeConfig.hasLat() && datatypeConfig.hasLon())) {
+                throw new GeoSpatialSearchException(
+                    "Requested extraction of geospatial coordinates (via " + GeoSpatial.LOCATION_AND_TIME_VALUE + ", "
+                    + GeoSpatial.LOCATION_AND_TIME_VALUE + ", " + GeoSpatial.LAT_VALUE + ", or " + GeoSpatial.LON_VALUE + ")"
+                    + " but the index contains no geospatial coordinates. Please remove the respective predicated from your query.");
+            }
+        }
+        
+        // lookup of time component in index not containing time
+        if (timeVar!=null && !datatypeConfig.hasTime()) {
+            throw new GeoSpatialSearchException(
+                "Requested extraction of time via " + GeoSpatial.TIME_VALUE 
+                + " but index does not contain time component.");
+        }
+        
+        // lookup of coordinate system in index not containing coordinate system identifier
+        if (coordSystemVar!=null && !datatypeConfig.hasCoordSystem()) {
+            throw new GeoSpatialSearchException(
+                "Requested extraction of coordinate system via " + GeoSpatial.COORD_SYSTEM_VALUE 
+                + " but index does not contain coordinate system component.");
+        }
+        
+        // lookup of custom fields where no custom fields are defined
+        if (customFieldsVar!=null && datatypeConfig.hasCustomFields()) {
+            throw new GeoSpatialSearchException(
+                    "Requested extraction of custom fields via " + GeoSpatial.CUSTOM_FIELDS_VALUES 
+                    + " but index does not define any custom fields.");
+        }
+
+        // assert that the custom fields defined in the index are identical with the specified custom fields
+        final Set<String> datatypeCustomFields = datatypeConfig.getCustomFields();
+        
+        if ((!getCustomFieldsConstraints().keySet().containsAll(datatypeCustomFields)) || 
+            (!datatypeCustomFields.containsAll(getCustomFieldsConstraints().keySet()))) {
+            
+            throw new GeoSpatialSearchException(
+                    "The custom fields defined in the datatype (" + Arrays.toString(datatypeCustomFields.toArray())
+                    + ") differs from the custom fields defined in the query (" 
+                    + Arrays.toString(getCustomFieldsConstraints().keySet().toArray()) + "). "
+                    + "You need to specify the upper and lower bounds for all custom components of "
+                    + "the index using predicates " + GeoSpatial.CUSTOM_FIELDS + ", " + GeoSpatial.CUSTOM_FIELDS_LOWER_BOUNDS
+                    + ", and " + GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS + ".");
+        }
+
+        switch (searchFunction) 
+        {
+        case IN_CIRCLE:
+        {
+            if (!(datatypeConfig.hasLat() && datatypeConfig.hasLon())) {
+                throw new GeoSpatialSearchException(
+                    "Search function inCircle used for datatype having no geospatial components.");
+            }
+                
+            if (spatialCircleCenter==null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_CENTER + " must be provided for search function inCircle.");
+            }
+            
+            if (spatialCircleRadius==null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_RADIUS + " must be provided for search function inCircle.");                
+            }
+            
+            if (spatialRectangleSouthWest!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST + " must not be provided for search function inCircle.");                                
+            }
+            
+            if (spatialRectangleNorthEast!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST + " must not be provided for search function inCircle.");                                                
+            }
+                
+            break;
+        }
+        case IN_RECTANGLE:
+        {
+            if (!(datatypeConfig.hasLat() && datatypeConfig.hasLon())) {
+                throw new GeoSpatialSearchException(
+                    "Search function inRectangle used for datatype having no geospatial components.");
+            }
+            
+            if (spatialRectangleSouthWest==null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST + " must be provided for search function inRectangle.");                                
+            }
+            
+            if (spatialRectangleNorthEast==null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST + " must be provided for search function inRectangle.");                                                
+            }
+
+            
+            if (spatialCircleCenter!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_CENTER + " must not be provided for search function inRectangle.");
+            }
+            
+            if (spatialCircleRadius!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_RADIUS + " must not be provided for search function inRectangle.");                
+            }
+            
+            break;
+        }
+        case UNDEFINED:
+        {
+            if (datatypeConfig.hasLat() || datatypeConfig.hasLon()) {
+                throw new GeoSpatialSearchException(
+                    "No search function given, but required since datatype has geospatial components.");
+            }
+            
+            if (spatialCircleCenter!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_CENTER + " must not be provided "
+                     + "for query against index without geospatial components.");
+            }
+            
+            if (spatialCircleRadius!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_RADIUS + " must not be provided "
+                    + "for query against index without geospatial components.");                
+            }
+            
+            if (spatialRectangleSouthWest!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST + " must not be provided "
+                    + "for query against index without geospatial components.");
+            }
+            
+            if (spatialRectangleNorthEast!=null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST + " must not be provided "
+                    + "for query against index without geospatial components.");
+            }
+            
+            break;
+        }
+        default:
+            throw new GeoSpatialSearchException("Unhandled search function: " + searchFunction);
+        }
+        
+        
+        // datatype has time but time not given in query
+        if (datatypeConfig.hasTime()) {
+            if (timeStart==null || timeEnd==null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.TIME_START + " and " + GeoSpatial.TIME_END 
+                    + " must be provided when querying index with time component");
+            }
+        }
+        
+        // query has time but unusable (since not present in datatype)
+        if (timeStart!=null || timeEnd!=null) {
+            if (!datatypeConfig.hasTime()) {
+                throw new GeoSpatialSearchException(
+                     "Predicate " + GeoSpatial.TIME_START + " or " + GeoSpatial.TIME_END 
+                     + " specified in query, but datatype that is queried does not have a time component.");                
+            }
+        }
+
+        // datatype has coord system but coord system not given in query
+        if (datatypeConfig.hasCoordSystem()) {
+            if (coordSystem==null) {
+                throw new GeoSpatialSearchException(
+                    "Predicate " + GeoSpatial.COORD_SYSTEM + 
+                    " must be provided when querying index with time component");
+            }
+        }
+        
+        // coord system in query but unusable (since not present in datatype)
+        if (coordSystem!=null && datatypeConfig.hasCoordSystem()) {
+             throw new GeoSpatialSearchException(
+                  "Predicate " + GeoSpatial.COORD_SYSTEM + " specified in query, "
+                  + "but datatype that is queried does not have a coordinate system component.");                
+        }
+        
+        
+        
+    }
+    
     @Override
     public GeoSpatialDatatypeConfiguration getDatatypeConfig() {
         return datatypeConfig;

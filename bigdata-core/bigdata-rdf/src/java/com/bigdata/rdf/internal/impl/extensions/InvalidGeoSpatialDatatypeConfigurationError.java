@@ -32,11 +32,11 @@ package com.bigdata.rdf.internal.impl.extensions;
  * 
  * @author msc
  */
-public class InvalidGeoSpatialLiteralError extends Error {
+public class InvalidGeoSpatialDatatypeConfigurationError extends Error {
     
     private static final long serialVersionUID = 1L;
 
-    public InvalidGeoSpatialLiteralError(final String msg) {
+    public InvalidGeoSpatialDatatypeConfigurationError(final String msg) {
         super(msg);
     }
 

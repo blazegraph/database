@@ -39,8 +39,8 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
-import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**
  * Configuration of a single geospatial datatype, including value type, multiplier,
@@ -61,9 +61,17 @@ public class GeoSpatialDatatypeConfiguration {
     // ordered list of fields defining the datatype
     private List<GeoSpatialDatatypeFieldConfiguration> fields;
 
+    // derived members
+    private boolean hasLat = false;
+    private boolean hasLon = false;
+    private boolean hasTime = false;
+    private boolean hasCoordSystem = false;
+    private Set<String> customFields = new HashSet<String>();
+
+
     /**
      * Constructor, setting up a {@link GeoSpatialDatatypeConfiguration} given a uri and a
-     * JSON array defining the fields as input. Throws an {@link IllegalArgumentException}
+     * JSON array defining the fields as input. Throws an {@link InvalidGeoSpatialDatatypeConfigurationError}
      * if the uri is null or empty or in case the JSON array does not describe a set of
      * valid fields.
      */
@@ -71,12 +79,12 @@ public class GeoSpatialDatatypeConfiguration {
         final String uriStr, final String literalSerializerClass, final JSONArray fieldsJson) {
         
         if (uriStr==null || uriStr.isEmpty())
-            throw new IllegalArgumentException("URI parameter must not be null or empty");
+            throw new InvalidGeoSpatialDatatypeConfigurationError("URI parameter must not be null or empty");
         
         try {
             this.uri = new URIImpl(uriStr);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid URI in geospatial datatype config: " + uriStr);
+            throw new InvalidGeoSpatialDatatypeConfigurationError("Invalid URI in geospatial datatype config: " + uriStr);
         }
         
         if (literalSerializerClass==null || literalSerializerClass.isEmpty()) {
@@ -88,7 +96,7 @@ public class GeoSpatialDatatypeConfiguration {
                     
                     final Object instance = literalSerializerClazz.newInstance();
                     if (!(instance instanceof GeoSpatialLiteralSerializer)) {
-                        throw new IllegalArgumentException("Literal serializer class " 
+                        throw new InvalidGeoSpatialDatatypeConfigurationError("Literal serializer class " 
                                 + literalSerializerClass + 
                                 " does not implement GeoSpatialLiteralSerializer interface.");
                     }
@@ -96,13 +104,13 @@ public class GeoSpatialDatatypeConfiguration {
                     literalSerializer = (GeoSpatialLiteralSerializer)instance;
                     
                 } catch (Exception e) {
-                    throw new IllegalArgumentException(
+                    throw new InvalidGeoSpatialDatatypeConfigurationError(
                             "Literal serializer class " + literalSerializerClass + 
                             " could not be instantiated: " + e.getMessage());
                 }
                 
             } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException(
+                throw new InvalidGeoSpatialDatatypeConfigurationError(
                     "Literal serializer class not found: " + literalSerializerClass);
 
             }
@@ -133,13 +141,13 @@ public class GeoSpatialDatatypeConfiguration {
             } catch (JSONException e) {
                 
                 log.warn("Invalid JSON for field description: " + e.getMessage());
-                throw new IllegalArgumentException(e); // forward exception
+                throw new InvalidGeoSpatialDatatypeConfigurationError(e.getMessage()); // forward exception
             }
         }
         
         // validate that there is at least one field defined for the geospatial datatype
         if (fields.isEmpty()) {
-            throw new IllegalArgumentException(
+            throw new InvalidGeoSpatialDatatypeConfigurationError(
                 "Geospatial datatype config for datatype " + uri + " must have at least one field, but has none.");
         }
         
@@ -156,19 +164,20 @@ public class GeoSpatialDatatypeConfiguration {
                 final String customServiceMapping = field.getCustomServiceMapping();
                 
                 if (customServiceMappings.contains(customServiceMapping)) {
-                    throw new GeoSpatialSearchException(
+                    throw new InvalidGeoSpatialDatatypeConfigurationError(
                         "Duplicate custom service mapping used for geospatial datatype config: " + customServiceMapping);                    
                 }
                 customServiceMappings.add(customServiceMapping);
                 
             } else if (serviceMappings.contains(curServiceMapping)) {
-                throw new GeoSpatialSearchException(
+                throw new InvalidGeoSpatialDatatypeConfigurationError(
                     "Duplicate service mapping used for geospatial datatype config: " + curServiceMapping);
             }
             
             serviceMappings.add(curServiceMapping);
         }
         
+        initDerivedMembers();
     }
     
     /**
@@ -182,21 +191,22 @@ public class GeoSpatialDatatypeConfiguration {
         final List<GeoSpatialDatatypeFieldConfiguration> fields) {
         
         if (uriString==null || uriString.isEmpty()) {
-            throw new IllegalArgumentException("URI string must not be null or empty.");
+            throw new InvalidGeoSpatialDatatypeConfigurationError("URI string must not be null or empty.");
         }
 
         if (literalSerializer==null) {
-            throw new IllegalArgumentException("Literal serializer must not be null.");
+            throw new InvalidGeoSpatialDatatypeConfigurationError("Literal serializer must not be null.");
         }
         
         if (fields==null) {
-            throw new IllegalArgumentException("Fields must not be null.");
+            throw new InvalidGeoSpatialDatatypeConfigurationError("Fields must not be null.");
         }
 
         this.uri = new URIImpl(uriString);
         this.literalSerializer = literalSerializer;
         this.fields = fields;
-        
+     
+        initDerivedMembers();
     }
     
     public URI getUri() {
@@ -268,6 +278,66 @@ public class GeoSpatialDatatypeConfiguration {
      */
     public int getNumDimensions() {
         return fields.size();
-     }
+    }
+    
+    
+    public boolean hasLat() {
+        return hasLat;
+    }
+
+    public boolean hasLon() {
+        return hasLon;
+    }
+
+    public boolean hasTime() {
+        return hasTime;
+    }
+
+    public boolean hasCoordSystem() {
+        return hasCoordSystem;
+    }
+
+    public Set<String> getCustomFields() {
+        return customFields; 
+    }
+    
+    public boolean hasCustomFields() {
+        return !customFields.isEmpty();
+    }
+    
+    public boolean hasCustomField(final String field) {
+        return customFields.contains(field);
+    }
+    
+    /**
+     * Initialized derived member variables, allowing efficient access to nested
+     * information (such as the field types).
+     */
+    void initDerivedMembers() {
+
+        for (final GeoSpatialDatatypeFieldConfiguration field : fields) {
+            
+            switch (field.getServiceMapping()) 
+            {
+            case LATITUDE:
+                hasLat = true;
+                break;
+            case LONGITUDE:
+                hasLon = true;
+            case COORD_SYSTEM:
+                hasCoordSystem = true;
+                break;
+            case TIME:
+                hasTime = true;
+                break;
+            case CUSTOM:
+                customFields.add(field.getCustomServiceMapping());
+                break;
+            default:
+                throw new InvalidGeoSpatialDatatypeConfigurationError(
+                    "Unhandled field type: " + field.getServiceMapping());
+            }
+        }
+    }
 
 }

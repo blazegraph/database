@@ -30,6 +30,8 @@ import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
+
 /**
  * Configuration of a single field/component in a given geospatial (multi-dimensional)
  * custom data type.
@@ -88,14 +90,13 @@ public class GeoSpatialDatatypeFieldConfiguration {
      */
     private ServiceMapping serviceMapping = ServiceMapping.CUSTOM; // default
     
-    
     /**
      * Custom service mapping string.
      */
     private String customServiceMapping;
     
 
-    public GeoSpatialDatatypeFieldConfiguration(JSONObject fieldJson) throws IllegalArgumentException {
+    public GeoSpatialDatatypeFieldConfiguration(JSONObject fieldJson) throws InvalidGeoSpatialDatatypeConfigurationError {
         
 
         /**
@@ -142,17 +143,17 @@ public class GeoSpatialDatatypeFieldConfiguration {
         } catch (NumberFormatException e) {
             
             log.warn("Expecting values that are of type long for minValue and multiplier.");
-            throw new IllegalArgumentException(e); // forward exception
+            throw new InvalidGeoSpatialDatatypeConfigurationError(e.getMessage()); // forward exception
             
         } catch (JSONException e) {
                 
             log.warn("Field could not be parsed: " + e.getMessage());
-            throw new IllegalArgumentException(e); // forward exception
+            throw new InvalidGeoSpatialDatatypeConfigurationError(e.getMessage()); // forward exception
             
         } catch (Exception e) {
             
             log.warn("Exception while initializing field: " + e.getMessage());
-            throw new IllegalArgumentException(e); // forward exception
+            throw new InvalidGeoSpatialDatatypeConfigurationError(e.getMessage()); // forward exception
         }
                 
     }
@@ -202,4 +203,5 @@ public class GeoSpatialDatatypeFieldConfiguration {
     public String getCustomServiceMapping() {
         return customServiceMapping;
     }
+
 }

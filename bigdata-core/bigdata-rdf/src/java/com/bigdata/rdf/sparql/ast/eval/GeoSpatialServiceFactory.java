@@ -569,7 +569,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          final BlockingBuffer<IBindingSet[]> buffer = 
             new BlockingBuffer<IBindingSet[]>(globalBufferChunkOfChunksCapacity);
-
+            
          final FutureTask<Void> ft = 
             new FutureTask<Void>(new GeoSpatialServiceCallTask(
                buffer, query.normalize(), kb, vars, context, globals, vf, geoSpatialCounters, 
@@ -2138,7 +2138,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                this.locationAndTimeVar = (IVariable<?>) sp.o().getValueExpression();
            }
        }
-       
+
        /**
         * Converts the configuration into a query over the given binding set
         * @param bs
@@ -2195,20 +2195,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
            if (geoFunctionStr != null && !geoFunctionStr.isEmpty()) {
 
-              try {
+               final GeoFunction gf = GeoFunction.forName(geoFunctionStr);
 
-                 return GeoFunction.forName(geoFunctionStr);
-
-              } catch (NumberFormatException e) {
-
-                 // illegal, ignore and proceed
-                 if (log.isInfoEnabled()) {
-                    log.info("Illegal geo function: " + geoFunctionStr
-                          + " -> will be ignored, using default.");
-
-                 }
-
-              }
+               if (gf==null) {
+                   throw new GeoSpatialSearchException("Geo function '" + geoFunctionStr + "' not known.");
+               }
+               
+               return gf;
            }
 
            return GeoFunction.UNDEFINED; // fallback
@@ -2226,20 +2219,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
            if (spatialUnitStr != null && !spatialUnitStr.isEmpty()) {
 
-              try {
+               final UNITS u = UNITS.valueOf(spatialUnitStr);
 
-                 return UNITS.valueOf(spatialUnitStr);
-
-              } catch (NumberFormatException e) {
-
-                 // illegal, ignore and proceed
-                 if (log.isInfoEnabled()) {
-                    log.info("Illegal spatial unit: " + spatialUnitStr
-                          + " -> will be ignored, using default.");
-
-                 }
-
-              }
+               if (u==null) {
+                   throw new GeoSpatialSearchException("Input could not be parsed as unit: '" + spatialUnitStr + "'.");
+               }
+               
+               return u;
            }
 
            return GeoSpatial.Options.DEFAULT_GEO_SPATIAL_UNIT; // fallback
@@ -2254,18 +2240,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
            }
 
            try {
+               
               return Double.valueOf(s);
+              
            } catch (NumberFormatException e) {
 
-              // illegal, ignore and proceed
-              if (log.isInfoEnabled()) {
-                 log.info("Illegal double value: " + s
-                       + " -> will be ignored, using default.");
+               throw new GeoSpatialSearchException("Input could not be resolved as double value: '" + s + "'.");
 
-              }
            }
-
-           return null; // could not parse
+           
         }
 
         Long resolveAsLong(final TermNode termNode, final IBindingSet bs) {
@@ -2276,18 +2259,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
            }
 
            try {
+               
               return Long.valueOf(s);
+              
            } catch (NumberFormatException e) {
 
-              // illegal, ignore and proceed
-              if (log.isInfoEnabled()) {
-                 log.info("Illegal double value: " + s
-                       + " -> will be ignored, using default.");
+               throw new GeoSpatialSearchException("Input could not be resolved as long value: '" + s + "'.");
 
-              }
            }
-
-           return null; // could not parse
         }
 
         PointLatLon resolveAsPoint(final TermNode termNode, final IBindingSet bs) {
@@ -2303,15 +2282,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
            } catch (NumberFormatException e) {
 
-              // illegal, ignore and proceed
-              if (log.isInfoEnabled()) {
-                 log.info("Illegal point value: " + pointAsStr
-                       + " -> will be ignored, using default.");
-
-              }
+               throw new GeoSpatialSearchException("Input could not be resolved as point: '" + pointAsStr + "'.");
            }
-
-           return null; // could not parse
+           
         }
 
         String resolveAsString(final TermNode termNode, final IBindingSet bs) {
@@ -2405,9 +2378,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                     throw new GeoSpatialSearchException(
                         GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
                  }
-                
             }
-            
         }
    }
 

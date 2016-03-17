@@ -237,13 +237,88 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     /**
      * Test case with customFields specification missing.
      */
-    public void testCRMissingCustomFields() throws Exception {
+    public void testCRMissingCustomFields01() throws Exception {
         
         try {
             
             new TestHelper(
                 "geo-cr-missingcustomfields",
-                "geo-cr-missingcustomfields.rq", 
+                "geo-cr-missingcustomfields01.rq", 
+                "empty.trig",
+                "geo-cr-empty.srx").runTest();
+        
+        } catch (Exception e) {
+            
+            // check for wrapped exception
+            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
+            
+            return; // expected
+        }
+
+        throw new RuntimeException("Expected to run into exception.");
+
+    }
+    
+    /**
+     * Test case with customFields specification missing.
+     */
+    public void testCRMissingCustomFields02() throws Exception {
+        
+        try {
+            
+            new TestHelper(
+                "geo-cr-missingcustomfields",
+                "geo-cr-missingcustomfields02.rq", 
+                "empty.trig",
+                "geo-cr-empty.srx").runTest();
+        
+        } catch (Exception e) {
+            
+            // check for wrapped exception
+            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
+            
+            return; // expected
+        }
+
+        throw new RuntimeException("Expected to run into exception.");
+
+    }
+    
+    /**
+     * Test case with customFields specification missing.
+     */
+    public void testCRMissingCustomFields03() throws Exception {
+        
+        try {
+            
+            new TestHelper(
+                "geo-cr-missingcustomfields",
+                "geo-cr-missingcustomfields03.rq", 
+                "empty.trig",
+                "geo-cr-empty.srx").runTest();
+        
+        } catch (Exception e) {
+            
+            // check for wrapped exception
+            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
+            
+            return; // expected
+        }
+
+        throw new RuntimeException("Expected to run into exception.");
+
+    }
+    
+    /**
+     * Test case with customFields specification missing.
+     */
+    public void testCRMissingCustomFields04() throws Exception {
+        
+        try {
+            
+            new TestHelper(
+                "geo-cr-missingcustomfields",
+                "geo-cr-missingcustomfields04.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -319,31 +394,6 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
             new TestHelper(
                 "geo-cr-toomanycustomfields",
                 "geo-cr-toomanycustomfields.rq", 
-                "empty.trig",
-                "geo-cr-empty.srx").runTest();
-        
-        } catch (Exception e) {
-            
-            // check for wrapped exception
-            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
-            
-            return; // expected
-        }
-
-        throw new RuntimeException("Expected to run into exception.");
-
-    }
-    
-    /**
-     * Test case with customFields specification containing non-existent elements.
-     */
-    public void testCRNonExistentCustomFieldsElements() throws Exception {
-
-        try {
-            
-            new TestHelper(
-                "geo-cr-nonexistentcustomfields",
-                "geo-cr-nonexistentcustomfields.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -584,13 +634,13 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     /**
      * Test case where rectangle query is given in combination with a circle center.
      */
-    public void testCRInRectangleCircleCenterGiven() throws Exception {
+    public void testCRInRectangleCenterGiven() throws Exception {
 
         try {
             
             new TestHelper(
-                "geo-cr-inrectanglecirclecentergiven",
-                "geo-cr-inrectanglecirclecentergiven.rq", 
+                "geo-cr-inrectanglecentergiven",
+                "geo-cr-inrectanglecentergiven.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -606,6 +656,31 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     }
     
     /**
+     * Test case where rectangle query is given in combination with a circle radius.
+     */
+    public void testCRInRectangleRadiusGiven() throws Exception {
+
+        try {
+            
+            new TestHelper(
+                "geo-cr-inrectangleradiusgiven",
+                "geo-cr-inrectangleradiusgiven.rq", 
+                "empty.trig",
+                "geo-cr-empty.srx").runTest();
+        
+        } catch (Exception e) {
+            
+            // check for wrapped exception
+            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
+            
+            return; // expected
+        }
+
+        throw new RuntimeException("Expected to run into exception.");
+    }
+    
+    
+    /**
      * Test case where circle query is given in combination with a south-west coordinate.
      */
     public void testCRInCircleSouthWestGiven() throws Exception {
@@ -613,8 +688,8 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
         try {
             
             new TestHelper(
-                "geo-cr-inrcirclesouthwestgiven",
-                "geo-cr-inrcirclesouthwestgiven.rq", 
+                "geo-cr-incirclesouthwestgiven",
+                "geo-cr-incirclesouthwestgiven.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -632,13 +707,13 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     /**
      * Test case where circle query is given in combination with a north-east coordinate.
      */
-    public void testCRInCircleNoNorthEastGiven() throws Exception {
+    public void testCRInCircleNorthEastGiven() throws Exception {
 
         try {
             
             new TestHelper(
-                "geo-cr-inrcirclenortheastgiven",
-                "geo-cr-inrcirclenortheastgiven.rq", 
+                "geo-cr-incirclenortheastgiven",
+                "geo-cr-incirclenortheastgiven.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -661,8 +736,8 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
         try {
             
             new TestHelper(
-                "geo-cr-inrcirclenocentergiven",
-                "geo-cr-inrcirclenocentergiven.rq", 
+                "geo-cr-incirclenocentergiven",
+                "geo-cr-incirclenocentergiven.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -680,13 +755,13 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     /**
      * Test case where circle query is given with an invalid center
      */
-    public void testCRInCircleInvalidCenter() throws Exception {
+    public void testCRInCircleInvalidCenterGiven() throws Exception {
 
         try {
             
             new TestHelper(
-                "geo-cr-inrcircleinvalidcenter",
-                "geo-cr-inrcircleinvalidcenter.rq", 
+                "geo-cr-incircleinvalidcentergiven",
+                "geo-cr-incircleinvalidcentergiven.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -709,8 +784,8 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
         try {
             
             new TestHelper(
-                "geo-cr-inrcirclenoradiusgiven",
-                "geo-cr-inrcirclenocradiusgiven.rq", 
+                "geo-cr-incirclenoradiusgiven",
+                "geo-cr-incirclenoradiusgiven.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -728,13 +803,13 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     /**
      * Test case where circle query is given with an invalid radius
      */
-    public void testCRInCircleInvalidRadius() throws Exception {
+    public void testCRInCircleInvalidRadiusGiven() throws Exception {
 
         try {
             
             new TestHelper(
-                "geo-cr-inrcircleinvalidradius",
-                "geo-cr-inrcircleinvalidradius.rq", 
+                "geo-cr-incircleinvalidradiusgiven",
+                "geo-cr-incircleinvalidradiusgiven.rq", 
                 "empty.trig",
                 "geo-cr-empty.srx").runTest();
         
@@ -824,7 +899,7 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     /**
      * Test case where we aim at extracting the latitude value, but the index contains no location.
      */
-    public void testCRLatValueButNoLocations() throws Exception {
+    public void testCRLatValueButNoLocation() throws Exception {
 
         try {
             
@@ -848,7 +923,7 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
     /**
      * Test case where we aim at extracting the longitude value, but the index contains no location.
      */
-    public void testCRLonValueButNoLocations() throws Exception {
+    public void testCRLonValueButNoLocation() throws Exception {
 
         try {
             
@@ -966,6 +1041,18 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
         properties.setProperty(
                 com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".2",
                 "{\"config\": "
+                + "{ \"uri\": \"http://my.custom.datatype/x-y-z-lat-lon\", "
+                + "\"fields\": [ "
+                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-1000\", \"multiplier\": \"10\", \"serviceMapping\": \"x\" }, "
+                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-10\", \"multiplier\": \"100\", \"serviceMapping\": \"y\" }, "
+                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-2\", \"multiplier\": \"1000\", \"serviceMapping\": \"z\" }, "
+                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
+                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
+                + "]}}");
+        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".3",
+                "{\"config\": "
                 + "{ \"uri\": \"http://my.custom.datatype/x-y-z-lat-lon-time\", "
                 + "\"fields\": [ "
                 + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-1000\", \"multiplier\": \"10\", \"serviceMapping\": \"x\" }, "
@@ -977,7 +1064,7 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
                 + "]}}");
         
         properties.setProperty(
-           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".3",
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".4",
            "{\"config\": "
            + "{ \"uri\": \"http://my.custom.datatype/x-y-z-lat-lon-time-coord\", "
            + "\"fields\": [ "
@@ -990,6 +1077,15 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
            + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\": \"COORD_SYSTEM\" } "
            + "]}}");
 
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".5",
+                "{\"config\": "
+                + "{ \"uri\": \"http://my.custom.datatype/lat-lon\", "
+                + "\"fields\": [ "
+                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
+                + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
+                + "]}}");        
+        
         properties.setProperty(
                 com.bigdata.rdf.store.AbstractLocalTripleStore.Options.VOCABULARY_CLASS,
                 "com.bigdata.rdf.sparql.ast.eval.service.GeoSpatialTestVocabulary");

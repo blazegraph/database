@@ -197,7 +197,6 @@ public interface IGeoSpatialQuery {
      */
     public GeoSpatialDatatypeConfiguration getDatatypeConfig();
     
-    
     /**
      * Helper class encapsulating both the lower and upper bound as implied
      * by the query, for the given datatype configuration.
