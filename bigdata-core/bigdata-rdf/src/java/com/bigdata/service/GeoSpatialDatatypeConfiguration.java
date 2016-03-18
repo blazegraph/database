@@ -28,8 +28,10 @@ package com.bigdata.service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -41,6 +43,7 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
+import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
 
 /**
  * Configuration of a single geospatial datatype, including value type, multiplier,
@@ -66,7 +69,7 @@ public class GeoSpatialDatatypeConfiguration {
     private boolean hasLon = false;
     private boolean hasTime = false;
     private boolean hasCoordSystem = false;
-    private Set<String> customFields = new HashSet<String>();
+    private Map<String,Integer> customFieldsIdxs = new HashMap<String,Integer>();
 
 
     /**
@@ -297,16 +300,28 @@ public class GeoSpatialDatatypeConfiguration {
         return hasCoordSystem;
     }
 
-    public Set<String> getCustomFields() {
-        return customFields; 
+    public Map<String,Integer> getCustomFieldsIdxs() {
+        return customFieldsIdxs; 
     }
     
     public boolean hasCustomFields() {
-        return !customFields.isEmpty();
+        return !customFieldsIdxs.keySet().isEmpty();
     }
     
     public boolean hasCustomField(final String field) {
-        return customFields.contains(field);
+        return customFieldsIdxs.keySet().contains(field);
+    }
+    
+    public Integer getCustomFieldIdx(final String customField) {
+        return customFieldsIdxs.get(customField);
+    }
+    
+    public ValueType getValueTypeOfCustomField(final String customField) {
+        
+        final Integer idx = getCustomFieldIdx(customField);
+        
+        return idx==null ? null : fields.get(idx).getValueType();
+        
     }
     
     /**
@@ -315,7 +330,9 @@ public class GeoSpatialDatatypeConfiguration {
      */
     void initDerivedMembers() {
 
-        for (final GeoSpatialDatatypeFieldConfiguration field : fields) {
+        for (int i=0; i<fields.size(); i++) {
+            
+            final GeoSpatialDatatypeFieldConfiguration field = fields.get(i);
             
             switch (field.getServiceMapping()) 
             {
@@ -332,7 +349,7 @@ public class GeoSpatialDatatypeConfiguration {
                 hasTime = true;
                 break;
             case CUSTOM:
-                customFields.add(field.getCustomServiceMapping());
+                customFieldsIdxs.put(field.getCustomServiceMapping(), i);
                 break;
             default:
                 throw new InvalidGeoSpatialDatatypeConfigurationError(

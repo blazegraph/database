@@ -224,10 +224,10 @@ public interface IGeoSpatialQuery {
     }
 
     public static class LowerAndUpperValue {
-        final public Double lowerValue;
-        final public Double upperValue;
+        final public Object lowerValue;
+        final public Object upperValue;
         
-        public  LowerAndUpperValue(final Double lowerValue, final Double upperValue) {
+        public  LowerAndUpperValue(final Object lowerValue, final Object upperValue) {
             this.lowerValue = lowerValue;
             this.upperValue = upperValue;
         }

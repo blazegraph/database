@@ -2135,7 +2135,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         */
        public GeoSpatialQuery toGeoSpatialQuery(final IBindingSet bs) {
            
-           final URI searchDatatypeUri = resolveSearchDatatype(
+             final URI searchDatatypeUri = resolveSearchDatatype(
                    this.searchDatatype, bs);
              final GeoFunction searchFunction = resolveAsGeoFunction(
                    this.searchFunction, bs);
@@ -2154,8 +2154,25 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              final Long timeEnd = resolveAsLong(this.timeEnd, bs);
              
              final String[] customFields = resolveAsStringArr(this.customFields, bs);
-             final Double[] customFieldsLowerBounds = resolveAsDoubleArr(this.customFieldsLowerBounds, bs);
-             final Double[] customFieldsUpperBounds = resolveAsDoubleArr(this.customFieldsUpperBounds, bs);
+             
+             // gather value types for custom fields
+             final GeoSpatialDatatypeConfiguration datatypeConfig = 
+                 GeoSpatialConfig.getInstance().getConfigurationForDatatype(searchDatatypeUri);
+             final ValueType[] customFieldsVTs = new ValueType[customFields.length];
+             for (int i=0; i<customFields.length; i++) {
+                 final ValueType vt = datatypeConfig.getValueTypeOfCustomField(customFields[i]);
+                 if (vt!=null) {
+                     customFieldsVTs[i] = vt;
+                 } else {
+                     throw new GeoSpatialSearchException(
+                         "Undefined custom field used in query: " + customFields[i]);
+                 }
+             }
+             
+             final Object[] customFieldsLowerBounds = 
+                 resolveAsLongDoubleArr(this.customFieldsLowerBounds, customFieldsVTs, bs);
+             final Object[] customFieldsUpperBounds = 
+                 resolveAsLongDoubleArr(this.customFieldsUpperBounds, customFieldsVTs, bs);
 
              final GeoSpatialQuery sq = 
                  new GeoSpatialQuery(searchFunction, searchDatatypeUri,
@@ -2338,16 +2355,37 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             return toSplit.split(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
         }
         
-        Double[] resolveAsDoubleArr(TermNode termNode, IBindingSet bs) {
+        Object[] resolveAsLongDoubleArr(final TermNode termNode, final ValueType[] valueTypes, final IBindingSet bs) {
 
             final String[] stringArr = resolveAsStringArr(termNode, bs);
             
-            final Double[] doubleArr = new Double[stringArr.length];
-            for (int i=0; i<stringArr.length; i++) {
-                doubleArr[i] = Double.valueOf(stringArr[i]);
+            if (stringArr.length!=valueTypes.length) {
+                throw new GeoSpatialSearchException(
+                    "Magic predicates geo:customFields, geo:customFieldsLowerBounds, and "
+                    + "geo:customFieldsUpperBounds must all be given and have same length.");
             }
             
-            return doubleArr;
+            final Object[] objArr = new Object[stringArr.length];
+            for (int i=0; i<stringArr.length; i++) {
+                switch (valueTypes[i]) {
+                case DOUBLE:
+                {
+                    final Double val = Double.valueOf(stringArr[i]);
+                    objArr[i] = val;
+                    break;
+                }
+                case LONG:
+                {
+                    final Long val = Long.valueOf(stringArr[i]);
+                    objArr[i] = val;
+                    break;
+                }
+                default:
+                    throw new GeoSpatialSearchException("Unhandled value type: " + valueTypes[i]);
+                }
+            }
+            
+            return objArr;
         }
         
         URI resolveSearchDatatype(final TermNode searchDatatype, final IBindingSet bs) {

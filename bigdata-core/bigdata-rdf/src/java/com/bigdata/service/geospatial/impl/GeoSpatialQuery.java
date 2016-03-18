@@ -200,7 +200,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
      * @return
      */
     public static Map<String, LowerAndUpperValue> toValidatedCustomFieldsConstraints(
-        final String[] customFields, final Double[] customFieldsLowerBounds, final Double[] customFieldsUpperBounds) {
+        final String[] customFields, final Object[] customFieldsLowerBounds, final Object[] customFieldsUpperBounds) {
         
         final  Map<String, LowerAndUpperValue> customFieldsConstraints = new HashMap<String, LowerAndUpperValue>();
         
@@ -215,12 +215,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                 " differs from number of upper bounds = " + customFieldsUpperBounds.length);
 
         for (int i=0; i<customFields.length; i++) {
-            
-            if (customFieldsLowerBounds[i]>customFieldsUpperBounds[i]) {
-                throw new GeoSpatialSearchException(
-                    "Lower bound for field " + customFields[i] + " must not be larger than upper bound.");
-            }
-            
+          
             customFieldsConstraints.put(
                 customFields[i], 
                 new LowerAndUpperValue(customFieldsLowerBounds[i],customFieldsUpperBounds[i]));
@@ -526,11 +521,6 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             
             // latitude south west range must be smaller or equal than north east
             if (lowerBoundingBox.northSouth>upperBoundingBox.northSouth) {
-                if (log.isInfoEnabled()) {
-                   log.info("Search rectangle upper left latitude (" + lowerBoundingBox.northSouth + 
-                      ") is larger than rectangle lower righ latitude (" + upperBoundingBox.northSouth + 
-                      ". Search request will give no results.");
-                }
                 
                 return false;
              }
@@ -539,9 +529,6 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         
         if (timeStart!=null && timeEnd!=null) {
             if (timeStart>timeEnd) {
-                
-                log.info("Search rectangle start time (" + timeStart + ") is larger than end time (" 
-                            + timeEnd +  ". Search request will give no results.");
                     
                 return false;
             }
@@ -550,10 +537,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         final Map<String, LowerAndUpperValue> cfcs = getCustomFieldsConstraints();
         for (final String key : cfcs.keySet()) {
             final LowerAndUpperValue val = cfcs.get(key);
-            if (val.lowerValue>val.upperValue) {
-                log.info("Custom field's " + key + " lower range (" + val.lowerValue+ ") is "
-                        + "larger than its upper range (" + val.upperValue + ". Search "
-                        + "request will give no results.");
+            
+            if (gt(val.lowerValue,val.upperValue)) {
                 
                 return false;
             }
@@ -614,7 +599,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }
 
         // assert that the custom fields defined in the index are identical with the specified custom fields
-        final Set<String> datatypeCustomFields = datatypeConfig.getCustomFields();
+        final Set<String> datatypeCustomFields = datatypeConfig.getCustomFieldsIdxs().keySet();
         
         if ((!getCustomFieldsConstraints().keySet().containsAll(datatypeCustomFields)) || 
             (!datatypeCustomFields.containsAll(getCustomFieldsConstraints().keySet()))) {
@@ -842,6 +827,29 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     
         }  // else: no geospatial component
         
+    }
+    
+    /**
+     * Compare two values of either type Double or Long using greater-than
+     * Throws an {@link GeoSpatialSearchException} if not both are of type Double
+     * or if they are not both of type Long.
+     */
+    private static boolean gt(final Object lower, final Object upper) {
+        
+        if ((lower instanceof Double) && (upper instanceof Double)) {
+
+            return (Double)lower>(Double)upper;
+            
+        } else if ((lower instanceof Long) && (upper instanceof Long)) {
+
+            return (Long)lower>(Long)upper;
+            
+        } else {
+
+            throw new GeoSpatialSearchException(
+                "Incompatible types for lower and upper bound. Something's wrong in the implementation.");
+            
+        }
     }
 
 }
