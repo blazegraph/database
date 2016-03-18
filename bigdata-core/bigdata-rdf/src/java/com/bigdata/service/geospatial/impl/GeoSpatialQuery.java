@@ -769,9 +769,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     }
     
     /**
-     * Set the query's internal bounding box, if required.
-     * 
-     * TODO: document -> this bounding box doesn't necessarily reflect a normalized query 
+     * Set the query's internal bounding box, if required. The bounding box
+     * that we compute does not necessarily represent a valid query, i.e.
+     * the query in the general case requires normalization in order to
+     * give valid z-order search strings later on.
      */
     private void computeLowerAndUpperBoundingBoxIfNotSet() {
     

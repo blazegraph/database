@@ -75,7 +75,7 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
-import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -371,19 +371,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
          }
       }
-
-      // TODO: move this check somewhere else: if the index is not using lat+lon, it is ok to not specify this
-//      if (!uris.contains(GeoSpatial.SEARCH)) {
-//         throw new RuntimeException("Required search predicate not found: "
-//               + GeoSpatial.SEARCH + " for searchVar=" + searchVar);
-//      }
-      
-      // TODO: get rid of this check and support unbound predicates as well
-      if (!uris.contains(GeoSpatial.PREDICATE)) {
-         throw new RuntimeException(
-               "GeoSpatial search with unbound predicate is currenly not supported.");
-      }
-
    }
 
    private void assertObjectIsURI(final StatementPatternNode sp) {
@@ -668,7 +655,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           * Decomposes the context path into subtasks according to the configuration.
           * Each subtasks is a range scan backed by the buffer.
           */
-         @SuppressWarnings("rawtypes")
          protected List<GeoSpatialServiceCallSubRangeTask> getSubTasks() {
                           
             final List<GeoSpatialServiceCallSubRangeTask> subTasks =
@@ -709,21 +695,21 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                         GeoSpatialSearchException.INVALID_PARAMETER_EXCEPTION + ": search datatype unknown.");
                 }
                 
-                final GeoSpatialLiteralExtension litExt = 
+                final GeoSpatialLiteralExtension<BigdataValue> litExt = 
                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig);
                 
-                final LiteralExtensionIV lowerBorderIV = litExt.createIV(southWestComponents);
-                final LiteralExtensionIV upperBorderIV = litExt.createIV(northEastComponents);
                 
-                if (log.isDebugEnabled()) {
-                   
-                    // TODO: fix this code
+                // this debug code (currently broken) might be re-enabled once needed
+//                if (log.isDebugEnabled()) {
+//                   
+//                    final LiteralExtensionIV lowerBorderIV = litExt.createIV(southWestComponents);
+//                    final LiteralExtensionIV upperBorderIV = litExt.createIV(northEastComponents);
 //                   log.debug("[OuterRange] Scanning from " + lowerBorderIV.getDelegate().integerValue() 
 //                         + " / " + litExt.toComponentString(0, 2, lowerBorderIV));
 //                   log.debug("[OuterRange]            to " + upperBorderIV.getDelegate().integerValue()
 //                         + " / " +  litExt.toComponentString(0, 2, upperBorderIV));
-    
-                }
+//    
+//                }
                 
 
 
@@ -751,9 +737,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                       subTasks.add(subTask);
                    }
                    
-                   if (log.isDebugEnabled()) {
-    
-                       // TODO: fix this code
+                   // note: this is old debugging code, which is broken
+                   //       -> might be fixed once we need debugging here...
+//                   if (log.isDebugEnabled()) {
+//    
 //                      LiteralExtensionIV lowerBorderIVPart = litExt.createIV(lowerBorder);
 //                      LiteralExtensionIV upperBorderIVPart = litExt.createIV(upperBorder);
 //    
@@ -763,7 +750,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 //                      log.debug("[InnerRange]            to " + upperBorderIVPart.getDelegate().integerValue() 
 //                            + " / " +  litExt.toComponentString(0, 2, upperBorderIVPart) 
 //                            + " / " + BytesUtil.byteArrToBinaryStr(litExt.toZOrderByteArray(upperBorder)));
-                   }
+//                   }
     
                 }
                 
@@ -1149,13 +1136,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
               * 
               * TODO: what's the rational for choosing the last component? wouldn't the one with the most significant
               *       bit make more sense? would need some experimental validation to figure that out...
+              * TODO: the bit shift/precision logics might be encapsulated in methods in the geospatial literal; it
+              *       unnecessarily blows up this method here and doesn't really belong here...
               */
              public List<GeoSpatialSearchRange> partition(int numTasks, long totalPointsInRange, int minDatapointsPerTask) {
 
                  final List<GeoSpatialSearchRange> partitions =  new ArrayList<GeoSpatialSearchRange>();
 
                  final long numPartitions = computeNumberOfPartitions(numTasks, totalPointsInRange, minDatapointsPerTask);
-                 
                  
                  final GeoSpatialDatatypeConfiguration datatypeConfig = geoSpatialSearchRange.getDatatypeConfig();
                  
@@ -1247,8 +1235,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                      final long startLongVal = breakPoints.get(i) + 1;
                      final long endLongVal = breakPoints.get(i + 1);             
                      
-                     // TODO: should encapsulate this as an "asLongValue" in the GeoSpatialLiteralExtension,
-                     //       the code doesn't belong here...
+                     
                      switch (vt) {
                      case LONG:
                      {
@@ -1261,8 +1248,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                      case DOUBLE:
                      {
                          // apply precision adjustment
-                         breakpointLowerBorder[finalPosition] = (double)startLongVal/(double)fieldToPartitionOn.getMultiplier();
-                         breakpointUpperBorder[finalPosition] = (double)endLongVal/(double)fieldToPartitionOn.getMultiplier();
+                         breakpointLowerBorder[finalPosition] = 
+                             (double)startLongVal/(double)fieldToPartitionOn.getMultiplier();
+                         
+                         breakpointUpperBorder[finalPosition] = 
+                             (double)endLongVal/(double)fieldToPartitionOn.getMultiplier();
                          
                          break;
                      }
@@ -1471,32 +1461,33 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           * If var differs from null, the variable is bind to a concatenation of the
           * values identified by idxs; if var is null, no action is performed.
           */
+         @SuppressWarnings("rawtypes")
          private void conditionallyBindVariableToIdxComponents(
             final Var<?> var, final IV[] ivs, final IBindingSet bs, 
             final ValueType vt, final int... idxs) {
             
             if (var!=null) {
                   
-                  final BigdataLiteral lit;
+                  final IV iv;
                   
                   if (ValueType.DOUBLE==vt) {
                   
-                      lit = vf.createLiteral(
-                          Double.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
+                      iv = new XSDNumericIV(Double.valueOf(
+                              litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
                   
                   } else if (ValueType.LONG==vt) {
                       
-                      lit = vf.createLiteral(
-                          Long.valueOf(litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
+                      iv = new XSDNumericIV(Long.valueOf(
+                              litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
 
                   } else { // vt==null or unknown
                   
-                      lit = vf.createLiteral(
-                        litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs));
+                      iv = DummyConstantNode.toDummyIV(vf.createLiteral(
+                        litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
                   
                   }
-                  bs.set(var, 
-                     new Constant<IV>(DummyConstantNode.toDummyIV((BigdataValue) lit)));
+                  
+                  bs.set(var, new Constant<IV>(iv));
             }
          }
       }
@@ -1811,7 +1802,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       @SuppressWarnings("rawtypes")      
       protected boolean isValidInternal(final ITuple tuple) {
           
-          // TODO: think about this special case
           if (!latLonIndicesValid)
               return false; // something's wrong here, reject all tuples
 

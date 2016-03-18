@@ -35,6 +35,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialLiteralError;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -134,7 +136,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
          encodeDecodeGeoSpatialLiterals(
             vf, getDummyGeospatialLiteralsLatLon(vf, URI_DATATYPE_LAT_LON_TIME), extLatLonTime);
          
-      } catch (IllegalArgumentException e) {
+      } catch (InvalidGeoSpatialLiteralError e) {
          
          case1Passed = true; // expected
          
@@ -158,7 +160,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
          encodeDecodeGeoSpatialLiterals(
             vf, getDummyGeospatialLiteralsLatLonTime(vf, GeoSpatial.DEFAULT_DATATYPE), extLatLon);
          
-      } catch (IllegalArgumentException e) {
+      } catch (InvalidGeoSpatialLiteralError e) {
          
          case2Passed = true; // expected
          

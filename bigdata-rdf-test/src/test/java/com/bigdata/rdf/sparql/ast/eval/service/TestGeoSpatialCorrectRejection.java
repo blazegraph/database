@@ -73,7 +73,7 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
                "geo-cr-wrongdataformat01.nt",
                "geo-cr-empty.srx").runTest();
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             
             // check for wrapped exception
             assertTrue(e.toString().contains(InvalidGeoSpatialLiteralError.class.getName()));
@@ -97,7 +97,7 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
                 "geo-cr-wrongdataformat01.nt",
                 "geo-cr-empty.srx").runTest();  
             
-        } catch (Exception e) {
+        } catch (Throwable e) {
             
             // check for wrapped exception
             assertTrue(e.toString().contains(InvalidGeoSpatialLiteralError.class.getName()));
@@ -121,7 +121,7 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
                 "geo-cr-wrongdataformat03.nt",
                 "geo-cr-empty.srx").runTest();
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             
             // check for wrapped exception
             assertTrue(e.toString().contains(InvalidGeoSpatialLiteralError.class.getName()));
