@@ -166,6 +166,7 @@ import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.sparse.GlobalRowStoreUtil;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
@@ -1328,11 +1329,11 @@ abstract public class AbstractTripleStore extends
 
         /**
          * ATTENTION: Do NEVER modify the definitions below -> they are important in order to maintain
-         *            binary compatibility at database level.
+         *            compatibility for geospatial data at database level.
          */
         final String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON = 
                 "{\"config\": "
-                + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral/v1/lat-lon\", "
+                + "{ \"uri\": \"" + GeoSpatial.GEOSPATIAL_LITERAL_V1_LAT_LON + "\", "
                 + "\"fields\": [ "
                 + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
                 + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
@@ -1340,7 +1341,7 @@ abstract public class AbstractTripleStore extends
         
         final String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON_TIME = 
             "{\"config\": "
-            + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral/v1/lat-lon-time\", "
+            + "{ \"uri\": \"" + GeoSpatial.GEOSPATIAL_LITERAL_V1_LAT_LON_TIME + "\", "
             + "\"fields\": [ "
             + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
             + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "

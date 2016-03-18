@@ -80,10 +80,8 @@ public class BigdataCoreVocabulary_v20160317 extends BigdataCoreVocabulary_v2015
 				BD.VIRTUAL_GRAPH,
 				RDRHistory.Vocab.ADDED,
 				RDRHistory.Vocab.REMOVED,
-				GeoSpatial.DEFAULT_DATATYPE,
 				GeoSpatial.DEFAULT_DATATYPE_LAT_LON,
-				GeoSpatial.DEFAULT_DATATYPE_LAT_LON_TIME,
-				GeoSpatial.DEFAULT_DATATYPE_LAT_LON_COORD));
+				GeoSpatial.DEFAULT_DATATYPE_LAT_LON_TIME));
 
     }
 

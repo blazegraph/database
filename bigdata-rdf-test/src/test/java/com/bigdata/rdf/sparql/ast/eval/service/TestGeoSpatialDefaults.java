@@ -143,7 +143,7 @@ public class TestGeoSpatialDefaults extends AbstractDataDrivenSPARQLTestCase {
 
         properties.setProperty(
             com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE,
-            "http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral/v1/lat-lon");
+            "http://www.bigdata.com/rdf/geospatial/literals/v1#lat-lon");
         
         return properties;
 

@@ -145,9 +145,12 @@ public interface GeoSpatial {
    /**
     * The default datatype to be used for GeoSpatial literals.
     */
-   final URI DEFAULT_DATATYPE_LAT_LON = new URIImpl(NAMESPACE + "geoSpatialLiteral/v1/lat-lon");
-   final URI DEFAULT_DATATYPE_LAT_LON_TIME = new URIImpl(NAMESPACE + "geoSpatialLiteral/v1/lat-lon-time");
-   final URI DEFAULT_DATATYPE_LAT_LON_COORD = new URIImpl(NAMESPACE + "geoSpatialLiteral/v1/lat-lon-coord");
+   final String GEOSPATIAL_LITERAL_PREFIX_V1  = "http://www.bigdata.com/rdf/geospatial/literals/v1#";
+   final String GEOSPATIAL_LITERAL_V1_LAT_LON = GEOSPATIAL_LITERAL_PREFIX_V1 + "lat-lon";
+   final String GEOSPATIAL_LITERAL_V1_LAT_LON_TIME = GEOSPATIAL_LITERAL_PREFIX_V1 + "lat-lon-time";
+   
+   final URI DEFAULT_DATATYPE_LAT_LON = new URIImpl(GEOSPATIAL_LITERAL_V1_LAT_LON);
+   final URI DEFAULT_DATATYPE_LAT_LON_TIME = new URIImpl(GEOSPATIAL_LITERAL_V1_LAT_LON_TIME);
    
    
    /************************************************************************************************
