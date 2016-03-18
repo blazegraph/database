@@ -24,11 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.vocab.core;
 
-import org.openrdf.model.impl.URIImpl;
-
-import com.bigdata.rdf.sail.RDRHistory;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
 import com.bigdata.service.geospatial.GeoSpatial;
 
@@ -39,7 +35,7 @@ import com.bigdata.service.geospatial.GeoSpatial;
  * extends this one and edit
  * {@link AbstractTripleStore.Options#DEFAULT_VOCABULARY_CLASS}.
  */
-public class BigdataCoreVocabulary_v20160317 extends BigdataCoreVocabulary_v20151106 {
+public class BigdataCoreVocabulary_v20160317 extends BigdataCoreVocabulary_v20151210 {
 
     /**
      * De-serialization ctor.
@@ -71,15 +67,6 @@ public class BigdataCoreVocabulary_v20160317 extends BigdataCoreVocabulary_v2015
          * Some new URIs for graph and RDR management.
          */
 		addDecl(new BaseVocabularyDecl(
-				new URIImpl(BD.NAMESPACE + "Vertex"), // BigdataRDFFactory.VERTEX,
-				new URIImpl(BD.NAMESPACE + "Edge"), // BigdataRDFFactory.EDGE,
-				new URIImpl("attr:/type"), // GPO.tid,
-				BD.SID,
-				BD.STATEMENT_TYPE,
-				BD.NULL_GRAPH,
-				BD.VIRTUAL_GRAPH,
-				RDRHistory.Vocab.ADDED,
-				RDRHistory.Vocab.REMOVED,
 				GeoSpatial.DEFAULT_DATATYPE_LAT_LON,
 				GeoSpatial.DEFAULT_DATATYPE_LAT_LON_TIME));
 

@@ -2294,17 +2294,32 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                  return null; // shouldn't happen, but just in case...
               }
 
-              final IVariable<?> var = (IVariable<?>) termNode
-                    .getValueExpression();
+              final IVariable<?> var = (IVariable<?>) termNode .getValueExpression();
+              
               if (bs.isBound(var)) {
                  IConstant<?> c = bs.get(var);
-                 if (c == null || c.get() == null
-                       || !(c.get() instanceof TermId<?>)) {
+                 if (c == null || c.get() == null) {
                     return null;
                  }
 
-                 TermId<?> cAsTerm = (TermId<?>) c.get();
-                 return cAsTerm.stringValue();
+                 
+                 final Object obj = c.get();
+                 if (obj instanceof TermId<?>) {
+                     
+                     return ((TermId<?>) obj).stringValue();
+                     
+                 } else if (obj instanceof IV) {
+                     
+                    @SuppressWarnings("rawtypes")
+                    final BigdataValue bdVal = ((IV)obj).getValue();
+
+                     if (bdVal!=null) {
+                         return bdVal.stringValue();
+                     }
+                 } 
+
+                 // should never end up here
+                 throw new GeoSpatialSearchException("Value for literal could not be retrieved.");
 
               } else {
                  throw new GeoSpatialSearchException(
