@@ -234,6 +234,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          log.debug("globalBufferChunkOfChunksCapacity=" + globalBufferChunkOfChunksCapacity);
       }
       
+      if (!store.getLexiconRelation().getLexiconConfiguration().isGeoSpatial()) {
+          throw new GeoSpatialSearchException(
+              "Geospatial is disabled. Please enable geospatial and reload your data.");
+      }
+      
       /*
        * Create and return the geospatial service call object, which will
        * execute this search request.
@@ -2165,6 +2170,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              // gather value types for custom fields
              final GeoSpatialDatatypeConfiguration datatypeConfig = 
                  geoSpatialConfig.getConfigurationForDatatype(searchDatatypeUri);
+             
+             if (datatypeConfig==null) {
+                 throw new GeoSpatialSearchException(
+                     "Datatype " + searchDatatypeUri + " is not a registered geospatial "
+                     + "datatype. Query cannot be executed.");
+             }
+             
              final ValueType[] customFieldsVTs = new ValueType[customFields.length];
              for (int i=0; i<customFields.length; i++) {
                  final ValueType vt = datatypeConfig.getValueTypeOfCustomField(customFields[i]);

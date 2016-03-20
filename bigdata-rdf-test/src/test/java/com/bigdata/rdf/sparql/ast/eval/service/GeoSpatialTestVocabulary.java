@@ -75,7 +75,9 @@ public class GeoSpatialTestVocabulary extends BigdataCoreVocabulary_v20160317 {
                 new URIImpl("http://my.custom.datatype/x-y-z-lat-lon"),
                 new URIImpl("http://my.custom.datatype/x-y-z-lat-lon-time"),
                 new URIImpl("http://my.custom.datatype/time-x-y-z"),
-                new URIImpl("http://my.custom.datatype/x-y-z-lat-lon-time-coord")
+                new URIImpl("http://my.custom.datatype/x-y-z-lat-lon-time-coord"),
+                new URIImpl("http://my-lat-lon-starttime-endtime-dt"),
+                new URIImpl("http://width-height-length-dt")
             )
         );
     }

@@ -992,6 +992,29 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
         throw new RuntimeException("Expected to run into exception.");
     }
 
+    /**
+     * Test case where we query a datatype that is not a geospatial one.
+     */
+    public void testCRUnknownGeoSpatialDatatype() throws Exception {
+
+        try {
+            
+            new TestHelper(
+                "geo-cr-unknowngeospatialdatatype",
+                "geo-cr-unknowngeospatialdatatype.rq", 
+                "empty.trig",
+                "geo-cr-empty.srx").runTest();
+        
+        } catch (Exception e) {
+            
+            // check for wrapped exception
+            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
+            
+            return; // expected
+        }
+
+        throw new RuntimeException("Expected to run into exception.");
+    }
     
     @Override
     public Properties getProperties() {
