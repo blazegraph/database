@@ -486,7 +486,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.serviceOptions = serviceOptions;
 
          this.gssConfig = 
-             new GeoSpatialServiceCallConfiguration(dflts, searchVar, sps);
+             new GeoSpatialServiceCallConfiguration(dflts, 
+                 kb.getLexiconRelation().getLexiconConfiguration().getGeoSpatialConfig(), 
+                 searchVar, sps);
 
          // for now: a single variable containing the result
          this.vars = new IVariable[] { searchVar };
@@ -597,6 +599,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private BOpContextBase context;
          final private GlobalAnnotations globals;
          final private BigdataValueFactory vf;
+         final private GeoSpatialConfig geoSpatialConfig;
          
          private final int numTasks;
          private final int minDatapointsPerTask;
@@ -641,6 +644,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.threadLocalBufferCapacity = threadLocalBufferCapacity;
             
             this.stats = stats;
+            this.geoSpatialConfig = 
+                kb.getLexiconRelation().getLexiconConfiguration().getGeoSpatialConfig();
             
             tasks = getSubTasks();
             
@@ -689,7 +694,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 
                 // set up datatype configuration for the datatype URI
                 final GeoSpatialDatatypeConfiguration datatypeConfig =
-                    GeoSpatialConfig.getInstance().getConfigurationForDatatype(query.getSearchDatatype());
+                    geoSpatialConfig.getConfigurationForDatatype(query.getSearchDatatype());
                 if (datatypeConfig==null) {
                     throw new GeoSpatialSearchException(
                         GeoSpatialSearchException.INVALID_PARAMETER_EXCEPTION + ": search datatype unknown.");
@@ -1953,6 +1958,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
    public static class GeoSpatialServiceCallConfiguration {
        
        private GeoSpatialDefaults defaults = null;
+       private GeoSpatialConfig geoSpatialConfig = null;
        
        private TermNode searchFunction = null;
        private TermNode predicate = null;
@@ -1980,9 +1986,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        private IVariable<?> customFieldsVar = null;
        
        public GeoSpatialServiceCallConfiguration(
-           final GeoSpatialDefaults defaults, final IVariable<?> searchVar, 
-           final Map<URI, StatementPatternNode> sps) {
+           final GeoSpatialDefaults defaults, final GeoSpatialConfig geoSpatialConfig,
+           final IVariable<?> searchVar, final Map<URI, StatementPatternNode> sps) {
            
+           this.geoSpatialConfig = geoSpatialConfig;
            this.defaults = defaults;
            this.searchVar = searchVar;
 
@@ -2157,7 +2164,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              
              // gather value types for custom fields
              final GeoSpatialDatatypeConfiguration datatypeConfig = 
-                 GeoSpatialConfig.getInstance().getConfigurationForDatatype(searchDatatypeUri);
+                 geoSpatialConfig.getConfigurationForDatatype(searchDatatypeUri);
              final ValueType[] customFieldsVTs = new ValueType[customFields.length];
              for (int i=0; i<customFields.length; i++) {
                  final ValueType vt = datatypeConfig.getValueTypeOfCustomField(customFields[i]);
@@ -2175,7 +2182,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                  resolveAsLongDoubleArr(this.customFieldsUpperBounds, customFieldsVTs, bs);
 
              final GeoSpatialQuery sq = 
-                 new GeoSpatialQuery(searchFunction, searchDatatypeUri,
+                 new GeoSpatialQuery(geoSpatialConfig, searchFunction, searchDatatypeUri,
                      bs.get(searchVar), predicate, context, spatialCircleCenter, 
                      spatialCircleRadius, spatialRectangleUpperLeft, 
                      spatialRectangleLowerRight, spatialUnit, timeStart, timeEnd, coordSystem, 
@@ -2391,7 +2398,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         URI resolveSearchDatatype(final TermNode searchDatatype, final IBindingSet bs) {
             
             if (searchDatatype==null) {
-                final URI datatype = GeoSpatialConfig.getInstance().getDefaultDatatype();
+                final URI datatype = geoSpatialConfig.getDefaultDatatype();
                 
                 if (datatype==null) {
                     throw new GeoSpatialSearchException(
@@ -2408,7 +2415,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                 
                 if (uri==null) {
                     
-                    uri = GeoSpatialConfig.getInstance().getDefaultDatatype();
+                    uri = geoSpatialConfig.getDefaultDatatype();
                     if (uri==null) {
                         throw new GeoSpatialSearchException(
                             "No default datatype set in configuration. Please specify the datatype "

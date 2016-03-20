@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -976,8 +975,7 @@ public class HashCollisionUtility {
 				vf,
 				uriFactory,
 				false, // GeoSpatial support
-				new ArrayList<String>(), // GeoSpatial datatype config
-				null
+				null // GeoSpatial config
 				);
 		
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(

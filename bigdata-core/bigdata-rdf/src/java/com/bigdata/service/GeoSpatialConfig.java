@@ -41,9 +41,9 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
 
 /**
- * Singleton class providing access to the GeoSpatial index configuration.
- * 
- * TODO: Singleton implementation might be re-considered.
+ * Class providing access to the GeoSpatial index configuration,
+ * including datatype definition and default datatype for querying.
+ * Initialized and used only if geospatial subsytem is used.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
@@ -65,28 +65,9 @@ public class GeoSpatialConfig {
     
     // the default datatype for querying
     private URI defaultDatatype;
-    
-    /**
-     * The one and only singleton instance.
-     */
-    private static GeoSpatialConfig instance;
 
+    public GeoSpatialConfig(final List<String> geoSpatialDatatypeConfigs, final String defaultDatatype) {
 
-    private GeoSpatialConfig() {
-        init(null, null);
-    }
-
-    public static GeoSpatialConfig getInstance() {
-
-        if (instance == null) {
-            instance = new GeoSpatialConfig();
-        }
-
-        return instance;
-    }
-
-    public void init(final List<String> geoSpatialDatatypeConfigs, final String defaultDatatype) {  
-        
         initDatatypes(geoSpatialDatatypeConfigs);
         
         if (defaultDatatype!=null && !defaultDatatype.isEmpty()) {

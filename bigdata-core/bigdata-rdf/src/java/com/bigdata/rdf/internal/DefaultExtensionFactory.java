@@ -10,7 +10,6 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 
 /**
@@ -51,14 +50,13 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	 */
     	if (config.isGeoSpatial()) {
     	   
-    	    // initialize the GeoSpatialConfig object from the lexicon configuration
-    	    final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
-    	    conf.init(config.getGeoSpatialDatatypeConfigs(), config.getGeoSpatialDefaultDatatype());
-
     	    // register the extensions, adding one extension per datatype config
-    	    final List<GeoSpatialDatatypeConfiguration> datatypeConfigs = conf.getDatatypeConfigs();
+    	    final List<GeoSpatialDatatypeConfiguration> datatypeConfigs = 
+    	        config.getGeoSpatialConfig().getDatatypeConfigs();
     	    for (int i=0; i<datatypeConfigs.size(); i++) {
-    	        extensions.add(new GeoSpatialLiteralExtension<BigdataLiteral>(resolver, datatypeConfigs.get(i)));    	
+    	        extensions.add(
+    	            new GeoSpatialLiteralExtension<BigdataLiteral>(
+    	                resolver, datatypeConfigs.get(i)));    	
     	    }
     	}
     	

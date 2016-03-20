@@ -65,6 +65,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
 
     
     // passed in as parameters
+    private final GeoSpatialConfig geoSpatialConfig;
     private final GeoFunction searchFunction;
     private final URI searchDatatype;
     private final IConstant<?> subject;
@@ -99,8 +100,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     /**
      * Constructor
      */
-    public GeoSpatialQuery(final GeoFunction searchFunction,
-            final URI searchDatatype,
+    public GeoSpatialQuery(final GeoSpatialConfig geoSpatialConfig,
+            final GeoFunction searchFunction, final URI searchDatatype,
             final IConstant<?> subject, final TermNode predicate,
             final TermNode context, final PointLatLon spatialCircleCenter,
             final Double spatialCircleRadius,
@@ -114,6 +115,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final IVariable<?> lonVar, final IVariable<?> coordSystemVar, 
             final IVariable<?> customFieldsVar, final IBindingSet incomingBindings) {
 
+        this.geoSpatialConfig = geoSpatialConfig;
         this.searchFunction = searchFunction;
         this.searchDatatype = searchDatatype;
         this.subject = subject;
@@ -137,7 +139,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.customFieldsVar = customFieldsVar;
         this.incomingBindings = incomingBindings;
         
-        this.datatypeConfig = GeoSpatialConfig.getInstance().getConfigurationForDatatype(searchDatatype);
+        this.datatypeConfig = 
+            geoSpatialConfig.getConfigurationForDatatype(searchDatatype);
         
         if (this.datatypeConfig==null) {
             throw new GeoSpatialSearchException(
@@ -157,7 +160,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
      * boundingBoxSouthEastWithTime, but expects appropriate values here
      * as input.
      */
-    private GeoSpatialQuery(final GeoFunction searchFunction,
+    private GeoSpatialQuery(final GeoSpatialConfig geoSpatialConfig,
+            final GeoFunction searchFunction,
             final URI searchDatatype,
             final IConstant<?> subject, final TermNode predicate,
             final TermNode context, final PointLatLon spatialCircleCenter,
@@ -179,7 +183,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final CoordinateDD lowerBoundingBox,
             final CoordinateDD upperBoundingBox) {
 
-        this(searchFunction, searchDatatype, subject, predicate, context, spatialCircleCenter,
+        this(geoSpatialConfig, searchFunction, searchDatatype, subject, predicate, context, spatialCircleCenter,
              spatialCircleRadius, spatialRectangleSouthWest, spatialRectangleNorthEast,  spatialUnit,
              timeStart, timeEnd, coordSystem, customFieldsConstraints, locationVar, timeVar, 
              locationAndTimeVar, latVar, lonVar, coordSystemVar, customFieldsVar, incomingBindings);
@@ -465,7 +469,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             
            final GeoSpatialQuery query1 = 
                new GeoSpatialQuery(
-                   searchFunction, searchDatatype, subject, predicate, context, 
+                   geoSpatialConfig, searchFunction, searchDatatype, subject, predicate, context, 
                    spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                    spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
                    customFieldsConstraints, locationVar, timeVar, locationAndTimeVar,
@@ -476,7 +480,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             
             final GeoSpatialQuery query2 = 
                 new GeoSpatialQuery(
-                    searchFunction, searchDatatype, subject, predicate, context, 
+                    geoSpatialConfig, searchFunction, searchDatatype, subject, predicate, context, 
                     spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                     spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
                     customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, 
@@ -548,8 +552,6 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     }
 
     void assertConsistency() {
-        
-        // TODO: implement system property or switch to disable consistency checking of queries
 
         // simple existence checks for required properties
         if (predicate==null) {

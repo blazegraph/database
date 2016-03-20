@@ -64,11 +64,10 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         final String config1 = sampleConfigComplete(config1Uri);
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config1);
         
-        conf.init(datatypeConfigs, "http://my.custom.datatype1.uri");
+        final GeoSpatialConfig conf = new GeoSpatialConfig(datatypeConfigs, "http://my.custom.datatype1.uri");
         
         final List<GeoSpatialDatatypeConfiguration> parsedDatatypeConfigs = conf.getDatatypeConfigs();
         assertEquals(parsedDatatypeConfigs.size(),1);
@@ -135,13 +134,12 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         final String config3 = sampleConfigComplete(config3Uri);
 
         // parse config
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config1);
         datatypeConfigs.add(config2);
         datatypeConfigs.add(config3);
         
-        conf.init(datatypeConfigs, config1Uri);
+        final GeoSpatialConfig conf = new GeoSpatialConfig(datatypeConfigs, config1Uri);
         
         // run tests
         final List<GeoSpatialDatatypeConfiguration> parsedDatatypeConfigs = conf.getDatatypeConfigs();
@@ -212,13 +210,11 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         final String config1 = sampleConfigNoFields(config1Uri);
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config1);
         
-        
         try {
-            conf.init(datatypeConfigs, config1Uri);
+            new GeoSpatialConfig(datatypeConfigs, config1Uri);
         } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
@@ -233,13 +229,12 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         final String config1 = sampleConfigSyntacticallyInvalid(config1Uri);
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config1);
         
         
         try {
-            conf.init(datatypeConfigs, config1Uri);
+            new GeoSpatialConfig(datatypeConfigs, config1Uri);
         } catch (IllegalArgumentException e) {
             return; // expected !
         }
@@ -254,13 +249,11 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         final String config = sampleConfigWithMissingValueType(configUri);
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config);
         
-        
         try {
-            conf.init(datatypeConfigs, configUri);
+            new GeoSpatialConfig(datatypeConfigs, configUri);
         } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
@@ -275,13 +268,12 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         final String config = sampleConfigWithMissingServiceMapping(configUri);
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config);
         
         
         try {
-            conf.init(datatypeConfigs, configUri);
+            new GeoSpatialConfig(datatypeConfigs, configUri);
         } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
@@ -296,13 +288,12 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         final String config = sampleConfigWithMappingConflict(configUri);
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config);
         
         
         try {
-            conf.init(datatypeConfigs, configUri);
+            new GeoSpatialConfig(datatypeConfigs, configUri);
         } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
@@ -317,13 +308,11 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         
         final String config = sampleConfigWithMappingConflict(configUri);
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config);
         
-        
         try {
-            conf.init(datatypeConfigs, configUri);
+            new GeoSpatialConfig(datatypeConfigs, configUri);
         } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }
@@ -340,14 +329,12 @@ public class TestGeoSpatialServiceConfigurationParsing extends AbstractDataDrive
         final String config1 = sampleConfigWithMappingConflict(configUri);
         final String config2 = sampleConfigWithMappingConflict(configUri); // same URI -> invalid!
 
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(config1);
         datatypeConfigs.add(config2);
         
-        
         try {
-            conf.init(datatypeConfigs, configUri);
+            new GeoSpatialConfig(datatypeConfigs, configUri);
         } catch (InvalidGeoSpatialDatatypeConfigurationError e) {
             return; // expected !
         }

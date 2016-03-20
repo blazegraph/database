@@ -34,7 +34,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -81,6 +80,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -131,12 +131,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     /**
      * Configuration of geospatial datatypes.
      */
-    final List<String> geoSpatialDatatypeConfigs;
-    
-    /**
-     * The geospatial default datatype.
-     */
-    final String geoSpatialDefaultDatatype;
+    final GeoSpatialConfig geoSpatialConfig;
     
     /**
      * <code>true</code> if textual literals will be inlined.
@@ -256,19 +251,12 @@ public class LexiconConfiguration<V extends BigdataValue>
        
        return geoSpatial;
     }
-
     
     @Override
-    public List<String> getGeoSpatialDatatypeConfigs() {
-       
-       return geoSpatialDatatypeConfigs;
+    public GeoSpatialConfig getGeoSpatialConfig() {
+        return geoSpatialConfig;
     }
-    
-    @Override
-    public String getGeoSpatialDefaultDatatype() {
-        return geoSpatialDefaultDatatype;
-    }
-    
+        
     @Override
     public boolean isInlineDateTimes() {
         return inlineDateTimes;
@@ -365,8 +353,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             final BigdataValueFactory valueFactory,//
             final IInlineURIFactory uriFactory,//
             final boolean geoSpatial,
-            final List<String> geoSpatialDatatypeConfigs,
-            final String geoSpatialDefaultDatatype) {
+            final GeoSpatialConfig geoSpatialConfig) {
 
         if (blobsThreshold < 0)
             throw new IllegalArgumentException();
@@ -393,8 +380,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.valueFactory = valueFactory;
         this.uriFactory = uriFactory;
         this.geoSpatial = geoSpatial;
-        this.geoSpatialDatatypeConfigs = geoSpatialDatatypeConfigs;
-        this.geoSpatialDefaultDatatype = geoSpatialDefaultDatatype;
+        this.geoSpatialConfig = geoSpatialConfig;
         
         /*
          * TODO Make this configurable.

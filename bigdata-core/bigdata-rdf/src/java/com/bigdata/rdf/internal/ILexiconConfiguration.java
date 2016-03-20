@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.util.List;
 import java.util.TimeZone;
 
 import org.openrdf.model.URI;
@@ -41,6 +40,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.service.GeoSpatialConfig;
 
 /**
  * Configuration determines which RDF Values are inlined into the statement
@@ -82,16 +82,9 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
     public boolean isGeoSpatial();
     
     /**
-     * Return the list of geospatial datatype configurations
+     * Return the geospatial datatype configuration.
      */
-    List<String> getGeoSpatialDatatypeConfigs();
-    
-    /**
-     * Return the geospatial default datatype (if any). The default datatype is
-     * the datatype that is queried whenever no datatype is explicitly specified
-     * within the query.
-     */
-    public String getGeoSpatialDefaultDatatype();
+    public GeoSpatialConfig getGeoSpatialConfig();
 
     /**
      * Return the default time zone to be used for inlining.
@@ -188,6 +181,5 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Get iterator over registered type handlers.
      */
     Iterable<IMathOpHandler> getTypeHandlers();
-
 
 }

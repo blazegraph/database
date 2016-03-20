@@ -719,10 +719,9 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         /**
          * Initialize geo spatial config with default
          */
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(GEO_SPATIAL_DATATYPE_CONFIG);
-        conf.init(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
+        final GeoSpatialConfig conf = new GeoSpatialConfig(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
         final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
@@ -777,10 +776,9 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         /**
          * Initialize geo spatial config with default
          */
-        final GeoSpatialConfig conf = GeoSpatialConfig.getInstance();
         final List<String> datatypeConfigs = new ArrayList<String>();
         datatypeConfigs.add(GEO_SPATIAL_DATATYPE_CONFIG);
-        conf.init(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
+        final GeoSpatialConfig conf = new GeoSpatialConfig(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
         final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
         final GeoSpatialLiteralExtension<BigdataValue> ext = 
             new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
