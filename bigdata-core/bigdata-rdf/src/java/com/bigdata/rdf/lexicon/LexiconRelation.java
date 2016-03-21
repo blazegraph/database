@@ -2188,6 +2188,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link AbstractTripleStore.Options#TEXT_INDEX} must be enabled. This
      * operation is only supported when the {@link IValueCentricTextIndexer} uses the
      * {@link FullTextIndex} class.
+     * 
+     * @param forceCreate
+     *            When <code>true</code> a new text index will be created
+     *            for a namespace that had no it before.
      */
     @SuppressWarnings("unchecked")
     public void rebuildTextIndex(final boolean forceCreate) {
@@ -2350,12 +2354,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
-	private void updateTextIndexConfiguration(final SparseRowStore global, final String namespace) {
-		
-		Map<String, Object> map = global.read(
-		        RelationSchema.INSTANCE, namespace);
+    private void updateTextIndexConfiguration(final SparseRowStore global, final String namespace) {
 
-		map.put(AbstractTripleStore.Options.TEXT_INDEX, "true");
+        Map<String, Object> map = global.read(
+             RelationSchema.INSTANCE, namespace);
+
+        map.put(AbstractTripleStore.Options.TEXT_INDEX, "true");
 
         map.put(FullTextIndex.Options.FIELDS_ENABLED, "false");
         
@@ -2364,9 +2368,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
 
-		global.write(RelationSchema.INSTANCE, map);
-		
-	}
+        global.write(RelationSchema.INSTANCE, map);
+
+    }
     
     /**
      * Batch resolution of internal values to {@link BigdataValue}s.

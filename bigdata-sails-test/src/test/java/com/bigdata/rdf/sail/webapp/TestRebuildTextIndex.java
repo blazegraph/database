@@ -76,65 +76,65 @@ public class TestRebuildTextIndex<S extends IIndexManager> extends
      * Test force create full text index.
      */
     public void test_rebuildTextIndex() throws Exception {
-    	
-    	final String namespace = "test" + UUID.randomUUID();
-    	
-    	final Properties properties = new Properties();
-    	
-    	properties.put(Options.TEXT_INDEX, "false");
-    	
-		m_mgr.createRepository(namespace, properties );
-		
-		final RemoteRepository repo = m_mgr.getRepositoryForNamespace(namespace);
-		
-		final ValueFactoryImpl vf = ValueFactoryImpl.getInstance();
-		
-		final URI s = vf.createURI("s:s1");
-		
-		final Literal o = vf.createLiteral("literal");
-		
-	    final Statement[] a = new Statement[] { 
-				vf.createStatement(s, RDFS.LABEL, o),
-				
-		};
 
-	    final AddOp addOp = new AddOp(Arrays.asList(a));
+        final String namespace = "test" + UUID.randomUUID();
 
-	    repo.add(addOp);
-	    
-	    final String sparql = "select ?s where { ?s ?p ?o . ?o <http://www.bigdata.com/rdf/search#search> \"" + o.stringValue() + "\" .}";
-	    
-	    try {
-	    	
-	    	repo.prepareTupleQuery(sparql).evaluate();
-	    	
-	    } catch (HttpException ex) {
-	    	assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
-	    }
-	    
-	    boolean forceBuildTextIndex = false;
-	    
-	    try {
+        final Properties properties = new Properties();
 
-	    	m_mgr.rebuildTextIndex(namespace, forceBuildTextIndex);
+        properties.put(Options.TEXT_INDEX, "false");
+
+        m_mgr.createRepository(namespace, properties );
+
+        final RemoteRepository repo = m_mgr.getRepositoryForNamespace(namespace);
+
+        final ValueFactoryImpl vf = ValueFactoryImpl.getInstance();
+
+        final URI s = vf.createURI("s:s1");
+
+        final Literal o = vf.createLiteral("literal");
+
+        final Statement[] a = new Statement[] { 
+                vf.createStatement(s, RDFS.LABEL, o),
+
+        };
+
+        final AddOp addOp = new AddOp(Arrays.asList(a));
+
+        repo.add(addOp);
+
+        final String sparql = "select ?s where { ?s ?p ?o . ?o <http://www.bigdata.com/rdf/search#search> \"" + o.stringValue() + "\" .}";
+
+        try {
+
+            repo.prepareTupleQuery(sparql).evaluate();
+
+        } catch (HttpException ex) {
+            assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
+        }
+
+        boolean forceBuildTextIndex = false;
+
+        try {
+
+            m_mgr.rebuildTextIndex(namespace, forceBuildTextIndex);
 
             fail("Expecting: " + HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 
         } catch (HttpException ex) {
             assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
         }
-	    
-	    forceBuildTextIndex = true;
-	    
-	    m_mgr.rebuildTextIndex(namespace, forceBuildTextIndex);
-	    
-	    TupleQueryResult result = repo.prepareTupleQuery(sparql).evaluate();
-      
-	    String expected = s.stringValue();
-	    
-	    String actual = result.next().getBinding("s").getValue().stringValue();
-	    
-	    assertEquals(expected, actual);
+
+        forceBuildTextIndex = true;
+
+        m_mgr.rebuildTextIndex(namespace, forceBuildTextIndex);
+
+        TupleQueryResult result = repo.prepareTupleQuery(sparql).evaluate();
+
+        String expected = s.stringValue();
+
+        String actual = result.next().getBinding("s").getValue().stringValue();
+
+        assertEquals(expected, actual);
 
     }
     

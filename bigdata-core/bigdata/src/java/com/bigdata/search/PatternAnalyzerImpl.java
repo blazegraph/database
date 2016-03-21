@@ -23,15 +23,14 @@ class PatternAnalyzerImpl extends Analyzer {
 	private CharArraySet stopWordList = null;
 
 	@SuppressWarnings("unused")
-	public PatternAnalyzerImpl(Pattern pattern, CharArraySet stopWordList) {
+	public PatternAnalyzerImpl(final Pattern pattern, final CharArraySet stopWordList) {
 		super();
-		System.err.println("Pattern:  " + pattern);
 		this.pattern = pattern;
 		this.stopWordList = stopWordList;
 	}
 	
 	@SuppressWarnings("unused")
-	public PatternAnalyzerImpl(String range, CharArraySet stopWordList,
+	public PatternAnalyzerImpl(final String range, final CharArraySet stopWordList,
 			boolean useStopWords) {
 		this.useStopWords = useStopWords;
 		this.stopWordList = stopWordList;
@@ -40,8 +39,8 @@ class PatternAnalyzerImpl extends Analyzer {
 	@Override
 	protected TokenStreamComponents createComponents(final String field) {
 		//Use default grouping
-		Tokenizer tokenizer = new PatternTokenizer(pattern,-1);
-		TokenStream filter = new LowerCaseFilter(tokenizer);
+		final Tokenizer tokenizer = new PatternTokenizer(pattern,-1);
+		final TokenStream filter = new LowerCaseFilter(tokenizer);
 		return new TokenStreamComponents(tokenizer, filter);
 	}
 }
