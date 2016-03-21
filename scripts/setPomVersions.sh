@@ -4,7 +4,6 @@
 BASE_DIR=`dirname $0`
 CURRENT_VERSION=`grep "CURRENT_VERSION" ${BASE_DIR}/version.properties | cut -d= -f2`
 BRANCH=`git rev-parse --abbrev-ref HEAD`
-BRANCH=master
 SNAPSHOT="SNAPSHOT"
 
 NEW_VERSION="${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT}"
