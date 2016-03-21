@@ -35,48 +35,81 @@ import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Data driven test suite for custom serializer.
+ * Data driven test suite for custom serializer, testing basic feasibility 
+ * for WKT literals (not strictly following the standard).
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class TestGeoSpatialCustomSerializer extends AbstractDataDrivenSPARQLTestCase {
+public class TestGeoSpatialCustomSerializerWKT extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * 
      */
-    public TestGeoSpatialCustomSerializer() {
+    public TestGeoSpatialCustomSerializerWKT() {
     }
 
     /**
      * @param name
      */ 
-    public TestGeoSpatialCustomSerializer(String name) {
+    public TestGeoSpatialCustomSerializerWKT(String name) {
         super(name);
     }
 
 
-    public void testSerializerRectangle01() throws Exception {
+    /**
+     * Simple rectangle query looking for WKT-style literals.
+     */
+    public void testWKTLiteral01() throws Exception {
        
        new TestHelper(
-          "geo-serializer-rectangle01",
-          "geo-serializer-rectangle01.rq", 
-          "geo-serializer.nt",
-          "geo-serializer-rectangle01.srx").runTest();
+          "geo-wktliteral01",
+          "geo-wktliteral01.rq", 
+          "geo-wktliteral.nt",
+          "geo-wktliteral01.srx").runTest();
        
     }
-
-    public void testSerializerCircle01() throws Exception {
+    
+    /**
+     * Simple rectangle query looking for WKT-style literal, with
+     * custom deserialization of geo:locationValue.
+     */
+    public void testWKTLiteral02() throws Exception {
         
         new TestHelper(
-           "geo-serializer-circle01",
-           "geo-serializer-circle01.rq", 
-           "geo-serializer.nt",
-           "geo-serializer-circle01.srx").runTest();
+           "geo-wktliteral02",
+           "geo-wktliteral02.rq", 
+           "geo-wktliteral.nt",
+           "geo-wktliteral02.srx").runTest();
         
-     }
+    }
 
+    /**
+     * Simple rectangle query looking for WKT-style literals.
+     */
+    public void testWKTLiteral03() throws Exception {
 
+        new TestHelper(
+            "geo-wktliteral03",
+            "geo-wktliteral03.rq", 
+            "geo-wktliteral.nt",
+            "geo-wktliteral03.srx").runTest();
+
+    }
+
+    /**
+     * Simple circle query looking for WKT-style literal, with
+     * custom deserialization of geo:locationValue.
+     */
+    public void testWKTLiteral04() throws Exception {
+
+        new TestHelper(
+            "geo-wktliteral04",
+            "geo-wktliteral04.rq", 
+            "geo-wktliteral.nt",
+            "geo-wktliteral04.srx").runTest();
+
+    }
     @Override
     public Properties getProperties() {
 
@@ -101,21 +134,23 @@ public class TestGeoSpatialCustomSerializer extends AbstractDataDrivenSPARQLTest
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL, "true");
 
-        // set up a datatype containing everything, including a dummy literal serializer
+        // set GeoSpatial configuration: use a higher precision and range shifts; 
+        // the test accounts for this higher precision (and assert that range shifts
+        // actually do not harm the evaluation process)
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".0",
            "{\"config\": "
-           + "{ \"uri\": \"http://my.custom.datatype/x-y-z-lat-lon-time-coord\", "
-           + "\"literalSerializer\": \"com.bigdata.rdf.sparql.ast.eval.service.GeoSpatialDummyLiteralSerializer\",  "
+           + "{ \"uri\": \"http://www.opengis.net/ont/geosparql#wktLiteral\", "
+           + "\"literalSerializer\": \"com.bigdata.rdf.sparql.ast.eval.service.GeoSpatialTestWKTLiteralSerializer\",  "
            + "\"fields\": [ "
-           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-1000\", \"multiplier\": \"10\", \"serviceMapping\": \"x\" }, "
-           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-10\", \"multiplier\": \"100\", \"serviceMapping\": \"y\" }, "
-           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"-2\", \"multiplier\": \"1000\", \"serviceMapping\": \"z\" }, "
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
-           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
-           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\": \"TIME\" }, "
-           + "{ \"valueType\": \"LONG\", \"minVal\" : \"0\", \"multiplier\": \"1\", \"serviceMapping\": \"COORD_SYSTEM\" } "
+           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
            + "]}}");
+        
+        // make our dummy WKT datatype default to ease querying
+        properties.setProperty(
+            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE, 
+            "http://www.opengis.net/ont/geosparql#wktLiteral");
         
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.VOCABULARY_CLASS,

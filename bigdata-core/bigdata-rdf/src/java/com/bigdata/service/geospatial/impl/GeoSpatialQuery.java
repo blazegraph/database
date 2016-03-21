@@ -733,10 +733,10 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }
 
         // datatype has coord system but coord system not given in query
-        if (datatypeConfig.hasCoordSystem() && coordSystem!=null) {
+        if (datatypeConfig.hasCoordSystem() && coordSystem==null) {
             throw new GeoSpatialSearchException(
                 "Predicate " + GeoSpatial.COORD_SYSTEM + 
-                " must be provided when querying index with time component");
+                " must be provided when querying index with coordinate system component");
         }
         
         // coord system in query but unusable (since not present in datatype)
