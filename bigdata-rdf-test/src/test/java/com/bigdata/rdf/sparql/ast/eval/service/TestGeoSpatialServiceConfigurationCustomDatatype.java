@@ -317,6 +317,27 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
     }
 
     
+    public void testCoordinateSystemInLatLonDatatype() throws Exception {
+       
+       new TestHelper(
+          "geo-coordSystem2-llc01",
+          "geo-coordSystem2-llc01.rq", 
+          "geo-coordSystem2.nt",
+          "geo-coordSystem2-llc01.srx").runTest();
+       
+    }
+
+    public void testCoordinateSystemInNonLatLonDatatype() throws Exception {
+        
+        new TestHelper(
+           "geo-coordSystem2-tc01",
+           "geo-coordSystem2-tc01.rq", 
+           "geo-coordSystem2.nt",
+           "geo-coordSystem2-tc01.srx").runTest();
+        
+     }
+
+    
     @Override
     public Properties getProperties() {
 
@@ -374,19 +395,9 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
            + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
            + "]}}");
         
-        // TODO: come up with tests for this one
+
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".3",
-           "{\"config\": "
-           + "{ \"uri\": \"http://my.custom.datatype/lat-lon\", "
-           + "\"fields\": [ "
-           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"1000000\", \"serviceMapping\": \"LATITUDE\" }, "
-           + "{ \"valueType\": \"DOUBLE\", \"minVal\" : \"0\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
-           + "]}}");
-
-        // TODO: come up with tests for this one
-        properties.setProperty(
-           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".4",
            "{\"config\": "
            + "{ \"uri\": \"http://my.custom.datatype/lat-lon-coord\", "
            + "\"fields\": [ "
@@ -395,9 +406,8 @@ public class TestGeoSpatialServiceConfigurationCustomDatatype extends AbstractDa
            + "{ \"valueType\": \"LONG\", \"serviceMapping\": \"COORD_SYSTEM\" } "
            + "]}}");
         
-        // TODO: come up with tests for this one
         properties.setProperty(
-           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".5",
+           com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".4",
            "{\"config\": "
            + "{ \"uri\": \"http://my.custom.datatype/time-coord\", "
            + "\"fields\": [ "
