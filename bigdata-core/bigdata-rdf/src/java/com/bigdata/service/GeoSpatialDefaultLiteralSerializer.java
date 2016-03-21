@@ -117,7 +117,7 @@ public class GeoSpatialDefaultLiteralSerializer implements IGeoSpatialLiteralSer
      * Converts the input passed via args into string using its toString() method, 
      * separating the components via {GeoSpatial#CUSTOM_FIELDS_SEPARATOR}.
      */
-    IV<?,?> toSeparatedString(final BigdataValueFactory vf, final Object... args) {
+    protected IV<?,?> toSeparatedString(final BigdataValueFactory vf, final Object... args) {
       
         final StringBuffer buf = new StringBuffer();
         

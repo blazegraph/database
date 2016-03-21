@@ -26,6 +26,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.eval.service;
 
+import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.service.GeoSpatialDefaultLiteralSerializer;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
@@ -67,5 +72,22 @@ public class GeoSpatialTestWKTLiteralSerializer extends GeoSpatialDefaultLiteral
         
         return buf.toString();
     }
+    
+    @Override
+    public IV<?,?> serializeLocation(
+        final BigdataValueFactory vf, final Object latitude, final Object longitude) {
 
+        final StringBuffer buf = new StringBuffer();
+        buf.append("Point(");
+        buf.append(latitude);
+        buf.append(",");
+        buf.append(longitude);
+        buf.append(")");
+        
+        return DummyConstantNode.toDummyIV(
+            vf.createLiteral(
+                buf.toString(), 
+                new URIImpl("http://www.opengis.net/ont/geosparql#wktLiteral")));
+        
+    }
 }

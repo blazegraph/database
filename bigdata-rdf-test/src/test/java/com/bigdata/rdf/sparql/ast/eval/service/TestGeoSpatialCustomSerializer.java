@@ -61,10 +61,25 @@ public class TestGeoSpatialCustomSerializer extends AbstractDataDrivenSPARQLTest
        new TestHelper(
           "geo-wktliteral01",
           "geo-wktliteral01.rq", 
-          "geo-wktliteral01.nt",
+          "geo-wktliteral.nt",
           "geo-wktliteral01.srx").runTest();
        
     }
+    
+    /**
+     * Test custom deserialization of geo:locationValue.
+     * 
+     * @throws Exception
+     */
+    public void testInRectangleQuery02() throws Exception {
+        
+        new TestHelper(
+           "geo-wktliteral02",
+           "geo-wktliteral02.rq", 
+           "geo-wktliteral.nt",
+           "geo-wktliteral02.srx").runTest();
+        
+     }
     
     // TODO: increased test coverage, amongst others:
     //       circle query, value extration, full literal access, etc.
