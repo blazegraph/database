@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.eval.service;
 
-import com.bigdata.service.GeoSpatialLiteralSerializer;
+import com.bigdata.service.GeoSpatialDefaultLiteralSerializer;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**
@@ -36,7 +36,7 @@ import com.bigdata.service.geospatial.GeoSpatialSearchException;
  * 
  * @author msc
  */
-public class GeoSpatialTestWKTLiteralSerializer implements GeoSpatialLiteralSerializer {
+public class GeoSpatialTestWKTLiteralSerializer extends GeoSpatialDefaultLiteralSerializer {
 
     @Override
     public String[] toComponents(String literalString) {

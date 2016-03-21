@@ -26,13 +26,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
+import com.bigdata.service.geospatial.GeoSpatial;
+
 /**
- * Default implementation of {@link GeoSpatialLiteralSerializer}, translating
+ * Default implementation of {@link IGeoSpatialLiteralSerializer}, translating
  * literals of the form F1#F2#...#Fn to a component string of length n and back.
  * 
  * @author msc
  */
-public class GeoSpatialDefaultLiteralSerializer implements GeoSpatialLiteralSerializer {
+public class GeoSpatialDefaultLiteralSerializer implements IGeoSpatialLiteralSerializer {
 
     private static final String COMPONENT_SEPARATOR = "#";
     
@@ -64,4 +70,65 @@ public class GeoSpatialDefaultLiteralSerializer implements GeoSpatialLiteralSeri
         return buf.toString();
     }
 
+    @Override
+    public IV<?,?> serializeLocation(
+        final BigdataValueFactory vf, final Object latitude, final Object longitude) {
+
+        return toSeparatedString(vf, latitude, longitude);
+    }
+
+    @Override
+    public IV<?,?> serializeLocationAndTime(
+        final BigdataValueFactory vf, final Object latitude, 
+        final Object longitude, final Object time) {
+
+        return toSeparatedString(vf, latitude, longitude, time);
+    }
+
+    @Override
+    @SuppressWarnings("rawtypes")
+    public IV<?,?> serializeTime(final BigdataValueFactory vf, final Object time) {
+        return new XSDNumericIV((Long)time);
+    }
+
+    @Override
+    @SuppressWarnings("rawtypes")
+    public IV<?,?> serializeLatitude(final BigdataValueFactory vf, final Object latitude) {
+        return new XSDNumericIV((Double)latitude);
+    }
+
+    @Override
+    @SuppressWarnings("rawtypes")
+    public IV<?,?> serializeLongitude(final BigdataValueFactory vf, final Object longitude) {
+        return new XSDNumericIV((Double)longitude);
+    }
+
+    @Override
+    public IV<?,?> serializeCoordSystem(final BigdataValueFactory vf, final Object coordinateSystem) {
+        return toSeparatedString(vf, coordinateSystem);
+    }
+
+    @Override
+    public IV<?,?> serializeCustomFields(final BigdataValueFactory vf, final Object... customFields) {
+        return toSeparatedString(vf, customFields);
+    }
+    
+    /**
+     * Converts the input passed via args into string using its toString() method, 
+     * separating the components via {GeoSpatial#CUSTOM_FIELDS_SEPARATOR}.
+     */
+    IV<?,?> toSeparatedString(final BigdataValueFactory vf, final Object... args) {
+      
+        final StringBuffer buf = new StringBuffer();
+        
+        for (int i=0; i<args.length; i++) {
+               
+            if (i>0)
+                buf.append(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
+               
+            buf.append(args[i].toString());
+        }
+        
+        return  DummyConstantNode.toDummyIV(vf.createLiteral(buf.toString()));
+    }
 }

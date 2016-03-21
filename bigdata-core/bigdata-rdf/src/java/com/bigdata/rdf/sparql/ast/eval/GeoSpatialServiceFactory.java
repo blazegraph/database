@@ -75,12 +75,10 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -108,6 +106,7 @@ import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
+import com.bigdata.service.IGeoSpatialLiteralSerializer;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatialCounters;
@@ -1387,6 +1386,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          
          final private BigdataValueFactory vf;
          final private GeoSpatialLiteralExtension<BigdataValue> litExt;
+         final private IGeoSpatialLiteralSerializer literalSerializer;
          
          // true if the resolver reports any components from the object literal
          final boolean reportsObjectComponents;
@@ -1414,6 +1414,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.objectPos = objectPos;
             this.vf = vf;
             this.litExt = litExt;
+
+            literalSerializer = litExt.getDatatypeConfig().getLiteralSerializer();
+
             
             reportsObjectComponents =
                locationVar!=null || timeVar!=null || locationAndTimeVar!=null ||coordSystemVar!=null
@@ -1449,56 +1452,80 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             final IBindingSet bs = incomingBindingSet.clone();
             bs.set(var, new Constant<IV>(ivs[subjectPos]));
-
+            
             // handle request for binding index components
             if (reportsObjectComponents) {
+                
+                final Object[] componentArr = 
+                    litExt.toComponentArray((LiteralExtensionIV)ivs[objectPos]);
                
-               conditionallyBindVariableToIdxComponents(locationVar, ivs, bs, null, latIdx, lonIdx);
-               conditionallyBindVariableToIdxComponents(timeVar, ivs, bs, ValueType.LONG, timeIdx);
-               conditionallyBindVariableToIdxComponents(latVar, ivs, bs, ValueType.DOUBLE, latIdx);
-               conditionallyBindVariableToIdxComponents(lonVar, ivs, bs, ValueType.DOUBLE, lonIdx);
-               conditionallyBindVariableToIdxComponents(coordSystemVar, ivs, bs, ValueType.LONG, coordSystemIdx);
-               conditionallyBindVariableToIdxComponents(customFieldsVar, ivs, bs, null, idxsOfCustomFields);
-               conditionallyBindVariableToIdxComponents(locationAndTimeVar, ivs, bs, null, latIdx, lonIdx, timeIdx);
+                if (locationVar!=null) {
+                    
+                    bs.set(locationVar, 
+                       new Constant<IV>(
+                           literalSerializer.serializeLocation(
+                               vf, componentArr[latIdx], componentArr[lonIdx])));
+                }
+                
+                if (locationAndTimeVar!=null) {
+                    
+                    bs.set(locationAndTimeVar, 
+                       new Constant<IV>(
+                           literalSerializer.serializeLocationAndTime(
+                               vf, 
+                               componentArr[latIdx], 
+                               componentArr[lonIdx], 
+                               componentArr[timeIdx])));
+                }
+                
+                if (timeVar!=null) {
+                    
+                    bs.set(timeVar, 
+                       new Constant<IV>(
+                           literalSerializer.serializeTime(vf, componentArr[timeIdx])));
+                    
+                }
+
+                if (latVar!=null) {
+                    
+                    bs.set(latVar, 
+                       new Constant<IV>(
+                           literalSerializer.serializeLatitude(vf, componentArr[latIdx])));
+                    
+                }
+                
+                if (lonVar!=null) {
+                    
+                    bs.set(lonVar, 
+                        new Constant<IV>(
+                            literalSerializer.serializeLongitude(vf, componentArr[lonIdx])));
+                    
+                }
+                
+                if (coordSystemVar!=null) {
+                    
+                    bs.set(coordSystemVar, 
+                       new Constant<IV>(literalSerializer.serializeCoordSystem(vf, componentArr[coordSystemIdx])));
+                    
+                }
+                
+                if (customFieldsVar!=null) {
+                    
+                    final Object[] customFieldsValues = new Object[idxsOfCustomFields.length];
+                    
+                    for (int i=0; i<idxsOfCustomFields.length; i++) {
+                        customFieldsValues[i] = componentArr[idxsOfCustomFields[i]];
+                    }
+                        
+                    bs.set(customFieldsVar, 
+                       new Constant<IV>(literalSerializer.serializeCustomFields(vf, customFieldsValues)));
+                    
+                }
 
             }
             
             return bs;
 
-         }
-
-         /**
-          * If var differs from null, the variable is bind to a concatenation of the
-          * values identified by idxs; if var is null, no action is performed.
-          */
-         @SuppressWarnings("rawtypes")
-         private void conditionallyBindVariableToIdxComponents(
-            final Var<?> var, final IV[] ivs, final IBindingSet bs, 
-            final ValueType vt, final int... idxs) {
-            
-            if (var!=null) {
-                  
-                  final IV iv;
-                  
-                  if (ValueType.DOUBLE==vt) {
-                  
-                      iv = new XSDNumericIV(Double.valueOf(
-                              litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
-                  
-                  } else if (ValueType.LONG==vt) {
-                      
-                      iv = new XSDNumericIV(Long.valueOf(
-                              litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
-
-                  } else { // vt==null or unknown
-                  
-                      iv = DummyConstantNode.toDummyIV(vf.createLiteral(
-                        litExt.toComponentStringInternal((LiteralExtensionIV)ivs[objectPos], idxs)));
-                  
-                  }
-                  
-                  bs.set(var, new Constant<IV>(iv));
-            }
          }
       }
    }

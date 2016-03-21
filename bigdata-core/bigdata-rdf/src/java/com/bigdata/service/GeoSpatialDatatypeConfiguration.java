@@ -59,7 +59,7 @@ public class GeoSpatialDatatypeConfiguration {
     // URI of the datatype, e.g. <http://my.custom.geospatial.coordinate>
     private final URI uri;
     
-    private final GeoSpatialLiteralSerializer literalSerializer;
+    private final IGeoSpatialLiteralSerializer literalSerializer;
 
     // ordered list of fields defining the datatype
     private List<GeoSpatialDatatypeFieldConfiguration> fields;
@@ -98,13 +98,13 @@ public class GeoSpatialDatatypeConfiguration {
                 try {
                     
                     final Object instance = literalSerializerClazz.newInstance();
-                    if (!(instance instanceof GeoSpatialLiteralSerializer)) {
+                    if (!(instance instanceof IGeoSpatialLiteralSerializer)) {
                         throw new InvalidGeoSpatialDatatypeConfigurationError("Literal serializer class " 
                                 + literalSerializerClass + 
                                 " does not implement GeoSpatialLiteralSerializer interface.");
                     }
                     
-                    literalSerializer = (GeoSpatialLiteralSerializer)instance;
+                    literalSerializer = (IGeoSpatialLiteralSerializer)instance;
                     
                 } catch (Exception e) {
                     throw new InvalidGeoSpatialDatatypeConfigurationError(
@@ -190,7 +190,7 @@ public class GeoSpatialDatatypeConfiguration {
      * @param fields
      */
     public GeoSpatialDatatypeConfiguration(
-        final String uriString, final GeoSpatialLiteralSerializer literalSerializer, 
+        final String uriString, final IGeoSpatialLiteralSerializer literalSerializer, 
         final List<GeoSpatialDatatypeFieldConfiguration> fields) {
         
         if (uriString==null || uriString.isEmpty()) {
@@ -216,7 +216,7 @@ public class GeoSpatialDatatypeConfiguration {
         return uri;
     }
     
-    public GeoSpatialLiteralSerializer getLiteralSerializer() {
+    public IGeoSpatialLiteralSerializer getLiteralSerializer() {
         return literalSerializer;
     }
     

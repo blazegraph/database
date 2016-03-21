@@ -49,9 +49,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
-import com.bigdata.service.GeoSpatialLiteralSerializer;
-import com.bigdata.service.geospatial.GeoSpatial;
-import com.bigdata.service.geospatial.GeoSpatialSearchException;
+import com.bigdata.service.IGeoSpatialLiteralSerializer;
 
 /**
  * Special encoding for GeoSpatial datatypes. We encode literals of the form
@@ -85,7 +83,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    private static final transient Logger log = Logger
          .getLogger(GeoSpatialLiteralExtension.class);
 
-   private final GeoSpatialLiteralSerializer litSerializer;
+   private final IGeoSpatialLiteralSerializer litSerializer;
    
    private final BigdataURI datatype;
    
@@ -438,35 +436,14 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
 
    /**
-    * Helper function that converts the components from (and including)
-    * startPos to (and including) endPos into an internal component 
-    * string, separated by #.
+    * Conversion of a an IV into its component array.
     */
    @SuppressWarnings("rawtypes")
-   public String toComponentStringInternal(LiteralExtensionIV iv, int... args) {
+   public Object[] toComponentArray(LiteralExtensionIV iv) {
       
       long[] longArr = asLongArray(iv);
       
-      final Object[] componentArr = longArrAsComponentArr(longArr);
-        
-      final StringBuffer buf = new StringBuffer();
-      for (int i=0; i<args.length; i++) {
-           
-          if (i>0)
-              buf.append(GeoSpatial.CUSTOM_FIELDS_SEPARATOR);
-           
-          if (args[i]<0) {
-              buf.append("?");
-          } else if (args[i]<componentArr.length) {
-              buf.append(componentArr[args[i]]);
-          } else {
-              throw new GeoSpatialSearchException(
-                  "Accessing index " + args[i] + " is out of range.");
-          }
-      }
-      
-    
-      return buf.toString();
+      return longArrAsComponentArr(longArr);
    }
    
    /**
