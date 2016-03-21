@@ -35,7 +35,7 @@ import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Data driven test suite for custom serializer.
+ * Data driven test suite for datatypes containing a coordinate system component.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
@@ -61,7 +61,7 @@ public class TestGeoSpatialCoordSystem extends AbstractDataDrivenSPARQLTestCase 
        new TestHelper(
           "geo-wktliteral01",
           "geo-wktliteral01.rq", 
-          "geo-wktliteral01.nt",
+          "geo-wktliteral.nt",
           "geo-wktliteral01.srx").runTest();
        
     }
