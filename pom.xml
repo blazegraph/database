@@ -424,6 +424,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <source>1.7</source>
           <target>1.7</target>
           <encoding>${project.build.sourceEncoding}</encoding>
+          <fork>true</fork>
+          <meminitial>512m</meminitial>
+          <maxmem>1048m</maxmem>
         </configuration>
       </plugin>
       <plugin>
