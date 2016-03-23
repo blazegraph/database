@@ -71,8 +71,7 @@ public class TestAll extends TestCase {
 //        suite.addTest(proxySuite(new TestLDS("LDS Search"),"LDS"));
 
         // search backed by EDS.
-        //FIXME:  Remove comment when testing is done.
-       // suite.addTest(proxySuite(new TestEDS("EDS Search"),"EDS"));
+        suite.addTest(proxySuite(new TestEDS("EDS Search"),"EDS"));
         
         suite.addTestSuite(TestLanguageRange.class);
 
