@@ -21,6 +21,7 @@ SELECT * WHERE {
     ?res geo:locationAndTimeValue ?locationAndTime .
     ?res geo:coordSystemValue ?coordSystem .
     ?res geo:customFieldsValues ?customFields  .
+    ?res geo:literalValue ?literal  .
     
   }
 }

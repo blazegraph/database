@@ -12,6 +12,7 @@
     <variable name="locationAndTime"/>
     <variable name="coordSystem"/>
     <variable name="customFields"/>
+    <variable name="literal"/>
   </head>
   <results>
      <result>
@@ -23,6 +24,8 @@
       <binding name="location"><literal>Location(3.0-4.0)</literal></binding>
       <binding name="locationAndTime"><literal>LocationAndTime(3.0-4.0-5)</literal></binding>
       <binding name="coordSystem"><literal>CoordSystem(6)</literal></binding>
+      <binding name="literal"><literal datatype="http://my.custom.datatype/x-y-z-lat-lon-time-coord">0.0#1.0#2.0#3.0#4.0#5#6</literal></binding>
+      
      </result>
 
      <result>
@@ -34,6 +37,7 @@
       <binding name="location"><literal>Location(4.0-5.0)</literal></binding>
       <binding name="locationAndTime"><literal>LocationAndTime(4.0-5.0-6)</literal></binding>
       <binding name="coordSystem"><literal>CoordSystem(6)</literal></binding>
+      <binding name="literal"><literal datatype="http://my.custom.datatype/x-y-z-lat-lon-time-coord">1.0#2.0#3.0#4.0#5.0#6#6</literal></binding>
      </result>
 
   </results>

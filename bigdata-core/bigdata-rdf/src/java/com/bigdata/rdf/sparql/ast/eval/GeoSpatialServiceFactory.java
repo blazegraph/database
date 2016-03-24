@@ -79,6 +79,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -361,6 +362,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             assertObjectIsURI(sp);
             
          } else if (uri.equals(GeoSpatial.LOCATION_VALUE) ||  uri.equals(GeoSpatial.TIME_VALUE) 
+                  || uri.equals(GeoSpatial.LAT_VALUE) || uri.equals(GeoSpatial.LON_VALUE)
+                  || uri.equals(GeoSpatial.LITERAL_VALUE) || uri.equals(GeoSpatial.COORD_SYSTEM_VALUE)
+                  || uri.equals(GeoSpatial.CUSTOM_FIELDS_VALUES)
                   || uri.equals(GeoSpatial.LOCATION_AND_TIME_VALUE)) {
             
             assertObjectIsVariable(sp);
@@ -887,6 +891,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final Var<?> coordSystemVar = varFromIVar(query.getCoordSystemVar());
             final Var<?> customFieldsVar = varFromIVar(query.getCustomFieldsVar());
             final Var<?> locationAndTimeVar = varFromIVar(query.getLocationAndTimeVar());
+            final Var<?> literalVar = varFromIVar(query.getLiteralVar());
             
             final Var<?> var = Var.var(vars[0].getName());
             final IBindingSet incomingBindingSet = query.getIncomingBindings();
@@ -894,7 +899,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final GeoSpatialServiceCallResolver resolver = 
                 new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
                     timeVar, locationAndTimeVar, latVar, lonVar, coordSystemVar, 
-                    customFieldsVar, subjectPos, objectPos, vf, 
+                    customFieldsVar, literalVar, subjectPos, objectPos, vf, 
                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig),
                     query.getCustomFieldsConstraints().keySet());
             
@@ -1373,6 +1378,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private Var<?> lonVar;
          final private Var<?> coordSystemVar;
          final private Var<?> customFieldsVar;
+         final private Var<?> literalVar;
          
          final private int subjectPos;
          final private int objectPos;
@@ -1397,9 +1403,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          public GeoSpatialServiceCallResolver(final Var<?> var, final IBindingSet incomingBindingSet,
             final Var<?> locationVar, final Var<?> timeVar, final Var<?> locationAndTimeVar, 
             final Var<?> latVar, final Var<?> lonVar, final Var<?> coordSystemVar, 
-            final Var<?> customFieldsVar, final int subjectPos, final int objectPos, 
-            final BigdataValueFactory vf, final GeoSpatialLiteralExtension<BigdataValue> litExt,
-            final Set<String> customFieldStrings) {
+            final Var<?> customFieldsVar, final Var<?> literalVar, final int subjectPos, 
+            final int objectPos, final BigdataValueFactory vf, 
+            final GeoSpatialLiteralExtension<BigdataValue> litExt, final Set<String> customFieldStrings) {
             
             this.var = var;
             this.incomingBindingSet = incomingBindingSet;
@@ -1410,6 +1416,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.lonVar = lonVar;
             this.coordSystemVar = coordSystemVar;
             this.customFieldsVar = customFieldsVar;
+            this.literalVar = literalVar;
             this.subjectPos = subjectPos;
             this.objectPos = objectPos;
             this.vf = vf;
@@ -1420,7 +1427,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
             reportsObjectComponents =
                locationVar!=null || timeVar!=null || locationAndTimeVar!=null ||coordSystemVar!=null
-               ||customFieldsVar!=null || latVar!=null || lonVar!=null;
+               ||customFieldsVar!=null || latVar!=null || lonVar!=null || literalVar!=null;
             
             extractToPosition =
                reportsObjectComponents ? 
@@ -1521,7 +1528,16 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                        new Constant<IV>(literalSerializer.serializeCustomFields(vf, customFieldsValues)));
                     
                 }
-
+                
+                if (literalVar!=null) {
+                    
+                    bs.set(literalVar,
+                       new Constant<IV>(
+                           DummyConstantNode.toDummyIV(
+                               vf.createLiteral(literalSerializer.fromComponents(componentArr),
+                               litExt.getDatatypeConfig().getUri()))));
+                    
+                }
             }
             
             return bs;
@@ -2016,6 +2032,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        private IVariable<?> lonVar = null;
        private IVariable<?> coordSystemVar = null;
        private IVariable<?> customFieldsVar = null;
+       private IVariable<?> literalVar = null;
        
        public GeoSpatialServiceCallConfiguration(
            final GeoSpatialDefaults defaults, final GeoSpatialConfig geoSpatialConfig,
@@ -2166,6 +2183,18 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
                this.locationAndTimeVar = (IVariable<?>) sp.o().getValueExpression();
            }
+           
+           if (sps.containsKey(GeoSpatial.LITERAL_VALUE)) {
+
+               final StatementPatternNode sp = sps.get(GeoSpatial.LITERAL_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "locationAndTimeValue property must be a variable");
+               }
+
+               this.literalVar = (IVariable<?>) sp.o().getValueExpression();
+
+           }
        }
 
        /**
@@ -2228,7 +2257,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                      GeoSpatialQuery.toValidatedCustomFieldsConstraints(
                          customFields, customFieldsLowerBounds, customFieldsUpperBounds), 
                      locationVar, timeVar, locationAndTimeVar, latVar, lonVar,
-                     coordSystemVar, customFieldsVar, bs);
+                     coordSystemVar, customFieldsVar, literalVar, bs);
 
              return sq;
        }

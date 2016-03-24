@@ -246,6 +246,11 @@ public interface GeoSpatial {
    final URI TIME_VALUE = new URIImpl(NAMESPACE + "timeValue");
    
    /**
+    * Output variable; if set, this variable is bound to the literal component "as is".
+    */
+   final URI LITERAL_VALUE = new URIImpl(NAMESPACE + "literalValue");
+   
+   /**
     * Output variable; if set, this variable is bound to the latitude component of the search result.
     */
    final URI LAT_VALUE = new URIImpl(NAMESPACE + "latValue");

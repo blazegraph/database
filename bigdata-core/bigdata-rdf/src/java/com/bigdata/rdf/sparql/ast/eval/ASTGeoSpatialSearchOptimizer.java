@@ -69,6 +69,7 @@ public class ASTGeoSpatialSearchOptimizer extends ASTSearchOptimizerBase {
         set.add(GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS);        
         set.add(GeoSpatial.LOCATION_VALUE);        
         set.add(GeoSpatial.TIME_VALUE);
+        set.add(GeoSpatial.LITERAL_VALUE);
         set.add(GeoSpatial.LAT_VALUE);
         set.add(GeoSpatial.LON_VALUE);
         set.add(GeoSpatial.COORD_SYSTEM_VALUE);

@@ -161,6 +161,11 @@ public interface IGeoSpatialQuery {
     public IVariable<?> getLocationAndTimeVar();
 
     /**
+     * @return the variable to which the literal value will be bound
+     */
+    public IVariable<?> getLiteralVar();
+    
+    /**
      * @return the incoming bindings to join with
      */
     public IBindingSet getIncomingBindings();

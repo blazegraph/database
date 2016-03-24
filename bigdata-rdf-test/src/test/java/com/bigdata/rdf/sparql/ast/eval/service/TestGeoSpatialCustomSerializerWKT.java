@@ -110,6 +110,22 @@ public class TestGeoSpatialCustomSerializerWKT extends AbstractDataDrivenSPARQLT
             "geo-wktliteral04.srx").runTest();
 
     }
+    
+    /**
+     * Simple circle query looking for WKT-style literal, with
+     * custom deserialization of full literal.
+     */
+    public void testWKTLiteral05() throws Exception {
+
+        new TestHelper(
+            "geo-wktliteral05",
+            "geo-wktliteral05.rq", 
+            "geo-wktliteral.nt",
+            "geo-wktliteral05.srx").runTest();
+
+    }
+    
+    
     @Override
     public Properties getProperties() {
 

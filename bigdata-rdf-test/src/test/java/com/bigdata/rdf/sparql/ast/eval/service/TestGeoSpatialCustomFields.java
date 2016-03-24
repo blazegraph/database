@@ -227,6 +227,20 @@ public class TestGeoSpatialCustomFields extends AbstractDataDrivenSPARQLTestCase
     }
     
     /**
+     * Simple basic test case for (x,y,z,TIME,LAT,LON) index, where we 
+     * additionally extract a single value from the index.
+     */
+    public void testCustomFieldsXYZLatLonTime02h() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyzllt02h",
+           "geo-customfields-xyzllt02h.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyzllt02h.srx").runTest();
+        
+    }
+    
+    /**
      * Simple basic test case for (x,y,z) index, with just the field
      * order definition inverted in the query.
      */
@@ -239,6 +253,19 @@ public class TestGeoSpatialCustomFields extends AbstractDataDrivenSPARQLTestCase
            "geo-customfields-xyz03.srx").runTest();
         
     }
+    
+    /**
+     * Simple basic test case for (x,y,z) index, with full literal extraction.
+     */
+    public void testCustomFieldsXYZ04() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-xyz04",
+           "geo-customfields-xyz04.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-xyz04.srx").runTest();
+        
+    }    
     
     /**
      * Simple basic test case for (TIME,x,y,z) index, with just the field
@@ -254,6 +281,19 @@ public class TestGeoSpatialCustomFields extends AbstractDataDrivenSPARQLTestCase
         
     }
 
+    /**
+     * Simple basic test case for (TIME,x,y,z) index with full literal value extraction.
+     */
+    public void testCustomFieldsTimeXYZ04() throws Exception {
+        
+        new TestHelper(
+           "geo-customfields-txyz04",
+           "geo-customfields-txyz04.rq", 
+           "geo-customfields.nt",
+           "geo-customfields-txyz04.srx").runTest();
+        
+    }
+    
     /**
      * Simple basic test case for (x,y,z,TIME,LAT,LON) index, with just the field
      * order definition inverted in the query.
