@@ -35,7 +35,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <artifactId>dsi-utils</artifactId>
   <version>2.1.0-master-SNAPSHOT</version>
   <name>Blazegraph DSI Utils</name>
-  <description>Blazegraph Modifications to the DSI utils.  This are forked from a version under LGPLv2.1.</description>
+  <description>Blazegraph Modifications to the DSI utils.  This are forked from version 1.10.0 under LGPLv2.1.</description>
   <packaging>jar</packaging>
   <licenses>
     <license>
@@ -44,46 +44,41 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     </license>
   </licenses>
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/java</directory>
+        <includes>
+          <include>**/*.in.*</include>
+          <include>**/*.out.*</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>src/test/java</directory>
+        <includes>
+          <include>**/test.html</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>2.4.3</version>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <artifactSet>
-                <excludes>
-                  <exclude>colt:colt</exclude>
-                  <exclude>concurrent:concurrent</exclude>
-                  <exclude>it.unimi.dsi:fastutil</exclude>
-                </excludes>
-              </artifactSet>
-              <filters>
-                <filter>
-                  <!--
-                     Make sure that the Blazegraph fork of the LGPL 2.1 DSI Utils shows up first in the classpath.
-                  -->
-                  <artifact>it.unimi.dsi:dsiutils</artifact>
-                  <excludes>
-                    <exclude>it/unimi/dsi/compression/CanonicalFast64CodeWordDecoder.class</exclude>
-                    <exclude>it/unimi/dsi/compression/Fast64CodeWordCoder.class</exclude>
-                    <exclude>it/unimi/dsi/compression/HuffmanCodec*.class</exclude>
-                    <exclude>it/unimi/dsi/io/InputBitStream.class</exclude>
-                    <exclude>it/unimi/dsi/io/NullOutputStream.class</exclude>
-                    <exclude>it/unimi/dsi/io/OutputBitStream.class</exclude>
-                    <exclude>it/unimi/dsi/util/BloomFilter2.class</exclude>
-                  </excludes>
-                </filter>
-              </filters>
-              <minimizeJar>true</minimizeJar>
-            </configuration>
-          </execution>
-        </executions>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+          <includes>
+            <include>**/TestAll.java</include>
+            <include>**/*Test.java</include>
+          </includes>
+          <excludes>
+            <exclude>com/bigdata/TestAll.java</exclude>
+          </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+          <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx4g</argLine>
+          <rerunFailingTestsCount>2</rerunFailingTestsCount>
+        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -121,12 +116,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </plugin>
     </plugins>
   </reporting>
-  <repositories>
-    <repository>
-      <id>repo-for-dsiutils</id>
-      <url>http://ir.dcs.gla.ac.uk/~bpiwowar/maven/</url>
-    </repository>
-  </repositories>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -145,10 +134,44 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       <version>${fastutil.version}</version>
     </dependency>
     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>dsiutils</artifactId>
-      <version>1.0.10</version>
-      <!-- <version>1.0.6-020610</version> -->
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>${apache.commons_io.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-configuration</groupId>
+      <artifactId>commons-configuration</artifactId>
+      <version>1.6</version>
+    </dependency>
+    <dependency>
+      <groupId>com.martiansoftware</groupId>
+      <artifactId>jsap</artifactId>
+      <version>2.1</version>
+    </dependency>
+    <dependency>
+      <!-- log4j is the primary logger for bigdata. -->
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>${log4j.version}</version>
+      <!-- There is a bug with log4j 1.2.15 where it has a lot  -->
+      <!-- of dependencies that we do not need in its POM. The  -->
+      <!-- exclusions are only necessary with that version.     -->
+      <!--
+           <exclusions>
+             <exclusion>
+               <groupId>javax.jms</groupId>
+               <artifactId>jms</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>com.sun.jdmk</groupId>
+               <artifactId>jmxtools</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>com.sun.jmx</groupId>
+               <artifactId>jmxri</artifactId>
+             </exclusion>
+           </exclusions>
+           -->
     </dependency>
   </dependencies>
 </project>

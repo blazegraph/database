@@ -185,8 +185,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						 * the arity and cardinality of the underlying triple or
 						 * quad pattern access path.
 						 */
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						/*
 						 * Update the estimated cardinality on the SP.
 						 */
@@ -246,8 +246,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						StatementPatternNode sp = 
 							statementPatternNode(
@@ -338,8 +338,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						StatementPatternNode sp =
 							statementPatternNode(
@@ -387,8 +387,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						StatementPatternNode sp = statementPatternNode(
 								varNode(s), varNode(p), varNode(o), varNode(z),
@@ -438,8 +438,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						expected = 
 								select(

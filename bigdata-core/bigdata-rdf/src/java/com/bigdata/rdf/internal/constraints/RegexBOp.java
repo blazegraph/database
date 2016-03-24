@@ -39,6 +39,8 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
  * SPARQL REGEX operator.
@@ -56,8 +58,18 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     private static final boolean debug = log.isDebugEnabled();
 
     private static final boolean info = log.isInfoEnabled();
-
-    public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
+    
+    /**
+     * 
+     * Local member to implement {@link QueryHints.REGEX_MATCH_NON_STRING}
+     * 
+     * {@link BLZG-1780}
+     * 
+     */
+    private boolean matchNonString = QueryHints.DEFAULT_REGEX_MATCH_NON_STRING;
+    
+	public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
+		
         
         /**
          * The cached regex pattern.
@@ -168,7 +180,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 
         @SuppressWarnings("rawtypes")
         final IV flags = arity() > 2 ? get(2).get(bs) : null;
-
+        
         if (debug) {
             log.debug("regex var: " + var);
             log.debug("regex pattern: " + pattern);
@@ -195,13 +207,31 @@ public class RegexBOp extends XSDBooleanIVValueExpression
             log.debug("regex var: " + arg);
             log.debug("regex pattern: " + parg);
             log.debug("regex flags: " + farg);
+            //Fixme not sure why we weren't able pick up via properties
+			log.debug(QueryHints.REGEX_MATCH_NON_STRING
+					+ ": "
+					+ this.getProperty(QueryHints.REGEX_MATCH_NON_STRING,
+							QueryHints.DEFAULT_REGEX_MATCH_NON_STRING));
+			log.debug("matchNonString:  " + this.matchNonString);
         }
-
+        
         //BLZG-1200 changed to isPlainLiteral
-        if (QueryEvaluationUtil.isPlainLiteral(arg)) {
+		if (QueryEvaluationUtil.isPlainLiteral(arg)
+				// BLZG-1780:  Query Hint to cast to string
+				|| matchNonString ) {
 
-            final String text = ((Literal) arg).getLabel();
+            final String text; 
 
+            if(QueryEvaluationUtil.isPlainLiteral(arg)) {
+            	text = ((Literal) arg).getLabel();
+            } else { //Query Hint Override with explicit conversion
+            	text = arg.stringValue();
+            }
+
+            if(debug) {
+            	log.debug("regex text:  " + text);
+            }
+            
             try {
 
                 // first check for cached pattern
@@ -239,6 +269,8 @@ public class RegexBOp extends XSDBooleanIVValueExpression
             }
 
         } else {
+        	
+
         	
         	if(debug) {
         		log.debug("Unknown type:  " + arg);
@@ -312,5 +344,14 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         throw new IllegalArgumentException();
         
     }
+
+    public boolean isMatchNonString() {
+		return matchNonString;
+	}
+
+	public void setMatchNonString(boolean matchNonString) {
+		this.matchNonString = matchNonString;
+	}
+
     
 }

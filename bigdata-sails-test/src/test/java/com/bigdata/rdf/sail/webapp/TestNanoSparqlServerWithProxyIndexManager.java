@@ -235,6 +235,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         	
 			// RWSTORE SPECIFIC TEST SUITE.
 			suite.addTestSuite(TestRWStoreTxBehaviors.class);
+			//BLZG-1727 Needs RWStore mode
+	        suite.addTestSuite(TestBackupServlet.class);
+
         	
         } else {
 

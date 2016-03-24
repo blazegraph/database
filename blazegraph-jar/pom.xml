@@ -245,5 +245,10 @@ ga('send', 'pageview');
       <artifactId>bigdata-client</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>vocabularies</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 </project>

@@ -111,6 +111,13 @@
    <async-supported>true</async-supported>
   </servlet>
   <servlet>
+   <servlet-name>Backup</servlet-name>
+   <display-name>Backup Servlet</display-name>
+   <description>Servlet providing a REST API for creating online backups.</description>
+   <servlet-class>com.bigdata.rdf.sail.webapp.BackupServlet</servlet-class>
+   <async-supported>true</async-supported>
+  </servlet>
+  <servlet>
    <servlet-name>Transaction Management API</servlet-name>
    <display-name>Transaction Management API</display-name>
    <description>The REST API for managing transactions for a Journal.
@@ -161,6 +168,11 @@
   <servlet-mapping>
   <servlet-name>DataLoader</servlet-name>
   <url-pattern>/dataloader</url-pattern>
+  </servlet-mapping>
+  <!-- Mappings for the Backup Servlet API. -->
+  <servlet-mapping>
+  <servlet-name>Backup</servlet-name>
+  <url-pattern>/backup</url-pattern>
   </servlet-mapping>
   <!-- Mappings for the TX API. -->
   <servlet-mapping>

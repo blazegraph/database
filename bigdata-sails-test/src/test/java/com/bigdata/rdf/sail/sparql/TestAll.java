@@ -80,6 +80,9 @@ public class TestAll extends TestCase {
             suite.addTest(Bigdata2ASTSPARQLSyntaxTest.suite());
 
             suite.addTest(Bigdata2ASTSPARQL11SyntaxTest.suite());
+            
+            //BLZG-1773
+            suite.addTestSuite(TestPrefixDeclProcessor.class);
 
         } catch (Exception ex) {
 
