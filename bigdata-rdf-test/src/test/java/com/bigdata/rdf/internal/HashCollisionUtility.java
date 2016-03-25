@@ -8,6 +8,8 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -946,9 +948,9 @@ public class HashCollisionUtility {
 
 		    @Override
 			@SuppressWarnings("rawtypes")
-			public IExtension[] getExtensions() {
-				return new IExtension[] {};
-			}
+		    public Iterator<IExtension<? extends BigdataValue>> getExtensions() {
+		        return Collections.emptyIterator();
+		    }
 		};
 		
 		final InlineURIFactory uriFactory = new InlineURIFactory();

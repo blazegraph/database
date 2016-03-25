@@ -27,6 +27,7 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -38,6 +39,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
+import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -665,12 +667,11 @@ public class ASTDeferredIVResolution {
             // HAVING clause
             {
                 final HavingNode having = queryRoot.getHaving();
-                if (having!=null) {
-                    for (final IConstraint c: having.getConstraints()) {
-                        for (final BOp bop: c.args()) {
-                            fillInIV(store, bop);
-                        }
-                    }
+                
+                if (having != null) {
+                	
+                	fillInIV(store, having);
+                	
                 }
             }
     
@@ -725,8 +726,12 @@ public class ASTDeferredIVResolution {
                         entry.setValue(new Constant(newIV));
                     }
                 });
-            } else if (value instanceof TermId) {
-                defer(((TermId)value).getValue(), new Handler(){
+            } else if (value instanceof AbstractIV) {
+            	// See BLZG-1788 (Typed literals in VALUES clause not matching data)
+            	// Changed from TermId to AbstractIV, as there are other types of IVs,
+            	// which could require resolution against the store
+            	// (for ex. FullyInlineTypedLiteralIV which represents typed literal)
+                defer(((AbstractIV)value).getValue(), new Handler(){
                     @Override
                     public void handle(final IV newIV) {
                         entry.setValue(new Constant(newIV));
@@ -855,9 +860,16 @@ public class ASTDeferredIVResolution {
                     defer(((TermId)v).getValue(), new Handler(){
                         @Override
                         public void handle(final IV newIV) {
-                            if (bop.args() instanceof ArrayList) {
-                                bop.args().set(fk, new Constant(newIV));
-                            }
+                        	if (bop instanceof BOpBase) {
+                        		((BOpBase)bop).__replaceArg(fk, new Constant(newIV));
+                        	} else {
+	                            List<BOp> args = bop.args();
+								if (args instanceof ArrayList) {
+	                                args.set(fk, new Constant(newIV));
+	                            } else {
+	                            	log.warn("bop.args() class " + args.getClass() + " or " + bop.getClass() + " does not allow updates");
+	                            }
+                        	}
                         }
                     });
                 }
@@ -890,15 +902,6 @@ public class ASTDeferredIVResolution {
                 }
             }
         } if (bop instanceof DeleteInsertGraph) {
-            // @see https://jira.blazegraph.com/browse/BLZG-1176
-            // Check for using WITH keyword with triple store not supporting quads
-            // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.visit(ASTModify, Object)
-            // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
-            if (!store.isQuads() && ((DeleteInsertGraph)bop).getContext()!=null) {
-                throw new QuadsOperationInTriplesModeException(
-                    "Using named graph referenced through WITH clause " +
-                    "is not supported in triples mode.");
-            }
             fillInIV(store, ((DeleteInsertGraph)bop).getDataset());
             fillInIV(store, ((DeleteInsertGraph)bop).getDeleteClause());
             fillInIV(store, ((DeleteInsertGraph)bop).getInsertClause());
@@ -953,30 +956,32 @@ public class ASTDeferredIVResolution {
             }
             final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
             if (fve instanceof IVValueExpression) {
-                for (int k = 0; k < fve.arity(); k++) {
-                    final BOp veBop = fve.get(k);
-                    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
-                        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
-                        final int fk = k;
-                        defer(v, new Handler(){
-                            @Override
-                            public void handle(final IV newIV) {
-                                final BigdataValue resolved = vf.asValue(v);
-                                if (resolved.getIV() == null && newIV!=null) {
-                                    resolved.setIV(newIV);
-                                    newIV.setValue(resolved);
-                                    final Constant newConstant = new Constant(newIV);
-                                    // we need to reread value expression from the node, as it might get changed by sibling nodes resolution
-                                    // @see https://jira.blazegraph.com/browse/BLZG-1682
-                                    final IValueExpression<? extends IV> fve = ((FunctionNode)bop).getValueExpression();
-                                    IValueExpression<? extends IV> newVe = (IValueExpression<? extends IV>) ((IVValueExpression) fve).setArg(fk, newConstant);
-                                    ((FunctionNode)bop).setValueExpression(newVe);
-                                    ((FunctionNode) bop).setArg(fk, new ConstantNode(newConstant));
-                                }
-                            }
-                        });
-                    }
-                }
+        		for (int k = 0; k < fve.arity(); k++) {
+        		    final BOp veBop = fve.get(k);
+        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
+        		        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
+        		        final int fk = k;
+        		        defer(v, new Handler(){
+        		            @Override
+        		            public void handle(final IV newIV) {
+        		                final BigdataValue resolved = vf.asValue(v);
+        		                if (resolved.getIV() == null && newIV!=null) {
+        		                    resolved.setIV(newIV);
+        		                    newIV.setValue(resolved);
+        		                    final Constant newConstant = new Constant(newIV);
+        		                    // we need to reread value expression from the node, as it might get changed by sibling nodes resolution
+        		                    // @see https://jira.blazegraph.com/browse/BLZG-1682
+        		                    final IValueExpression<? extends IV> fve = ((ValueExpressionNode)bop).getValueExpression();
+        		                    IValueExpression<? extends IV> newVe = (IValueExpression<? extends IV>) ((IVValueExpression) fve).setArg(fk, newConstant);
+        		                    ((ValueExpressionNode)bop).setValueExpression(newVe);
+        		                    ((ValueExpressionNode)bop).setArg(fk, new ConstantNode(newConstant));
+        		                }
+        		            }
+        		        });
+        		    } else if (veBop instanceof IVValueExpression) {
+        		    	fillInIV(store, veBop);
+        		    }
+        		}
             } else if (fve instanceof Constant) {
                 final Object value = ((Constant)fve).get();
                 if (value instanceof BigdataValue) {
@@ -999,11 +1004,15 @@ public class ASTDeferredIVResolution {
         } else if (bop instanceof StatementPatternNode) {
             final StatementPatternNode sp = (StatementPatternNode)bop;
             // @see https://jira.blazegraph.com/browse/BLZG-1176
+            // Check for using WITH keyword with triple store not supporting quads
+            // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.visit(ASTModify, Object)
             // Check for using GRAPH keyword with triple store not supporting quads
             // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
-            if (!store.isQuads() && Scope.NAMED_CONTEXTS.equals(sp.getScope())) {
+            // At this point it is not possible to distinguish using WITH keyword from GRAPH construct,
+            // as WITH scope was propagated into statement pattern
+            if (!store.isQuads() && (sp.getScope()!=null && !(Scope.DEFAULT_CONTEXTS.equals(sp.getScope())))) {
                 throw new QuadsOperationInTriplesModeException(
-                        "Use of GRAPH construct in query body is not supported " +
+                        "Use of WITH and GRAPH constructs in query body is not supported " +
                         "in triples mode.");
             }
         } else if(bop instanceof ServiceNode) {
@@ -1092,7 +1101,9 @@ public class ASTDeferredIVResolution {
 
                 final BigdataValue toBeResolved = v; // asValue() invoked above. // f.asValue(v);
                 ivs[i] = TermId.mockIV(VTE.valueOf(v));
-                toBeResolved.clearInternalValue();
+                if (!toBeResolved.isRealIV()) {
+                	toBeResolved.clearInternalValue();
+                }
                 values[i++] = toBeResolved;
                 
             }
@@ -1101,7 +1112,9 @@ public class ASTDeferredIVResolution {
                 
                 final BigdataValue toBeResolved = vf.asValue(v);
                 ivs[i] = v.getIV();
-                toBeResolved.clearInternalValue();
+                if (!toBeResolved.isRealIV()) {
+                	toBeResolved.clearInternalValue();
+                }
                 values[i++] = toBeResolved;
                 
             }
@@ -1184,7 +1197,14 @@ public class ASTDeferredIVResolution {
                         }
                         final DTE dte = DTE.valueOf(dataType);
                         if (dte != null) {
-                            iv = IVUtility.decode(label, dte.name());
+                        	// Check if lexical form is empty, and keep FullyInlineTypedLiteralIV
+                        	// holding corresponding data type as iv for the new value
+                        	// @see https://jira.blazegraph.com/browse/BLZG-1716 (SPARQL Update parser fails on invalid numeric literals)
+                        	if (label.isEmpty()) {
+                        		iv = ivs[i];
+                        	} else {
+                        		iv = IVUtility.decode(label, dte.name());
+                        	}
                         } else {
                             iv = TermId.mockIV(VTE.valueOf(v));
                         }

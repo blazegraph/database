@@ -349,6 +349,18 @@ ga('send', 'pageview');
       <artifactId>fastutil</artifactId>
       <version>${fastutil.version}</version>
     </dependency>
+    <!-- jsonld -->
+    <dependency>
+      <groupId>com.github.jsonld-java</groupId>
+      <artifactId>jsonld-java-sesame</artifactId>
+      <version>${jsonld.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <!-- Included for RDFa support -->
     <dependency>
       <groupId>org.semarglproject</groupId>

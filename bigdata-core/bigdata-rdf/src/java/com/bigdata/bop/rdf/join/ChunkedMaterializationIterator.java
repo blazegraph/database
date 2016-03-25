@@ -130,12 +130,13 @@ public class ChunkedMaterializationIterator implements
         if (!hasNext())
             throw new NoSuchElementException();
 
-        final IBindingSet[] chunk = src.next();
+        final IBindingSet[] chunkIn = src.next();
 
-        ChunkedMaterializationOp.resolveChunk(required, lex, chunk,
-                materializeInlineIVs);
+        final IBindingSet[] chunkOut =
+            ChunkedMaterializationOp.resolveChunk(
+                required, lex, chunkIn, materializeInlineIVs);
 
-        return chunk;
+        return chunkOut;        
 
     }
 

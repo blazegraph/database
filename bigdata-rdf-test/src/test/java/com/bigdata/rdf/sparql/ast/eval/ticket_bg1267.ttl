@@ -1,0 +1,4 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix ex:  <http://example.org/> .
+ex:1 rdf:type ex:Thing .
+ex:1 ex:has ex:2 .

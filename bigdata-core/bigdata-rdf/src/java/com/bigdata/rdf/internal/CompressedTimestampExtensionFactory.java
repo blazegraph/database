@@ -37,9 +37,10 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public class CompressedTimestampExtensionFactory extends DefaultExtensionFactory {
 
+    @Override
     protected void _init(final IDatatypeURIResolver resolver,
             final ILexiconConfiguration<BigdataValue> lex,
-            final Collection<IExtension> extensions) {
+            final Collection<IExtension<? extends BigdataValue>> extensions) {
 
         extensions.add(new CompressedTimestampExtension<BigdataLiteral>(resolver));
 

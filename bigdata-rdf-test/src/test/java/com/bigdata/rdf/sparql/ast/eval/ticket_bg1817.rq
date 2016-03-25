@@ -1,0 +1,19 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX pr: <http://www.wikidata.org/prop/reference/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+SELECT ?property ?propertyLabel ?count WHERE {
+  {
+    SELECT ?p (COUNT(*) AS ?count) WHERE {
+       BIND (wd:Q4167410 AS ?tgt_class) .
+       ?b wdt:P31 ?tgt_class .
+       ?a ?p ?b .
+    } GROUP BY ?p LIMIT 100
+  } . 
+  ?property wikibase:directClaim ?p .
+  SERVICE wikibase:label {
+    bd:serviceParam wikibase:language "en" .
+  }
+}
+ORDER BY DESC(?count) # ?pLabel

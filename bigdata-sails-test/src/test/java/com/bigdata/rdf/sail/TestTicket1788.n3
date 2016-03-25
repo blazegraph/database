@@ -1,0 +1,3 @@
+<http://s1> <http://p> "A"^^xsd:string .
+<http://s2> <http://p> "B"^^xsd:string .
+<http://s3> <http://p> "C"^^xsd:string .
