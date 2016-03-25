@@ -2351,22 +2351,93 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
            }
         }
 
+        Literal resolveAsLiteral(final TermNode termNode, final IBindingSet bs) {
+
+            if (termNode == null) { // term node not set explicitly
+               return null;
+            }
+
+            if (termNode.isConstant()) {
+
+               return (Literal) termNode.getValue();
+
+            } else {
+
+               if (bs == null) {
+                  return null; // shouldn't happen, but just in case...
+               }
+
+               final IVariable<?> var = (IVariable<?>) termNode .getValueExpression();
+
+               if (bs.isBound(var)) {
+                  IConstant<?> c = bs.get(var);
+                  if (c == null || c.get() == null) {
+                     return null;
+                  }
+
+
+                  final Object obj = c.get();
+                  if (obj instanceof TermId<?>) {
+
+                      return ((TermId<?>) obj);
+
+                  } else if (obj instanceof IV) {
+
+                     @SuppressWarnings("rawtypes")
+                     final BigdataValue bdVal = ((IV)obj).getValue();
+
+                      if (bdVal!=null) {
+                          return (Literal)bdVal;
+                      }
+                  }
+
+                  // should never end up here
+                  throw new GeoSpatialSearchException("Value for literal could not be retrieved.");
+
+               } else {
+                  throw new GeoSpatialSearchException(
+                      GeoSpatialSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
+               }
+            }
+         }
+
         PointLatLon resolveAsPoint(final TermNode termNode, final IBindingSet bs) {
 
-           String pointAsStr = resolveAsString(termNode, bs);
-           if (pointAsStr == null || pointAsStr.isEmpty()) {
-              return null;
-           }
+            Literal lit = resolveAsLiteral(termNode, bs);
+            if (lit == null || lit.stringValue().isEmpty()) {
+                return null;
+            }
 
-           try {
+            String pointAsStr = lit.stringValue();
+            IGeoSpatialLiteralSerializer serializer = null;
+            GeoSpatialDatatypeConfiguration pconfig = null;
 
-              return new PointLatLon(pointAsStr);
+            if (lit.getDatatype() != null) {
+                // If we have datatype that can extract coordinates, use it to exteract
+                pconfig = geoSpatialConfig.getConfigurationForDatatype(lit.getDatatype());
+                if (pconfig.hasLat() && pconfig.hasLon()) {
+                    serializer = pconfig.getLiteralSerializer();
+                }
+            }
 
-           } catch (NumberFormatException e) {
+            try {
+                
+                if (serializer == null) {
+                    
+                  return new PointLatLon(pointAsStr);
 
-               throw new GeoSpatialSearchException("Input could not be resolved as point: '" + pointAsStr + "'.");
-           }
-           
+                } else {
+                    
+                    String[] comps = serializer.toComponents(pointAsStr);
+                    Double lat = Double.parseDouble(comps[pconfig.idxOfField(ServiceMapping.LATITUDE)]);
+                    Double lon = Double.parseDouble(comps[pconfig.idxOfField(ServiceMapping.LONGITUDE)]);
+                    return new PointLatLon(lat, lon);
+                
+                }
+            } catch (NumberFormatException e) {
+
+                throw new GeoSpatialSearchException("Input could not be resolved as point: '" + pointAsStr + "'.");
+            }
         }
 
         String resolveAsString(final TermNode termNode, final IBindingSet bs) {
