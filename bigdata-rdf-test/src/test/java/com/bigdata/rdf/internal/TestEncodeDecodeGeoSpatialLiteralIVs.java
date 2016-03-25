@@ -43,12 +43,12 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.service.GeoSpatialDatatypeConfiguration;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
-import com.bigdata.service.GeoSpatialDefaultLiteralSerializer;
 import com.bigdata.service.geospatial.GeoSpatial;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDefaultLiteralSerializer;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ValueType;
 
 /**
  * Unit tests for {@link GeoSpatialLiteralExtension}.

@@ -31,7 +31,7 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
-import com.bigdata.service.GeoSpatialDefaultLiteralSerializer;
+import com.bigdata.service.geospatial.GeoSpatialDefaultLiteralSerializer;
 import com.bigdata.service.geospatial.GeoSpatialSearchException;
 
 /**

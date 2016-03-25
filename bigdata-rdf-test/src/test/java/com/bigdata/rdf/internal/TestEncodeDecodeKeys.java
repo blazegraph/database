@@ -67,8 +67,8 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.service.GeoSpatialConfig;
-import com.bigdata.service.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the

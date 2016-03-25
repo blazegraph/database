@@ -80,7 +80,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.service.GeoSpatialConfig;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
 import com.bigdata.util.InnerCause;
 
 /**

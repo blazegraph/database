@@ -31,11 +31,11 @@ import java.util.List;
 
 import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
-import com.bigdata.service.GeoSpatialConfig;
-import com.bigdata.service.GeoSpatialDatatypeConfiguration;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ValueType;
 
 /**
  * Test suite testing the form-JSON parsing facilities for the GeoSpatial service configuration.

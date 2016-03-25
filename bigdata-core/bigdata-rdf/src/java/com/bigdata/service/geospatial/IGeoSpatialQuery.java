@@ -36,7 +36,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.sparql.ast.TermNode;
-import com.bigdata.service.GeoSpatialDatatypeConfiguration;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Feb 10, 2016
  */
-package com.bigdata.service;
+package com.bigdata.service.geospatial;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,8 +42,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration.ValueType;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ValueType;
 
 /**
  * Configuration of a single geospatial datatype, including value type, multiplier,

@@ -40,7 +40,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.service.GeoSpatialConfig;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
 
 /**
  * Configuration determines which RDF Values are inlined into the statement

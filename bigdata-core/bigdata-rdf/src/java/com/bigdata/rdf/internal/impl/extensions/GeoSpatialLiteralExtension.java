@@ -47,9 +47,9 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.service.GeoSpatialDatatypeConfiguration;
-import com.bigdata.service.GeoSpatialDatatypeFieldConfiguration;
-import com.bigdata.service.IGeoSpatialLiteralSerializer;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.geospatial.IGeoSpatialLiteralSerializer;
 
 /**
  * Special encoding for GeoSpatial datatypes. We encode literals of the form

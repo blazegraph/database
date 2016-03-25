@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Feb 10, 2016
  */
-package com.bigdata.service;
+package com.bigdata.service.geospatial;
 
 import java.util.ArrayList;
 import java.util.HashSet;

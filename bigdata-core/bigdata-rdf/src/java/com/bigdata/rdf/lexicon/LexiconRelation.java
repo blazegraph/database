@@ -116,8 +116,8 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.search.FullTextIndex;
-import com.bigdata.service.GeoSpatialConfig;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -628,10 +628,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     
                     log.info("Registering geospatial built-in datatypes.");
                     geoSpatialDatatypeConfigs.add(
-                        AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON);
+                        AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_CONFIG);
                     
                     geoSpatialDatatypeConfigs.add(
-                        AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON_TIME);
+                        AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_TIME_CONFIG);
                 }
     
                 geoSpatialConfig = 

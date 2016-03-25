@@ -10,7 +10,7 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.service.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
 
 /**
  * Default {@link IExtensionFactory}. The following extensions are supported:

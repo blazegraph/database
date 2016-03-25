@@ -1331,7 +1331,7 @@ abstract public class AbstractTripleStore extends
          * ATTENTION: Do NEVER modify the definitions below -> they are important in order to maintain
          *            compatibility for geospatial data at database level.
          */
-        final String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON = 
+        final String GEO_SPATIAL_LITERAL_V1_LAT_LON_CONFIG = 
                 "{\"config\": "
                 + "{ \"uri\": \"" + GeoSpatial.GEOSPATIAL_LITERAL_V1_LAT_LON + "\", "
                 + "\"fields\": [ "
@@ -1339,7 +1339,7 @@ abstract public class AbstractTripleStore extends
                 + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" } "
                 + "]}}";        
         
-        final String DEFAULT_GEO_SPATIAL_DATATYPE_CONFIG_LAT_LON_TIME = 
+        final String GEO_SPATIAL_LITERAL_V1_LAT_LON_TIME_CONFIG = 
             "{\"config\": "
             + "{ \"uri\": \"" + GeoSpatial.GEOSPATIAL_LITERAL_V1_LAT_LON_TIME + "\", "
             + "\"fields\": [ "

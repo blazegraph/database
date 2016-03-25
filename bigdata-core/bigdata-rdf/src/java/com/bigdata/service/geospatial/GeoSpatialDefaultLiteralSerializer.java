@@ -24,13 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on March 02, 2016
  */
-package com.bigdata.service;
+package com.bigdata.service.geospatial;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
-import com.bigdata.service.geospatial.GeoSpatial;
 
 /**
  * Default implementation of {@link IGeoSpatialLiteralSerializer}, translating

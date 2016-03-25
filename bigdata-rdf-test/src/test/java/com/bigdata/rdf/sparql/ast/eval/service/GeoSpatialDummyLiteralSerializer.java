@@ -29,7 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval.service;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
-import com.bigdata.service.GeoSpatialDefaultLiteralSerializer;
+import com.bigdata.service.geospatial.GeoSpatialDefaultLiteralSerializer;
 
 /**
  * Test serializer for WKT literals of the form Point(lat,lon).
