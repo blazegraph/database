@@ -73,6 +73,11 @@ public class GeoSpatialConfigOptions {
         /**
          * ATTENTION: Do NEVER modify the definitions below -> they are important in order to maintain
          *            compatibility for geospatial datatypes that we expose as built-in datatypes.
+         *            
+         * See https://wiki.blazegraph.com/wiki/index.php/GeoSpatial#Custom_Geospatial_Datatypes for a
+         * documentation of the JSON syntax. The JSON is parsed into instances by using the constructor
+         * of {@link GeoSpatialConfig}, which takes a JSON string -- so you may also have a look at the
+         * parsing logics there.
          */
         final String GEO_SPATIAL_LITERAL_V1_LAT_LON_CONFIG = 
                 "{\"config\": "
