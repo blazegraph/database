@@ -284,6 +284,11 @@ ga('send', 'pageview');
       <version>${lucene.version}</version>
     </dependency>
     <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-analyzers-smartcn</artifactId>
+        <version>${lucene.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.ibm.icu</groupId>
       <artifactId>icu4j</artifactId>
       <version>${icu.version}</version>
