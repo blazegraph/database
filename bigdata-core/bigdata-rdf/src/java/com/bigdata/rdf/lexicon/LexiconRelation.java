@@ -581,67 +581,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
                     AbstractTripleStore.Options.DEFAULT_REJECT_INVALID_XSD_VALUES));
             
-            final Boolean geoSpatial = Boolean.parseBoolean(getProperty(
-                  AbstractTripleStore.Options.GEO_SPATIAL,
-                  AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
 
-            final Boolean geoSpatialIncludeBuiltinDatatypes = Boolean.parseBoolean(getProperty(
-                    AbstractTripleStore.Options.GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES,
-                    AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES));
-            
-            final String geoSpatialDefaultDatatype = getProperty(
-                    AbstractTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE,
-                    AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DEFAULT_DATATYPE);
-            
-
-            // initialized geospatial configuration if geospatial is enabled
-            GeoSpatialConfig geoSpatialConfig = null; 
-            if (geoSpatial) {
-                
-                /**
-                 * We have configuration strings of the form 
-                 * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].0 = ...
-                 * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].1 = ...
-                 * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].2 = ...
-                 * ...
-                 * 
-                 * We read this configuration up to the first index that is not defined.
-                 * If no explicit configuration is provided, we fallback on our single
-                 * latitude-longitude-time default.
-                 */
-                final List<String> geoSpatialDatatypeConfigs = new LinkedList<String>();
-                boolean finished = false;
-                for (int i=0; !finished; i++) {
-                    final String curId = AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + "." + i;
-                    final String curVal = getProperty(curId, null /* fallback */);
-                    
-                    if (curVal!=null) {
-                        geoSpatialDatatypeConfigs.add(curVal);
-                    } else {
-                        finished = true; // we're done
-                    }
-                }
-    
-    
-                // also register built-in datatypes, if enabled
-                if (geoSpatialIncludeBuiltinDatatypes) {
-                    
-                    log.info("Registering geospatial built-in datatypes.");
-                    geoSpatialDatatypeConfigs.add(
-                        AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_CONFIG);
-                    
-                    geoSpatialDatatypeConfigs.add(
-                        AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_TIME_CONFIG);
-                }
-    
-                geoSpatialConfig = 
-                    new GeoSpatialConfig(geoSpatialDatatypeConfigs, geoSpatialDefaultDatatype);
-            }
-                
-            
             // Resolve the vocabulary.
             vocab = getContainer().getVocabulary();
+
             
+            // Resolve the geospatial configuration, if geospatial is enabled
+            final Boolean geoSpatial = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.GEO_SPATIAL,
+                    AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
+            
+            final GeoSpatialConfig geoSpatialConfig = 
+                geoSpatial!=null && geoSpatial ?  getContainer().getGeoSpatialConfig() : null;
+
+
             final IExtensionFactory xFactory;
             try {
                 

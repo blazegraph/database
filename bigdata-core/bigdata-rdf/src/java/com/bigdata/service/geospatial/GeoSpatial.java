@@ -75,7 +75,7 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
  */
 public interface GeoSpatial {
 
-    public static String CUSTOM_FIELDS_SEPARATOR = "#";
+   public static String CUSTOM_FIELDS_SEPARATOR = "#";
     
    /**
     * Enum for implemented geo functions.

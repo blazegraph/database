@@ -39,6 +39,8 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  */
 public class GeoSpatialDefaultLiteralSerializer implements IGeoSpatialLiteralSerializer {
 
+    private static final long serialVersionUID = 1L;
+    
     private static final String COMPONENT_SEPARATOR = "#";
     
     @Override

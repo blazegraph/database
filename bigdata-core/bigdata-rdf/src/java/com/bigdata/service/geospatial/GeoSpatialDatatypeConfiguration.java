@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.geospatial;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -52,9 +53,12 @@ import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.Value
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class GeoSpatialDatatypeConfiguration {
+public class GeoSpatialDatatypeConfiguration implements Serializable {
     
-    final static private Logger log = Logger.getLogger(GeoSpatialDatatypeConfiguration.class);
+    private static final long serialVersionUID = 1L;
+
+    final static private transient Logger log = 
+        Logger.getLogger(GeoSpatialDatatypeConfiguration.class);
 
     // URI of the datatype, e.g. <http://my.custom.geospatial.coordinate>
     private final URI uri;

@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.geospatial;
 
+import java.io.Serializable;
+
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -37,7 +39,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * 
  * @author msc
  */
-public interface IGeoSpatialLiteralSerializer {
+public interface IGeoSpatialLiteralSerializer extends Serializable {
     
     /**
      * Decomposes a string[] into an array of strings identifying the

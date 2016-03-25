@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.geospatial;
 
+import java.io.Serializable;
+
 import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -39,9 +41,12 @@ import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigu
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class GeoSpatialDatatypeFieldConfiguration {
+public class GeoSpatialDatatypeFieldConfiguration implements Serializable {
     
-    final static private Logger log = Logger.getLogger(GeoSpatialDatatypeFieldConfiguration.class);
+    private static final long serialVersionUID = 1L;
+
+    final static private transient Logger log = 
+        Logger.getLogger(GeoSpatialDatatypeFieldConfiguration.class);
     
     private final static String JSON_STR_VALUETYPE = "valueType";
     private final static String JSON_STR_MINVALUE = "minValue";

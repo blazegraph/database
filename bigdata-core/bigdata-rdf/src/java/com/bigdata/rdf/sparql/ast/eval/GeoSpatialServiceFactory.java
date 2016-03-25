@@ -494,9 +494,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.serviceOptions = serviceOptions;
 
          this.gssConfig = 
-             new GeoSpatialServiceCallConfiguration(dflts, 
-                 kb.getLexiconRelation().getLexiconConfiguration().getGeoSpatialConfig(), 
-                 searchVar, sps);
+             new GeoSpatialServiceCallConfiguration(
+                 dflts, kb.getGeoSpatialConfig(), searchVar, sps);
 
          // for now: a single variable containing the result
          this.vars = new IVariable[] { searchVar };
@@ -652,8 +651,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.threadLocalBufferCapacity = threadLocalBufferCapacity;
             
             this.stats = stats;
-            this.geoSpatialConfig = 
-                kb.getLexiconRelation().getLexiconConfiguration().getGeoSpatialConfig();
+            this.geoSpatialConfig = kb.getGeoSpatialConfig();
             
             tasks = getSubTasks();
             

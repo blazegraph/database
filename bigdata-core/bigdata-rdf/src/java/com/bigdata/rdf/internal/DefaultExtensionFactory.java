@@ -49,7 +49,7 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	 * Set up the configuration of the geospatial module
     	 */
     	if (config.isGeoSpatial()) {
-    	   
+    	    
     	    // register the extensions, adding one extension per datatype config
     	    final List<GeoSpatialDatatypeConfiguration> datatypeConfigs = 
     	        config.getGeoSpatialConfig().getDatatypeConfigs();

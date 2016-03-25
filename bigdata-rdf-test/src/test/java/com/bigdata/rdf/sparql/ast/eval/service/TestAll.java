@@ -127,6 +127,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestGeoSpatialCorrectRejection.class);
         suite.addTestSuite(TestGeoSpatialDefaults.class);
         suite.addTestSuite(TestGeoSpatialExamplesFromDocumentation.class);
+        suite.addTestSuite(TestGeoSpatialServiceConfigurationParsing.class);
         suite.addTestSuite(TestGeoSpatialQueryIfGeospatialDisabled.class);
         suite.addTestSuite(TestGeoSpatialDisableBuiltinDatatypes.class);
         suite.addTestSuite(TestGeoSpatialQueryVaryOneDimension.class);

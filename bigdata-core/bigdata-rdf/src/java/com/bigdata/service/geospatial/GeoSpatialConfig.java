@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.geospatial;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -48,14 +49,16 @@ import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigu
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class GeoSpatialConfig {
+public class GeoSpatialConfig implements Serializable {
 
-    final static private Logger log = Logger.getLogger(GeoSpatialConfig.class);
+    private static final long serialVersionUID = 1L;
 
     private final static String JSON_STR_CONFIG = "config";
     private final static String JSON_STR_URI = "uri";
     private final static String JSON_STR_LITERALSERIALIZER = "literalSerializer";
     private final static String JSON_STR_FIELDS = "fields";
+
+    final static private transient Logger log = Logger.getLogger(GeoSpatialConfig.class);
 
     /**
      * List containing the configurations for the geospatial datatypes.
@@ -66,6 +69,7 @@ public class GeoSpatialConfig {
     // the default datatype for querying
     private URI defaultDatatype;
 
+    
     public GeoSpatialConfig(final List<String> geoSpatialDatatypeConfigs, final String defaultDatatype) {
 
         initDatatypes(geoSpatialDatatypeConfigs);
@@ -153,7 +157,6 @@ public class GeoSpatialConfig {
 
         }
     }
-
    
     public GeoSpatialDatatypeConfiguration getConfigurationForDatatype(URI datatypeUri) {
         for (int i=0; i<datatypeConfigs.size(); i++) {
