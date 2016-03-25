@@ -180,4 +180,9 @@ public class RemoteRepositoryDecls {
     * @see com.bigdata.rdf.sail.webapp.QueryServlet.BINDING_PREFIX
     */
    public static final String BINDING_PREFIX = "$";
+   
+   /**
+    * URL query parameter that contains boolean flag to create full text index if not exists.
+    */
+   public static final String FORCE_INDEX_CREATE = "force-index-create";
 }

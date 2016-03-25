@@ -32,7 +32,7 @@ import java.util.Properties;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -122,25 +122,31 @@ public abstract class AbstractSearchTest  extends ProxyTestCase<IIndexManager>  
 	protected String getTokenStream(Analyzer a, String text) throws IOException {
 		StringBuffer sb = new StringBuffer();
 		TokenStream s = a.tokenStream(null, new StringReader(text));
+		s.reset();
 	    while (s.incrementToken()) {
-	        final TermAttribute term = s.getAttribute(TermAttribute.class);
+	        final CharTermAttribute term = s.getAttribute(CharTermAttribute.class);
 	        if (sb.length()!=0) {
 	        	sb.append(" ");
 	        }
-	        sb.append(term.term());
+	        sb.append(term.toString());
 	    }
+		s.close();
 		return sb.toString();
 	}
 
 	private void compareTokenStream(Analyzer a, String text, String expected[]) throws IOException {
 		TokenStream s = a.tokenStream(null, new StringReader(text));
 		int ix = 0;
+		
+		s.reset();
+		
 		while (s.incrementToken()) {
-			final TermAttribute term = s.getAttribute(TermAttribute.class);
-			final String word = term.term();
+			final CharTermAttribute term = s.getAttribute(CharTermAttribute.class);
+			final String word = term.toString();
 			assertTrue(ix < expected.length);
 			assertEquals(expected[ix++], word);
 		}
+		s.close();
 		assertEquals(ix, expected.length);
 	}
 

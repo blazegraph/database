@@ -43,10 +43,11 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.StopAnalyzer;
-import org.apache.lucene.analysis.miscellaneous.PatternAnalyzer;
+import org.apache.lucene.analysis.core.StopAnalyzer;
+import org.apache.lucene.analysis.pattern.PatternTokenizer;
 import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.util.Version;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -82,7 +83,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 			"com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.*.like=eng\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.por.analyzerClass=org.apache.lucene.analysis.br.BrazilianAnalyzer\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.pt.like=por\n" +
-		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.zho.analyzerClass=org.apache.lucene.analysis.cn.ChineseAnalyzer\n" +
+		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.zho.analyzerClass=org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.chi.like=zho\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.zh.like=zho\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.jpn.analyzerClass=org.apache.lucene.analysis.cjk.CJKAnalyzer\n" +
@@ -155,7 +156,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 			Object rslt[] = new Object[params.length];
 			for (int i=0; i<params.length; i++) {
 				if (params[i] instanceof Set) {
-					rslt[i] = Collections.EMPTY_SET;
+					rslt[i] = CharArraySet.EMPTY_SET;
 				} else {
 					rslt[i] = params[i];
 				}
@@ -190,23 +191,25 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 	}
 	
 	/**
-	 * Special case code for {@link PatternAnalyzer}
+	 * Special case code for {@link PatternTokenizer}
 	 * @author jeremycarroll
 	 *
 	 */
-    private static class PatternAnalyzerPair extends AnalyzerPair {
-		public PatternAnalyzerPair(ConfigOptionsToAnalyzer lro, Pattern pattern) throws Exception {
-			super(lro.languageRange, getConstructor(PatternAnalyzer.class,Version.class,Pattern.class,Boolean.TYPE,Set.class), 
-				Version.LUCENE_CURRENT, 
-				pattern,
-				true,
-				lro.getStopWords());
+    private static class PatternAnalyzer extends AnalyzerPair {
+		public PatternAnalyzer(ConfigOptionsToAnalyzer lro, Pattern pattern, CharArraySet stopWords) throws Exception {
+			/*
+			super(lro.languageRange, getConstructor(PatternAnalyzerImpl.class,Pattern.class, CharArraySet.class), 
+				pattern, stopWords);
+				*/
+			super(lro.languageRange, new PatternAnalyzerImpl(pattern, stopWords), new PatternAnalyzerImpl(pattern, CharArraySet.EMPTY_SET));
+		}
+
+		public PatternAnalyzer(ConfigOptionsToAnalyzer lro, Pattern pattern) throws Exception {
+			super(lro.languageRange, new PatternAnalyzerImpl(pattern, CharArraySet.EMPTY_SET));
 		}
 	}
     
-
-
-	/**
+    /**
 	 * This class is initialized with the config options, using the {@link #setProperty(String, String)}
 	 * method, for a particular language range and works out which pair of {@link Analyzer}s
 	 * to use for that language range.
@@ -248,7 +251,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 		public Set<?> getStopWords() {
 			
 			if (doNotUseStopWords()) 
-				return Collections.EMPTY_SET;
+				return CharArraySet.EMPTY_SET;
 			
 			if (useDefaultStopWords()) {
 				return getStopWordsForClass(className);
@@ -312,10 +315,10 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 		 */
 		public void validate() {
 			if (pattern != null ) {
-				if ( className != null && className != PatternAnalyzer.class.getName()) {
+				if ( className != null && className != PatternTokenizer.class.getName()) {
 					throw new RuntimeException("Bad Option: Language range "+languageRange + " with pattern propety for class "+ className);
 				}
-				className = PatternAnalyzer.class.getName();
+				className = PatternTokenizer.class.getName();
 			}
 			if (this.wordBoundary != null  ) {
 				if ( className != null && className != TermCompletionAnalyzer.class.getName()) {
@@ -338,8 +341,8 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 				throw new RuntimeException("Bad option: Language range "+languageRange + ": must specify wordBoundary for TermCompletionAnalyzer");
 			}
 			
-			if (PatternAnalyzer.class.getName().equals(className) && pattern == null ) {
-				throw new RuntimeException("Bad Option: Language range "+languageRange + " must specify pattern for PatternAnalyzer.");
+			if (PatternTokenizer.class.getName().equals(className) && pattern == null ) {
+				throw new RuntimeException("Bad Option: Language range "+languageRange + " must specify pattern for PatternTokenizer.");
 			}
 			if ( (like != null) == (className != null) ) {
 				throw new RuntimeException("Bad Option: Language range "+languageRange + " must specify exactly one of implementation class or like.");
@@ -359,7 +362,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 				return null;
 			}
 			if (pattern != null) {
-				return new PatternAnalyzerPair(this, pattern);
+				return new PatternAnalyzer(this, pattern);
 			}
 			if (softHyphens != null) {
 				return new AnalyzerPair(
@@ -379,15 +382,21 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 			}
 			final Class<? extends Analyzer> cls = getAnalyzerClass();
             
+            if (hasConstructor(cls, CharArraySet.class)) {
+    			return new AnalyzerPair(languageRange,
+    					cls.getConstructor(CharArraySet.class).newInstance(new CharArraySet(getStopWords(), false)),
+    					cls.getConstructor(CharArraySet.class).newInstance(new CharArraySet(Collections.emptySet(), false)));
+            }
+            
             if (hasConstructor(cls, Version.class, Set.class)) {
 
             	// RussianAnalyzer is missing any way to access stop words.
             	if (RussianAnalyzer.class.equals(cls)) {
             		if (useDefaultStopWords()) {
-            		    return new AnalyzerPair(languageRange, new RussianAnalyzer(Version.LUCENE_CURRENT), new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));
+            		    return new AnalyzerPair(languageRange, new RussianAnalyzer(), new RussianAnalyzer(CharArraySet.EMPTY_SET));
             		}
             		if (doNotUseStopWords()) {
-            		    return new AnalyzerPair(languageRange,  new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));	
+            		    return new AnalyzerPair(languageRange,  new RussianAnalyzer(CharArraySet.EMPTY_SET));	
             		}
             	}
             	return new VersionSetAnalyzerPair(this, cls);
@@ -550,6 +559,9 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 		try {
 			return cls.getConstructor(parameterTypes);
 		} catch (NoSuchMethodException | SecurityException e) {
+			if(log.isDebugEnabled()) {
+				log.debug(e);
+			}
 			return null;
 		}
 	}
