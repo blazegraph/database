@@ -2370,7 +2370,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final IVariable<?> var = (IVariable<?>) termNode .getValueExpression();
 
                if (bs.isBound(var)) {
-                  IConstant<?> c = bs.get(var);
+                  final IConstant<?> c = bs.get(var);
                   if (c == null || c.get() == null) {
                      return null;
                   }
@@ -2403,12 +2403,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
         PointLatLon resolveAsPoint(final TermNode termNode, final IBindingSet bs) {
 
-            Literal lit = resolveAsLiteral(termNode, bs);
+            final Literal lit = resolveAsLiteral(termNode, bs);
             if (lit == null || lit.stringValue().isEmpty()) {
                 return null;
             }
 
-            String pointAsStr = lit.stringValue();
+            final String pointAsStr = lit.stringValue();
             IGeoSpatialLiteralSerializer serializer = null;
             GeoSpatialDatatypeConfiguration pconfig = null;
 
@@ -2428,12 +2428,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
                 } else {
                     
-                    String[] comps = serializer.toComponents(pointAsStr);
-                    Double lat = Double.parseDouble(comps[pconfig.idxOfField(ServiceMapping.LATITUDE)]);
-                    Double lon = Double.parseDouble(comps[pconfig.idxOfField(ServiceMapping.LONGITUDE)]);
+                    final String[] comps = serializer.toComponents(pointAsStr);
+                    final Double lat = Double.parseDouble(comps[pconfig.idxOfField(ServiceMapping.LATITUDE)]);
+                    final Double lon = Double.parseDouble(comps[pconfig.idxOfField(ServiceMapping.LONGITUDE)]);
                     return new PointLatLon(lat, lon);
                 
                 }
+                
             } catch (NumberFormatException e) {
 
                 throw new GeoSpatialSearchException("Input could not be resolved as point: '" + pointAsStr + "'.");

@@ -125,6 +125,33 @@ public class TestGeoSpatialCustomSerializerWKT extends AbstractDataDrivenSPARQLT
 
     }
     
+    /**
+     * Test passing in of WKT point as parameter of geo:spatialCircleCenter.
+     */
+    public void testWKTLiteral06() throws Exception {
+
+        new TestHelper(
+            "geo-wktliteral06",
+            "geo-wktliteral06.rq", 
+            "geo-wktliteral.nt",
+            "geo-wktliteral06.srx").runTest();
+
+    }
+
+    /**
+     * Test passing in of WKT point as parameter of geo:spatialRectangleSouthWest
+     * and geo:spatialRectangleNorthEast.
+     */
+    public void testWKTLiteral07() throws Exception {
+
+        new TestHelper(
+            "geo-wktliteral07",
+            "geo-wktliteral07.rq", 
+            "geo-wktliteral.nt",
+            "geo-wktliteral07.srx").runTest();
+
+    }
+
     
     @Override
     public Properties getProperties() {
