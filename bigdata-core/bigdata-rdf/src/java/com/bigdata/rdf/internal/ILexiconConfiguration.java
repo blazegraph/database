@@ -40,6 +40,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
 
 /**
  * Configuration determines which RDF Values are inlined into the statement
@@ -80,12 +81,10 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      */
     public boolean isGeoSpatial();
     
-    
     /**
-     * Return the configuration string for the GeoSpatial service
+     * Return the geospatial datatype configuration.
      */
-    public String getGeoSpatialConfig();
-    
+    public GeoSpatialConfig getGeoSpatialConfig();
 
     /**
      * Return the default time zone to be used for inlining.

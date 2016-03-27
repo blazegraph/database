@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="event"/>
+    <variable name="latitude"/>
+    <variable name="longitude"/>
+    <variable name="customFields"/>
+  </head>
+  <results>
+     <result>
+      <binding name="event"><uri>http://www.example.com/OktoberfestB-2013</uri></binding>
+      <binding name="latitude"><literal datatype="http://www.w3.org/2001/XMLSchema#double">48.13188</literal></binding>
+      <binding name="longitude"><literal datatype="http://www.w3.org/2001/XMLSchema#double">11.54965</literal></binding>
+      <binding name="customFields"><literal>1379714400#1381017600</literal></binding>
+     </result>
+  </results>
+</sparql>

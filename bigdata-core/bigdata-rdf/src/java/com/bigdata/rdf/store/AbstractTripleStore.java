@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -142,7 +143,7 @@ import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
-import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151210;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20160317;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -166,6 +167,8 @@ import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
+import com.bigdata.service.geospatial.GeoSpatialConfigOptions;
 import com.bigdata.sparse.GlobalRowStoreUtil;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
@@ -515,7 +518,8 @@ abstract public class AbstractTripleStore extends
      */
     public static interface Options extends AbstractResource.Options,
             InferenceEngine.Options, com.bigdata.journal.Options,
-            KeyBuilder.Options, DataLoader.Options, FullTextIndex.Options {
+            KeyBuilder.Options, DataLoader.Options, FullTextIndex.Options,
+            GeoSpatialConfigOptions.Options {
 
         /**
          * Boolean option (default <code>true</code>) enables support for the
@@ -685,7 +689,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151210.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20160317.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -1296,21 +1300,7 @@ abstract public class AbstractTripleStore extends
          */
         String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".rdrHistoryClass";
-
-        /**
-         * Enable GeoSpatial support. See https://jira.blazegraph.com/browse/BLZG-249.
-         */
-        String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
-      
-        String DEFAULT_GEO_SPATIAL = "false";
-
-        /**
-         * GeoSpatial configuration. See https://jira.blazegraph.com/browse/BLZG-249.
-         */
-        String GEO_SPATIAL_CONFIG = AbstractTripleStore.class.getName() + ".geoSpatialConfig";
-      
-        String DEFAULT_GEO_SPATIAL_CONFIG = null;
-        
+                
         /**
          * If this option is set to false, do not compute closure for sids.
          */
@@ -1760,7 +1750,78 @@ abstract public class AbstractTripleStore extends
                     ((BaseVocabulary) vocabRef.get()).init();
 
                 }
-                
+
+                /*
+                 * For performance reasons, we also store the geospatial configuration
+                 * in the global row store, in case geospatial is enabled.
+                 */
+                {
+                    assert geoSpatialConfigRef.get() == null;
+                    
+                    final Boolean geoSpatial = Boolean.parseBoolean(getProperty(
+                            AbstractTripleStore.Options.GEO_SPATIAL,
+                            AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
+        
+                    if (geoSpatial!=null && geoSpatial) { // geospatial enabled
+                          
+                        final Boolean geoSpatialIncludeBuiltinDatatypes = Boolean.parseBoolean(getProperty(
+                            AbstractTripleStore.Options.GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES,
+                            AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES));
+                      
+                        final String geoSpatialDefaultDatatype = getProperty(
+                            AbstractTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE,
+                            AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DEFAULT_DATATYPE);
+          
+                        // initialized geospatial configuration if geospatial is enabled
+                        if (geoSpatial) {
+                          
+                            /**
+                             * We have configuration strings of the form 
+                             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].0 = ...
+                             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].1 = ...
+                             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].2 = ...
+                             * ...
+                             * 
+                             * We read this configuration up to the first index that is not defined.
+                             * If no explicit configuration is provided, we fallback on our single
+                             * latitude-longitude-time default.
+                             */
+                            final List<String> geoSpatialDatatypeConfigs = new LinkedList<String>();
+                            boolean finished = false;
+                            for (int i=0; !finished; i++) {
+
+                                final String curId = AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + "." + i;
+                                final String curVal = getProperty(curId, null /* fallback */);
+                              
+                                if (curVal!=null) {
+                                    log.info("Adding geospatial datatype #" + i);
+                                    geoSpatialDatatypeConfigs.add(curVal);
+                                } else {
+                                    finished = true; // we're done
+                                }
+                            }
+              
+                            // also register built-in datatypes, if enabled
+                            if (geoSpatialIncludeBuiltinDatatypes) {
+                              
+                                log.info("Adding geospatial built-in datatype v1/LAT+LON");
+                                geoSpatialDatatypeConfigs.add(
+                                    AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_CONFIG);
+                              
+                                log.info("Adding geospatial built-in datatype v1/LAT+LON+TIME");
+                                geoSpatialDatatypeConfigs.add(
+                                    AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_TIME_CONFIG);
+                            }
+              
+                            final GeoSpatialConfig geoSpatialConfig = 
+                                new GeoSpatialConfig(geoSpatialDatatypeConfigs, geoSpatialDefaultDatatype);
+
+                            geoSpatialConfigRef.compareAndSet(null, geoSpatialConfig);
+                        }
+                    }
+                }
+
+
                 lexiconRelation = new LexiconRelation(this/* container */,
                         getIndexManager(), LEXICON_NAMESPACE, getTimestamp(),
                         new Properties(tmp)// Note: Must wrap properties!
@@ -1812,6 +1873,7 @@ abstract public class AbstractTripleStore extends
                 }
 
             }
+
         
             /**
              * Write on the global row store. We atomically set all
@@ -1842,6 +1904,12 @@ abstract public class AbstractTripleStore extends
                     // vocabulary.
                     map.put(TripleStoreSchema.VOCABULARY, vocabRef.get());
                     // setProperty(TripleStoreSchema.VOCABULARY,vocab);
+                }
+                
+                if (geoSpatialConfigRef.get() != null) {
+                    // geospatial config.
+                    map.put(TripleStoreSchema.GEO_SPATIAL_CONFIG, geoSpatialConfigRef.get());
+                    // setProperty(TripleStoreSchema.GEO_SPATIAL_CONFIG,geoSpatoalConfig)
                 }
 
                 /*
@@ -2110,11 +2178,79 @@ abstract public class AbstractTripleStore extends
     }
     
     /**
+     * Return the configured {@link GeoSpatialConfig}. The GeoSpatialConfig
+     * defines the structure and storage details of registered geospatial
+     * datatypes. 
+     * 
+     * @return the geospatial configuration
+     * 
+     * @throws IllegalStateException
+     *             if there is no lexicon.
+     * 
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL_DATATYPE_CONFIG
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL_DEFAULT_DATATYPE
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES
+     */
+    final public GeoSpatialConfig getGeoSpatialConfig() {
+
+        if (!lexicon)
+            throw new IllegalStateException();
+
+        GeoSpatialConfig geoSpatialConfig = geoSpatialConfigRef.get();
+        
+        if (geoSpatialConfig == null) {
+
+            synchronized (geoSpatialConfigRef) {
+
+                geoSpatialConfig = geoSpatialConfigRef.get();
+                
+                if (geoSpatialConfig == null) {
+
+                    /*
+                     * The vocabulary is stored in properties for the triple
+                     * store instance in the global row store. However, we
+                     * pre-materialize those properties so we can directly
+                     * retrieve the vocabulary from the materialized properties.
+                     */
+
+                    geoSpatialConfig = (GeoSpatialConfig) getBareProperties().get(
+                            TripleStoreSchema.GEO_SPATIAL_CONFIG);
+
+                    if (geoSpatialConfig == null)
+                        throw new RuntimeException("No geospatial config defined? : " + this);
+                    
+
+                    if (!this.geoSpatialConfigRef.compareAndSet(null/* expect */, geoSpatialConfig)) {
+                        
+                        throw new AssertionError();
+                        
+                    }
+                    
+                }
+                
+            }
+            
+        }
+        
+        return geoSpatialConfig;
+        
+    }    
+    
+    /**
      * Note: This is used both as a monitor object and as an atomic reference.
      * 
      * @see #getVocabulary()
      */
     private final AtomicReference<Vocabulary> vocabRef = new AtomicReference<Vocabulary>();
+    
+    /**
+     * The geospatial configuration -- if null, geospatial is disabled.
+     * 
+     * @see #getGeoSpatialConfig()
+     */
+    private final AtomicReference<GeoSpatialConfig> geoSpatialConfigRef =
+        new AtomicReference<GeoSpatialConfig>();
     
     /**
      * The {@link SPORelation} (triples and their access paths).

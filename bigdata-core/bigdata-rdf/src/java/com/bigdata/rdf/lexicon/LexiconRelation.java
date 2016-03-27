@@ -122,6 +122,7 @@ import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -586,18 +587,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
                     AbstractTripleStore.Options.DEFAULT_REJECT_INVALID_XSD_VALUES));
             
-            geoSpatial = Boolean.parseBoolean(getProperty(
-                  AbstractTripleStore.Options.GEO_SPATIAL,
-                  AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
 
-            geoSpatialConfig = getProperty(
-                  AbstractTripleStore.Options.GEO_SPATIAL_CONFIG,
-                  AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_CONFIG);
-
-            
             // Resolve the vocabulary.
             vocab = getContainer().getVocabulary();
+
             
+            // Resolve the geospatial configuration, if geospatial is enabled
+            final Boolean geoSpatial = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.GEO_SPATIAL,
+                    AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
+            
+            final GeoSpatialConfig geoSpatialConfig = 
+                geoSpatial!=null && geoSpatial ?  getContainer().getGeoSpatialConfig() : null;
+
+
             final IExtensionFactory xFactory;
             try {
                 
@@ -935,16 +938,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	 * {@link AbstractTripleStore.Options#DEFAULT_INLINE_DATE_TIMES_TIMEZONE}.
 	 */
     final private TimeZone inlineDateTimesTimeZone;
-    
-    /**
-     * When <code>true</code>, support for GeoSpatial features is turned on.
-     */
-    final private boolean geoSpatial;
-
-    /**
-     * Configuration string for the GeoSpatial search facilities
-     */
-    final private String geoSpatialConfig;
 
     /**
      * Return <code>true</code> if datatype literals are being inlined into
@@ -974,23 +967,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         return inlineDateTimes;
         
-    }
-    
-    /**
-     * Return <code>true</code> if GeoSpatial support is enabled.
-     */
-    final public boolean isGeoSpatial() {
-       
-       return geoSpatial;
-       
-    }
-    
-    /**
-     * Return the configuration string for the GeoSpatial service.
-     */
-    final public String getGeoSpatialConfig() {
-       
-       return geoSpatialConfig;
     }
 
     /**

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="locationOfMunich"/>
+    <variable name="event"/>
+    <variable name="location"/>
+  </head>
+  <results>
+     <result>
+      <binding name="locationOfMunich"><literal datatype="http://www.bigdata.com/rdf/geospatial/literals/v1#lat-lon">48.13743#11.57549</literal></binding>
+      <binding name="event"><uri>http://www.example.com/RAR-2013</uri></binding>
+      <binding name="location"><literal>50.33406#6.94259</literal></binding>
+     </result>
+     <result>
+      <binding name="locationOfMunich"><literal datatype="http://www.bigdata.com/rdf/geospatial/literals/v1#lat-lon">48.13743#11.57549</literal></binding>
+      <binding name="event"><uri>http://www.example.com/RAR-2014</uri></binding>
+      <binding name="location"><literal>50.33406#6.94259</literal></binding>
+     </result>
+     <result>
+      <binding name="locationOfMunich"><literal datatype="http://www.bigdata.com/rdf/geospatial/literals/v1#lat-lon">48.13743#11.57549</literal></binding>
+      <binding name="event"><uri>http://www.example.com/RAR-2015</uri></binding>
+      <binding name="location"><literal>50.3678#7.3117</literal></binding>
+     </result>
+  </results>
+</sparql>

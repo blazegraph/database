@@ -81,6 +81,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -127,14 +128,11 @@ public class LexiconConfiguration<V extends BigdataValue>
      * <code>true</code> if geospatial support is enabled
      */
     private final boolean geoSpatial;
-    
-
-
+        
     /**
-     * Optional configuration string for the geospatial facilities.
+     * Configuration of geospatial datatypes.
      */
-    private final String geoSpatialConfig;
-
+    final GeoSpatialConfig geoSpatialConfig;
     
     /**
      * <code>true</code> if textual literals will be inlined.
@@ -254,14 +252,12 @@ public class LexiconConfiguration<V extends BigdataValue>
        
        return geoSpatial;
     }
-
+    
     @Override
-    public String getGeoSpatialConfig() {
-       
-       return geoSpatialConfig;
+    public GeoSpatialConfig getGeoSpatialConfig() {
+        return geoSpatialConfig;
     }
-    
-    
+        
     @Override
     public boolean isInlineDateTimes() {
         return inlineDateTimes;
@@ -358,8 +354,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             final BigdataValueFactory valueFactory,//
             final IInlineURIFactory uriFactory,//
             final boolean geoSpatial,
-            final String geoSpatialConfig
-            ) {
+            final GeoSpatialConfig geoSpatialConfig) {
 
         if (blobsThreshold < 0)
             throw new IllegalArgumentException();
