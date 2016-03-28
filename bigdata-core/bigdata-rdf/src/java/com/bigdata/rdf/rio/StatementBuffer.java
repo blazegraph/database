@@ -699,8 +699,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			 * @see BLZG-641
 			 * 
 			 * @see BLZG-1522
+			 * 
+			 * @see BLZG-1813
 			 */
-			queue = new LinkedBlockingQueue<Batch<S>>(10/* capacity */);
+			queue = new LinkedBlockingQueue<Batch<S>>(queueCapacity/* capacity */);
 
 			/*
 			 * Setup executor used to drain the queue, merge the batches and
@@ -1390,7 +1392,36 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
 		} else {
 			
-			if (ft == null) {
+			
+			if (ft == null || ft.isDone() /* BLZG-1813 */) {
+			
+				/*
+				 * If the future is done, get the future, and
+				 * propogate any exceptions. 
+				 * 
+				 * @see BLZG-1813
+				 */
+				if (ft != null && ft.isDone()) {
+
+					try {
+
+						ft.get(); // get the future.
+
+						/*
+						 * Fall through. New Future will be created below.
+						 */
+
+					} catch (InterruptedException e) {
+
+						// Propagate interrupt
+                        throw new RuntimeException(e);
+
+					} catch (ExecutionException ex) {
+
+						throw new RuntimeException(ex);
+
+					}
+				}
 
 				/*
 				 * Note: Lazily initialized since reset() does not make the
