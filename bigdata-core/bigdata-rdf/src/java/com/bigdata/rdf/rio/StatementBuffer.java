@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -158,6 +160,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * become large.
      */
     private Map<String, BigdataBNode> bnodes;
+    
+    /**
+     * The #of blank nodes, which are not resolved and thus will require adding
+     * to values array while running {@link #incrementalWrite()} 
+	 * @see https://jira.blazegraph.com/browse/BLZG-1708 (DataLoader fails with ArrayIndexOutOfBoundsException)
+     */
+    private int bnodesUnresolvedCount;
     
     /**
      * Statements which use blank nodes in their {s,p,o} positions must be
@@ -386,6 +395,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				final Map<String, BigdataBNode> t = bnodes;
 				if (t != null)
 					setValue(t.size());
+			}
+		});
+		
+		counters.addCounter("bnodesUnresolvedCount", new Instrument<Integer>() {
+			@Override
+			public void sample() {
+				setValue(bnodesUnresolvedCount);
 			}
 		});
 		
@@ -792,7 +808,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				if (queue.isEmpty()) {
 
 					// Nothing else in the queue. Write out the batch immediately.
-					batch.writeNow();
+					BatchResult batchResult = batch.writeNow();
+					bnodesUnresolvedCount -= batchResult.getNbnodesResolved();
 					batchWriteCount++;
 					
 					continue;
@@ -860,13 +877,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				/*
 				 * Safety check. Do not merge a single batch.
 				 */
-				avail.get(0).writeNow();
+				BatchResult batchResult = avail.get(0).writeNow();
+				bnodesUnresolvedCount -= batchResult.getNbnodesResolved();
 				batchWriteCount++;
 
 			} else {
 
 				// Merge the batches together and then write them out.
-				new MergeUtility<S>().merge(avail).writeNow();
+				BatchResult batchResult = new MergeUtility<S>().merge(avail).writeNow();
+				bnodesUnresolvedCount -= batchResult.getNbnodesResolved();
 				batchMergeCount += avail.size();
 				batchWriteCount++;
 
@@ -1222,6 +1241,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
         bnodes = null;
         
+        bnodesUnresolvedCount = 0;
+        
         deferredStmts = null;
         
         reifiedStmts = null;
@@ -1260,6 +1281,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         this.bnodes = bnodes;
         
+        bnodesUnresolvedCount = 0;
+        
+        for (BigdataBNode bnode: bnodes.values()) {
+        	if (bnode.getIV() == null) {
+        		bnodesUnresolvedCount++;
+        	}
+        }
+        
     }
     
     /**
@@ -1270,13 +1299,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected void _clear() {
         
-        for (int i = 0; i < numValues; i++) {
+        for (int i = 0; i < Math.min(values.length, numValues); i++) {
 
             values[i] = null;
 
         }
 
-        for (int i = 0; i < numStmts; i++) {
+        for (int i = 0; i < Math.min(stmts.length, numStmts); i++) {
 
             stmts[i] = null;
 
@@ -1337,7 +1366,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	// Buffer a batch and then incrementally flush.
 		if (queue == null) {
 
-			new Batch<S>(this, false/* clone */).writeNow();
+			BatchResult batchResult = new Batch<S>(this, false/* clone */).writeNow();
+			bnodesUnresolvedCount -= batchResult.getNbnodesResolved();
 			batchWriteCount++;
 
 	        // Reset the state of the buffer (but not the bnodes nor deferred stmts).
@@ -1540,6 +1570,34 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
     }
 
+    /**
+     * Result of the {@link Batch} execution, consists of
+     * #of statements written to the database
+     * and #of bnodes, which do have their IVs assigned after incremental write
+     * 
+     * @author kim
+     *
+     * @see BLZG-1708
+     */
+	private static class BatchResult {
+
+		private final long nwritten;
+		private final long nBnodesResolved;
+
+		public BatchResult(long nwritten, long nBnodesResolved) {
+			this.nwritten = nwritten;
+			this.nBnodesResolved = nBnodesResolved;
+		}
+		
+		public long getNwritten() {
+			return nwritten;
+		}
+		
+		public long getNbnodesResolved() {
+			return nBnodesResolved;
+		}
+	}
+
 	/**
 	 * A batch of statements together with their distinct values to be written
 	 * onto the database.
@@ -1627,7 +1685,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			this.numStmts = numStmts;
 			this.stmts = stmts;
     	}
-    	
+
     	/**
 		 * 
 		 * @param sb
@@ -1692,9 +1750,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		 * 
 		 * @return The #of statements actually written.
 		 */
-		private long writeNow() {
+		private BatchResult writeNow() {
 
             final long begin = System.currentTimeMillis();
+
+            long nBnodesResolved = 0;
 
             if (log.isInfoEnabled())
 				log.info("numValues=" + numValues + ", numStmts=" + numStmts);
@@ -1714,7 +1774,20 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                                                 : ""));
                     }
                 }
-    			addTerms(database, values, numValues, readOnly);
+                // Calculate #of bnodes, which were unresolved
+                for (BigdataValue v: values) {
+                	if (v instanceof BigdataBNode && v.getIV() == null) {
+                		nBnodesResolved++;
+                	}
+                }
+                addTerms(database, values, numValues, readOnly);
+                // Substract #of bnodes, which remain unresolved
+                // as a result we have number of bnodes, which were resolved
+                for (BigdataValue v: values) {
+                	if (v instanceof BigdataBNode && v.getIV() == null) {
+                		nBnodesResolved--;
+                	}
+                }
                 if (log.isDebugEnabled()) {
                     for (int i = 0; i < numValues; i++) {
                         log
@@ -1755,7 +1828,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 
             }
             
-            return nwritten;
+            return new BatchResult(nwritten, nBnodesResolved);
             
     	}
     	
@@ -2105,7 +2178,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (numStmts + 1 > bufferCapacity)
             return true;
 
-        if (numValues + arity > values.length)
+        // This check takes into account dynamically calculated #of unresolved bnodes,
+        // which will get added to values array while running incrementalWrite
+        // @see https://jira.blazegraph.com/browse/BLZG-1708
+        if (numValues + bnodesUnresolvedCount + arity > values.length)
             return true;
 
         return false;
@@ -2169,6 +2245,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	
 	                // allocating canonicalizing map for blank nodes.
 	                bnodes = new HashMap<String, BigdataBNode>(bufferCapacity);
+	                
+	                bnodesUnresolvedCount = 0;
 	
 	                // insert this blank node into the map.
 	                bnodes.put(id, bnode);
@@ -2191,6 +2269,16 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	                // insert this blank node into the map.
 	                bnodes.put(id, bnode);
 	                
+	            }
+	            
+	            // keep track on #of unresolved IVs, which require
+	            // adding to values array on running incrementalWrite
+	            // @see https://jira.blazegraph.com/browse/BLZG-1708
+	            // (DataLoader fails with ArrayIndexOutOfBoundsException)
+	            if (bnode.getIV() == null) {
+	            	
+	            	bnodesUnresolvedCount++;
+	            	
 	            }
 	            
             }
