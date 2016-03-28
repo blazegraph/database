@@ -27,10 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +39,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -102,8 +100,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
     final private static Logger log = Logger.getLogger(StatementBuffer.class);
    
-//    final protected boolean INFO = log.isInfoEnabled();
-//    final protected boolean DEBUG = log.isDebugEnabled();
+//    final static private boolean INFO = log.isInfoEnabled();
+    final static private boolean DEBUG = log.isDebugEnabled();
     
     /**
      * Buffer for parsed RDF {@link Value}s.
@@ -739,51 +737,51 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		}
 	}
     
-	/**
-	 * Evict a batch (blocking put, but spins to look for an error in
-	 * {@link Future} for the thread draining the queue.
-	 * 
-	 * @param batch
-	 *            A batch (required).
-	 * 
-	 * @throws InterruptedException
-	 */
-	private void putOnQueue(final Batch<S> batch) throws InterruptedException {
-
-		Future<Void> f;
-		while ((f = ft) != null && !f.isDone()) {
-
-			if (queue.offer(batch, 100L, TimeUnit.MILLISECONDS)) {
-
-				return;
-
-			}
-
-		}
-
-		if (f == null) {
-
-			/*
-			 * The Future of the task draining the queue has been cleared (most
-			 * likely due to an error or interrupt). At this point nothing more
-			 * will be drained from the queue.
-			 */
-
-			throw new RuntimeException("Writer is done, but reader still working?");
-
-		} else if (f.isDone()) {
-
-			/*
-			 * This is most likely to indicate either an error or interrupt in
-			 * the writer. At this point nothing more will be drained from the
-			 * queue.
-			 */
-
-			throw new RuntimeException("Writer is done, but reader still working?");
-
-		}
-		
-	}
+//	/**
+//	 * Evict a batch (blocking put, but spins to look for an error in
+//	 * {@link Future} for the thread draining the queue.
+//	 * 
+//	 * @param batch
+//	 *            A batch (required).
+//	 * 
+//	 * @throws InterruptedException
+//	 */
+//	private void putOnQueue(final Batch<S> batch) throws InterruptedException {
+//
+//		Future<Void> f;
+//		while ((f = ft) != null && !f.isDone()) {
+//
+//			if (queue.offer(batch, 100L, TimeUnit.MILLISECONDS)) {
+//
+//				return;
+//
+//			}
+//
+//		}
+//
+//		if (f == null) {
+//
+//			/*
+//			 * The Future of the task draining the queue has been cleared (most
+//			 * likely due to an error or interrupt). At this point nothing more
+//			 * will be drained from the queue.
+//			 */
+//
+//			throw new RuntimeException("Writer is done, but reader still working?");
+//
+//		} else if (f.isDone()) {
+//
+//			/*
+//			 * This is most likely to indicate either an error or interrupt in
+//			 * the writer. At this point nothing more will be drained from the
+//			 * queue.
+//			 */
+//
+//			throw new RuntimeException("Writer is done, but reader still working?");
+//
+//		}
+//		
+//	}
 
 	/**
 	 * Drains {@link Batch}es from the queue and writes on the database.
@@ -791,14 +789,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	 * @author bryan
 	 * 
 	 * @see BLZG-1522
-	 * 
-	 *      FIXME BLZG-1522 Modify this to merge multiple batches using
-	 *      drainTo() and then batch the combined result. Then do performance
-	 *      testing. The 10k value used by the bufferCapacity is probably good
-	 *      in combination with a queue capacity of 10 since that would allow as
-	 *      many as 100k statements to be buffered. But larger values might also
-	 *      be ok as well as large queue capacities. Allow the latter to be
-	 *      parameterized and do some performance tests.
 	 */
 	private class DrainQueueCallable implements Callable<Void> {
 
@@ -824,8 +814,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				if (queue.isEmpty()) {
 
 					// Nothing else in the queue. Write out the batch immediately.
-					BatchResult batchResult = batch.writeNow();
-					bnodesResolvedCount += batchResult.getNbnodesResolved();
+					final BatchResult batchResult = batch.writeNow();
+					bnodesResolvedCount += batchResult.getNumBNodesResolved();
 					batchWriteCount++;
 					
 					continue;
@@ -893,15 +883,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				/*
 				 * Safety check. Do not merge a single batch.
 				 */
-				BatchResult batchResult = avail.get(0).writeNow();
-				bnodesResolvedCount += batchResult.getNbnodesResolved();
+				final BatchResult batchResult = avail.get(0).writeNow();
+				bnodesResolvedCount += batchResult.getNumBNodesResolved();
 				batchWriteCount++;
 
 			} else {
 
 				// Merge the batches together and then write them out.
-				BatchResult batchResult = new MergeUtility<S>().merge(avail).writeNow();
-				bnodesResolvedCount += batchResult.getNbnodesResolved();
+			    final BatchResult batchResult = new MergeUtility<S>().merge(avail).writeNow();
+				bnodesResolvedCount += batchResult.getNumBNodesResolved();
 				batchMergeCount += avail.size();
 				batchWriteCount++;
 
@@ -1319,13 +1309,18 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected void _clear() {
         
-        for (int i = 0; i < Math.min(values.length, numValues); i++) {
+        // Avoid potential IndexOutOfBoundsException in _clear().
+        // @see https://jira.blazegraph.com/browse/BLZG-1708 (DataLoader fails with ArrayIndexOutOfBoundsException)
+        final int nvalues = Math.min(values.length, numValues);
+        final int nstmts = Math.min(stmts.length, numStmts);
+        
+        for (int i = 0; i < nvalues; i++) {
 
             values[i] = null;
 
         }
 
-        for (int i = 0; i < Math.min(stmts.length, numStmts); i++) {
+        for (int i = 0; i < nstmts; i++) {
 
             stmts[i] = null;
 
@@ -1386,8 +1381,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	// Buffer a batch and then incrementally flush.
 		if (queue == null) {
 
-			BatchResult batchResult = new Batch<S>(this, false/* clone */).writeNow();
-			bnodesResolvedCount += batchResult.getNbnodesResolved();
+			final BatchResult batchResult = new Batch<S>(this, false/* clone */).writeNow();
+			bnodesResolvedCount += batchResult.getNumBNodesResolved();
 			batchWriteCount++;
 
 	        // Reset the state of the buffer (but not the bnodes nor deferred stmts).
@@ -1591,9 +1586,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     }
 
     /**
-     * Result of the {@link Batch} execution, consists of
-     * #of statements written to the database
-     * and #of bnodes, which do have their IVs assigned after incremental write
+     * Result of the {@link Batch} execution, consists of #of statements written
+     * to the database and #of bnodes, which do have their IVs assigned after
+     * incremental write
      * 
      * @author kim
      *
@@ -1604,16 +1599,16 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		private final long nwritten;
 		private final long nBnodesResolved;
 
-		public BatchResult(long nwritten, long nBnodesResolved) {
+		public BatchResult(final long nwritten, final long nBnodesResolved) {
 			this.nwritten = nwritten;
 			this.nBnodesResolved = nBnodesResolved;
 		}
 		
-		public long getNwritten() {
+		public long getNumWritten() {
 			return nwritten;
 		}
 		
-		public long getNbnodesResolved() {
+		public long getNumBNodesResolved() {
 			return nBnodesResolved;
 		}
 	}
@@ -1766,10 +1761,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	}
 
 	    /**
-		 * Flush the batch.
-		 * 
-		 * @return The #of statements actually written.
-		 */
+         * Flush the batch.
+         * 
+         * @return A summary of the #of statements actually written and blank
+         *         nodes actually resolved.
+         */
 		private BatchResult writeNow() {
 
             final long begin = System.currentTimeMillis();
@@ -1781,7 +1777,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
             // Insert terms (batch operation).
             if (numValues > 0) {
-                if (log.isDebugEnabled()) {
+                if (DEBUG) {
                     for (int i = 0; i < numValues; i++) {
                         log
                                 .debug("adding term: "
@@ -1808,7 +1804,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 		nBnodesResolved--;
                 	}
                 }
-                if (log.isDebugEnabled()) {
+                if (DEBUG) {
                     for (int i = 0; i < numValues; i++) {
                         log
                                 .debug(" added term: "
@@ -1826,13 +1822,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             // Insert statements (batch operation).
             final long nwritten;
 			if (numStmts > 0) {
-				if (log.isDebugEnabled()) {
+				if (DEBUG) {
 					for (int i = 0; i < numStmts; i++) {
 						log.debug("adding stmt: " + stmts[i]);
 					}
 				}
 				nwritten = addStatements(database, statementStore, stmts, numStmts, changeLog, didWriteCallback);
-				if (log.isDebugEnabled()) {
+				if (DEBUG) {
 					for (int i = 0; i < numStmts; i++) {
 						log.debug(" added stmt: " + stmts[i]);
 					}
@@ -1859,12 +1855,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     			final boolean readOnly//
     			) {
 
-            if (log.isInfoEnabled()) {
+    	    if(log.isInfoEnabled())
+    	        log.info("writing " + numTerms);
+            
+            if (DEBUG) {
 
-                log.info("writing " + numTerms);
-                
                 for (int i = 0; i < numTerms; i++) {
-                	log.info("term: " + terms[i] + ", iv: " + terms[i].getIV());
+                	log.debug("term: " + terms[i] + ", iv: " + terms[i].getIV());
                 }
 
             }
@@ -1922,7 +1919,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 
                 final SPO spo = new SPO(stmt);
 
-                if (log.isDebugEnabled()) 
+                if (DEBUG) 
                     log.debug("adding: " + stmt.toString() + " (" + spo + ")");
                 
                 if(!spo.isFullyBound()) {
@@ -2087,8 +2084,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 log.info("writing " + numStmts + " on "
                         + (statementStore != null ? "statementStore" : "database"));
                 
-                for (int i = 0; i < numStmts; i++) {
-                	log.info("spo: " + stmts[i]);
+                if(DEBUG) {
+                    for (int i = 0; i < numStmts; i++) {
+                    	log.debug("spo: " + stmts[i]);
+                    }
                 }
 
             }
@@ -2263,8 +2262,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	
 	            if (bnodes == null) {
 	
-	                // allocating canonicalizing map for blank nodes.
-	                bnodes = new HashMap<String, BigdataBNode>(bufferCapacity);
+	                /*
+                     * Allocating canonicalizing map for blank nodes. Note:
+                     * Using linked hash map since we have to iterate over this
+                     * in order to decide how many resolved and unresolved blank
+                     * nodes remain in the map per
+                     * https://jira.blazegraph.com/browse/BLZG-1708 (DataLoader
+                     * fails with ArrayIndexOutOfBoundsException).
+                     */
+	                bnodes = new LinkedHashMap<String, BigdataBNode>(bufferCapacity);
 	                
 	                bnodesUnresolvedCount = 0;
 	                
@@ -2322,7 +2328,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	            
 	            // return the pre-existing term.
 	            
-	            if(log.isDebugEnabled()) {
+	            if(DEBUG) {
 	                
 	                log.debug("duplicate: "+term);
 	                
@@ -2345,7 +2351,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	            
 	        }
 	
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug("new term: "+term);
                 
@@ -2431,7 +2437,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	// silently strip context in quads mode. See #1086.
     	_c = database.isQuads() ? _c : null;
        
-    	if (log.isDebugEnabled()) {
+    	if (DEBUG) {
     		
     		log.debug("handle stmt: " + _s + ", " + _p + ", " + _o + ", " + _c);
     		
@@ -2498,7 +2504,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	    				
 	    		reifiedStmt.set(p, o);	
 	    		
-	            if (log.isDebugEnabled()) 
+	            if (DEBUG) 
 	                log.debug("reified piece: "+stmt);
 	            
 	            if (reifiedStmt.isFullyBound(arity)) {
