@@ -156,7 +156,7 @@ public class Depends {
             "http://logging.apache.org/log4j/1.2/");
     
     private final static Dep lucene = new ApacheDep("lucene",
-            "http://lucene.apache.org/java/docs/index.html");
+            "http://lucene.apache.org/core/index.html");
 
     /*
      * http client and its dependencies are used for remote SPARQL requests and
