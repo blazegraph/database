@@ -202,6 +202,11 @@ abstract public class AbstractTripleStore extends
         IRawTripleStore, IMutableDatabase<AbstractTripleStore> {
 
     final static private Logger log = Logger.getLogger(AbstractTripleStore.class);
+    
+    final protected static boolean INFO = log.isInfoEnabled();
+    final protected static boolean DEBUG = log.isDebugEnabled();
+    
+    
 
     /*
      * TODO I have held back this change until I can test it on a cluster.  I am
@@ -1679,7 +1684,7 @@ abstract public class AbstractTripleStore extends
     @Override
     public void create() {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info(toString());
 
         assertWritable();
@@ -1794,7 +1799,9 @@ abstract public class AbstractTripleStore extends
                                 final String curVal = getProperty(curId, null /* fallback */);
                               
                                 if (curVal!=null) {
-                                    log.info("Adding geospatial datatype #" + i);
+                                    if (INFO)
+                                        log.info("Adding geospatial datatype #" + i);
+                                    
                                     geoSpatialDatatypeConfigs.add(curVal);
                                 } else {
                                     finished = true; // we're done
@@ -1804,11 +1811,15 @@ abstract public class AbstractTripleStore extends
                             // also register built-in datatypes, if enabled
                             if (geoSpatialIncludeBuiltinDatatypes) {
                               
-                                log.info("Adding geospatial built-in datatype v1/LAT+LON");
+                                if (INFO)
+                                    log.info("Adding geospatial built-in datatype v1/LAT+LON");
+
                                 geoSpatialDatatypeConfigs.add(
                                     AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_CONFIG);
-                              
-                                log.info("Adding geospatial built-in datatype v1/LAT+LON+TIME");
+
+                                if (INFO)
+                                    log.info("Adding geospatial built-in datatype v1/LAT+LON+TIME");
+
                                 geoSpatialDatatypeConfigs.add(
                                     AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_TIME_CONFIG);
                             }
@@ -2095,7 +2106,7 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No axioms defined? : "
                                 + this);
 
-                    if (log.isInfoEnabled())
+                    if (INFO)
 						log.info("read axioms: " + axioms.getClass().getName()
 								+ ", size=" + axioms.size());
                     
@@ -2156,7 +2167,7 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No vocabulary defined? : "
                                 + this);
                     
-					if (log.isInfoEnabled())
+					if (INFO)
 						log.info("read vocabulary: "
 								+ vocab.getClass().getName() + ", size="
 								+ vocab.size());
@@ -2904,7 +2915,7 @@ abstract public class AbstractTripleStore extends
 
             final boolean found = ndx.contains(key);
 
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug(spo + " : found=" + found + ", key="
                         + BytesUtil.toString(key));
@@ -4158,7 +4169,7 @@ abstract public class AbstractTripleStore extends
 
                 }
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log
                             .info("Copied "
                                     + nwritten
@@ -4384,7 +4395,7 @@ abstract public class AbstractTripleStore extends
                 
                 if (numStmts > 1000) {
 
-                    if(log.isInfoEnabled())
+                    if(INFO)
                     log.info("Wrote "
                             + numStmts
                             + " statements (mutationCount="
@@ -4702,7 +4713,7 @@ abstract public class AbstractTripleStore extends
             // note: count will be exact.
             statementCount1 = tempStore.getStatementCount();
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Finished " + nrounds + " rounds: statementBefore="
                         + statementCount0 + ", statementsAfter="
                         + statementCount1);
@@ -5071,7 +5082,8 @@ abstract public class AbstractTripleStore extends
 
             if (nknown == 0) {
 
-                log.warn("No known predicates: preds=" + Arrays.toString(preds));
+                if (log.isInfoEnabled())
+                    log.warn("No known predicates: preds=" + Arrays.toString(preds));
 
                 return new EmptyChunkedIterator<IBindingSet>(null/* keyOrder */);
 
@@ -5086,7 +5098,8 @@ abstract public class AbstractTripleStore extends
 
         if (_cls == null) {
 
-            log.warn("Unknown class: class=" + cls);
+            if (log.isInfoEnabled())
+                log.warn("Unknown class: class=" + cls);
 
             return new EmptyChunkedIterator<IBindingSet>(null/* keyOrder */);
             
@@ -5176,7 +5189,7 @@ abstract public class AbstractTripleStore extends
 
             final IRule tmp = r.specialize(constants, null/* constraints */);
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(tmp.toString());
             
             program.addStep(tmp);

@@ -426,7 +426,8 @@ public class LexiconConfiguration<V extends BigdataValue>
 	            }
 
 	            if (iv2ext.containsKey(datatype.getIV())) {
-	            	log.warn("multiple IExtension implementations for: " + datatype);
+	                if (log.isInfoEnabled())
+	                    log.warn("multiple IExtension implementations for: " + datatype);
 	            }
 
 	            iv2ext.put(datatype.getIV(), extension);

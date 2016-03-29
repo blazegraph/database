@@ -58,6 +58,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
    private static final transient Logger log = Logger
          .getLogger(ZOrderIndexBigMinAdvancer.class);
    
+   final protected static boolean DEBUG = log.isDebugEnabled();
+   
    // Search min (upper left) byte array as z-order string (no leading zero)
    private final byte[] searchMinZOrder;
 
@@ -113,7 +115,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       ITuple<SPO> curTuple = tuple; 
       while(curTuple!=null) {
          
-         if (log.isDebugEnabled()) {
+         if (DEBUG) {
             log.debug("Advancor visiting tuple:    " + curTuple);
          }
          
