@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
@@ -78,10 +77,6 @@ import com.bigdata.service.geospatial.IGeoSpatialLiteralSerializer;
 public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExtension<V> {
 
    private static final int BASE_SIZE = Double.SIZE / 8;
-
-   @SuppressWarnings("unused")
-   private static final transient Logger log = Logger
-         .getLogger(GeoSpatialLiteralExtension.class);
 
    private final IGeoSpatialLiteralSerializer litSerializer;
    
