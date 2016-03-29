@@ -267,7 +267,7 @@ public class Depends {
             "http://www.eclipse.org/jetty/",
             "http://www.apache.org/licenses/LICENSE-2.0.html");
 
-    private final static Dep jsonld = new Dep("jsonlod",
+    private final static Dep jsonld = new Dep("jsonld",
             "https://github.com/jsonld-java/jsonld-java/",
             "https://raw.githubusercontent.com/jsonld-java/jsonld-java/master/LICENCE");
     
