@@ -59,6 +59,7 @@ elease Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
     * [BLZG-1813] - Concurrency hole in StatementBuffer can cause load to stop progress when queueCapacity != 0
     * [BLZG-1814] - DataLoader -namespace argument is not working
     * [BLZG-1816] - Setup Default Configuration to Avoid Queues for Concurrency Avoidence
+    * [BLZG-1835] - Failed to create debian package
     * [BLZG-1839] - Report of out of memory error during bigdata-core compile
 
 
