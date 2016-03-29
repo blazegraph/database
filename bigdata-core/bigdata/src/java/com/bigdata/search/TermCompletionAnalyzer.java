@@ -253,7 +253,7 @@ public class TermCompletionAnalyzer extends Analyzer {
 	    return new TokenStreamComponents(source){
 	    	private Reader reader;
 			@Override
-	    	protected void setReader(Reader reader) throws IOException {
+	    	protected void setReader(Reader reader) {
 	    		this.reader = reader;
 	    		super.setReader(reader);
 	    	}
