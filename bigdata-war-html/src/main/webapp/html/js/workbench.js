@@ -78,7 +78,8 @@ var NAMESPACE_PARAMS = {
    'rdr': 'com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers',
    'axioms': 'com.bigdata.rdf.store.AbstractTripleStore.axiomsClass',
    'justify': 'com.bigdata.rdf.store.AbstractTripleStore.justify',
-   'isolatableIndices': 'com.bigdata.rdf.sail.isolatableIndices'
+   'isolatableIndices': 'com.bigdata.rdf.sail.isolatableIndices',
+   'geoSpatial': 'com.bigdata.rdf.store.AbstractTripleStore.geoSpatial'
 };
 
 var NAMESPACE_SHORTCUTS = {
@@ -386,6 +387,7 @@ function getPreparedProperties(elem) {
           params.name = $('#new-namespace-name').val().trim();
           params.textIndex = $('#new-namespace-textIndex').is(':checked');
           params.isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked');
+          params.geoSpatial = $('#new-namespace-geoSpatial').is(':checked');
           
           var mode = $('#new-namespace-mode').val();
           if(mode == 'triples') {
@@ -468,6 +470,7 @@ function cloneNamespace(namespace) {
       $('#new-namespace-inference').prop('checked', params[NAMESPACE_PARAMS.axioms] == 'com.bigdata.rdf.axioms.OwlAxioms');
       $('#new-namespace-textIndex').prop('checked', params[NAMESPACE_PARAMS.textIndex] == 'true');
       $('#new-namespace-isolatableIndices').prop('checked', params[NAMESPACE_PARAMS.isolatableIndices] == 'true');
+      $('#new-namespace-geoSpatial').prop('checked', params[NAMESPACE_PARAMS.geoSpatial] == 'true');      
       changeNamespaceMode();
 
       $('#new-namespace-name').focus();
@@ -578,6 +581,7 @@ function validateNamespaceOptions() {
 function changeNamespaceMode() {
    var quads = $('#new-namespace-mode').val() == 'quads'; // Figure out the current mode (quads, triples, rdr).
    var isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked'); // Are isolatable indices requested?
+   var geoSpatial = $('new-namespace-geoSpatial').is(':checked'); // Is geoSpatial turned on?
    var inferenceDisabled = (quads || isolatableIndices) ? true : false; // true iff inference is not supported.
 //alert("quads="+quads+", isolatableIndices="+isolatableIndices+", inferenceDisallowed="+inferenceDisallowed);
    $('#new-namespace-inference').prop('disabled', inferenceDisabled); // conditionally disable inference checkbox.
@@ -2126,6 +2130,7 @@ function setupHandlers() {
 
    $('#new-namespace-mode').change(changeNamespaceMode);
    $('#new-namespace-isolatableIndices').change(changeNamespaceMode);
+   $('#new-namespace-geoSpatial').change(changeNamespaceMode);   
    $('#namespace-create').submit(function(e){
         e.preventDefault();
         var hiddenSection = $('.popup-container');
