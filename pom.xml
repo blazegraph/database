@@ -244,6 +244,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 Plugins for Maven Central Deployment 
                 See:  http://central.sonatype.org/pages/apache-maven.html 
          -->
+      <!-- See BLZG-1835 -->
+      <properties>
+        <signDebian>true</signDebian>
+      </properties>
       <build>
         <plugins>
           <plugin>
