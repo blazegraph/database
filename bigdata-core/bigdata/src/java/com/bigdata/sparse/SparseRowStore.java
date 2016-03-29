@@ -26,6 +26,8 @@ package com.bigdata.sparse;
 
 import java.text.RuleBasedCollator;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
@@ -37,9 +39,13 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.Journal;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.ndx.IClientIndex;
 
 import cutthecrap.utils.striterators.Resolver;
@@ -1133,5 +1139,58 @@ public class SparseRowStore implements IRowStoreConstants {
             .valueOf(System.getProperty(
                     SparseRowStore.Options.PRIMARY_KEY_UNICODE_CLEAN,
                     SparseRowStore.Options.DEFAULT_PRIMARY_KEY_UNICODE_CLEAN));
+
+    /**
+     * List of namespaces, defined in the row store.
+     * @param tx The transaction identifier -or- <code>timestamp</code> if the
+	 *         {@link IIndexManager} is not a {@link Journal}.
+     * @return List of namespaces
+     */
+	public List<String> getNamespaces(long tx) {
+		// the triple store namespaces.
+		final List<String> namespaces = new LinkedList<String>();
+
+		// scan the relation schema in the global row store.
+		@SuppressWarnings("unchecked")
+		final Iterator<ITPS> itr = (Iterator<ITPS>)
+				rangeIterator(RelationSchema.INSTANCE);
+
+		while (itr.hasNext()) {
+
+			// A timestamped property value set is a logical row with
+			// timestamped property values.
+			final ITPS tps = itr.next();
+
+			// If you want to see what is in the TPS, uncomment this.
+			// System.err.println(tps.toString());
+
+			// The namespace is the primary key of the logical row for the
+			// relation schema.
+			final String namespace = (String) tps.getPrimaryKey();
+
+			// Get the name of the implementation class
+			// (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
+			final String className = (String) tps.get(RelationSchema.CLASS)
+					.getValue();
+
+			if (className == null) {
+				// Skip deleted triple store entry.
+				continue;
+			}
+
+			try {
+				final Class<?> cls = Class.forName(className);
+				if (AbstractTripleStore.class.isAssignableFrom(cls)) {
+					// this is a triple store (vs something else).
+					namespaces.add(namespace);
+				}
+			} catch (ClassNotFoundException e) {
+				log.error(e, e);
+			}
+
+		}
+
+		return namespaces;
+	}
 
 }
