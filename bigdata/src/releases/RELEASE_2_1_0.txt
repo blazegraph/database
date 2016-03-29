@@ -40,8 +40,7 @@ Checkout the latest source code:
 	
 git clone -b BLAZEGRAPH_RELEASE_2_1_0 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_0
 
-
-Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
+elease Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
 
 ** Bug
     * [BLZG-1017] - Support JSON LD
@@ -84,20 +83,23 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
     * [BLZG-1850] - Ease use of geospatial
     * [BLZG-1851] - Remove non-conditional logging in AbstractTripleStore
     * [BLZG-1853] - Benchmark 2.1.0 Release
+    * [BLZG-1855] - Rerun geospatial benchmark in 2.1.0
 
 ** Sub-task
     * [BLZG-1229] - SPARQL* not parsed in SPARQL UPDATE
     * [BLZG-1267] - Unable to bind result of EXISTS operator
     * [BLZG-1466] - Queries in Explain mode are run twice
     * [BLZG-1479] - Generalized version of GeoSpatial feature
+    * [BLZG-1621] - Test Cases for rebuildTextIndex
     * [BLZG-1622] - Data migration scripts for 2.0 release
     * [BLZG-1623] - Include data migration instructions in release notes.
+    * [BLZG-1637] - REST API method to rebuild the text index.
+    * [BLZG-1638] - Add ability to rebuild the text index to the workbench
     * [BLZG-1714] - Document the data loader REST API capability on the wiki
+    * [BLZG-1722] - Document procedure to rebuild the text index
     * [BLZG-1779] - Add full test coverage for RDF* and SPARQL UPDATE
     * [BLZG-1822] - Test cases for generalized version of GeoSpatial feature
     * [BLZG-1823] - Documentation for generalized version of GeoSpatial feature
     * [BLZG-1830] - Code review on critical things related to geospatial issue
     * [BLZG-1833] - geo:locationValue should use default type or specified query type
     * [BLZG-1841] - Support extraction of complete GeoSpatial literal in geospatial SERVICE
-
-
