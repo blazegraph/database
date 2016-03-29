@@ -134,6 +134,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
    private static final Logger log = Logger
          .getLogger(GeoSpatialServiceFactory.class);
 
+   final protected static boolean INFO = log.isInfoEnabled();
+   final protected static boolean DEBUG = log.isDebugEnabled();
+   
    /*
     * Note: This could extend the base class to allow for search service
     * configuration options.
@@ -227,7 +230,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY, 
             BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
   
-      if (log.isDebugEnabled()) {
+      if (DEBUG) {
          log.debug("maxParallel=" + maxParallel);
          log.debug("numTasksPerThread=" + numTasksPerThread);
          log.debug("threadLocalBufferCapacity=" + threadLocalBufferCapacity);
@@ -511,7 +514,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.threadLocalBufferCapacity = threadLocalBufferCapacity;
          this.globalBufferChunkOfChunksCapacity = globalBufferChunkOfChunksCapacity;
          
-         if (log.isDebugEnabled()) {
+         if (DEBUG) {
              log.debug("Number of threads used for execution: " + maxParallel);
          }
 
@@ -972,7 +975,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          @Override
          public Void call() throws Exception {
 
-            if (log.isDebugEnabled()) {
+            if (DEBUG) {
                 log.debug("Number of service call tasks to execute: " + tasks.size());
             }
              
@@ -1891,7 +1894,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                     
          } catch (Exception e) {
          
-             if (log.isInfoEnabled()) {
+             if (INFO) {
                 log.info(
                    "Something went wrong extracting the object: " + e.getMessage() +
                    "Rejecting unprocessable value.");
