@@ -880,20 +880,12 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         final Analyzer a = getAnalyzer(languageCode, filterStopwords);
         
         TokenStream tokenStream;
-		try {
-			tokenStream = a.tokenStream(null/* @todo field? */, r);
+		tokenStream = a.tokenStream(null/* @todo field? */, r);
 
-			// force to lower case.
-			tokenStream = new LowerCaseFilter(tokenStream);
+		// force to lower case.
+		tokenStream = new LowerCaseFilter(tokenStream);
 
-			return tokenStream;
-		} catch (IOException e) {
-			if(log.isDebugEnabled()) {
-				log.debug(e);
-			}
-		}
-		
-		return null;
+		return tokenStream;
     }
 
     /**
