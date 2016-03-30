@@ -53,7 +53,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
-     
+
         /*
          * Note: This default will locate the jetty.xml resource that is bundled
          * with the JAR. This preserves the historical behavior. If you want to

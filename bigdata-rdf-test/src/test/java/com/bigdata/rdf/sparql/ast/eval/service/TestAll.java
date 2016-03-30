@@ -120,6 +120,17 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestGeoSpatialServiceEvaluation.class);
         suite.addTestSuite(TestGeoSpatialServiceEvaluationQuads.class);
         suite.addTestSuite(TestGeoSpatialServiceConfiguration.class);
+        suite.addTestSuite(TestGeoSpatialServiceConfigurationCustomDatatype.class);
+        suite.addTestSuite(TestGeoSpatialCustomSerializer.class);
+        suite.addTestSuite(TestGeoSpatialCustomSerializerWKT.class);
+        suite.addTestSuite(TestGeoSpatialCustomFields.class);
+        suite.addTestSuite(TestGeoSpatialCorrectRejection.class);
+        suite.addTestSuite(TestGeoSpatialDefaults.class);
+        suite.addTestSuite(TestGeoSpatialExamplesFromDocumentation.class);
+        suite.addTestSuite(TestGeoSpatialServiceConfigurationParsing.class);
+        suite.addTestSuite(TestGeoSpatialQueryIfGeospatialDisabled.class);
+        suite.addTestSuite(TestGeoSpatialDisableBuiltinDatatypes.class);
+        suite.addTestSuite(TestGeoSpatialQueryVaryOneDimension.class);
         
         return suite;
         

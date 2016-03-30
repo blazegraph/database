@@ -1,0 +1,27 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT * WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inCircle" .
+    ?res geo:searchDatatype <http://my.custom.datatype/x-y-z-lat-lon-time-coord> .
+    ?res geo:predicate <http://p> .
+    ?res geo:spatialCircleCenter "5#6" .
+    ?res geo:spatialCircleRadius "300" .    
+    ?res geo:customFields "x#y#z" .
+    ?res geo:customFieldsLowerBounds "2#3#4" .
+    ?res geo:customFieldsUpperBounds "2#3#4" .
+    ?res geo:timeStart "7" .
+    ?res geo:timeEnd "7" .
+    ?res geo:coordSystem "5" .
+    
+    ?res geo:latValue ?lat .
+    ?res geo:lonValue ?lon .
+    ?res geo:timeValue ?time .
+    ?res geo:locationValue ?location .
+    ?res geo:locationAndTimeValue ?locationAndTime .
+    ?res geo:coordSystemValue ?coordSystem .
+    ?res geo:customFieldsValues ?customFields  .
+    ?res geo:literalValue ?literal  .
+    
+  }
+}

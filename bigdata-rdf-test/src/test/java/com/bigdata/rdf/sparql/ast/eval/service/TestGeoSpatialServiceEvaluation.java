@@ -1213,6 +1213,20 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
         properties.setProperty(
            com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL, "true");
 
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + ".0",
+                "{\"config\": "
+                + "{ \"uri\": \"http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral\", "
+                + "\"fields\": [ "
+                + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
+                + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
+                + "{ \"valueType\": \"LONG\", \"serviceMapping\" : \"TIME\"  } "
+                + "]}}");
+        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractLocalTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE,
+                "http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral");
+        
         return properties;
 
     }

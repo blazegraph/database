@@ -75,12 +75,15 @@ import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
  */
 public interface GeoSpatial {
 
+   public static String CUSTOM_FIELDS_SEPARATOR = "#";
+    
    /**
     * Enum for implemented geo functions.
     */
    public static enum GeoFunction {
       IN_CIRCLE("inCircle"),
-      IN_RECTANGLE("inRectangle");
+      IN_RECTANGLE("inRectangle"),
+      UNDEFINED("undefined");
       
       GeoFunction(final String name) {
          this.name = name;
@@ -113,8 +116,6 @@ public interface GeoSpatial {
        */
       String GEO_FUNCTION = GeoSpatial.class.getName() + ".defaultGeoFunction";
       
-      GeoFunction DEFAULT_GEO_FUNCTION = GeoFunction.IN_CIRCLE;
-      
       /**
        * Option that may be set to specify a default for {@link GeoSpatial#SPATIAL_DISTANCE_UNIT},
        * to be used in geo service. Defaults to meters.
@@ -125,23 +126,48 @@ public interface GeoSpatial {
 
 
    }
-   
-   
+
+   /************************************************************************************************
+    *                                      META DECLARATIONS                                       *
+    ************************************************************************************************/
+
    /**
     * The namespace used for magic search predicates.
     */
    final String NAMESPACE = "http://www.bigdata.com/rdf/geospatial#";
+
+
+   // do not use anymore -- need to be retained because it is linked by old vocabulary class
+   @Deprecated
+   final URI DEFAULT_DATATYPE= new URIImpl(NAMESPACE + "geoSpatialLiteral");
+   
    
    /**
-    * The datatype to be used for GeoSpatial literals.
+    * The default datatype to be used for GeoSpatial literals.
     */
-   final URI DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
-
+   final String GEOSPATIAL_LITERAL_PREFIX_V1  = "http://www.bigdata.com/rdf/geospatial/literals/v1#";
+   final String GEOSPATIAL_LITERAL_V1_LAT_LON = GEOSPATIAL_LITERAL_PREFIX_V1 + "lat-lon";
+   final String GEOSPATIAL_LITERAL_V1_LAT_LON_TIME = GEOSPATIAL_LITERAL_PREFIX_V1 + "lat-lon-time";
+   
+   final URI DEFAULT_DATATYPE_LAT_LON = new URIImpl(GEOSPATIAL_LITERAL_V1_LAT_LON);
+   final URI DEFAULT_DATATYPE_LAT_LON_TIME = new URIImpl(GEOSPATIAL_LITERAL_V1_LAT_LON_TIME);
+   
+   
+   /************************************************************************************************
+    *                                      MAGIC PREDICATES                                        *
+    ************************************************************************************************/
+   
    /**
     * The name of the search function, pointing to a {@link GeoFunction}.
     */
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
-   
+
+   /**
+    * The datatype for literals we're interested in. If not specified, defaults
+    * to DEFAULT_DATATYPE.
+    */
+   final URI SEARCH_DATATYPE = new URIImpl(NAMESPACE + "searchDatatype");
+
    /**
     * Pointer to the predicate used in scanned triples.
     */
@@ -188,7 +214,27 @@ public interface GeoSpatial {
     * End time of the time interval to scan for.
     */
    final URI TIME_END = new URIImpl(NAMESPACE + "timeEnd");
+
+   /**
+    * End time of the time interval to scan for.
+    */
+   final URI COORD_SYSTEM = new URIImpl(NAMESPACE + "coordSystem");
    
+   /**
+    * #-separated list of custom fields to be queries, e.g. myField1#myField2
+    */
+   final URI CUSTOM_FIELDS = new URIImpl(NAMESPACE + "customFields");
+   
+   /**
+    * Lower bounds for custom fields, e.g. 10#20
+    */
+   final URI CUSTOM_FIELDS_LOWER_BOUNDS = new URIImpl(NAMESPACE + "customFieldsLowerBounds");
+
+   /**
+    * Upper bounds for custom fields, e.g. 11#5000
+    */
+   final URI CUSTOM_FIELDS_UPPER_BOUNDS = new URIImpl(NAMESPACE + "customFieldsUpperBounds");
+
    /**
     * Output variable; if set, this variable is bound to the locations component of the search result.
     */
@@ -200,8 +246,34 @@ public interface GeoSpatial {
    final URI TIME_VALUE = new URIImpl(NAMESPACE + "timeValue");
    
    /**
+    * Output variable; if set, this variable is bound to the literal component "as is".
+    */
+   final URI LITERAL_VALUE = new URIImpl(NAMESPACE + "literalValue");
+   
+   /**
+    * Output variable; if set, this variable is bound to the latitude component of the search result.
+    */
+   final URI LAT_VALUE = new URIImpl(NAMESPACE + "latValue");
+
+   /**
+    * Output variable; if set, this variable is bound to the longitude component of the search result.
+    */
+   final URI LON_VALUE = new URIImpl(NAMESPACE + "lonValue");
+
+   /**
+    * Output variable; if set, this variable is bound to the longitude component of the search result.
+    */
+   final URI COORD_SYSTEM_VALUE = new URIImpl(NAMESPACE + "coordSystemValue");
+   
+   /**
+    * Output variable; if set, this variable is bound to the values for the custom fields,
+    * separated by CUSTOM_FIELDS_SEPARATOR (in case there are multiple custom fields)
+    */
+   final URI CUSTOM_FIELDS_VALUES = new URIImpl(NAMESPACE + "customFieldsValues");
+   
+   /**
     * Output variable; if set, this variable is bound to a combined representation of the
-    * locations + time component of the search result.
+    * locations + time component of the search result, separated through the CUSTOM_FIELDS_SEPARATOR.
     */
    final URI LOCATION_AND_TIME_VALUE = new URIImpl(NAMESPACE + "locationAndTimeValue");
    

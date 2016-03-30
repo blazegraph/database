@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="res"/>
+    <variable name="lat"/>
+    <variable name="lon"/>
+    <variable name="time"/>
+    <variable name="location"/>
+    <variable name="locationAndTime"/>
+    <variable name="coordSystem"/>
+    <variable name="customFields"/>
+    <variable name="literal"/>
+  </head>
+  <results>
+
+     <result>
+      <binding name="res"><uri>http://s2</uri></binding>
+      <binding name="customFields"><literal>CustomFields(2.0-3.0-4.0)</literal></binding>
+      <binding name="lat"><literal>Lat(5.0)</literal></binding>
+      <binding name="lon"><literal>Lon(6.0)</literal></binding>
+      <binding name="time"><literal>Time(7)</literal></binding>
+      <binding name="location"><literal>Location(5.0-6.0)</literal></binding>
+      <binding name="locationAndTime"><literal>LocationAndTime(5.0-6.0-7)</literal></binding>
+      <binding name="coordSystem"><literal>CoordSystem(5)</literal></binding>
+      <binding name="literal"><literal datatype="http://my.custom.datatype/x-y-z-lat-lon-time-coord">2.0#3.0#4.0#5.0#6.0#7#5</literal></binding>
+     </result>
+
+  </results>
+</sparql>

@@ -27,16 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.search;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
 import org.apache.lucene.analysis.cjk.CJKAnalyzer;
-import org.apache.lucene.analysis.cn.ChineseAnalyzer;
+import org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer;
 import org.apache.lucene.analysis.cz.CzechAnalyzer;
 import org.apache.lucene.analysis.de.GermanAnalyzer;
 import org.apache.lucene.analysis.el.GreekAnalyzer;
@@ -45,7 +43,7 @@ import org.apache.lucene.analysis.nl.DutchAnalyzer;
 import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
-import org.apache.lucene.util.Version;
+import org.apache.lucene.analysis.util.CharArraySet;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -57,7 +55,7 @@ import com.bigdata.btree.keys.KeyBuilder;
  * certain three letter ISO 639 codes:
  * "por", "deu", "ger", "zho", "chi", "jpn", "kor", "ces", "cze", "dut", "nld", "gre", "ell",
  * "fra", "fre", "rus" and "tha". All other tags are treated as English.
- * These codes do not work if they are used with subtags, e.g. "ger-AT" is treated as English.
+ * These codes do not work if they are used with subtagse.g. "ger-AT" is treated as English.
  * No two letter code, other than "en" works correctly: note that the W3C and 
  * IETF recommend the use of the two letter forms instead of the three letter forms.
  * 
@@ -189,7 +187,7 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
      * 
      * @todo strip language code down to 2/3 characters during lookup.
      * 
-     * @todo There are a lot of pidgins based on french, english, and other
+     * @todo There are a lot of pidgins based on frenchenglish, and other
      *       languages that are not being assigned here.
      */
     synchronized private Map<String,AnalyzerConstructor> getAnalyzers() {
@@ -202,14 +200,14 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         
         analyzers = new HashMap<String, AnalyzerConstructor>();
         
-        final Set<?> emptyStopwords = Collections.EMPTY_SET;
+        final CharArraySet emptyStopwords = CharArraySet.EMPTY_SET;
 
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new BrazilianAnalyzer(Version.LUCENE_CURRENT) :
-                    	new BrazilianAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new BrazilianAnalyzer() :
+                    	new BrazilianAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("por", a);
@@ -229,7 +227,9 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
-            		return new ChineseAnalyzer();
+                    return filterStopwords ?
+                		new SmartChineseAnalyzer() :
+                		new SmartChineseAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("zho", a);
@@ -245,8 +245,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new CJKAnalyzer(Version.LUCENE_CURRENT) :
-                		new CJKAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new CJKAnalyzer() :
+                		new CJKAnalyzer(emptyStopwords);
                 }
             };
 //            analyzers.put("zho", a);
@@ -263,8 +263,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new CzechAnalyzer(Version.LUCENE_CURRENT) :
-            			new CzechAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new CzechAnalyzer() :
+            			new CzechAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("ces",a);
@@ -276,8 +276,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new DutchAnalyzer(Version.LUCENE_CURRENT) :
-            			new DutchAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new DutchAnalyzer() :
+            			new DutchAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("dut",a);
@@ -289,8 +289,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new FrenchAnalyzer(Version.LUCENE_CURRENT) :
-            			new FrenchAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new FrenchAnalyzer() :
+            			new FrenchAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("fra",a); 
@@ -306,8 +306,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new GermanAnalyzer(Version.LUCENE_CURRENT) :
-            			new GermanAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new GermanAnalyzer() :
+            			new GermanAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("deu",a); 
@@ -320,8 +320,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new GreekAnalyzer(Version.LUCENE_CURRENT) :
-            			new GreekAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new GreekAnalyzer() :
+            			new GreekAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("gre",a); 
@@ -334,8 +334,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new RussianAnalyzer(Version.LUCENE_CURRENT) :
-                    	new RussianAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new RussianAnalyzer() :
+                    	new RussianAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("rus",a); 
@@ -345,7 +345,7 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
-                    return new ThaiAnalyzer(Version.LUCENE_CURRENT);
+                    return new ThaiAnalyzer();
                 }
             };
             analyzers.put("tha",a); 
@@ -357,8 +357,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance(final boolean filterStopwords) {
                     return filterStopwords ?
-                		new StandardAnalyzer(Version.LUCENE_CURRENT) :
-                		new StandardAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
+                		new StandardAnalyzer() :
+                		new StandardAnalyzer(emptyStopwords);
                 }
             };
             analyzers.put("eng", a);

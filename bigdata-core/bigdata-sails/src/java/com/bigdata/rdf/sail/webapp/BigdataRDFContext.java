@@ -2684,20 +2684,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	public List<String> getNamespacesTx(long tx) {
 
-		final IIndexManager indexManager = getIndexManager();
-		
-        if (tx == ITx.READ_COMMITTED && indexManager instanceof IBigdataFederation) {
+        if (tx == ITx.READ_COMMITTED && getIndexManager() instanceof IBigdataFederation) {
 
 			// Use the last commit point for the federation *only*.
             tx = getIndexManager().getLastCommitTime();
 
         }
 
-        // the triple store namespaces.
-		final List<String> namespaces = new LinkedList<String>();
-
-		final SparseRowStore grs = getIndexManager().getGlobalRowStore(
-				tx);
+		final SparseRowStore grs = getIndexManager().getGlobalRowStore(tx);
 
 		if (grs == null) {
 
@@ -2705,52 +2699,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 					+ TimestampUtility.toString(tx));
 
 			// Empty.
-			return namespaces;
+			return Collections.emptyList();
 
 		}
 
-		// scan the relation schema in the global row store.
-		@SuppressWarnings("unchecked")
-		final Iterator<ITPS> itr = (Iterator<ITPS>) grs
-				.rangeIterator(RelationSchema.INSTANCE);
-
-		while (itr.hasNext()) {
-
-			// A timestamped property value set is a logical row with
-			// timestamped property values.
-			final ITPS tps = itr.next();
-
-			// If you want to see what is in the TPS, uncomment this.
-			// System.err.println(tps.toString());
-
-			// The namespace is the primary key of the logical row for the
-			// relation schema.
-			final String namespace = (String) tps.getPrimaryKey();
-
-			// Get the name of the implementation class
-			// (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
-			final String className = (String) tps.get(RelationSchema.CLASS)
-					.getValue();
-
-			if (className == null) {
-				// Skip deleted triple store entry.
-				continue;
-			}
-
-			try {
-				final Class<?> cls = Class.forName(className);
-				if (AbstractTripleStore.class.isAssignableFrom(cls)) {
-					// this is a triple store (vs something else).
-					namespaces.add(namespace);
-				}
-			} catch (ClassNotFoundException e) {
-				log.error(e, e);
-			}
-
-		}
-
-		return namespaces;
-
+		return grs.getNamespaces(tx);
 	}
     
 	/**

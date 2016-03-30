@@ -98,7 +98,7 @@ public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluatio
 		 * This is the astContainer of the last query executed.
 		 */
 		protected ASTContainer astContainer;
-
+		
 		public AbsHelper(final String queryStr) {
 
 		    this.queryStr = queryStr;

@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -49,6 +50,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Tx;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
@@ -61,6 +63,7 @@ import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.PropertyUtil;
+import com.bigdata.rdf.sail.BigdataSailHelper;
 
 /**
  * Mult-tenancy Administration Servlet (management for bigdata namespaces). A
@@ -97,6 +100,12 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
      * should be described.
      */
     protected static final String DESCRIBE_DEFAULT_NAMESPACE = "describe-default-namespace";
+    
+    /**
+     * URL query parameter used to specify that full text index 
+     * will be created if not exists.
+     */    
+    private static final String FORCE_INDEX_CREATE_PARAMETER = "force-index-create"; 
     
     /**
      * Delegate for the sparql end point expressed by
@@ -144,8 +153,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     @Override
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-
-        if (req.getRequestURI().endsWith("/namespace")) {
+    	
+    	if (req.getRequestURI().endsWith("/namespace")) {
 
             // CREATE NAMESPACE.
             doCreateNamespace(req, resp);
@@ -160,7 +169,20 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             return;
             
-        } 
+        }
+        
+    	final String namespace = getNamespace(req);
+    	
+    	if (req.getRequestURI().endsWith(ConnectOptions.urlEncode(namespace) + "/textIndex")) {
+
+            // CREATE NAMESPACE.
+            doRebuildTextIndex(req, resp, namespace);
+
+            return;
+            
+        }
+        
+        
 
         /*
          * Pass through to the SPARQL end point REST API.
@@ -778,5 +800,30 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
         v.describeDataSet(false/* describeStatistics */, describeEachNamedGraph);
         
     }
+    
+ 	private void doRebuildTextIndex(HttpServletRequest req,
+			HttpServletResponse resp, String namespace) throws IOException {
+		
+		boolean forceIndexCreate = Boolean.TRUE.toString().equals(req.getParameter(FORCE_INDEX_CREATE_PARAMETER));
+
+		PrintWriter writer = resp.getWriter();
+
+		try {
+
+			AbstractTripleStore store = getBigdataRDFContext().getTripleStore(namespace, Tx.UNISOLATED);
+			
+			store.getLexiconRelation().rebuildTextIndex(forceIndexCreate);
+			
+			writer.append("Text index rebuild completed");
+			
+		} catch (UnsupportedOperationException e) {
+			
+			writer.append(e.getMessage());
+			
+			resp.sendError(HTTP_INTERNALERROR, e.getMessage());
+			
+		}
+		
+	}
 
 }

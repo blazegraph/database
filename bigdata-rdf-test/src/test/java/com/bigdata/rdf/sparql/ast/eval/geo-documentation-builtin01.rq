@@ -1,0 +1,15 @@
+PREFIX geoliteral: <http://www.bigdata.com/rdf/geospatial/literals/v1#>
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+PREFIX example: <http://www.example.com/>
+
+SELECT * WHERE {
+  SERVICE geo:search {
+    ?event geo:search "inCircle" .
+    ?event geo:searchDatatype geoliteral:lat-lon-time .
+    ?event geo:predicate example:happened .
+    ?event geo:spatialCircleCenter "48.13743#11.57549" .
+    ?event geo:spatialCircleRadius "100" . # default unit: Kilometers
+    ?event geo:timeStart "1356994800" . # 01.01.2013, 00:00:00
+    ?event geo:timeEnd "1388530799" .   # 31.12.2013, 23:59:59
+  }
+}

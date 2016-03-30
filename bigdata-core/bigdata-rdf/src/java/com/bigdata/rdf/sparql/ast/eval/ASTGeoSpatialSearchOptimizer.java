@@ -53,6 +53,7 @@ public class ASTGeoSpatialSearchOptimizer extends ASTSearchOptimizerBase {
         final Set<URI> set = new LinkedHashSet<URI>();
         
         set.add(GeoSpatial.SEARCH);
+        set.add(GeoSpatial.SEARCH_DATATYPE);
         set.add(GeoSpatial.PREDICATE);
         set.add(GeoSpatial.CONTEXT);
         set.add(GeoSpatial.SPATIAL_CIRCLE_CENTER);
@@ -62,8 +63,17 @@ public class ASTGeoSpatialSearchOptimizer extends ASTSearchOptimizerBase {
         set.add(GeoSpatial.SPATIAL_UNIT);        
         set.add(GeoSpatial.TIME_START);
         set.add(GeoSpatial.TIME_END);
+        set.add(GeoSpatial.COORD_SYSTEM);
+        set.add(GeoSpatial.CUSTOM_FIELDS);
+        set.add(GeoSpatial.CUSTOM_FIELDS_LOWER_BOUNDS);
+        set.add(GeoSpatial.CUSTOM_FIELDS_UPPER_BOUNDS);        
         set.add(GeoSpatial.LOCATION_VALUE);        
         set.add(GeoSpatial.TIME_VALUE);
+        set.add(GeoSpatial.LITERAL_VALUE);
+        set.add(GeoSpatial.LAT_VALUE);
+        set.add(GeoSpatial.LON_VALUE);
+        set.add(GeoSpatial.COORD_SYSTEM_VALUE);
+        set.add(GeoSpatial.CUSTOM_FIELDS_VALUES);
         set.add(GeoSpatial.LOCATION_AND_TIME_VALUE);
         
         searchUris = Collections.unmodifiableSet(set);

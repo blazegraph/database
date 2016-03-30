@@ -93,7 +93,7 @@ public class RESTServlet extends BigdataRDFServlet {
         m_deleteServlet = new DeleteServlet();
         m_describeServlet = new DescribeCacheServlet();
         m_workbenchServlet = new WorkbenchServlet();
-        
+       
         {
             final String provider = this
     				.getInitParameter(ConfigParams.BLUEPRINTS_SERVLET_PROVIDER); 
