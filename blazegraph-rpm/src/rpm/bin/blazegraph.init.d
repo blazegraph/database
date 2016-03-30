@@ -247,13 +247,16 @@ case "$1" in
 				rm -f "${BLZG_PID}"
 				rm -rf "$JVM_TMP"
 				echo "Stopped $NAME (pid ${PID})"
+				exit 0
 			else
 				echo "Failed to stop $NAME (pid ${PID})"
+				exit 1
 			fi
 		fi
 
 	else
 		echo "(not running)"
+	 	exit 1
 	fi
 	set -e
 	;;

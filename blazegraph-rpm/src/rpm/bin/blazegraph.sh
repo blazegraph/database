@@ -73,7 +73,7 @@ case "$1" in
          $cmd >> $BLZG_LOG 2>&1 &
       fi
       pid=$!
-      retval=$$
+      retval=$?
       # echo "PID=$pid"
       echo "$pid">$BLZG_PID
       exit $retval
@@ -89,11 +89,13 @@ case "$1" in
 # The process has died so remove the old pid file.
                 echo $"`date` : `hostname` : $pid died?"
                 rm -f "$BLZG_PID"
+		exit 0
             else
                 echo -ne $"`date` : `hostname` : bringing blazegraph service down ... "
                 kill $pid
                 rm -f "$BLZG_PID"
                 echo "done!"
+		exit 0
             fi
         fi
         ;;
@@ -112,6 +114,7 @@ case "$1" in
         else
             echo $"`date` : `hostname` : not running."
         fi
+	exit 0
         ;;
 #
 # Simply stop then start.
