@@ -1,0 +1,11 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?res WHERE {
+  SERVICE geo:search {
+    ?res geo:searchDatatype <http://my.custom.datatype/time-coord> .
+    ?res geo:predicate <http://p> .
+    ?res geo:timeStart "0" .
+    ?res geo:timeEnd "1" .
+    ?res geo:coordSystem "0" .
+  }
+} 

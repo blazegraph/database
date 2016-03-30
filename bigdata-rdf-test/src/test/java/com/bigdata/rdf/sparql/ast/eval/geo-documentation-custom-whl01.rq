@@ -1,0 +1,16 @@
+PREFIX geoliteral: <http://www.bigdata.com/rdf/geospatial/literals/v1#>
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+PREFIX example: <http://www.example.com/>
+
+SELECT * WHERE {
+ 
+  SERVICE geo:search {
+    ?article geo:predicate example:dimension .
+    ?article geo:searchDatatype <http://width-height-length-dt>  .
+    ?article geo:customFields "width#height#length" .
+    ?article geo:customFieldsLowerBounds "10#20#10" .
+    ?article geo:customFieldsUpperBounds "30#30#20" .
+    ?article geo:customFieldsValues ?customFields .
+    
+  }
+}

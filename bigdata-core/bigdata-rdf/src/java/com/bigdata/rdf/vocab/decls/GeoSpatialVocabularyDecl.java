@@ -43,11 +43,13 @@ import com.bigdata.service.geospatial.GeoSpatial;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
+@Deprecated
 public class GeoSpatialVocabularyDecl implements VocabularyDecl {
 
+    // TODO: proper registration of datatypes passed in via config
     static private final URI[] uris = new URI[]{
         new URIImpl(GeoSpatial.NAMESPACE),//
-        GeoSpatial.DATATYPE,
+        GeoSpatial.DEFAULT_DATATYPE,
     };
 
     public GeoSpatialVocabularyDecl() {

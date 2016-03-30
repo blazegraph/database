@@ -210,7 +210,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <slf4j.version>1.6.1</slf4j.version>
     <jetty.version>9.2.3.v20140905</jetty.version>
     <servlet.version>3.1.0</servlet.version>
-    <lucene.version>3.0.0</lucene.version>
+    <lucene.version>5.5.0</lucene.version>
     <apache.commons_codec.version>1.4</apache.commons_codec.version>
     <apache.commons_configuration.version>1.10</apache.commons_configuration.version>
     <apache.commons_fileupload.version>1.3.1</apache.commons_fileupload.version>
@@ -244,6 +244,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 Plugins for Maven Central Deployment 
                 See:  http://central.sonatype.org/pages/apache-maven.html 
          -->
+      <!-- See BLZG-1835 -->
+      <properties>
+        <signDebian>true</signDebian>
+      </properties>
       <build>
         <plugins>
           <plugin>

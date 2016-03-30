@@ -1,0 +1,15 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?res WHERE {
+
+  BIND("x#y#z" AS ?customFields)
+  SERVICE geo:search {
+    ?res geo:searchDatatype <http://my.custom.datatype/time-x-y-z> .
+    ?res geo:predicate <http://p> .
+    ?res geo:customFields ?customFields .
+    ?res geo:customFieldsLowerBounds "0#0.4#1" .
+    ?res geo:customFieldsUpperBounds "1#1#1" .
+    ?res geo:timeStart "1" .
+    ?res geo:timeEnd "2" .    
+  }
+}

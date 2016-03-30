@@ -32,11 +32,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaDescription;
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription;
-import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription.Datatype;
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialDatatypeConfigurationError;
+import com.bigdata.rdf.internal.impl.extensions.InvalidGeoSpatialLiteralError;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -44,6 +44,11 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.service.geospatial.GeoSpatial;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration;
+import com.bigdata.service.geospatial.GeoSpatialDefaultLiteralSerializer;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ServiceMapping;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeFieldConfiguration.ValueType;
 
 /**
  * Unit tests for {@link GeoSpatialLiteralExtension}.
@@ -54,6 +59,18 @@ import com.bigdata.service.geospatial.GeoSpatial;
 public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       AbstractEncodeDecodeKeysTestCase {
 
+   private final String STR_DATATYPE_LAT_LON_LONG_MIN = "http://my.test.datatype/lat_lon_long_min";
+   private final URI URI_DATATYPE_LAT_LON_LONG_MIN = new URIImpl(STR_DATATYPE_LAT_LON_LONG_MIN);
+
+   private final String STR_DATATYPE_LAT_LON_LONG = "http://my.test.datatype/lat_lon_as-long";
+   private final URI URI_DATATYPE_LAT_LON_LONG = new URIImpl(STR_DATATYPE_LAT_LON_LONG);
+
+   private final String STR_DATATYPE_LAT_LON_DOUBLE = "http://my.test.datatype/lat_lon_as-double";
+   private final URI URI_DATATYPE_LAT_LON_DOUBLE = new URIImpl(STR_DATATYPE_LAT_LON_DOUBLE);
+
+   private final String STR_DATATYPE_LAT_LON_TIME = "http://my.test.datatype/lat_lon_time";
+   private final URI URI_DATATYPE_LAT_LON_TIME = new URIImpl(STR_DATATYPE_LAT_LON_TIME);
+   
    /**
      * 
      */
@@ -79,7 +96,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
          getLatLonTimeGSLiteralExtension(vf);
       
       encodeDecodeGeoSpatialLiterals(
-         vf, getDummyGeospatialLiteralsLatLonTime(vf), ext);
+         vf, getDummyGeospatialLiteralsLatLonTime(vf, URI_DATATYPE_LAT_LON_TIME), ext);
    }
 
    
@@ -95,7 +112,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
          getLatLonGSLiteralExtension(vf);
       
       encodeDecodeGeoSpatialLiterals(
-         vf, getDummyGeospatialLiteralsLatLon(vf), ext);
+         vf, getDummyGeospatialLiteralsLatLon(vf, URI_DATATYPE_LAT_LON_DOUBLE), ext);
    }
    
    /**
@@ -117,9 +134,9 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
                getLatLonTimeGSLiteralExtension(vf);
          
          encodeDecodeGeoSpatialLiterals(
-            vf, getDummyGeospatialLiteralsLatLon(vf), extLatLonTime);
+            vf, getDummyGeospatialLiteralsLatLon(vf, URI_DATATYPE_LAT_LON_TIME), extLatLonTime);
          
-      } catch (IllegalArgumentException e) {
+      } catch (InvalidGeoSpatialLiteralError e) {
          
          case1Passed = true; // expected
          
@@ -141,9 +158,9 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
                getLatLonGSLiteralExtension(vf);
 
          encodeDecodeGeoSpatialLiterals(
-            vf, getDummyGeospatialLiteralsLatLonTime(vf), extLatLon);
+            vf, getDummyGeospatialLiteralsLatLonTime(vf, GeoSpatial.DEFAULT_DATATYPE), extLatLon);
          
-      } catch (IllegalArgumentException e) {
+      } catch (InvalidGeoSpatialLiteralError e) {
          
          case2Passed = true; // expected
          
@@ -168,7 +185,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
             getSimpleLatLonGSLiteralExtension(vf); 
       
       
-      zIndexOrderingPositiveBase(vf, litExt);
+      zIndexOrderingPositiveBase(vf, litExt, URI_DATATYPE_LAT_LON_LONG);
       
    }
    
@@ -185,7 +202,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       final GeoSpatialLiteralExtension<BigdataValue> litExt = 
          getSimpleLatLonGSLiteralExtensionWithRange(vf, Long.valueOf(0)); 
       
-      zIndexOrderingPositiveBase(vf, litExt);
+      zIndexOrderingPositiveBase(vf, litExt, URI_DATATYPE_LAT_LON_LONG_MIN);
    }
    
 
@@ -201,7 +218,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       final GeoSpatialLiteralExtension<BigdataValue> litExt = 
          getSimpleLatLonGSLiteralExtension(vf); 
       
-      zIndexOrderingMixedBase(vf, litExt);
+      zIndexOrderingMixedBase(vf, litExt, URI_DATATYPE_LAT_LON_LONG);
    }
    
    /**
@@ -217,7 +234,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       final GeoSpatialLiteralExtension<BigdataValue> litExt = 
          getSimpleLatLonGSLiteralExtensionWithRange(vf, Long.valueOf(-2)); 
       
-      zIndexOrderingMixedBase(vf, litExt);
+      zIndexOrderingMixedBase(vf, litExt, URI_DATATYPE_LAT_LON_LONG_MIN);
    }
    
    
@@ -267,7 +284,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
 
    protected void zIndexOrderingPositiveBase(
       final BigdataValueFactory vf,
-      final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+      final GeoSpatialLiteralExtension<BigdataValue> litExt,
+      final URI datatype) {
       
       /**
        * Scenario description: assume we have integers 0 .. 7 for each of the
@@ -361,7 +379,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       
       // Generate in syntactical order (as above): 0#0, ..., 0#7, 1#0, ... 7#7:
       final BigdataLiteral[] asWritten  =
-         getGeospatialLiteralsLatLonInRange(vf,0,7);
+         getGeospatialLiteralsLatLonInRange(vf,0,7,datatype);
       
       // convert into LiteralExtensionIVs (backed by BigInteger, in this case)
       @SuppressWarnings("rawtypes")
@@ -468,11 +486,12 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
 
    protected void zIndexOrderingMixedBase(
       final BigdataValueFactory vf,
-      final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+      final GeoSpatialLiteralExtension<BigdataValue> litExt,
+      final URI datatype) {
       
       // Generate values
       final BigdataLiteral[] asWritten  =
-         getGeospatialLiteralsLatLonInRange(vf,-2,1);
+         getGeospatialLiteralsLatLonInRange(vf, -2, 1, datatype);
       
       // convert into LiteralExtensionIVs (backed by BigInteger, in this case)
       @SuppressWarnings("rawtypes")
@@ -539,7 +558,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
     * @return the list of generated literals
     */
    protected final BigdataLiteral[] getDummyGeospatialLiteralsLatLon(
-         final BigdataValueFactory vf) {
+         final BigdataValueFactory vf, final URI datatype) {
 
       /**
        * The basic schema is a three-component datatype string made up from the
@@ -594,7 +613,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       for (int lat = 0; lat < baseLatLong.length; lat++) {
          for (int lon = 0; lon < baseLatLong.length; lon++) {
             dt[ctr++] = vf.createLiteral(
-               baseLatLong[lat] + "#" + baseLatLong[lon], GeoSpatial.DATATYPE);
+               baseLatLong[lat] + "#" + baseLatLong[lon], datatype);
          }
       }
 
@@ -618,15 +637,10 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
     * @return the list of generated literals
     */
    protected final BigdataLiteral[] getDummyGeospatialLiteralsLatLonTime(
-         final BigdataValueFactory vf) {
+         final BigdataValueFactory vf, final URI datatype) {
 
       /**
-       * The basic schema is a three-component datatype string made up from the
-       * following three components:
-       * 
-       * sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); sfd.add(new
-       * SchemaFieldDescription(Datatype.DOUBLE, 5)); sfd.add(new
-       * SchemaFieldDescription(Datatype.LONG, -1));
+       * Using the built-in datatype schema.
        */
 
       // let's start out with some random values of different magnitudes
@@ -698,7 +712,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
             for (int time = 0; time < baseTime.length; time++) {
                dt[ctr++] = vf.createLiteral(baseLatLong[lat] + "#"
                      + baseLatLong[lon] + "#" + baseTime[time],
-                     GeoSpatial.DATATYPE);
+                     datatype);
             }
          }
       }
@@ -716,7 +730,8 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
     * @return the list of generated literals
     */
    protected final BigdataLiteral[] getGeospatialLiteralsLatLonInRange(
-      final BigdataValueFactory vf, final int from, final int to) {
+      final BigdataValueFactory vf, final int from, final int to,
+      final URI datatype) {
       
       final int numComponents = to-from+1;
       
@@ -729,7 +744,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       int ctr = 0;
       for (int y = from; y <= to; y++) {
          for (int x = from; x <= to; x++) {
-            dt[ctr++] = vf.createLiteral(x + "#" + y, GeoSpatial.DATATYPE);
+            dt[ctr++] = vf.createLiteral(x + "#" + y, datatype);
          }
       }
 
@@ -743,13 +758,29 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
    protected GeoSpatialLiteralExtension<BigdataValue> 
       getLatLonTimeGSLiteralExtension(final BigdataValueFactory vf) {
       
-      final List<SchemaFieldDescription> latLonTimeSfd = 
-            new ArrayList<SchemaFieldDescription>();
-      latLonTimeSfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* lat */
-      latLonTimeSfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* lon */
-      latLonTimeSfd.add(new SchemaFieldDescription(Datatype.LONG, 10));   /* time */
+       final GeoSpatialDatatypeFieldConfiguration field1Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.DOUBLE, null, 100000, ServiceMapping.LATITUDE, null);
+       
+       final GeoSpatialDatatypeFieldConfiguration field2Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.DOUBLE, null, 100000, ServiceMapping.LONGITUDE, null);
+
+       final GeoSpatialDatatypeFieldConfiguration field3Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.LONG, null, 10, ServiceMapping.TIME, null);
+       
+       final List<GeoSpatialDatatypeFieldConfiguration> fieldConfig =
+           new ArrayList<GeoSpatialDatatypeFieldConfiguration>();
+       fieldConfig.add(field1Config);
+       fieldConfig.add(field2Config);
+       fieldConfig.add(field3Config);
+       
+       final GeoSpatialDatatypeConfiguration config =
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_TIME, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
             
-      return getGSLiteralExtension(vf, new SchemaDescription(latLonTimeSfd));
+      return getGSLiteralExtension(vf, config);
    }
 
    /**
@@ -759,12 +790,24 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
    protected GeoSpatialLiteralExtension<BigdataValue> 
       getLatLonGSLiteralExtension(final BigdataValueFactory vf) {
       
-      final List<SchemaFieldDescription> latLonSfd = 
-            new ArrayList<SchemaFieldDescription>();
-      latLonSfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* lat */
-      latLonSfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 100000)); /* lon */
-            
-      return getGSLiteralExtension(vf, new SchemaDescription(latLonSfd));
+       final GeoSpatialDatatypeFieldConfiguration field1Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.DOUBLE, null, 100000, ServiceMapping.LATITUDE, null);
+           
+       final GeoSpatialDatatypeFieldConfiguration field2Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.DOUBLE, null, 100000, ServiceMapping.LONGITUDE, null);
+           
+       final List<GeoSpatialDatatypeFieldConfiguration> fieldConfig =
+           new ArrayList<GeoSpatialDatatypeFieldConfiguration>();
+       fieldConfig.add(field1Config);
+       fieldConfig.add(field2Config);
+           
+       final GeoSpatialDatatypeConfiguration config =
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_DOUBLE, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
+                
+       return getGSLiteralExtension(vf, config);       
       
    }
    
@@ -774,14 +817,26 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
     */
    protected GeoSpatialLiteralExtension<BigdataValue> 
       getSimpleLatLonGSLiteralExtension(final BigdataValueFactory vf) {
-      
-      final List<SchemaFieldDescription> latLonSfd = 
-            new ArrayList<SchemaFieldDescription>();
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1)); /* lat */
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1)); /* lon */
-            
-      return getGSLiteralExtension(vf, new SchemaDescription(latLonSfd));
-      
+       
+       final GeoSpatialDatatypeFieldConfiguration field1Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.LONG, null, 1, ServiceMapping.LATITUDE, null);
+               
+       final GeoSpatialDatatypeFieldConfiguration field2Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.LONG, null, 1, ServiceMapping.LONGITUDE, null);
+               
+       final List<GeoSpatialDatatypeFieldConfiguration> fieldConfig =
+           new ArrayList<GeoSpatialDatatypeFieldConfiguration>();
+       fieldConfig.add(field1Config);
+       fieldConfig.add(field2Config);
+               
+       final GeoSpatialDatatypeConfiguration config =
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_LONG, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
+                    
+       return getGSLiteralExtension(vf, config);             
+
    }
    
    /**
@@ -792,12 +847,24 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       getSimpleLatLonGSLiteralExtensionWithRange(
          final BigdataValueFactory vf, final Long min) {
       
-      final List<SchemaFieldDescription> latLonSfd = 
-            new ArrayList<SchemaFieldDescription>();
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1, min)); /* lat */
-      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1, min)); /* lon */
-            
-      return getGSLiteralExtension(vf, new SchemaDescription(latLonSfd));
+       final GeoSpatialDatatypeFieldConfiguration field1Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.LONG, min, 1, ServiceMapping.LATITUDE, null);
+                   
+       final GeoSpatialDatatypeFieldConfiguration field2Config =
+           new GeoSpatialDatatypeFieldConfiguration(
+               ValueType.LONG, min, 1, ServiceMapping.LONGITUDE, null);
+                   
+       final List<GeoSpatialDatatypeFieldConfiguration> fieldConfig =
+           new ArrayList<GeoSpatialDatatypeFieldConfiguration>();
+       fieldConfig.add(field1Config);
+       fieldConfig.add(field2Config);
+                   
+       final GeoSpatialDatatypeConfiguration config =
+           new GeoSpatialDatatypeConfiguration(
+               STR_DATATYPE_LAT_LON_LONG_MIN, new GeoSpatialDefaultLiteralSerializer(), fieldConfig);
+       
+       return getGSLiteralExtension(vf, config);             
       
    }
 
@@ -806,7 +873,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
     * the schema specified in the {@link SchemaDescription} object.
     */
    protected GeoSpatialLiteralExtension<BigdataValue> getGSLiteralExtension(
-      final BigdataValueFactory vf, final SchemaDescription sd) {
+      final BigdataValueFactory vf, final GeoSpatialDatatypeConfiguration datatypeConfig) {
       
       return 
          new GeoSpatialLiteralExtension<BigdataValue>(
@@ -816,7 +883,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
                   buri.setIV(newTermId(VTE.URI));
                   return buri;
                }
-         },sd);
+         },datatypeConfig);
       
    }
 
