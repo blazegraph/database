@@ -5,8 +5,10 @@
 	<id>bundle</id>
 	<formats>
 		<format>tar.gz</format>
+<!--  Only build the tar.gz
 		<format>tar.bz2</format>
 		<format>zip</format>
+-->
 	</formats>
     <!-- The base directory will be the name of the artifact based on the maven versioning. -->
 	<includeBaseDirectory>true</includeBaseDirectory>
