@@ -320,6 +320,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
             suite.addTestSuite(StressTestConcurrentRestApiRequests.class);
             suite.addTestSuite(NativeDistinctNamedGraphUpdateTest.class);
             suite.addTestSuite(HashDistinctNamedGraphUpdateTest.class);
+            suite.addTestSuite(TestNamedGraphAccess.class);
          }
 
             // Stress tests. See code for even longer running versions.
