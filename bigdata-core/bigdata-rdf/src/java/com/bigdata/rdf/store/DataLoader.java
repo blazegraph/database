@@ -195,7 +195,7 @@ public class DataLoader {
 
             } else {
 
-                buffer = new StatementBuffer(database, bufferCapacity);
+                buffer = new StatementBuffer(database, bufferCapacity, queueCapacity);
 
             }
 
