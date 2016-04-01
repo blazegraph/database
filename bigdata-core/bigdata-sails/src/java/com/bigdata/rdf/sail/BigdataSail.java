@@ -62,6 +62,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
@@ -72,6 +73,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
+import org.openrdf.IsolationLevel;
+import org.openrdf.IsolationLevels;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -4601,6 +4604,17 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
+         * NOP.
+         * <p>
+         * {@inheritDoc}
+         */
+		@Override
+		public void begin(IsolationLevel level)
+				throws UnknownSailTransactionStateException, SailException {
+
+		}
+
+        /**
 		 * Always returns <code>true</code>.
 		 * <p>
 		 * Note: Bigdata does not expose its internal transaction state to the
@@ -5159,5 +5173,15 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
     } // class BigdataSailReadOnlyConnection
+
+	@Override
+	public List<IsolationLevel> getSupportedIsolationLevels() {
+		return Arrays.<IsolationLevel>asList(IsolationLevels.READ_UNCOMMITTED, IsolationLevels.SNAPSHOT_READ);
+	}
+
+	@Override
+	public IsolationLevel getDefaultIsolationLevel() {
+		return IsolationLevels.READ_UNCOMMITTED;
+	}
     
 }

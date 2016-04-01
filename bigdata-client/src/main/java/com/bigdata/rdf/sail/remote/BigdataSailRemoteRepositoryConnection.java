@@ -37,6 +37,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
+import org.openrdf.IsolationLevel;
+import org.openrdf.IsolationLevels;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -803,6 +805,16 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					throw new UnsupportedOperationException();
 				}
 
+				@Override
+				public void setMaxExecutionTime(int maxExecTime) {
+					throw new UnsupportedOperationException();
+				}
+
+				@Override
+				public int getMaxExecutionTime() {
+					return 0;
+				}
+
 			};
 			
 		} catch (Exception ex) {
@@ -883,6 +895,13 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
     * Note: The monitor of this object is also used as a synchronization point.
     */
 	private final AtomicReference<IRemoteTx> remoteTx = new AtomicReference<IRemoteTx>();
+
+	/**
+	 * The transaction isolation level for the next transaction(s) on this
+	 * connection.
+	 * @since OpenRDF version 2.8
+	 */
+	private IsolationLevel transactionIsolationLevel;
 	
    @Override
    public boolean isOpen() throws RepositoryException {
@@ -1015,20 +1034,54 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
    }
 
    @Override
-   public void begin() throws RepositoryException {
+   public void begin(IsolationLevel level) throws RepositoryException {
       assertOpen(); // non-blocking.
       synchronized (remoteTx) {
          assertOpen();
          if (remoteTx.get() != null)
             throw new RepositoryException("Active transaction exists");
+         
+         final IsolationLevel effectiveLevel;
+         if (level == null) {
+        	 effectiveLevel = transactionIsolationLevel;
+         } else {
+        	 effectiveLevel = level;
+         }
+         
+         long timestamp;
+		 if (effectiveLevel.isCompatibleWith(IsolationLevels.SNAPSHOT_READ)) {
+        	 timestamp = RemoteTransactionManager.READ_COMMITTED;
+         } else if (effectiveLevel.isCompatibleWith(IsolationLevels.READ_UNCOMMITTED)) {
+        	 timestamp = RemoteTransactionManager.UNISOLATED;
+         } else {
+        	 throw new RepositoryException("Isolation level " + effectiveLevel + " is not supported");
+         }
+         
          try {
             remoteTx.set(repo.getRemoteRepository()
                   .getRemoteRepositoryManager().getTransactionManager()
-                  .createTx(RemoteTransactionManager.UNISOLATED));
+                  .createTx(timestamp));
          } catch (RuntimeException e) {
             throw new RepositoryException(e);
          }
-      }
+	  }
+   }
+	
+
+	@Override
+	public void setIsolationLevel(IsolationLevel level)
+			throws IllegalStateException {
+		transactionIsolationLevel = level;
+	}
+	
+	@Override
+	public IsolationLevel getIsolationLevel() {
+		return transactionIsolationLevel;
+	}
+	
+   @Override
+   public void begin() throws RepositoryException {
+	   begin(transactionIsolationLevel);
    }
 
    /**
@@ -1037,19 +1090,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
     * read on the same commit point.
     */
    public void beginReadOnly() throws RepositoryException {
-      assertOpen(); // non-blocking.
-      synchronized (remoteTx) {
-         assertOpen();
-         if (remoteTx.get() != null)
-            throw new RepositoryException("Active transaction exists");
-         try {
-            remoteTx.set(repo.getRemoteRepository()
-                  .getRemoteRepositoryManager().getTransactionManager()
-                  .createTx(RemoteTransactionManager.READ_COMMITTED));
-         } catch (RuntimeException e) {
-            throw new RepositoryException(e);
-         }
-      }
+	   begin(IsolationLevels.SNAPSHOT_READ);
    }
 
    /**
@@ -1121,5 +1162,4 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          }
       }
    }
-
 }
