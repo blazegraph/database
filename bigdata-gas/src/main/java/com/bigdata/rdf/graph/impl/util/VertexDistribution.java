@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+import org.apache.log4j.spi.LoggerFactory;
 import org.openrdf.model.Resource;
 
 import com.bigdata.rdf.graph.EdgesEnum;
@@ -44,6 +46,8 @@ import com.bigdata.rdf.graph.EdgesEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class VertexDistribution {
+
+    private static final Logger log = Logger.getLogger(VertexDistribution.class);
 
     /**
      * A sample.
@@ -410,6 +414,41 @@ public class VertexDistribution {
 //        }
 //
 //        return selected.toArray(new Resource[selected.size()]);
+
+    }
+
+    /**
+     * Return all (without duplicates) vertices from the graph
+     *
+     * @param desiredSampleSize
+     *            The number of VertexElements in the VertexDistribution.
+     * @param edges
+     *            The sample is taken from vertices having the specified type(s)
+     *            of edges. Vertices with zero degree for the specified type(s)
+     *            of edges will not be present in the returned sampled.
+     *
+     * @return The distinct samples that were found.
+     */
+    public Resource[] getAll() {
+
+        if (samples.isEmpty()) {
+
+            // There are no samples to choose from.
+            return new Resource[] {};
+
+        }
+
+        // The selected samples.
+        final Set<Resource> selected = new HashSet<Resource>();
+
+        for(int i=0; i<indexOf.size(); i++) {
+
+            final Resource v = indexOf.get(Integer.valueOf(i)).v;
+
+            selected.add(v);
+        }
+
+        return selected.toArray(new Resource[selected.size()]);
 
     }
 

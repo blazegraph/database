@@ -126,6 +126,10 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
             addAllVerticesToFrontier(ctx);
             break;
         }
+            case SampledVertices: {
+                addSampledVerticesToFrontier(ctx);
+                break;
+            }
         }
 
     }
@@ -163,9 +167,39 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
         final VertexDistribution dist = ctx.getGraphAccessor().getDistribution(
                 new Random());
 
+        final Resource[] initialFrontier = dist.getAll();
+        
+        if (log.isDebugEnabled())
+            log.debug("initialFrontier=" + Arrays.toString(initialFrontier));
+
+        gasState.setFrontier(ctx, initialFrontier);
+
+    }
+
+    /**
+     * Populate the initial frontier using all vertices in the graph.
+     *
+     * @param ctx
+     *            The graph evaluation context.
+     *
+     *            TODO This has a random number generator whose initial seed is
+     *            not controlled by the caller. However, the desired use case
+     *            here is to produce a distribution over ALL vertices so the
+     *            random number should be ignored - perhaps we should pass it in
+     *            as <code>null</code>?
+     */
+    private void addSampledVerticesToFrontier(final IGASContext<VS, ES, ST> ctx) {
+
+        final IGASState<VS, ES, ST> gasState = ctx.getGASState();
+
+        final EdgesEnum sampleEdges = getSampleEdgesFilter();
+
+        final VertexDistribution dist = ctx.getGraphAccessor().getDistribution(
+                new Random());
+
         final Resource[] initialFrontier = dist.getUnweightedSample(
                 dist.size(), sampleEdges);
-        
+
         if (log.isDebugEnabled())
             log.debug("initialFrontier=" + Arrays.toString(initialFrontier));
 
