@@ -84,8 +84,8 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         if (label == null)
             throw new IllegalArgumentException();
 
-        if (language != null && datatype != null)
-            throw new IllegalArgumentException();
+//        if (language != null && datatype != null)
+//            throw new IllegalArgumentException();
         
         this.label = label;
         
