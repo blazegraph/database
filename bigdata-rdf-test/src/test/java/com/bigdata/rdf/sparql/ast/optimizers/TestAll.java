@@ -107,6 +107,9 @@ public class TestAll extends TestCase {
         // Unit tests for assigning join variables for named subquery includes.
         suite.addTestSuite(TestASTNamedSubqueryOptimizer.class);
         
+        // Unit tests for assigning join variables for named solution sets includes.
+        suite.addTestSuite(TestASTNamedSubqueryOptimizer2.class);
+        
         // Unit tests for lifting of simple optionals into the parent group.
         suite.addTestSuite(TestASTSimpleOptionalOptimizer.class);
 
