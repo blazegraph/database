@@ -184,8 +184,16 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 
         }
         
-        // rewrite the top-level select
-		doSelectQuery(context, sa, (QueryRoot) queryNode);
+        /**
+         * https://jira.blazegraph.com/browse/BLZG-618, failure of 
+         * http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg06 
+         * mentioned in one of the comments: we are not allowed to do the fast range count
+         * optimization if the query exhibits an additional having clause (which might apply
+         * any [possibly other] kind of aggregation on the query body).
+         */
+        final QueryRoot qr = (QueryRoot)queryNode;
+        if (qr.getHaving()==null)
+            doSelectQuery(context, sa, qr);
 
       return new QueryNodeWithBindingSet(queryNode, bindingSets);
     	
