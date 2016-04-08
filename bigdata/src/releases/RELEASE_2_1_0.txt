@@ -40,10 +40,9 @@ Checkout the latest source code:
 	
 git clone -b BLAZEGRAPH_RELEASE_2_1_0 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_0
 
-elease Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
 
 ** Bug
-    * [BLZG-1017] - Support JSON LD
     * [BLZG-1200] - REGEX not working for string literals with language tags
     * [BLZG-1708] - DataLoader fails with ArrayIndexOutOfBoundsException
     * [BLZG-1716] - SPARQL Update parser fails on invalid numeric literals
@@ -61,6 +60,7 @@ elease Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
     * [BLZG-1816] - Setup Default Configuration to Avoid Queues for Concurrency Avoidence
     * [BLZG-1835] - Failed to create debian package
     * [BLZG-1839] - Report of out of memory error during bigdata-core compile
+    * [BLZG-1874] - The memory manager should not block when configured in a non-blocking mode
 
 
 ** Improvement
@@ -71,6 +71,7 @@ elease Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
     * [BLZG-1854] - Move to Lucene 5.5.0
 
 ** New Feature
+    * [BLZG-1017] - Support JSON LD
     * [BLZG-1727] - Allow snapshot policies with standalone installs (Online Backup REST API)
     * [BLZG-1780] - Create Query Hint to Automatically Add the str(...) function for SPARQL REGEX
     * [BLZG-1820] - Add MapgraphServlet API Methods to the RemoteRepositoryManager
@@ -84,7 +85,6 @@ elease Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
     * [BLZG-1850] - Ease use of geospatial
     * [BLZG-1851] - Remove non-conditional logging in AbstractTripleStore
     * [BLZG-1853] - Benchmark 2.1.0 Release
-    * [BLZG-1855] - Rerun geospatial benchmark in 2.1.0
 
 ** Sub-task
     * [BLZG-1229] - SPARQL* not parsed in SPARQL UPDATE
@@ -104,3 +104,5 @@ elease Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
     * [BLZG-1830] - Code review on critical things related to geospatial issue
     * [BLZG-1833] - geo:locationValue should use default type or specified query type
     * [BLZG-1841] - Support extraction of complete GeoSpatial literal in geospatial SERVICE
+
+
