@@ -43,6 +43,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.BooleanLiteralImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.cache.WeakValueCache;
@@ -346,6 +347,9 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private final BigdataURIImpl xsd_boolean = new BigdataURIImpl(this, xsd
             + "boolean");
 
+    private final BigdataURIImpl rdf_langstring = new BigdataURIImpl(this,
+    		RDF.LANGSTRING.stringValue());
+
 //    private final BigdataLiteralImpl TRUE = new BigdataLiteralImpl(this, "true", null,
 //            xsd_boolean);
 //
@@ -367,7 +371,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
 		final BigdataURIImpl[] a = new BigdataURIImpl[] { xsd_string,
 				xsd_dateTime, xsd_date, xsd_long, xsd_int, xsd_byte, xsd_short,
-				xsd_double, xsd_float, xsd_boolean };
+				xsd_double, xsd_float, xsd_boolean, rdf_langstring };
 
 		for (BigdataURIImpl x : a) {
 
@@ -511,7 +515,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     	 * Untyped literals have xsd:string datatype according to RDF 1.1
     	 * See https://jira.blazegraph.com/browse/BLZG-1845
     	 */
-        return new BigdataLiteralImpl(this, label, language, xsd_string);
+        return new BigdataLiteralImpl(this, label, language, rdf_langstring);
 
     }
 
@@ -536,7 +540,16 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
             
         }
         
-        if (datatype == null) {
+        if (language != null) {
+        	
+        	/*
+        	 * Literals with language-tagged string values have rdf:langString datatype according to RDF 1.1
+        	 * See https://www.w3.org/TR/rdf-schema/#ch_langstring
+        	 * See https://jira.blazegraph.com/browse/BLZG-1845
+        	 */
+        	datatype = rdf_langstring;
+        	
+        } else if (datatype == null) {
         	
         	/*
         	 * Untyped literals have xsd:string datatype according to RDF 1.1
