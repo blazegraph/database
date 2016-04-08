@@ -2418,7 +2418,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             if (lit.getDatatype() != null) {
                 // If we have datatype that can extract coordinates, use it to exteract
                 pconfig = geoSpatialConfig.getConfigurationForDatatype(lit.getDatatype());
-                if (pconfig.hasLat() && pconfig.hasLon()) {
+                if (pconfig != null && pconfig.hasLat() && pconfig.hasLon()) {
                     serializer = pconfig.getLiteralSerializer();
                 }
             }
