@@ -1,0 +1,4 @@
+DESCRIBE ?resource 
+WHERE {
+ { <http://s> <http://p1> ?resource } UNION { <http://s> <http://p2> ?resource  }
+}

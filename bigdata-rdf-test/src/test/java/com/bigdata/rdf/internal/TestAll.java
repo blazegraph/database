@@ -169,6 +169,13 @@ public class TestAll extends TestCase {
         // DTEExtension.ARRAY
         suite.addTestSuite(TestEncodeDecodeLiteralArrayIVs.class);
         
+        //Inline URI Handlers
+        suite.addTestSuite(TestInlineURIHandlers.class);
+        
+        //Test handlers for packing multiple inline URI handlers into a single
+        //namespace.
+        suite.addTestSuite(TestInlineLocalNameIntegerURIHandler.class);
+        
         return suite;
         
     }

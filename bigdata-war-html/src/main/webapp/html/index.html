@@ -75,7 +75,8 @@
         </div>
         <div class="splashbox">
             For instructions on getting started writing Blaze clients, see
-          <a href="https://github.com/blazegraph/blazegraph-samples">Samples</a>
+          <a href="https://github.com/blazegraph/blazegraph-samples">Code Samples</a> or 
+          <a href="https://wiki.blazegraph.com/wiki/index.php/Quick_Start">User's Guide</a>.
         </div>
       </div>
 
@@ -143,7 +144,7 @@
         <div class="box">
 
           <div class="links">
-            <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> -
+            <a href="https://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> -
             <a href="http://www.w3.org/TR/sparql11-query/">SPARQL Query</a>
           </div>
 
@@ -194,6 +195,9 @@
             <input type="checkbox" id="show-datatypes"> <label for="show-datatypes">Show datatypes</label>
             <input type="checkbox" id="show-languages"> <label for="show-languages">Show languages</label>
           </div>
+        </div>
+
+        <div id="query-explanation-download" class="box">
         </div>
 
         <div id="query-explanation" class="box">
@@ -310,6 +314,11 @@
           <br>
           <a href="namespace">Download VoID description of all namespaces</a>
         </div>
+        
+        <div id="namespace-rebuild-text-index" class="box">
+          <h1></h1>
+          <p></p>
+        </div>
 
         <div id="namespace-properties" class="box">
           <h1></h1>
@@ -319,7 +328,7 @@
         <div class="box">
           <h1>Create namespace</h1>
           <p>
-		There a number of features to enable.  There's full documentation <a href="http://wiki.blazegraph.com/wiki/index.php/GettingStarted#So_how_do_I_put_the_database_in_triple_store_versus_quad_store_mode.3F">here</a>.  You must select "Use" after you have created the KB.
+		There are a number of features to enable.  There's full documentation <a href="http://wiki.blazegraph.com/wiki/index.php/GettingStarted#So_how_do_I_put_the_database_in_triple_store_versus_quad_store_mode.3F">here</a>.  You must select "Use" after you have created the KB.
 	  </p>
 		<br>
 	  <p><h2>A quick reference is below:</h2>
@@ -350,6 +359,8 @@
             <input type="checkbox" id="new-namespace-isolatableIndices">
             <label for="new-namespace-textIndex">Full text index:</label>
             <input type="checkbox" id="new-namespace-textIndex">
+            <label for="new-namespace-geoSpatial">Enable geospatial:</label>
+            <input type="checkbox" id="new-namespace-geoSpatial">            
             <br>
             <br>
             <input type="submit" value="Create namespace">

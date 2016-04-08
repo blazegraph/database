@@ -10,43 +10,43 @@
   <results>
      <result>
       <binding name="res"><uri>http://s.2#2#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#2.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>2.0#2.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.2#3#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#3.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>2.0#3.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.2#4#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#4.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>2.0#4.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.2#5#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#5.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>2.0#5.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.2#6#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">2.0#6.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>2.0#6.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.3#2#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#2.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>3.0#2.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.3#3#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#3.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>3.0#3.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.3#4#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#4.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>3.0#4.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.3#5#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#5.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>3.0#5.0#4</literal></binding>
      </result>
      <result>
       <binding name="res"><uri>http://s.3#6#4</uri></binding>
-      <binding name="locationAndTime"><literal datatype="http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral">3.0#6.0#4</literal></binding>
+      <binding name="locationAndTime"><literal>3.0#6.0#4</literal></binding>
      </result>
   </results>
 </sparql>

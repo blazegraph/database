@@ -78,7 +78,8 @@ var NAMESPACE_PARAMS = {
    'rdr': 'com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers',
    'axioms': 'com.bigdata.rdf.store.AbstractTripleStore.axiomsClass',
    'justify': 'com.bigdata.rdf.store.AbstractTripleStore.justify',
-   'isolatableIndices': 'com.bigdata.rdf.sail.isolatableIndices'
+   'isolatableIndices': 'com.bigdata.rdf.sail.isolatableIndices',
+   'geoSpatial': 'com.bigdata.rdf.store.AbstractTripleStore.geoSpatial'
 };
 
 var NAMESPACE_SHORTCUTS = {
@@ -232,8 +233,8 @@ function getNamespaces(synchronous) {
          var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
          var namespaces = data.getElementsByTagNameNS(rdf, 'Description');
          var i, title, titleText, use;
-	 if( namespaces.length > 0)
-	 {
+     if( namespaces.length > 0)
+     {
             for(i=0; i<namespaces.length; i++) {
                title = namespaces[i].getElementsByTagName('title')[0].textContent;
                titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
@@ -242,8 +243,13 @@ function getNamespaces(synchronous) {
                } else {
                   use = '<a href="#" class="use-namespace">Use</a>';
                }
-               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
+               
+               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="namespace-rebuild-text-index">Rebuild Full Text Index</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
+               
+               initMapgraphNamespaceMgmtExtensions(title);
+
             }
+            
            $('.use-namespace').click(function(e) {
               e.preventDefault();
               useNamespace($(this).parents('tr').data('name'));
@@ -260,6 +266,10 @@ function getNamespaces(synchronous) {
               e.preventDefault();
               getNamespaceProperties($(this).parents('tr').data('name'), 'java');
            });
+           $('.namespace-rebuild-text-index').click(function(e) {
+               e.preventDefault();
+               rebuildTextIndex($(this).parents('tr').data('name'), true);
+            });
            $('.clone-namespace').click(function(e) {
               e.preventDefault();
               cloneNamespace($(this).parents('tr').data('name'));
@@ -268,7 +278,7 @@ function getNamespaces(synchronous) {
            $('.namespace-service-description').click(function() {
               return confirm('This can be an expensive operation. Proceed anyway?');
            });
-	 }
+     }
       }
    };
    $.ajax(settings);
@@ -315,6 +325,7 @@ function getNamespaceProperties(namespace, download) {
          $('#namespace-properties h1').html(namespace);
          $('#namespace-properties table').empty();
          $('#namespace-properties').show();
+         $('#namespace-rebuild-text-index').hide();
       }
    $.get(url, function(data) {
       var java = '';
@@ -331,64 +342,102 @@ function getNamespaceProperties(namespace, download) {
    });
 }
 
+function rebuildTextIndex(namespace) {
+    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/textIndex';
+
+    $('#namespace-rebuild-text-index h1').html(namespace);
+    $('#namespace-rebuild-text-index p').empty();
+    $('#namespace-properties table').empty();
+    $('#namespace-properties').hide();
+    $('#namespace-rebuild-text-index').show();
+
+    var settings = {
+              type: 'POST',
+              success: function(data) { 
+                            $('#namespace-rebuild-text-index h1').html(namespace); 
+                            $('#namespace-rebuild-text-index p').html(data); 
+                            },
+              error: function(jqXHR, textStatus, errorThrown) {
+
+                            if (errorThrown.indexOf('not enabled')!=-1 && confirm('Full text index does not exist. Do you want to create it?')) {
+
+                                url += '?force-index-create=true';
+                                var settings = {
+                                          type: 'POST',
+                                          success: function(data) { 
+                                                        $('#namespace-rebuild-text-index h1').html(namespace); 
+                                                        $('#namespace-rebuild-text-index p').html(data); 
+                                                        },
+                                          error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
+                                          };
+                                $.ajax(url, settings);
+                            }
+
+                        }
+           };
+    $.ajax(url, settings);
+}
+
+
 function getPreparedProperties(elem) {
 
-	   var url = RO_URL_PREFIX + 'namespace/prepareProperties';
-	      var params = {};
-	      
-	      params.name = $('#new-namespace-name').val().trim();
-	      params.textIndex = $('#new-namespace-textIndex').is(':checked');
-	      params.isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked');
-	      
-	      var mode = $('#new-namespace-mode').val();
-	      if(mode == 'triples') {
-	         params.quads = false;
-	         params.rdr = false;
-	      } else if(mode == 'rdr') {
-	         params.quads = false;
-	         params.rdr = true;
-	      } else { // quads
-	         params.quads = true;
-	         params.rdr = false;
-	      }
-	      
-	      if($('#new-namespace-inference').is(':checked')) {
-	         // Enable inference related options.
-	         params.axioms = 'com.bigdata.rdf.axioms.OwlAxioms';
-	         params.truthMaintenance = true;
-	         params.justify = true;
-	      } else {
-	         // Disable inference related options.
-	         params.axioms = 'com.bigdata.rdf.axioms.NoAxioms';
-	         params.truthMaintenance = false;
-	         params.justify = false;
-	      }
+          var url = RO_URL_PREFIX + 'namespace/prepareProperties';
+          var params = {};
+          
+          params.name = $('#new-namespace-name').val().trim();
+          params.textIndex = $('#new-namespace-textIndex').is(':checked');
+          params.isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked');
+          params.geoSpatial = $('#new-namespace-geoSpatial').is(':checked');
+          
+          var mode = $('#new-namespace-mode').val();
+          if(mode == 'triples') {
+             params.quads = false;
+             params.rdr = false;
+          } else if(mode == 'rdr') {
+             params.quads = false;
+             params.rdr = true;
+          } else { // quads
+             params.quads = true;
+             params.rdr = false;
+          }
+          
+          if($('#new-namespace-inference').is(':checked')) {
+             // Enable inference related options.
+             params.axioms = 'com.bigdata.rdf.axioms.OwlAxioms';
+             params.truthMaintenance = true;
+             params.justify = true;
+          } else {
+             // Disable inference related options.
+             params.axioms = 'com.bigdata.rdf.axioms.NoAxioms';
+             params.truthMaintenance = false;
+             params.justify = false;
+          }
 
-	      var data = elem.html();//'<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
-	      for(var key in NAMESPACE_PARAMS) {
-//	         data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
-	    	  data += NAMESPACE_PARAMS[key] + '=' + params[key] + '\n';
-	      }
-//	      data += '</properties>';
-	      
-	   var settings = {
-	    	     type: 'POST',
-	    	     data: data,
-	    	     contentType: 'text/plain',
-//	    	     contentType: 'application/xml',
-	    	     async: false,
-	    	     success: function(data) { 
-		   			  elem.html('');
-					  $.each(data.getElementsByTagName('entry'), function(i, entry) {
-					    	  elem.append(entry.getAttribute('key') + '=' + entry.textContent + '\n');
-					      });
-	   			 },
-	    	     error: function(jqXHR, textStatus, errorThrown) {
-						  elem.html('');
-						  alert(jqXHR.responseText);
-					  }
-	    	   	};
-	  $.ajax(url, settings);
+          var data = elem.html();//'<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
+          for(var key in NAMESPACE_PARAMS) {
+//             data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
+              data += NAMESPACE_PARAMS[key] + '=' + params[key] + '\n';
+          }
+//          data += '</properties>';
+          
+       var settings = {
+                 type: 'POST',
+                 data: data,
+                 contentType: 'text/plain',
+//                 contentType: 'application/xml',
+                 async: false,
+                 success: function(data) { 
+                         elem.html('');
+                      $.each(data.getElementsByTagName('entry'), function(i, entry) {
+                              elem.append(entry.getAttribute('key') + '=' + entry.textContent + '\n');
+                          });
+                    },
+                 error: function(jqXHR, textStatus, errorThrown) {
+                          elem.html('');
+                          alert(jqXHR.responseText);
+                      }
+                   };
+      $.ajax(url, settings);
 }
 
 function cloneNamespace(namespace) {
@@ -421,7 +470,8 @@ function cloneNamespace(namespace) {
       $('#new-namespace-inference').prop('checked', params[NAMESPACE_PARAMS.axioms] == 'com.bigdata.rdf.axioms.OwlAxioms');
       $('#new-namespace-textIndex').prop('checked', params[NAMESPACE_PARAMS.textIndex] == 'true');
       $('#new-namespace-isolatableIndices').prop('checked', params[NAMESPACE_PARAMS.isolatableIndices] == 'true');
-	  changeNamespaceMode();
+      $('#new-namespace-geoSpatial').prop('checked', params[NAMESPACE_PARAMS.geoSpatial] == 'true');      
+      changeNamespaceMode();
 
       $('#new-namespace-name').focus();
    });
@@ -430,6 +480,78 @@ function cloneNamespace(namespace) {
 function namespaceExists(name) {
    return $('#namespaces-list tr[data-name=' + name + ']').length !== 0;
 }
+
+function publishNamespace(namespace) {
+    
+    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+
+    var settings = {
+       method: 'POST',
+       data: { 'mapgraph' : 'publish' },
+       success: function() { location.reload(); },
+       error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
+    };
+    
+    $.ajax(url, settings);
+}
+
+function dropNamespace(namespace) {
+
+    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+
+    var settings = {
+       method: 'POST',
+       data: { 'mapgraph' : 'drop' },
+       success: function() { location.reload(); },
+       error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
+    };
+    
+    $.ajax(url, settings);
+
+}
+
+/**
+ * Optionally initialized the magraph extension, if mapgraph enabled.
+ * Has no effect if mapgraph not active.
+ */
+function initMapgraphNamespaceMgmtExtensions(namespace) {
+    
+    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+    
+    var settings = {
+       method: 'POST',
+       data: { 'mapgraph' : 'checkPublished' },
+       success: function(xml){
+           var ret = $(xml).find("data").attr('result') == "true";
+           
+           if (ret) {
+               $('#namespaces-list > tbody > tr[data-name=' + namespace + ']').append('<td><a href="#" class="drop-namespace">Drop from GPU</a></td>'); 
+           } else {
+               $('#namespaces-list > tbody > tr[data-name=' + namespace + ']').append('<td><a href="#" class="publish-namespace">Publish to GPU</a></td>'); 
+           }
+           
+           // register event listeners
+           $('.publish-namespace').click(function(e) {
+               e.preventDefault();
+               publishNamespace($(this).parents('tr').data('name'));
+            }); 
+           $('.drop-namespace').click(function(e) {
+               e.preventDefault();
+               dropNamespace($(this).parents('tr').data('name'));
+            });
+           
+       },
+       error: function(jqXHR, textStatus, errorThrown) {  
+           // nothing to do: mapgraph not initialized
+       }
+    };
+    
+    $.ajax(url, settings);
+
+}
+
+
+
 
 function validateNamespaceOptions() {
    var errors = [], i;
@@ -459,6 +581,7 @@ function validateNamespaceOptions() {
 function changeNamespaceMode() {
    var quads = $('#new-namespace-mode').val() == 'quads'; // Figure out the current mode (quads, triples, rdr).
    var isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked'); // Are isolatable indices requested?
+   var geoSpatial = $('new-namespace-geoSpatial').is(':checked'); // Is geoSpatial turned on?
    var inferenceDisabled = (quads || isolatableIndices) ? true : false; // true iff inference is not supported.
 //alert("quads="+quads+", isolatableIndices="+isolatableIndices+", inferenceDisallowed="+inferenceDisallowed);
    $('#new-namespace-inference').prop('disabled', inferenceDisabled); // conditionally disable inference checkbox.
@@ -543,11 +666,11 @@ function getDefaultNamespace() {
         // Chrome does not work with rdf\:Description, so look for Description too
         var defaultDataset = $(data).find('rdf\\:Description, Description');
         var ELEMENT = defaultDataset.find('title');
-	
+    
         // select the default namespace if there's only a single namespace avlb.
         if (ELEMENT.length == 1) 
         {
-        	DEFAULT_NAMESPACE = ELEMENT[0].textContent;
+            DEFAULT_NAMESPACE = ELEMENT[0].textContent;
         }
       }
    };
@@ -1034,12 +1157,18 @@ function submitQuery(e) {
       error: queryResultsError
    };
 
-   $('#query-response').show().html('Query running...');
-   $('#query-pagination').hide();
+   if(!$('#query-explain').is(':checked')) {
+     $('#query-response').show().html('Query running...');
+     $('#query-pagination').hide();
 
-   $.ajax(url, settings);
+     $.ajax(url, settings);
+   } else {
+     $('#query-response').show().html('Query results skipped with Explain mode.');
+     $('#query-pagination').hide();
+   }
 
    $('#query-explanation').empty();
+   $('#query-explanation-download').empty();
    if($('#query-explain').is(':checked')) {
       settings = {
          type: 'POST',
@@ -1048,15 +1177,18 @@ function submitQuery(e) {
          success: showQueryExplanation,
          error: queryResultsError
       };
+      $('#query-explanation').show().html('Query running in Explain mode.');;
       $.ajax(url, settings);
    } else {
       $('#query-explanation').hide();
+      $('#query-explanation-download').hide();
    }
 }
 
 function clearQueryResponse() {
    $('#query-response, #query-explanation').empty('');
-   $('#query-response, #query-pagination, #query-explanation, #query-export-container').hide();
+   $('#query-response, #query-explanation-download').empty('');
+   $('#query-response, #query-pagination, #query-explanation, #query-explanation-download, #query-export-container').hide();
 }
 
 function showQueryExportModal() {
@@ -1293,7 +1425,13 @@ function showQueryResults(data) {
 }
 
 function showQueryExplanation(data) {
-   $('#query-explanation').html(data).show();
+
+   //See http://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
+   //BLZG-1466: Adds a download link for the query explain
+   $('#query-explanation-download').show().html('<a href = \"data:text/html;charset=utf-8,' 
+        + encodeURIComponent(data) + '\" download = \"explain.html\">Download Query Explanation</a>');
+   $('#query-explanation').html(data)
+   $('#query-explanation').show();
 }
 
 function queryResultsError(jqXHR, textStatus, errorThrown) {
@@ -1496,29 +1634,29 @@ function loadURI(target) {
    // jshint multistr:true
    var vertexQuery = '\
 select ?col1 ?col2 ?incoming (count(?star) as ?star) {\n\
-	   {\n\
-	     URI ?col1 ?col2\n\
-	     bind (false as ?incoming) .\n\
-	     optional {\n\
-	       {\n\
-	         bind(<<URI ?col1 ?col2>> AS ?sid) . ?sid ?sidP ?star\n\
-	       } union {\n\
-	         bind(<<URI ?col1 ?col2>> AS ?sid) . ?star ?sidP ?sid\n\
-	       }\n\
-	     }\n\
-	   } union {\n\
-	     ?col1 ?col2 URI\n\
-	     bind (true as ?incoming) .\n\
-	     optional {\n\
-	       {\n\
-	         bind(<<?col1 ?col2 URI>> AS ?sid) . ?sid ?sidP ?star\n\
-	       } union {\n\
-	         bind(<<?col1 ?col2 URI>> AS ?sid) . ?star ?sidP ?sid\n\
-	       }\n\
-	     }\n\
-	   }\n\
-	 }\n\
-	 group by ?col1 ?col2 ?incoming';
+       {\n\
+         URI ?col1 ?col2\n\
+         bind (false as ?incoming) .\n\
+         optional {\n\
+           {\n\
+             bind(<<URI ?col1 ?col2>> AS ?sid) . ?sid ?sidP ?star\n\
+           } union {\n\
+             bind(<<URI ?col1 ?col2>> AS ?sid) . ?star ?sidP ?sid\n\
+           }\n\
+         }\n\
+       } union {\n\
+         ?col1 ?col2 URI\n\
+         bind (true as ?incoming) .\n\
+         optional {\n\
+           {\n\
+             bind(<<?col1 ?col2 URI>> AS ?sid) . ?sid ?sidP ?star\n\
+           } union {\n\
+             bind(<<?col1 ?col2 URI>> AS ?sid) . ?star ?sidP ?sid\n\
+           }\n\
+         }\n\
+       }\n\
+     }\n\
+     group by ?col1 ?col2 ?incoming';
    
    
    var edgeQuery = '\
@@ -1937,31 +2075,31 @@ function loadQueryHistory() {
 }
 
 function deselect(e) {
-	  $('.pop').slideFadeToggle(function() {
-	    e.removeClass('selected');
-	  });    
-	}
+      $('.pop').slideFadeToggle(function() {
+        e.removeClass('selected');
+      });    
+    }
 
-	$(function() {
-	  $('#contact').on('click', function() {
-	    if($(this).hasClass('selected')) {
-	      deselect($(this));               
-	    } else {
-	      $(this).addClass('selected');
-	      $('.pop').slideFadeToggle();
-	    }
-	    return false;
-	  });
+    $(function() {
+      $('#contact').on('click', function() {
+        if($(this).hasClass('selected')) {
+          deselect($(this));               
+        } else {
+          $(this).addClass('selected');
+          $('.pop').slideFadeToggle();
+        }
+        return false;
+      });
 
-	  $('.close').on('click', function() {
-	    deselect($('#contact'));
-	    return false;
-	  });
-	});
+      $('.close').on('click', function() {
+        deselect($('#contact'));
+        return false;
+      });
+    });
 
-	$.fn.slideFadeToggle = function(easing, callback) {
-	  return this.animate({ opacity: 'toggle', height: 'toggle' }, 'fast', easing, callback);
-	};
+    $.fn.slideFadeToggle = function(easing, callback) {
+      return this.animate({ opacity: 'toggle', height: 'toggle' }, 'fast', easing, callback);
+    };
 
 
 /* Startup functions */
@@ -1992,34 +2130,35 @@ function setupHandlers() {
 
    $('#new-namespace-mode').change(changeNamespaceMode);
    $('#new-namespace-isolatableIndices').change(changeNamespaceMode);
+   $('#new-namespace-geoSpatial').change(changeNamespaceMode);   
    $('#namespace-create').submit(function(e){
-	    e.preventDefault();
-		var hiddenSection = $('.popup-container');
-		hiddenSection.click(function(event){
-			if(event.target.className.indexOf("popup-container") !== -1){
-				hiddenSection.fadeOut();
-			}
-		});
-		getPreparedProperties($('#properties-text-area'));
-		if ($('#properties-text-area').html()) {
-			hiddenSection.fadeIn()
-			    // unhide section.hidden
-			    .css({ 'display':'block' })
-			    // set to full screen
-			    .css({ width: '100%', height: '100%', top: '0', left: '0' })
-			    // greyed out background
-			    .css({ 'background-color': 'rgba(0,0,0,0.5)' })
-			    .appendTo('body');
-				
-			
-			    $('#cancel-namespace').click(function(){ 
-			    		hiddenSection.fadeOut(); 
-			    	});
-			    $('#create-namespace').focus().click(function(){ 
-			    		$(hiddenSection).fadeOut(); 
-			    		createNamespace($('#properties-text-area'));
-			    	});
-		}
+        e.preventDefault();
+        var hiddenSection = $('.popup-container');
+        hiddenSection.click(function(event){
+            if(event.target.className.indexOf("popup-container") !== -1){
+                hiddenSection.fadeOut();
+            }
+        });
+        getPreparedProperties($('#properties-text-area'));
+        if ($('#properties-text-area').html()) {
+            hiddenSection.fadeIn()
+                // unhide section.hidden
+                .css({ 'display':'block' })
+                // set to full screen
+                .css({ width: '100%', height: '100%', top: '0', left: '0' })
+                // greyed out background
+                .css({ 'background-color': 'rgba(0,0,0,0.5)' })
+                .appendTo('body');
+                
+            
+                $('#cancel-namespace').click(function(){ 
+                        hiddenSection.fadeOut(); 
+                    });
+                $('#create-namespace').focus().click(function(){ 
+                        $(hiddenSection).fadeOut(); 
+                        createNamespace($('#properties-text-area'));
+                    });
+        }
     });
    $('#update-type').change(function() { setUpdateSettings(this.value); });
    $('#rdf-type').change(function() { setUpdateMode('rdf'); });

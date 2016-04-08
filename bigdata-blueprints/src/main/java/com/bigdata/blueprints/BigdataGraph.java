@@ -167,14 +167,14 @@ public abstract class BigdataGraph implements Graph {
     private final boolean laxEdges;
     
     /**
-     * If true, read from the write connection.  Necessary for the test suites.
-     */
-    private final boolean readFromWriteConnection;
-    
-    /**
      * If true, use pure append mode (don't check old property values).
      */
     protected final boolean laxProperties;
+    
+    /**
+     * If true, read from the write connection.  Necessary for the test suites.
+     */
+    protected transient boolean readFromWriteConnection;
     
     public BigdataGraph(final BlueprintsValueFactory factory) {
         this(factory, new Properties());
@@ -230,6 +230,15 @@ public abstract class BigdataGraph implements Graph {
      * or being blocked by writers.
      */
     public abstract RepositoryConnection getReadConnection() throws Exception;
+
+    /**
+     * Clients can read from the write connection if they choose.
+     * 
+     * @param readFromWriteConnection
+     */
+    public void setReadFromWriteConnection(boolean readFromWriteConnection) {
+        this.readFromWriteConnection = readFromWriteConnection;
+    }
     
     /**
      * Return a single-valued property for an edge or vertex.

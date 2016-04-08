@@ -715,7 +715,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * {@link AbstractRunningQuery#haltOp(IHaltOpMessage)} check to see if the
      * deadline for a query has expired. However, those methods are only invoked
      * when a query plan operator starts and halts. In cases where the query is
-     * compute bound within a single operator (e.g., ORDER BY or an unconstraint
+     * compute bound within a single operator (e.g., ORDER BY or an unconstrained
      * cross-product JOIN), the query will not be checked for termination. This
      * priority queue is used to ensure that the query deadline is tested even
      * though it may be in a compute bound operator.
@@ -730,7 +730,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * queue for an existing reference to the query. It also means that we are
      * able to store an object that wraps the query with a {@link WeakReference}
      * and thus can avoid pinning the query on the heap until its deadline
-     * expires. That means that we do not need to remove an entries from the
+     * expires. That means that we do not need to remove an entry from the
      * deadline queue each time a query terminates, but we do need to
      * periodically trim the queue to ensure that queries with distant deadlines
      * do not hang around in the queue for long periods of time after their

@@ -134,6 +134,7 @@ public class ArbitraryLengthPathNode
 
         super(args, anns);
 
+        subgroup().setSubgroupOfALPNode( true );
     }
 
     /**

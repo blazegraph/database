@@ -348,7 +348,7 @@ public class BuildInfo {
          <doctitle>
                 <![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
          <bottom>
-            <![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC. All Rights Reserved.</i>
+            <![CDATA[<i>Copyright &#169; 2006-2016 SYSTAP, LLC DBA Blazegraph. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -851,8 +851,6 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/icu4j-charset.jar" />
       <copy file="${bigdata.lib}/apache/log4j-${log4j.version}.jar"
             tofile="${dist.lib}/log4j.jar" />
-      <copy file="${bigdata.lib}/lucene/lucene-analyzers-${lucene.version}.jar"
-            tofile="${dist.lib}/lucene-analyzer.jar" />
       <copy file="${bigdata.lib}/lucene/lucene-core-${lucene.version}.jar"
             tofile="${dist.lib}/lucene-core.jar" />
 
@@ -2131,7 +2129,6 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/start.jar" />
         <pathelement location="${dist.lib}/reggie.jar" />
         <pathelement location="${dist.lib}/log4j.jar" />
-        <pathelement location="${dist.lib}/lucene-analyzer.jar" />
         <pathelement location="${dist.lib}/lucene-core.jar" />
         <pathelement location="${dist.lib}/openrdf-sesame.jar" />
         <pathelement location="${dist.lib}/slf4j.jar" />

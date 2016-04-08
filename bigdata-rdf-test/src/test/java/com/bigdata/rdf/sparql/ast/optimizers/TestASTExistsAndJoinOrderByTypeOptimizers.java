@@ -137,10 +137,10 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
 
     		varCount = 0;
 			final ArbitraryLengthPathNode alpp1 = arbitartyLengthPropertyPath(varNode(w), constantNode(b), HelperFlag.ONE_OR_MORE,
-					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()) ) );
+					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()), HelperFlag.SUBGROUP_OF_ALP ) );
     		varCount = 0;
 			final ArbitraryLengthPathNode alpp2 = arbitartyLengthPropertyPath(varNode(w), constantNode(b), HelperFlag.ONE_OR_MORE,
-					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()) ) );
+					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()), HelperFlag.SUBGROUP_OF_ALP ) );
             final SubqueryRoot askQuery1, askQuery2;
 			expected = select( varNode(w), 
 					where (joinGroupNode(

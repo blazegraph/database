@@ -23,9 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
@@ -574,6 +577,20 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         return baseServiceURL + "/namespace/" + ConnectOptions.urlEncode(namespace);
     }
 
+    
+    /**
+     * Returns the SPARQL endpoint URL for the given namespace or the default SPARQL
+     * endpoint in case namespace is null.
+     * 
+     * @param namespace
+     * @return the namespace 
+     */
+    private String getSparqlEndpointUrlForNamespaceOrDefault(final String namespace) {
+        
+        return namespace==null ?
+                baseServiceURL + "/sparql" : 
+                getRepositoryBaseURLForNamespace(namespace) + "/sparql";
+    }
     /**
      * Obtain a flyweight {@link RemoteRepository} for the default namespace
      * associated with the remote service.
@@ -905,6 +922,69 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         }
 
     }
+    
+    /**
+     * 
+     * 
+     * @param 
+     * @param 
+     * 
+     * @return 
+     * 
+     * @throws Exception
+     */
+    public void rebuildTextIndex(final String namespace,
+            final boolean forceBuildTextIndex) throws Exception {
+    	rebuildTextIndex(namespace, forceBuildTextIndex, UUID.randomUUID());
+    }
+    
+    public void rebuildTextIndex(final String namespace,
+    		final boolean forceBuildTextIndex, final UUID uuid) throws Exception {
+
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
+        final String endpointURL = baseServiceURL + "/namespace/" + namespace + "/textIndex"; 
+        
+        
+       
+        /*
+         * Note: This operation does not currently permit embedding into a
+         * read/write tx.
+         */
+        final ConnectOptions opts = newConnectOptions(endpointURL, uuid, null/* tx */);
+        
+        if (forceBuildTextIndex) {
+        	
+        	opts.addRequestParam(RemoteRepositoryDecls.FORCE_INDEX_CREATE, "true");
+        	
+        } 
+ 
+        JettyResponseListener response = null;
+
+        boolean consumeNeeded = true;
+        
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+            
+            consumeNeeded = false;
+            
+        } catch (Exception e) {
+            consumeNeeded = !InnerCause.isInnerCause(e,
+                    HttpException.class);
+        	throw e;
+        	
+        } finally {
+        	
+        	if (response != null)
+        		response.abort();
+
+        }
+        
+    }
 
     /**
      * Destroy a KB instance.
@@ -952,6 +1032,296 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
     }
 
+    /**********************************************************************
+     ************************** Mapgraph Servlet **************************
+     **********************************************************************/
+    static private final String COMPUTE_MODE = "computeMode";
+    static private final String MAPGRAPH = "mapgraph";
+    static private final String MAPGRAPH_RESET = "reset";
+    static private final String MAPGRAPH_PUBLISH = "publish";
+    static private final String MAPGRAPH_DROP = "drop";
+    static private final String MAPGRAPH_CHECK_RUNTIME_AVAILABLE = "runtimeAvailable";
+    static private final String CHECK_PUBLISHED = "checkPublished";
+
+    public enum ComputeMode {
+        CPU,
+        GPU;
+    }
+    
+    /**
+     * Publishes the given namespace to the mapgraph runtime. If
+     * the namespace if already published, no action is performed.
+     * The return value is false in the latter case, true otherwise.
+     * If the namespace that is passed in is null, the default
+     * namespace will be used.
+     * 
+     * @return true if the namespace was not yet published already, 
+     *         false otherwise (i.e., in case no action has been taken)
+     * @throws NoGPUAccelerationAvailableException
+     */
+    public boolean publishNamespaceToMapgraph(final String namespace)
+    throws Exception {
+        
+        assertMapgraphRuntimeAvailable();
+
+        if (namespacePublishedToMapgraph(namespace))
+            return false; // nothing to be done
+        
+        
+        final String repositoryUrl = 
+            getSparqlEndpointUrlForNamespaceOrDefault(namespace);
+        
+        final ConnectOptions opts = 
+                newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_PUBLISH);
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+            
+        return true;
+
+    }
+
+    /**
+     * Drops the given namespace from the mapgraph runtime. If
+     * the namespace was not registered in the runtime, no action is
+     * performed. The return value is false in the latter case, true otherwise.
+     * If the namespace that is passed in is null, the default
+     * namespace will be used.
+     * 
+     * @return true if the namespace was published before and has been dropped, 
+     *         false otherwise (i.e., in case no action has been taken)
+     * @throws NoGPUAccelerationAvailableException
+     */
+    public boolean dropNamespaceFromMapgraph(final String namespace)
+    throws Exception {
+
+        assertMapgraphRuntimeAvailable();
+
+        if (!namespacePublishedToMapgraph(namespace))
+            return false; // nothing to be done
+        
+        final String repositoryUrl = 
+                getSparqlEndpointUrlForNamespaceOrDefault(namespace);
+
+        final ConnectOptions opts = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_DROP);
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+        
+        return true;
+    }
+
+    
+    /**
+     * Checks whether the given namespace has been published. If null is passed
+     * in, the method performs a check for the default namespace.
+     * 
+     * @return true if the namespace is registered for acceleration,
+     *         false otherwise
+     * @throws NoGPUAccelerationAvailableException
+     */
+    public boolean namespacePublishedToMapgraph(final String namespace)
+    throws Exception {
+        
+        assertMapgraphRuntimeAvailable();
+        
+        final String repositoryUrl = 
+            getSparqlEndpointUrlForNamespaceOrDefault(namespace);
+        
+        final ConnectOptions opts = 
+                newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.setAcceptHeader("Accept: text/plain");
+            opts.addRequestParam(MAPGRAPH, CHECK_PUBLISHED);
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+            final String responseBody = response.getResponseBody();
+            
+            return responseBody!=null && responseBody.contains("true");
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+                    
+        
+    }
+    
+    /**
+     * Resets the mapgraph runtime for the compute mode.
+     * 
+     * @param computeMode the desired compute mode
+     */
+    public void resetMapgraphRuntime(final ComputeMode computeMode)
+    throws Exception {
+
+        assertMapgraphRuntimeAvailable();
+
+        if (computeMode==null) {
+            throw new IllegalArgumentException("Compute mode must not be null");
+        }
+
+        final String repositoryUrl = 
+                getSparqlEndpointUrlForNamespaceOrDefault(null /* default namespace */);
+
+        final ConnectOptions opts = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_RESET);
+            opts.addRequestParam(COMPUTE_MODE, computeMode.toString());
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+
+    }
+    
+    /**
+     * Returns the current status report for mapgraph.
+     * 
+     * @return the status report as human-readable string
+     * @throws Exception
+     */
+    public String getMapgraphStatus() throws Exception {
+        
+        String repositoryUrl = baseServiceURL + "/status";
+        
+        /**
+         * First reset the runtime
+         */
+        final ConnectOptions opts = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, "");
+            opts.method = "GET";
+        }
+
+        try {
+
+            response = doConnect(opts);
+            return response.getResponseBody();
+            
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+        
+    }
+    
+    /**
+     * Checks whether the mapgraph runtime is available.
+     * @return
+     */
+    public boolean mapgraphRuntimeAvailable() throws Exception {
+
+        final String repositoryUrl = 
+            getSparqlEndpointUrlForNamespaceOrDefault(null /* default namespace */);
+
+        /**
+         * First reset the runtime
+         */
+        final ConnectOptions opts = 
+            newConnectOptions(repositoryUrl, UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            opts.addRequestParam(MAPGRAPH, MAPGRAPH_CHECK_RUNTIME_AVAILABLE);
+            opts.method = "POST";
+        }
+
+        try {
+
+            response = doConnect(opts);
+            
+            return response.getStatus()==200 /* HTTP OK */;
+            
+        } finally {
+
+            if (response != null)
+                response.abort();
+
+        }
+
+    }
+    
+    void assertMapgraphRuntimeAvailable() throws Exception {
+        if (!mapgraphRuntimeAvailable()) 
+            throw new NoGPUAccelerationAvailable();
+    }
+
+
+    
     /**
      * Return the effective configuration properties for the named data set.
      * <p>
@@ -1028,6 +1398,56 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         }
 
+    }
+    
+    /**
+     * Initiate an online backup using the {@link com.bigdata.rdf.sail.webapp.BackupServlet}.
+     * 
+     * 
+     * @param file  -- The name of the file for the backup. (default = "backup.jnl")
+     * @param compress -- Use compression for the snapshot (default = false)
+     * @param block  -- Block on the response (default = true)
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1727
+     */
+	public void onlineBackup(final String file, final boolean compress,
+			final boolean block) throws Exception {
+		
+		/**
+		 * Use copies of these from {@link com.bigdata.rdf.sail.webapp.BackupServlet}
+		 * to avoid introducing cyclical dependency with bigdata-core.
+		 * 
+		 */
+		
+		final String COMPRESS = "compress";
+
+		final String FILE = "file";
+
+		final String BLOCK = "block";
+		
+        final ConnectOptions opts = newConnectOptions(baseServiceURL + "/backup", UUID.randomUUID(), null/* tx */);
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+        	opts.addRequestParam(FILE, file);
+        	opts.addRequestParam(COMPRESS, Boolean.toString(compress));
+        	opts.addRequestParam(BLOCK, Boolean.toString(block));
+
+            opts.method = "POST";
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+        } finally {
+            if (response != null)
+                response.abort();
+
+        }
+    	
     }
     
     /**

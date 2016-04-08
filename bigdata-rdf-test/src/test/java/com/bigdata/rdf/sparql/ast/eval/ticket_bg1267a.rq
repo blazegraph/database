@@ -1,0 +1,6 @@
+prefix ex: <http://example.org/>
+SELECT DISTINCT ?thingA ?hasB WHERE {
+  
+  ?thingA rdf:type ex:Thing .
+  BIND(EXISTS {?thingA ex:has ?thingB} AS ?hasB)
+}

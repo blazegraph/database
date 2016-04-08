@@ -400,6 +400,11 @@ graph ?g {
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
 
+        /*
+The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
+         */
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg03",
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg07",
     });
 
 	/**

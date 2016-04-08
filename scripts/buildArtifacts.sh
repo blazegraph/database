@@ -4,6 +4,7 @@ BASE_DIR=`dirname $0`
 echo "Building dependencies..."
 "$BASE_DIR"/mavenInstall.sh
 echo "Building artifacts..."
+
 #Install the parent pom
 mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml clean
 mvn -f "${BASE_DIR}"/../blazegraph-artifacts/pom.xml install -N -DskipTests=true
@@ -108,5 +109,13 @@ for tarball in $FILE_EXT; do
    fi
 
 done
+
+#Copy the releases file as README.txt
+VERSION=`cat ${BASE_DIR}/version.properties | cut -d= -f2 | sed -e 's/\./_/g'`
+RELEASE_NOTES="RELEASE_${VERSION}.txt"
+
+if [ -f "${BASE_DIR}/../bigdata/src/releases/${RELEASE_NOTES}" ] ; then
+	cp -f "${BASE_DIR}/../bigdata/src/releases/$RELEASE_NOTES" "${ARTIFACT_DIR}/README.txt"
+fi
 
 echo "Copied the deployers to ${ARTIFACT_DIR}."

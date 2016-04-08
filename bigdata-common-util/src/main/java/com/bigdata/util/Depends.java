@@ -156,7 +156,7 @@ public class Depends {
             "http://logging.apache.org/log4j/1.2/");
     
     private final static Dep lucene = new ApacheDep("lucene",
-            "http://lucene.apache.org/java/docs/index.html");
+            "http://lucene.apache.org/core/index.html");
 
     /*
      * http client and its dependencies are used for remote SPARQL requests and
@@ -266,6 +266,10 @@ public class Depends {
     private final static Dep jetty = new Dep("jetty",
             "http://www.eclipse.org/jetty/",
             "http://www.apache.org/licenses/LICENSE-2.0.html");
+
+    private final static Dep jsonld = new Dep("jsonld",
+            "https://github.com/jsonld-java/jsonld-java/",
+            "https://raw.githubusercontent.com/jsonld-java/jsonld-java/master/LICENCE");
     
     private final static Dep servletApi = new ApacheDep("servlet-api",
             "http://tomcat.apache.org");
@@ -319,6 +323,7 @@ public class Depends {
 //            nxparser,//
             nanohttp,//
             jetty,//
+            jsonld,//
             servletApi,//
             jacksonCore,//
             blueprintsCore,//

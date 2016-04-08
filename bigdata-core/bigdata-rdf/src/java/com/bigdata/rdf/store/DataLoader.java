@@ -195,7 +195,7 @@ public class DataLoader {
 
             } else {
 
-                buffer = new StatementBuffer(database, bufferCapacity);
+                buffer = new StatementBuffer(database, bufferCapacity, queueCapacity);
 
             }
 
@@ -465,6 +465,8 @@ public class DataLoader {
 		 */
 		static final String QUEUE_CAPACITY = DataLoader.class.getName() + ".queueCapacity";
 
+		//BLZG-1816  Disable by default to avoid concurrency issues
+		//BLZG-1813  Re-enabled based on fix for capacity issue.
 		static final String DEFAULT_QUEUE_CAPACITY = "10";
 
         /**

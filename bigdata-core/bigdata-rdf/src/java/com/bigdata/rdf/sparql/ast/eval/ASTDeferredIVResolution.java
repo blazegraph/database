@@ -39,6 +39,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
+import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -725,8 +726,12 @@ public class ASTDeferredIVResolution {
                         entry.setValue(new Constant(newIV));
                     }
                 });
-            } else if (value instanceof TermId) {
-                defer(((TermId)value).getValue(), new Handler(){
+            } else if (value instanceof AbstractIV) {
+            	// See BLZG-1788 (Typed literals in VALUES clause not matching data)
+            	// Changed from TermId to AbstractIV, as there are other types of IVs,
+            	// which could require resolution against the store
+            	// (for ex. FullyInlineTypedLiteralIV which represents typed literal)
+                defer(((AbstractIV)value).getValue(), new Handler(){
                     @Override
                     public void handle(final IV newIV) {
                         entry.setValue(new Constant(newIV));
@@ -897,15 +902,6 @@ public class ASTDeferredIVResolution {
                 }
             }
         } if (bop instanceof DeleteInsertGraph) {
-            // @see https://jira.blazegraph.com/browse/BLZG-1176
-            // Check for using WITH keyword with triple store not supporting quads
-            // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.visit(ASTModify, Object)
-            // TODO: needs additional unit tests, see https://jira.blazegraph.com/browse/BLZG-1518
-            if (!store.isQuads() && ((DeleteInsertGraph)bop).getContext()!=null) {
-                throw new QuadsOperationInTriplesModeException(
-                    "Using named graph referenced through WITH clause " +
-                    "is not supported in triples mode.");
-            }
             fillInIV(store, ((DeleteInsertGraph)bop).getDataset());
             fillInIV(store, ((DeleteInsertGraph)bop).getDeleteClause());
             fillInIV(store, ((DeleteInsertGraph)bop).getInsertClause());
@@ -1008,11 +1004,15 @@ public class ASTDeferredIVResolution {
         } else if (bop instanceof StatementPatternNode) {
             final StatementPatternNode sp = (StatementPatternNode)bop;
             // @see https://jira.blazegraph.com/browse/BLZG-1176
+            // Check for using WITH keyword with triple store not supporting quads
+            // Moved from com.bigdata.rdf.sail.sparql.UpdateExprBuilder.visit(ASTModify, Object)
             // Check for using GRAPH keyword with triple store not supporting quads
             // Moved from GroupGraphPatternBuilder.visit(final ASTGraphGraphPattern node, Object data)
-            if (!store.isQuads() && Scope.NAMED_CONTEXTS.equals(sp.getScope())) {
+            // At this point it is not possible to distinguish using WITH keyword from GRAPH construct,
+            // as WITH scope was propagated into statement pattern
+            if (!store.isQuads() && (sp.getScope()!=null && !(Scope.DEFAULT_CONTEXTS.equals(sp.getScope())))) {
                 throw new QuadsOperationInTriplesModeException(
-                        "Use of GRAPH construct in query body is not supported " +
+                        "Use of WITH and GRAPH constructs in query body is not supported " +
                         "in triples mode.");
             }
         } else if(bop instanceof ServiceNode) {
@@ -1197,7 +1197,14 @@ public class ASTDeferredIVResolution {
                         }
                         final DTE dte = DTE.valueOf(dataType);
                         if (dte != null) {
-                            iv = IVUtility.decode(label, dte.name());
+                        	// Check if lexical form is empty, and keep FullyInlineTypedLiteralIV
+                        	// holding corresponding data type as iv for the new value
+                        	// @see https://jira.blazegraph.com/browse/BLZG-1716 (SPARQL Update parser fails on invalid numeric literals)
+                        	if (label.isEmpty()) {
+                        		iv = ivs[i];
+                        	} else {
+                        		iv = IVUtility.decode(label, dte.name());
+                        	}
                         } else {
                             iv = TermId.mockIV(VTE.valueOf(v));
                         }

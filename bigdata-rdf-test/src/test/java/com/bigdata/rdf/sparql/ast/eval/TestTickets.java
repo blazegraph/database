@@ -27,13 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.List;
+
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -1899,8 +1904,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
    }
    
    /**
-    * BLZG-852: MINUS and UNION.
-    */
+     * BLZG-852: MINUS and UNION.
+     */
    public void test_ticket_852a() throws Exception {
 
       new TestHelper(
@@ -1910,8 +1915,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
           "ticket_bg852a.srx"// resultFileURL
          ).runTest();   
    }
-
-
 
    /**
     * BLZG-852: MINUS and UNION.
@@ -1923,6 +1926,19 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
           "ticket_bg852b.rq",// queryFileURL
           "empty.trig",// dataFileURL
           "ticket_bg852b.srx"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+    * BLZG-1750: DESCRIBE and UNION.
+    */
+   public void test_ticket_1750() throws Exception {
+
+      new TestHelper(
+          "ticket_bg1750",// testURI,
+          "ticket_bg1750.rq",// queryFileURL
+          "ticket_bg1750-data.trig",// dataFileURL
+          "ticket_bg1750-res.trig"// resultFileURL
          ).runTest();   
    }
    
@@ -1951,5 +1967,101 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_bg1748.srx"// resultFileURL
           ).runTest();   
     }
+
+   /**
+    * BLZG-1267a: Unable to bind result of EXISTS operator
+    * -> query with exists evaluating to true
+    */
+   public void test_ticket_1267a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267a",   // testURI,
+           "ticket_bg1267a.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267a.srx"// resultFileURL
+          ).runTest();   
+    }
+
+   /**
+    * BLZG-1267b: Unable to bind result of EXISTS operator
+    * -> query with exists evaluating to false
+    */
+   public void test_ticket_1267b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267b",   // testURI,
+           "ticket_bg1267b.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1267c: Unable to bind result of EXISTS operator
+    * -> query with two EXISTS that compare equal
+    */
+   public void test_ticket_1267c() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267c",   // testURI,
+           "ticket_bg1267c.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267c.srx"// resultFileURL
+           ).runTest();    
+    }
+   
+   /**
+    * BLZG-1267d: Unable to bind result of EXISTS operator
+    * -> query with two NOT EXISTS that compare unequal
+    */
+   public void test_ticket_1267d() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267d",   // testURI,
+           "ticket_bg1267d.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267d.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1817: reordering inside complex subqueries that will
+    * be translated into NSIs.
+    */
+   public void test_ticket_1817() throws Exception {
+
+       final ASTContainer ast = new TestHelper(
+                                   "ticket_bg1817",   // testURI,
+                                   "ticket_bg1817.rq",// queryFileURL
+                                   "ticket_bg1817.ttl",// dataFileURL
+                                   "ticket_bg1817.srx"// resultFileURL
+                                   ).runTest();    
+       
+       // assert that ?b wdt:P31 ?tgt_class is placed in front of ?a ?p ?b .
+       final List<StatementPatternNode> spns = 
+               BOpUtility.toList(ast.getOptimizedAST(), StatementPatternNode.class);
+       
+       int idxOfB = -1;
+       int idxOfA = -1;       
+       for (int i=0; i<spns.size(); i++) {
+           
+           final StatementPatternNode spn = spns.get(i);
+           
+           final TermNode subjectTN = spn.get(0);
+           if (subjectTN instanceof VarNode) {
+               final VarNode subjectVN = (VarNode)subjectTN;
+               final String varName = ((Var<?>)subjectVN.get(0)).getName();
+               if ("a".equals(varName)) {
+                   idxOfA = i;
+               } else if ("b".equals(varName)) {
+                   idxOfB = i;
+               }
+           }
+           
+       }
+       
+       assertTrue(idxOfB<idxOfA);
+   }
+   
 
 }

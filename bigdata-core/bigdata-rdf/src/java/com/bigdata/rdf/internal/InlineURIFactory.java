@@ -88,14 +88,14 @@ public class InlineURIFactory implements IInlineURIFactory {
     protected void addHandler(final InlineURIHandler handler) {
 
     	//        this.handlers.add(handler);
-        handlersByNamespace.put(handler.getNamespace(), handler);
+        getHandlersByNamespace().put(handler.getNamespace(), handler);
         
     }
 
     @Override
     public void init(final Vocabulary vocab) {
 
-    	for (InlineURIHandler handler : handlersByNamespace.values()) {
+    	for (InlineURIHandler handler : getHandlersByNamespace().values()) {
         
     		handler.init(vocab);
     		
@@ -110,7 +110,7 @@ public class InlineURIFactory implements IInlineURIFactory {
 		final String str = uri.stringValue();
 
 		// Find handler with longest prefix match LTE the given URI.
-		final Map.Entry<String, InlineURIHandler> floorEntry = handlersByNamespace.floorEntry(str);
+		final Map.Entry<String, InlineURIHandler> floorEntry = getHandlersByNamespace().floorEntry(str);
 
 		if (floorEntry == null) {
 
@@ -162,7 +162,7 @@ public class InlineURIFactory implements IInlineURIFactory {
     public String getLocalNameFromDelegate(final URI namespace,
             final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
 
-		final InlineURIHandler handler = handlersByNamespace.get(namespace.stringValue());
+		final InlineURIHandler handler = getHandlersByNamespace().get(namespace.stringValue());
 		
 		if (handler == null) {
 			throw new IllegalArgumentException(
@@ -171,6 +171,10 @@ public class InlineURIFactory implements IInlineURIFactory {
 		
 		return handler.getLocalNameFromDelegate(delegate);
 		
+	}
+
+	public TreeMap<String, InlineURIHandler> getHandlersByNamespace() {
+		return handlersByNamespace;
 	}
 
 }

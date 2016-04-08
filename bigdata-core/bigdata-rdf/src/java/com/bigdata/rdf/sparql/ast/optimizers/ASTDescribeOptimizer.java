@@ -40,6 +40,7 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -125,8 +126,24 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 		if (queryRoot.hasWhereClause()) {
 			
 		    // start with the existing WHERE clause.
-			where = queryRoot.getWhereClause();
-			
+		    if (queryRoot.getWhereClause() instanceof UnionNode) {
+		        
+	            /**
+	             * https://jira.blazegraph.com/browse/BLZG-1750:
+	             * if "where" is a UNION node, the subsequent call where.addChild(union) 
+	             * only accept JoinGroupNodes (and casting UnionNode to JoinGroupNode fails). 
+	             * We therefore need to wrap the UNION node into a join group node.
+	             */
+		        where = new JoinGroupNode();
+		        where.addChild(queryRoot.getWhereClause());
+		        queryRoot.setWhereClause(where);
+                
+		    } else {
+		        
+		        where = queryRoot.getWhereClause();
+		        
+		    }
+		    
 		} else {
 			
 			// some describe queries don't have where clauses
@@ -135,9 +152,10 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 		}
 		
 		final UnionNode union = new UnionNode();
-		
-		where.addChild(union); // append UNION to WHERE clause.
 
+		
+        where.addChild(union); // append UNION to WHERE clause.
+		
         final ConstructNode construct = new ConstructNode(context);
 
         final ProjectionNode projection = queryRoot.getProjection();

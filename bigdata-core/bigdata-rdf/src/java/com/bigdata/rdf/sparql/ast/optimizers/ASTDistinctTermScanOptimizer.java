@@ -378,7 +378,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
                "Expecting estimated-cardinality to be bound: sp=" + sp);
       }
       final int arity = context.isQuads() ? 4 : 3;
-      final long newCard = (long) (1.0 / arity);
+      final long newCard = (long) (oldCard * 1.0 / arity);
 
       sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, newCard);
 

@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -107,6 +108,22 @@ public class InHashBOp extends InBOp {
         
     }
 
+    /**
+     * Extends {@link com.bigdata.bop.CoreBaseBOp#mutation() CoreBaseBOp.mutation} method to reflect args changes in cached IVs set.
+     */
+    @Override
+    public void mutation() {
+    	super.mutation();
+    	if (set != null) {
+            synchronized (this) {
+                if (set != null) {
+                    // clearing cached set is guarded by double-checked locking pattern.
+                    set = null;
+                }
+            }
+        }
+    }
+    
     private void init() {
 
         valueExpr = getValueExpression();
@@ -130,13 +147,20 @@ public class InHashBOp extends InBOp {
 
     public boolean accept(final IBindingSet bindingSet) {
         
+    	final Set<IV> _set;
         if (valueExpr == null||set==null) {
             synchronized (this) {
                 if (valueExpr == null||set==null) {
                     // init() is guarded by double-checked locking pattern.
                     init();
                 }
+                // "set" is pulled into a local variable in this double-checked locking pattern
+                // to avoid the possibility that set is resolved to non-null
+                // and then cleared to null before it is used in accept()
+                _set = set;                    
             }
+        } else {
+        	_set = set;
         }
 
         // get as-bound value of the value expression.
@@ -145,7 +169,7 @@ public class InHashBOp extends InBOp {
         if (v == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
-        final boolean found = set.contains(v);
+        final boolean found = _set.contains(v);
 
         return not ? !found : found;
 

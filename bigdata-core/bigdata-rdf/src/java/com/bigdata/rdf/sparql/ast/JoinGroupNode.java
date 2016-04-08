@@ -67,6 +67,16 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
          * @see OptimizerQueryHint
          */
         String OPTIMIZER = QueryHints.OPTIMIZER;
+
+        /**
+         * An optional boolean that indicates whether this {@link JoinGroupNode}
+         * is the subgroup of an {@link ArbitraryLengthPathNode}. The default of
+         * this annotation is {@value #DEFAULT_IS_SUBGROUP_OF_ALP_NODE} (see:
+         * {@link #DEFAULT_IS_SUBGROUP_OF_ALP_NODE}).
+         */
+        String IS_SUBGROUP_OF_ALP_NODE = "isSubgroupOfArbitraryLengthPathNode";
+        
+        boolean DEFAULT_IS_SUBGROUP_OF_ALP_NODE = false;
         
     }
     
@@ -232,6 +242,23 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
         setProperty(Annotations.MINUS, minus);
         
+    }
+
+    /**
+     * Returns the property {@link Annotations#IS_SUBGROUP_OF_ALP_NODE} of this
+     * {@link JoinGroupNode}. 
+     */
+    final public boolean isSubgroupOfALPNode() {
+        
+        return getProperty(Annotations.IS_SUBGROUP_OF_ALP_NODE,
+                           Annotations.DEFAULT_IS_SUBGROUP_OF_ALP_NODE);
+        
+    }
+
+    final public void setSubgroupOfALPNode( final boolean isSubgroup ) {
+       
+       setProperty(Annotations.IS_SUBGROUP_OF_ALP_NODE, isSubgroup);
+       
     }
 
     /**

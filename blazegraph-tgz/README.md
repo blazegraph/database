@@ -30,4 +30,3 @@ log/    #Log file.  The default is blazegraph.out
 pid/    #pid file
 war/    #web application sources for the Blazegraph Workbench
 ```
-

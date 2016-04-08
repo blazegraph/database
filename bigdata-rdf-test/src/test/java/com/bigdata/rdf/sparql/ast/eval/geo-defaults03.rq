@@ -1,0 +1,5 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?s WHERE {
+  ?s ?p ?o
+} 

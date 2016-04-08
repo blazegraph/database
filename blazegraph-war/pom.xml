@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-artifacts</artifactId>
-    <version>2.0.1</version>
+    <version>2.1.0</version>
     <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-war</artifactId>
-  <version>2.0.1</version>
+  <version>2.1.0</version>
   <name>Blazegraph WAR</name>
   <description>Blazegraph Web Application Archive</description>
   <packaging>war</packaging>
@@ -205,7 +205,12 @@ ga('send', 'pageview');
     </dependency>
     <dependency>
       <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-analyzers</artifactId>
+      <artifactId>lucene-analyzers-common</artifactId>
+      <version>${lucene.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-analyzers-smartcn</artifactId>
       <version>${lucene.version}</version>
     </dependency>
     <dependency>
@@ -349,11 +354,23 @@ ga('send', 'pageview');
       <artifactId>fastutil</artifactId>
       <version>${fastutil.version}</version>
     </dependency>
+    <!-- jsonld -->
+    <dependency>
+      <groupId>com.github.jsonld-java</groupId>
+      <artifactId>jsonld-java-sesame</artifactId>
+      <version>${jsonld.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <!-- Included for RDFa support -->
     <dependency>
-       <groupId>org.semarglproject</groupId>
-       <artifactId>semargl-sesame</artifactId>
-       <version>${semargl.version}</version>
+      <groupId>org.semarglproject</groupId>
+      <artifactId>semargl-sesame</artifactId>
+      <version>${semargl.version}</version>
     </dependency>
   </dependencies>
 </project>

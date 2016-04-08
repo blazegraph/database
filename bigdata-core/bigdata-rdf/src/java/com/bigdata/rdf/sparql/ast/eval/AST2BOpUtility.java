@@ -352,7 +352,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
     private static PipelineOp convertQueryBase(PipelineOp left,
             final QueryBase query, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
-
+        
         final ProjectionNode projection = query.getProjection();
         
         final IVariable<?>[] projectedVars = projection == null
@@ -380,6 +380,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         // Add any variables known to be materialized into this scope.
         doneSet.addAll(tmp);
+
+        if( left != null) {
+        	left = (PipelineOp) left.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+        }
 
         return left;
 
@@ -729,6 +733,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (log.isInfoEnabled())
             log.info("\nqueryOrSubquery:\n" + queryBase + "\nplan:\n"
                     + BOpUtility.toString(left));
+        
+        if (left != null) {
+        	left = (PipelineOp) left.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+        }
 
         return left;
 
@@ -884,9 +892,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
        
         final PipelineOp subqueryBase = 
            addDistinctProjectionOp(null, ctx, subqueryRoot, subqueryProjVars);
-        
-        final PipelineOp subqueryPlan = 
+
+        PipelineOp subqueryPlan = 
            convertQueryBase(subqueryBase,subqueryRoot, doneSet, ctx);
+        // inherit the namespace property (which is needed for the CPU/GPU),
+        // see https://github.com/SYSTAP/bigdata-gpu/issues/343
+        subqueryPlan = (PipelineOp) subqueryPlan.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
 
         /*
          * Annotate the named subquery with the set of variables known to be
@@ -1994,6 +2005,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
             */
            subqueryPlan = 
                convertQueryBase(null, subqueryRoot, doneSet, ctx);
+           // inherit the namespace property (which is needed for the CPU/GPU) to the top-level query
+           // see https://github.com/SYSTAP/bigdata-gpu/issues/343           
+           subqueryPlan = (PipelineOp) subqueryPlan.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+
         }
         
         left = addHashIndexOp(left, usePipelinedHashJoin, ctx, subqueryRoot, 
@@ -2275,6 +2290,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
               convertJoinGroupOrUnion(
                  null /* standalone */, subqueryRoot.getWhereClause(),
                  new LinkedHashSet<IVariable<?>>(doneSet)/* doneSet */, ctx);
+           // inherit the namespace property (which is needed for the CPU/GPU),
+           // see https://github.com/SYSTAP/bigdata-gpu/issues/343
+           subqueryPlan = (PipelineOp) subqueryPlan.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());           
         } 
 
         
@@ -2416,8 +2434,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
          */
         subqueryRoot.setSlice(new SliceNode(0L/* offset */, 1L/* limit */));
         
-        final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
-                subqueryRoot, doneSet, ctx);
+        PipelineOp subqueryPlan = convertQueryBase(null/* left */, subqueryRoot, doneSet, ctx);
+        // inherit the namespace property (which is needed for the CPU/GPU) to the top-level query
+        // see https://github.com/SYSTAP/bigdata-gpu/issues/343      
+        subqueryPlan = (PipelineOp) subqueryPlan.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());        
 
         left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
                 new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
@@ -2759,6 +2779,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     alpNode, ctx);
             
         }
+        
+        // inherit the namespace property (which is needed for the CPU/GPU),
+        // see https://github.com/SYSTAP/bigdata-gpu/issues/343
+        subquery = (PipelineOp) subquery.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+        
+
 
         /**
          * Now, we're ready to set up the ALPOp at the core. 
@@ -2810,6 +2836,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER)//
                  ), alpNode, ctx);
+           // inherit the namespace property (which is needed for the CPU/GPU) to the top-level query
+           // see https://github.com/SYSTAP/bigdata-gpu/issues/343                 
+           alpOp = (PipelineOp) alpOp.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());           
 
         }
 
@@ -3044,14 +3073,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
         	
         	left = ctx.gpuEvaluation.convertJoinGroup(left, joinGroup, doneSet, start, ctx);
         	
-        	if (needsEndOp && joinGroup.getParent() != null) {
-        		left = addEndOp(left, ctx);
-        	}
-        	
-        	return left;
         }
-        
-        if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
+        else if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
                 ctx.mergeJoin)) {
 
             /*
@@ -4185,7 +4208,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
             */
            subqueryPlan = 
               convertJoinGroupOrUnion(null /* standalone */, subgroup, doneSet, ctx);
-           
+           // inherit the namespace property (which is needed for the CPU/GPU),
+           // see https://github.com/SYSTAP/bigdata-gpu/issues/343           
+           subqueryPlan = (PipelineOp) subqueryPlan.setProperty(BOp.Annotations.NAMESPACE, ctx.getNamespace());
+          
         } 
         
         left = addHashIndexOp(left, usePipelinedHashJoin, ctx, subgroup, 
