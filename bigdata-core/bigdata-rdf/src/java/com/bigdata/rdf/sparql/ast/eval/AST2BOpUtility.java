@@ -502,7 +502,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
             if (isAggregate) {
 
-                left = addAggregation(left, projection, groupBy, having, ctx);
+                final Set<IVariable<IV>> vars = new HashSet<IVariable<IV>>();
+                
+                StaticAnalysis.gatherVarsToMaterialize(having, vars);
+                vars.removeAll(doneSet);
+                if (!vars.isEmpty()) {
+                    left = addChunkedMaterializationStep(
+                        left, vars, ChunkedMaterializationOp.Annotations.DEFAULT_MATERIALIZE_INLINE_IVS, null, having.getQueryHints(), ctx);
+                }
+                
+                left = addAggregation(left, projection, groupBy, having, ctx, doneSet);
 
             } else {
 
@@ -548,7 +557,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 
                 preserveOrder = true;
 
-                left = addOrderBy(left, queryBase, orderBy, ctx);
+                left = addOrderBy(left, queryBase, orderBy, ctx, doneSet);
 
             } else {
                 
@@ -570,7 +579,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
             if (orderBy != null && !orderBy.isEmpty()) {
 
-                left = addOrderBy(left, queryBase, orderBy, ctx);
+                left = addOrderBy(left, queryBase, orderBy, ctx, doneSet);
 
             }
 
@@ -1142,7 +1151,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
                 // Add the materialization step.
                 left = addMaterializationSteps2(left, rightId,
-                        (Set<IVariable<IV>>) (Set) vars, queryHints, ctx);
+                        (Set<IVariable<IV>>) (Set) vars, queryHints, ctx, doneSet);
 
                 // These variables have now been materialized.
                 doneSet.addAll(vars);
@@ -3797,7 +3806,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (vars.size() > 0) {
 
             left = addMaterializationSteps1(left, bopId, ve, vars,
-                    queryHints, ctx);
+                    queryHints, ctx, doneSet);
 
             if(req.getRequirement()==Requirement.ALWAYS) {
 
@@ -3895,7 +3904,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
        if (vars.size() > 0) {
 
            left = addMaterializationSteps1(left, bopId, ve, vars,
-                   queryHints, ctx);
+                   queryHints, ctx, doneSet);
 
            if(req.getRequirement()==Requirement.ALWAYS) {
 
@@ -4008,7 +4017,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
             // Add materialization steps for those variables.
             left = addMaterializationSteps1(left, bopId, ve, vars,
-                    joinGroup.getQueryHints(), ctx);
+                    joinGroup.getQueryHints(), ctx, doneSet);
 
             if (req.getRequirement() == Requirement.ALWAYS) {
                 
@@ -4449,7 +4458,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
     @SuppressWarnings("rawtypes")
     private static final PipelineOp addAggregation(PipelineOp left,
             final ProjectionNode projection, final GroupByNode groupBy,
-            final HavingNode having, final AST2BOpContext ctx) {
+            final HavingNode having, final AST2BOpContext ctx,
+            final Set<IVariable<?>> doneSet) {
 
         final IValueExpression<?>[] projectExprs = projection
                 .getValueExpressions();
@@ -4552,7 +4562,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         }
 
-        left = addMaterializationSteps2(left, bopId, vars, queryHints, ctx);
+        left = addMaterializationSteps2(left, bopId, vars, queryHints, ctx, doneSet);
 
         if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()
                 && !groupByState.isNestedAggregates()) {
@@ -4627,7 +4637,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static final PipelineOp addOrderBy(PipelineOp left,
             final QueryBase queryBase, final OrderByNode orderBy,
-            final AST2BOpContext ctx) {
+            final AST2BOpContext ctx, final Set<IVariable<?>> doneSet) {
 
         // The query hints are taken from the QueryBase
         final Properties queryHints = queryBase.getQueryHints();
@@ -4671,7 +4681,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final int sortId = ctx.nextId();
 
-        left = addMaterializationSteps2(left, sortId, vars, queryHints, ctx);
+        left = addMaterializationSteps2(left, sortId, vars, queryHints, ctx, doneSet);
 
         left = applyQueryHints(
                 new MemorySortOp(

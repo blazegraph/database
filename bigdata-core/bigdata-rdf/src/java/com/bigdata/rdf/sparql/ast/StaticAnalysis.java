@@ -2007,7 +2007,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         boolean materialize = false;
         boolean always = false;
         
-        final Iterator<BOp> it = BOpUtility.preOrderIterator(c);
+        final Iterator<BOp> it = BOpUtility.preOrderIteratorWithAnnotations(c);
         
         while (it.hasNext()) {
             
