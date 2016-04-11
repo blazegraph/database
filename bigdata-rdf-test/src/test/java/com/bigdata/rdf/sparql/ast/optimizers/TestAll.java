@@ -185,6 +185,10 @@ public class TestAll extends TestCase {
 		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
 			suite.addTest(TestASTDistinctTermScanOptimizer.suite());
 
+                      
+        suite.addTestSuite(TestASTOrderByAggregateFlatteningOptimizer.class);
+               
+                
         return suite;
 
     }

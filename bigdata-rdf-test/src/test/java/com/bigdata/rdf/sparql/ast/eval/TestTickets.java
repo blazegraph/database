@@ -64,6 +64,59 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         super(name);
     }
 
+    
+    
+    public void test_ticket_618a() throws Exception {
+
+        new TestHelper("sparql11-order-02",// testURI,
+                "sparql11-order-02.rq",// queryFileURL
+                "sparql11-order-02.ttl",// dataFileURL
+                "sparql11-order-02.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618b() throws Exception {
+
+        new TestHelper("sparql11-order-03",// testURI,
+                "sparql11-order-03.rq",// queryFileURL
+                "sparql11-order-03.ttl",// dataFileURL
+                "sparql11-order-03.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618c() throws Exception {
+
+        new TestHelper("sparql11-subquery-04",// testURI,
+                "sparql11-subquery-04.rq",// queryFileURL
+                "sparql11-subquery-04.ttl",// dataFileURL
+                "sparql11-subquery-04.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618d() throws Exception {
+
+        new TestHelper("ticket-618d",// testURI,
+                "ticket-618d.rq",// queryFileURL
+                "ticket-618d.ttl",// dataFileURL
+                "ticket-618d.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618e() throws Exception {
+
+        new TestHelper("ticket-618e",// testURI,
+                "ticket-618e.rq",// queryFileURL
+                "ticket-618e.ttl",// dataFileURL
+                "ticket-618e.srx",// resultFileURL
+                true /* checkOrder */).runTest();
+
+    }
+    
+    
     /**
      * <pre>
      * SELECT * WHERE {{}}
