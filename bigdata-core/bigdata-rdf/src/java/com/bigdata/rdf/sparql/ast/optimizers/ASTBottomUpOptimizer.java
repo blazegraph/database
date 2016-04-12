@@ -544,7 +544,13 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         final JoinGroupNode pp = p.getParentJoinGroup();
 
         if (pp == null)
-            throw new AssertionError();
+            /**
+             * BLZG-1760: in case we have multiple OPTIONALs nested inside one
+             * group, we may enter this method multiple times and, as replacement
+             * is taking place in the first one, there's nothing that needs to be
+             * done in following iterations, so just return.
+             */
+            return;
 
         final String namedSet = context.createVar(NAMED_SET_PREFIX);
 

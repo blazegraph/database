@@ -1,0 +1,7 @@
+select ?p (count(*) as $cnt)
+WHERE
+{ 
+  graph ?g { ?s ?p ?o . }
+} group by ?p 
+having(strlen(str(?p)) > 25)
+order by desc($cnt)

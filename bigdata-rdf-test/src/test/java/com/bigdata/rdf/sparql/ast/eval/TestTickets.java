@@ -2121,6 +2121,49 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
    }
    
    /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395a",   // testURI,
+           "ticket_bg1395a.rq",// queryFileURL
+           "ticket_bg1395a.ttl",// dataFileURL
+           "ticket_bg1395a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395b",   // testURI,
+           "ticket_bg1395b.rq",// queryFileURL
+           "ticket_bg1395bc.ttl",// dataFileURL
+           "ticket_bg1395bc.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395c() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395c",   // testURI,
+           "ticket_bg1395c.rq",// queryFileURL
+           "ticket_bg1395bc.ttl",// dataFileURL
+           "ticket_bg1395bc.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   
+   /**
     * BLZG-1817: reordering inside complex subqueries that will
     * be translated into NSIs.
     */
@@ -2158,6 +2201,48 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        
        assertTrue(idxOfB<idxOfA);
    }
-   
 
+
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1760a",   // testURI,
+           "ticket_bg1760a.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1760b",   // testURI,
+           "ticket_bg1760b.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760c() throws Exception {
+
+
+       new TestHelper(
+           "ticket_bg1760c",   // testURI,
+           "ticket_bg1760c.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760c.srx"// resultFileURL
+           ).runTest();    
+   }
+
+   
 }
