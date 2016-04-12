@@ -296,6 +296,7 @@ public class AST2BOpFilters extends AST2BOpBase {
              * Note: This code path does not reorder the solutions (no
              * conditional routing).
              */
+
             return addChunkedMaterializationStep(
                     left,
                     vars,
@@ -624,7 +625,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                     && ((INeedsMaterialization) c).getRequirement() == Requirement.ALWAYS) {
 
                 // add any new terms to the list of already materialized
-                doneSet.addAll(terms);
+                alreadyMaterialized.addAll(terms);
                 
             }
 

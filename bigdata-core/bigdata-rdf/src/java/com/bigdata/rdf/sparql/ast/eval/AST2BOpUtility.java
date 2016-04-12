@@ -558,7 +558,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 
                 preserveOrder = true;
 
-                left = addOrderBy(left, queryBase, orderBy, ctx, doneSet);
+                left = addOrderBy(left, queryBase, orderBy, ctx);
 
             } else {
                 
@@ -580,7 +580,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
             if (orderBy != null && !orderBy.isEmpty()) {
 
-                left = addOrderBy(left, queryBase, orderBy, ctx, doneSet);
+                left = addOrderBy(left, queryBase, orderBy, ctx);
 
             }
 
@@ -4638,7 +4638,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static final PipelineOp addOrderBy(PipelineOp left,
             final QueryBase queryBase, final OrderByNode orderBy,
-            final AST2BOpContext ctx, final Set<IVariable<?>> doneSet) {
+            final AST2BOpContext ctx) {
 
         // The query hints are taken from the QueryBase
         final Properties queryHints = queryBase.getQueryHints();
