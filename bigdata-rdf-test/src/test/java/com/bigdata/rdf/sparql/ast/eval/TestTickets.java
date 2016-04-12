@@ -116,6 +116,49 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
+    /* Currently disabled due to parsing problems. 
+    
+    //CONSTRUCT { ?x ex:p ?y }
+    //WHERE 
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+    public void test_ticket_618f() throws Exception {
+
+        new TestHelper("ticket-618f",// testURI,
+                "ticket-618f.rq",// queryFileURL
+                "ticket-618f.ttl",// dataFileURL
+                "ticket-618f.srx").runTest();
+
+    }
+    */
+    
+    /* Currently disabled due to parsing problems. 
+    
+    //ASK
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+
+    
+    public void test_ticket_618g() throws Exception {
+
+        new TestHelper("ticket-618g",// testURI,
+                "ticket-618g.rq",// queryFileURL
+                "ticket-618g.ttl",// dataFileURL
+                "ticket-618g.srx").runTest();
+
+    }
+    */
+    
+    
+    
     
     /**
      * <pre>

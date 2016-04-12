@@ -1,0 +1,31 @@
+# This is just a modification of ticket-618e.rq for testing aggregates 
+# in GROUP BY in combination with CONSTRUCT instead of SELECT.
+
+PREFIX ex: <http://example.org/>
+CONSTRUCT { ?x ex:p ?y }
+WHERE 
+{
+  ?x ex:r ?y .
+  ?y ex:q ?z 
+}
+GROUP BY ?x ?y
+ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
