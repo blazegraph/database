@@ -209,8 +209,7 @@ public class AST2BOpFilters extends AST2BOpBase {
             final IValueExpression<IV> ve,//
             final Set<IVariable<IV>> vars, //
             final Properties queryHints,
-            final AST2BOpContext ctx, 
-            final Set<IVariable<?>> doneSet) {
+            final AST2BOpContext ctx) {
 
         /*
          * If the constraint "c" can run without a NotMaterializedException then
@@ -225,7 +224,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                 new NV(PipelineOp.Annotations.ALT_SINK_REF, rightId)//
                 ), queryHints, ctx);
 
-        return addMaterializationSteps2(left, rightId, vars, queryHints, ctx, doneSet);
+        return addMaterializationSteps2(left, rightId, vars, queryHints, ctx);
 
     }
 
@@ -282,8 +281,7 @@ public class AST2BOpFilters extends AST2BOpBase {
             final int rightId, //
             final Set<IVariable<IV>> vars,//
             final Properties queryHints, //
-            final AST2BOpContext ctx,
-            final Set<IVariable<?>> doneSet) {
+            final AST2BOpContext ctx) {
 
         final int nvars = vars.size();
 
@@ -298,8 +296,6 @@ public class AST2BOpFilters extends AST2BOpBase {
              * Note: This code path does not reorder the solutions (no
              * conditional routing).
              */
-            doneSet.addAll(vars);
-
             return addChunkedMaterializationStep(
                     left,
                     vars,
@@ -648,8 +644,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                         ve, // value expression
                         terms,// varsToMaterialize,
                         queryHints,//
-                        ctx,
-                        doneSet);
+                        ctx);
                 
             }
 
