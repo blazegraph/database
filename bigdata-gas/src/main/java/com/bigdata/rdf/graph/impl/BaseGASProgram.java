@@ -15,10 +15,7 @@
 */
 package com.bigdata.rdf.graph.impl;
 
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
@@ -122,10 +119,10 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
     public void before(final IGASContext<VS, ES, ST> ctx) {
         
         switch (getInitialFrontierEnum()) {
-        case AllVertices: {
-            addAllVerticesToFrontier(ctx);
-            break;
-        }
+            case AllVertices: {
+                addAllVerticesToFrontier(ctx);
+                break;
+            }
             case SampledVertices: {
                 addSampledVerticesToFrontier(ctx);
                 break;
@@ -168,11 +165,38 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
                 new Random());
 
         final Resource[] initialFrontier = dist.getAll();
-        
-        if (log.isDebugEnabled())
-            log.debug("initialFrontier=" + Arrays.toString(initialFrontier));
 
-        gasState.setFrontier(ctx, initialFrontier);
+        if (ctx.getLinkType() != null) {
+            if (log.isDebugEnabled())
+                log.debug("linkType=" + ctx.getLinkType());
+            final Set<Resource> filtered = new HashSet<>();
+            for (Resource r : initialFrontier) {
+                if ( ctx.getGraphAccessor().getEdgeCount(ctx, r, EdgesEnum.InEdges) != 0 ||
+                        ctx.getGraphAccessor().getEdgeCount(ctx, r, EdgesEnum.OutEdges) != 0) {
+                    filtered.add(r);
+                } else {
+                    continue;
+                }
+            }
+            final Resource[] filteredFrontier = new Resource[filtered.size()];
+            int i = 0;
+            for (Resource r : filtered) {
+                filteredFrontier[i] = r;
+                i++;
+            }
+            gasState.setFrontier(ctx, filteredFrontier);
+
+            if(log.isDebugEnabled())
+                log.debug("initialFrontier=" + Arrays.toString(initialFrontier));
+            
+        }  else {
+
+            if (log.isDebugEnabled())
+                log.debug("initialFrontier=" + Arrays.toString(initialFrontier));
+
+            gasState.setFrontier(ctx, initialFrontier);
+        }
+
 
     }
 

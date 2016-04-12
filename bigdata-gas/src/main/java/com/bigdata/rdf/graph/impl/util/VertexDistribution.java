@@ -420,12 +420,6 @@ public class VertexDistribution {
     /**
      * Return all (without duplicates) vertices from the graph
      *
-     * @param desiredSampleSize
-     *            The number of VertexElements in the VertexDistribution.
-     * @param edges
-     *            The sample is taken from vertices having the specified type(s)
-     *            of edges. Vertices with zero degree for the specified type(s)
-     *            of edges will not be present in the returned sampled.
      *
      * @return The distinct samples that were found.
      */
