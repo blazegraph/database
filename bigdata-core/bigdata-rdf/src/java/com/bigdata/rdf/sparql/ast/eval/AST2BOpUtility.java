@@ -512,7 +512,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                         null /* cutOffLimit */, having.getQueryHints(), ctx);
                 }
                 
-                left = addAggregation(left, projection, groupBy, having, ctx, doneSet);
+                left = addAggregation(left, projection, groupBy, having, ctx);
 
             } else {
 
@@ -4459,8 +4459,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
     @SuppressWarnings("rawtypes")
     private static final PipelineOp addAggregation(PipelineOp left,
             final ProjectionNode projection, final GroupByNode groupBy,
-            final HavingNode having, final AST2BOpContext ctx,
-            final Set<IVariable<?>> doneSet) {
+            final HavingNode having, final AST2BOpContext ctx) {
 
         final IValueExpression<?>[] projectExprs = projection
                 .getValueExpressions();
