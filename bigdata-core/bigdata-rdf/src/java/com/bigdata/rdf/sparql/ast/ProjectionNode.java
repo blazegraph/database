@@ -98,6 +98,8 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         
         /** "Black list" for variables that should not be treated as projection
          * variables, eg, auxiliary aliases introduced for flattening aggregates.
+         * Essentially, the blacklisted variables won't show in 
+         * getProjectionVars().
          */
         String VARS_TO_EXCLUDE_FROM_PROJECTION = "varsToExcludeFromProjection";
         
