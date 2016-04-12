@@ -23,8 +23,10 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -45,7 +47,8 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * This compulsory AST transformation (not an optional optimizer!) enforces the
@@ -149,7 +152,7 @@ public class ASTOrderByAggregateFlatteningOptimizer implements IASTOptimizer {
 
         // recursion first.
         doRecursiveRewrite(context, queryBase.getWhereClause());
-
+        
         if (queryBase.getQueryType() != QueryType.SELECT) {
             return;
         }
@@ -171,6 +174,9 @@ public class ASTOrderByAggregateFlatteningOptimizer implements IASTOptimizer {
             // The transformation is not applicable here.
             return;
         }
+        
+        final Set<IVariable<?>> varsToExcludeFromProjection = 
+                new HashSet<IVariable<?>>();
         
         for (OrderByExpr orderByExpr : orderBy) {
             IValueExpression<? extends IV> ve = orderByExpr.getValueExpression();
@@ -198,7 +204,7 @@ public class ASTOrderByAggregateFlatteningOptimizer implements IASTOptimizer {
                 final AssignmentNode replacementAlias = 
                         new AssignmentNode((VarNode) newVEN,ven);
                 projection.addProjectionExpression(replacementAlias);
-                projection.addVarToExcludeFromProjection(freshVar);
+                varsToExcludeFromProjection.add(freshVar);
                 
             } else {
                 newOrderBy.addExpr(orderByExpr);
@@ -206,6 +212,7 @@ public class ASTOrderByAggregateFlatteningOptimizer implements IASTOptimizer {
 
         } // for (OrderByExpr orderByExpr : orderBy)
 
+        projection.setVarsToExcludeFromProjection(varsToExcludeFromProjection);
 
         if (!aggregatesPresent) {
             // The transformation is not applicable here.
