@@ -1,0 +1,10 @@
+SELECT * WHERE 
+{ 
+  ?s rdf:type <http://www.example.com/Product>
+  {
+    OPTIONAL {?s rdfs:label ?label }
+    OPTIONAL {?s rdfs:comment ?comment } 
+  } UNION {
+    ?s <http://www.example.com/notexists> ?o .
+  }
+}
