@@ -47,6 +47,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.internal.constraints.DateTimeUtility;
 import com.bigdata.rdf.internal.constraints.IMathOpHandler;
@@ -638,7 +639,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         IV<BigdataLiteral, ?> iv = null;
 
-        if (datatype != null && datatype2ext.containsKey(datatype.stringValue())) {
+        if (datatype != null && !datatype.equals(XMLSchema.STRING) && datatype2ext.containsKey(datatype.stringValue())) {
 
             /*
              * Check the registered extension factories first.
