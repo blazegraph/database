@@ -188,7 +188,7 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
 
             if(log.isDebugEnabled())
                 log.debug("initialFrontier=" + Arrays.toString(initialFrontier));
-            
+
         }  else {
 
             if (log.isDebugEnabled())
