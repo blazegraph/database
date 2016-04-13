@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -37,10 +38,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
@@ -78,6 +81,9 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
         
+        // collect named subquery includes that have been resolved already
+        final Set<String> resolvedNSIs = new HashSet<String>();
+        
         /*
          * NAMED SUBQUERIES
          * 
@@ -97,11 +103,11 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
                    final QueryBase queryBase = itr.next();
 
-                   rewriteProjection(sa, queryBase, null);
+                   rewriteProjection(sa, queryBase, null, resolvedNSIs);
 
                }
 
-             rewriteProjection(sa, subqueryRoot, null);
+               rewriteProjection(sa, subqueryRoot, null, resolvedNSIs);
                
             }
 
@@ -127,7 +133,7 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
                 final QueryBase queryBase = itr.next();
 
-                rewriteProjection(sa, queryBase, null);
+                rewriteProjection(sa, queryBase, null, resolvedNSIs);
 
             }
 
@@ -135,7 +141,7 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
         // Rewrite the projection on the QueryRoot last.
         rewriteProjection(
-           sa, queryRoot, context.getSolutionSetStats().getUsedVars());
+           sa, queryRoot, context.getSolutionSetStats().getUsedVars(), resolvedNSIs);
 
         return new QueryNodeWithBindingSet(queryRoot, bindingSets);
     
@@ -151,8 +157,41 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
      *            rewritten.
      */
     private void rewriteProjection(final StaticAnalysis sa,
-            final QueryBase queryBase, Set<IVariable<?>> exogeneousVars) {
+            final QueryBase queryBase, Set<IVariable<?>> exogeneousVars,
+            final Set<String> resolvedNSIs /* to break infinite loops */) {
 
+        /**
+         * BLZG-1763: recurse into named subquery includes. 
+         */
+        if (queryBase instanceof NamedSubqueryRoot) {
+            
+            final NamedSubqueryRoot queryBaseAsNsr = (NamedSubqueryRoot)queryBase;
+            
+            final GraphPatternGroup<?> gpg = queryBaseAsNsr.getGraphPattern();
+            
+            @SuppressWarnings("unchecked")
+            final Iterator<NamedSubqueryInclude> itr = 
+                (Iterator<NamedSubqueryInclude>) new Striterator(
+                    BOpUtility.postOrderIteratorWithAnnotations((BOp) gpg)).
+                    addTypeFilter(NamedSubqueryInclude.class);
+            
+            while (itr.hasNext()) {
+                
+                final NamedSubqueryInclude nsi = itr.next();
+                
+                final String name = nsi.getName();
+
+                final NamedSubqueryRoot nsr = sa.getNamedSubqueryRoot(name);
+
+                if (!resolvedNSIs.contains(name)) { // otherwise: already rewritten
+                    
+                    resolvedNSIs.add(name); // -> do not process again, will be resolved
+                    rewriteProjection(sa, nsr, exogeneousVars, resolvedNSIs);
+
+                }
+            }
+        }
+        
         final ProjectionNode projection = queryBase.getProjection();
 
         if (projection != null && projection.isWildcard()) {
