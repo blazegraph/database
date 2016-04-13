@@ -411,9 +411,13 @@ graph ?g {
 
         /*
 The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
+               
+               They are no longer in the black list because they work now, 
+               after the completion of https://jira.blazegraph.com/browse/BLZG-618
+ 
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg03",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg07",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg03",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg07",
     });
 
 	/**
