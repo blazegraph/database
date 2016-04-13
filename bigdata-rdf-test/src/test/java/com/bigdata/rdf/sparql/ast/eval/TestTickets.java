@@ -64,6 +64,102 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         super(name);
     }
 
+    
+    
+    public void test_ticket_618a() throws Exception {
+
+        new TestHelper("sparql11-order-02",// testURI,
+                "sparql11-order-02.rq",// queryFileURL
+                "sparql11-order-02.ttl",// dataFileURL
+                "sparql11-order-02.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618b() throws Exception {
+
+        new TestHelper("sparql11-order-03",// testURI,
+                "sparql11-order-03.rq",// queryFileURL
+                "sparql11-order-03.ttl",// dataFileURL
+                "sparql11-order-03.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618c() throws Exception {
+
+        new TestHelper("sparql11-subquery-04",// testURI,
+                "sparql11-subquery-04.rq",// queryFileURL
+                "sparql11-subquery-04.ttl",// dataFileURL
+                "sparql11-subquery-04.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618d() throws Exception {
+
+        new TestHelper("ticket-618d",// testURI,
+                "ticket-618d.rq",// queryFileURL
+                "ticket-618d.ttl",// dataFileURL
+                "ticket-618d.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618e() throws Exception {
+
+        new TestHelper("ticket-618e",// testURI,
+                "ticket-618e.rq",// queryFileURL
+                "ticket-618e.ttl",// dataFileURL
+                "ticket-618e.srx",// resultFileURL
+                true /* checkOrder */).runTest();
+
+    }
+    
+    /* Currently disabled due to parsing problems. 
+    
+    //CONSTRUCT { ?x ex:p ?y }
+    //WHERE 
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+    public void test_ticket_618f() throws Exception {
+
+        new TestHelper("ticket-618f",// testURI,
+                "ticket-618f.rq",// queryFileURL
+                "ticket-618f.ttl",// dataFileURL
+                "ticket-618f.srx").runTest();
+
+    }
+    */
+    
+    /* Currently disabled due to parsing problems. 
+    
+    //ASK
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+
+    
+    public void test_ticket_618g() throws Exception {
+
+        new TestHelper("ticket-618g",// testURI,
+                "ticket-618g.rq",// queryFileURL
+                "ticket-618g.ttl",// dataFileURL
+                "ticket-618g.srx").runTest();
+
+    }
+    */
+    
+    
+    
+    
     /**
      * <pre>
      * SELECT * WHERE {{}}
@@ -2138,6 +2234,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
     */
    public void test_ticket_1760c() throws Exception {
+
 
        new TestHelper(
            "ticket_bg1760c",   // testURI,
