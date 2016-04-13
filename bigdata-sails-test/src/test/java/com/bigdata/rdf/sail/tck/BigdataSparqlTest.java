@@ -165,7 +165,16 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-06",
         //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-02", // BLZG-618
         //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-03", // BLZG-618
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sum-02",
+        
+        /* This test actually produces correct result (see TestTCK.test_sparql11_sum_02()) 
+         * which is deemed incorrect because sparql11-sum-02.srx in 
+         * the Sesame Test Suite v2.7.12 is wrong: it specifies {totalPrice=0} 
+         * as the correct result (see TestTCK.test_sparql11_sum_02()). Note that 
+         * the latest release sesame-sparql-testsuite 4.1.1 still contains 
+         * the wrong result file.
+         */ 
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sum-02", 
+        
         
         /*
          * This test produces no result instead of an empty result.
