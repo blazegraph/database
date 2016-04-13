@@ -162,7 +162,12 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
 
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-cycles-04",
         //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-04", // BLZG-618
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-06",
+        
+        
+        /* This query currently works: */ 
+        //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-06",
+        
+        
         //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-02", // BLZG-618
         //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-03", // BLZG-618
         
@@ -200,7 +205,7 @@ Data:
 
 =========================================
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-empty-group2",
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-empty-group2", 
         
         /*
          * This test produces some extra results.
@@ -310,8 +315,11 @@ Data:
 :s :p :o, :o1, :o2.
 :t :p :o1, :o2.
 =========================================
+ 
+            This query currently works correctly.
+ 
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/exists/manifest#exists04",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/exists/manifest#exists04",
         
         /*
          * These two are the same problem.  We drop solutions that do not have
