@@ -402,12 +402,15 @@ graph ?g {
 }
 }
 =========================================
+* 
+*         Currently (Apr 13, 2016) only subquery03 fails.
+* 
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery01",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery02",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery01",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery02",
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
 
         /*
 The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
