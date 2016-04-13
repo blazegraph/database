@@ -1043,7 +1043,11 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          
          final IsolationLevel effectiveLevel;
          if (level == null) {
-        	 effectiveLevel = transactionIsolationLevel;
+        	 if (transactionIsolationLevel == null) {
+        		 effectiveLevel = IsolationLevels.READ_UNCOMMITTED;
+             } else {
+        		 effectiveLevel = transactionIsolationLevel;
+        	 }
          } else {
         	 effectiveLevel = level;
          }
