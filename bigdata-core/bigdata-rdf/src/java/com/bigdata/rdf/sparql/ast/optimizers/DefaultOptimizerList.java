@@ -144,6 +144,23 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     
     public DefaultOptimizerList() {
 
+        
+       // DO NOT ADD ANY OPTIMIZERS BEFORE THIS WITHOUT CHECKING 
+       // THE COMMENT BELOW! ALSO, DO NOT ADD ANY OPTIMIZERS 
+       // AFTER ASTOrderByAggregateFlatteningOptimizer THAT MAY
+       // INTRODUCE ANONYMOUS AGGREGATES IN 'ORDER BY'.
+        
+       /** Flattens ORDER BY arguments by introducing auxiliary aliases 
+        *  in the corresponding SELECTs.
+        *  This is not a real optimizer as it is not optional -- 
+        *  this AST transformation is necessary to comply with the SPARQL 
+        *  semantics. It must be applied before any optional optimisations 
+        *  and <b>no consequent optimizer calls are allowed to introduce 
+        *  anonymous aggregates in ORDER BY<b>. 
+        */  
+       add(new ASTOrderByAggregateFlatteningOptimizer());
+        
+        
        /**
         * Query hints are identified applied to AST nodes based on the
         * specified scope and the location within the AST in which they are

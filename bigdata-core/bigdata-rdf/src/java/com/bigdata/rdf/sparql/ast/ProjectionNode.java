@@ -39,6 +39,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import java.util.HashSet;
 
 /**
  * AST node modeling projected value expressions.
@@ -95,6 +96,14 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
          */
         String DESCRIBE_STATEMENT_LIMIT = "describeStatementLimit";
         
+        /** "Black list" for variables that should not be treated as projection
+         * variables, eg, auxiliary aliases introduced for flattening aggregates.
+         * Essentially, the blacklisted variables won't show in 
+         * getProjectionVars().
+         */
+        String VARS_TO_EXCLUDE_FROM_PROJECTION = "varsToExcludeFromProjection";
+        
+        Set<IVariable<?>> DEFAULT_VARS_TO_EXCLUDE_FROM_PROJECTION = null;
     }
 
     public ProjectionNode() {
@@ -250,7 +259,17 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         addExpr(assignment);
 
     }
-
+    
+    /** Makes a copy of vars the (new) black list for variables that are 
+     *  not to be treated as projection variables.
+     *  This feature is useful for auxiliary aliases.
+     */
+    public void setVarsToExcludeFromProjection(final Set<IVariable<?>> vars) {
+        setProperty(Annotations.VARS_TO_EXCLUDE_FROM_PROJECTION, 
+                new HashSet<IVariable<?>>(vars));
+    }
+    
+    
     /**
      * Return the ordered subset of the value expressions which project a
      * computed value expression which is not a bare variable.
@@ -305,7 +324,9 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
         for (AssignmentNode n : this) {
 
-            vars.add(n.getVar());
+            if (!excludeFromProjection(n.getVar())) {
+                vars.add(n.getVar());
+            }
 
         }
         
@@ -313,6 +334,18 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
 
+    
+    
+    /** Checks if the variable is "blacklisted" to be excluded from
+     *  projection variables. This feature is useful for auxiliary aliases.
+     */
+    public boolean excludeFromProjection(final IVariable<?> var) {
+        Set<IVariable<?>> vars = 
+                (Set<IVariable<?>>) getProperty(Annotations.VARS_TO_EXCLUDE_FROM_PROJECTION,
+                Annotations.DEFAULT_VARS_TO_EXCLUDE_FROM_PROJECTION);
+        return (vars != null) && vars.contains(var);
+    }
+    
     /**
      * Collect the variables used by the SELECT EXPRESSIONS for this projection
      * node.
@@ -417,6 +450,10 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
                 }
 
                 sb.append(v);
+
+                if (excludeFromProjection(v.getVar())) {
+                    sb.append("[excludeFromProjection]");
+                }
             
             }
 

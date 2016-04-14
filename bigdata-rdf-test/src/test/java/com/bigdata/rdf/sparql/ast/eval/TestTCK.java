@@ -732,30 +732,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Variant of {@link #test_sparql11_order_02()} which works around the LCWC
-     * change in SPARQL ORDER BY semantics.
-     * 
-     * <pre>
-     * SELECT  ?type (count(?subj) as ?cnt)
-     * WHERE { ?subj a ?type } 
-     * GROUP BY ?type 
-     * ORDER BY ?cnt
-     * </pre>
-     * 
-     * @throws Exception
-     */
-    public void test_sparql11_order_02_workaround() throws Exception {
-
-        new TestHelper("sparql11-order-02-workaround", // testURI,
-                "sparql11-order-02-workaround.rq",// queryFileURL
-                "sparql11-order-02.ttl",// dataFileURL
-                "sparql11-order-02.srx"// resultFileURL
-                ,true// checkOrder
-        ).runTest();
-
-    }
-
-    /**
      * TCK (non-DAWG) query we picked up with <code>Sesame 2.6.3</code>
      * 
      * <pre>
