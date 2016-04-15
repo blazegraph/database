@@ -38,6 +38,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
@@ -164,9 +165,9 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
             final URI dcCreator = new URIImpl("http://purl.org/dc/terms/creator");
 
-            final Literal bryan = new LiteralImpl("bryan");
+            final Literal bryan = new LiteralImpl("bryan", XMLSchema.STRING);
             
-            final Literal mike = new LiteralImpl("mike");
+            final Literal mike = new LiteralImpl("mike", XMLSchema.STRING);
 
             /*
              * This is a hand-coded query.

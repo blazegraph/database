@@ -1916,7 +1916,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     	for (int i = 0; i < length; i++) {
     		sb.append('a');
     	}
-    	return new LiteralImpl(sb.toString());
+    	return new LiteralImpl(sb.toString(), XMLSchema.STRING);
     	
     }
 
