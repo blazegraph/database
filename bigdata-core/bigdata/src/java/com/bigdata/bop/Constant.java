@@ -39,7 +39,16 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      */
     private static final long serialVersionUID = -2967861242470442497L;
     
+    /** value == null indicates this == errorValueConstant, representing 
+     *  an error value as in
+     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
+     */
     final private E value;
+    
+    /** Represents error value as in
+     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra
+     */
+    private static final Constant errorValueConstant = new Constant();
 
     public interface Annotations extends ImmutableBOp.Annotations {
 
@@ -85,7 +94,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      * 
-     * @param op
+     * @param op may be errorValueConstant
      */
     public Constant(final Constant<E> op) {
 
@@ -164,7 +173,22 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         this.value = value;
 
     }
+    
+    /** Currently only used by errorValueConstant(). */
+    private Constant() {
+        super(BOp.NOARGS, BOp.NOANNS);
+        value = null;
+    }
 
+    /** Always returns the same constant representing error values as in
+     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra .
+     *  Note that, however, copies of this Constant can be created,
+     *  so comparison of reference is not enough for equality checks.
+     */
+    public static Constant errorValueConstant() {
+        return errorValueConstant;
+    }
+    
     /**
      * Clone is overridden to reduce heap churn.
      */
@@ -175,6 +199,10 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     }
 
     public String toString() {
+        
+        if (value == null) {
+            return "<error value>";
+        }
         
         @SuppressWarnings("unchecked")
         final IVariable<E> var = (IVariable<E>) getProperty(Annotations.VAR);
@@ -192,14 +220,16 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     final public boolean equals(final IVariableOrConstant<E> o) {
 
-        if (o.isConstant() && value.equals(o.get())) {
-
-            return true;
-
+        if (!o.isConstant()) {
+            return false;
         }
-
-        return false;
-
+            
+        if (value == null) {
+            return ((Constant) o).value == null;
+        }
+        
+        return ((Constant) o).value != null && 
+                value.equals(((Constant) o).value);
     }
     
     final public boolean equals(final Object o) {
@@ -244,16 +274,26 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     final public int hashCode() {
         
 //        return (int) (id ^ (id >>> 32));
+        
+        if (value == null) {
+            return 747282; // arbitrary, not too small
+        }
         return value.hashCode();
         
     }
 
+    /** @return possibly null if this Constant represents an error value 
+     *  as in https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
+     */
     final public E get() {
         
         return value;
         
     }
-
+    
+    /** @return possibly null if this Constant represents an error value 
+     *  as in https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
+     */
     final public E get(final IBindingSet bindingSet) {
         
         return value;
