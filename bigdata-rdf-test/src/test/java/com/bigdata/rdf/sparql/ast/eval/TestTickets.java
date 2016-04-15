@@ -2272,4 +2272,29 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            ).runTest();    
    }
    
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg911a",   // testURI,
+           "ticket_bg911a.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
+
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911b() throws Exception {
+       
+       new TestHelper(
+           "ticket_bg911b",   // testURI,
+           "ticket_bg911b.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
 }
