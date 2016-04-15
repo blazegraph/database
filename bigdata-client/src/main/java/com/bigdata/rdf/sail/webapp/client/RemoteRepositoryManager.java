@@ -23,12 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
@@ -48,8 +45,9 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.http.HttpMethod;
-import org.openrdf.model.Resource;
+import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
@@ -64,7 +62,6 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
-import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.sparql.query.InsertBindingSetCursor;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
@@ -170,6 +167,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
      * Show Queries Query Parameter
      */
     private static String SHOW_QUERIES = "showQueries";
+    
+    final ConcurrentHashSet<String> runningQueries = new ConcurrentHashSet<String>();
 
     /**
      * Return the remote client for the transaction manager API.
@@ -515,6 +514,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             // Already closed.
             return;
         }
+        
+        cancel();
 
         if (httpClient instanceof AutoCloseable) {
 
@@ -552,6 +553,33 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         }
 
         m_closed = true;
+
+    }
+    //
+    private void cancel() throws IOException, Exception {
+
+        final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL + "/status", null, null/* txId */);
+
+        opts.addRequestParam("cancelQuery");
+        
+        opts.addRequestParam(QUERYID, runningQueries.toArray(new String[runningQueries.size()]));
+
+        // Note: handled above.
+        // opts.addRequestParam(QUERYID, queryId.toString());
+
+        JettyResponseListener response = null;
+        try {
+            // Issue request, check response status code.
+            checkResponseCode(response = doConnect(opts));
+        } finally {
+            /*
+             * Ensure that the http response entity is consumed so that the http
+             * connection will be released in a timely fashion.
+             */
+            if (response != null)
+                response.abort();
+
+        }
 
     }
 
@@ -1621,8 +1649,16 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                 queryTimeoutMillis = s == null ? -1L : StringUtil.toLong(s);
             }
 
-            final JettyResponseListener listener = new JettyResponseListener(request, queryTimeoutMillis);
+            final JettyResponseListener listener = new JettyResponseListener(request, queryTimeoutMillis) {
+                @Override
+                public void onComplete(Result result) {
+                    super.onComplete(result);
+                    runningQueries.remove(opts.getRequestParam(QUERYID));
+                }
+            };
 
+            runningQueries.add(opts.getRequestParam(QUERYID));
+            
             // Note: Send with a listener is non-blocking.
             request.send(listener);
 
@@ -1637,6 +1673,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
                 if (request != null)
                     request.abort(t);
+                
+                runningQueries.remove(opts.getRequestParam(QUERYID));
 
             } catch (Throwable t2) {
                 log.warn(t2); // ignored.
