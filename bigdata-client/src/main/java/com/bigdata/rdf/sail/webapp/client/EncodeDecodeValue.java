@@ -34,6 +34,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 /**
  * Utility class to encode/decode RDF {@link Value}s for interchange with the
@@ -420,7 +422,9 @@ public class EncodeDecodeValue {
                 sb.append("@");
                 sb.append(lit.getLanguage());
             }
-            if (lit.getDatatype() != null) {
+            if (lit.getDatatype() != null 
+            		&& !lit.getDatatype().equals(XMLSchema.STRING)
+            		&& !lit.getDatatype().equals(RDF.LANGSTRING)) {
                 sb.append("^^");
                 sb.append(encodeValue(lit.getDatatype()));
             }
