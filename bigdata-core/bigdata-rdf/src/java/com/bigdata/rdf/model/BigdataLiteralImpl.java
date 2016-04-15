@@ -156,6 +156,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
      * This is directly copied from LiteralImpl.hashCode() and should be the same as effective Sesame version.
      * Usecases include for example putting LiteralImpl instances into Set or HashMap and then using BigdataLiteralImpl
      * to check existance of the item in the Set or retrieve value from HashMap.
+     * @See https://www.w3.org/TR/rdf11-concepts/#dfn-literal-term-equality
      */
 	@Override
 	public int hashCode() {
