@@ -177,6 +177,7 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
          * as the correct result (see TestTCK.test_sparql11_sum_02()). Note that 
          * the latest release sesame-sparql-testsuite 4.1.1 still contains 
          * the wrong result file.
+         * See https://openrdf.atlassian.net/browse/SES-884
          */ 
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sum-02", 
         
