@@ -162,6 +162,11 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
         super(BOp.NOARGS, BOp.NOANNS);
 
+        // TODO: assert value != null
+        // Currently this may potentially break some hacks relying 
+        // on IllegalArgumentException,
+        // e.g., in PipelinedAggregationOp.call()
+        
         if (value == null)
             throw new IllegalArgumentException();
 
@@ -187,6 +192,15 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      */
     public static Constant errorValueConstant() {
         return errorValueConstant;
+    }
+    
+    /** Checks if this Constant represents the error value. 
+     *  Equivalent to this.equals(Constant.errorValueConstant()), 
+     *  but not to (this == Constant.errorValueConstant()),
+     *  because copies of Constant.errorValueConstant() may be created.
+     */
+    final public boolean isErrorValueConstant() {
+        return value == null;
     }
     
     /**
