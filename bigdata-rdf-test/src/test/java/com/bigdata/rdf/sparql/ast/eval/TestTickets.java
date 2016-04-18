@@ -181,6 +181,24 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
     }
     
+    public void test_ticket_1202m() throws Exception {
+
+        new TestHelper("ticket-1202-additional1",// testURI,
+                "ticket-1202-additional1.rq",// queryFileURL
+                "ticket-1202-additional1.ttl",// dataFileURL
+                "ticket-1202-additional1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202n() throws Exception {
+
+        new TestHelper("ticket-1202-additional2",// testURI,
+                "ticket-1202-additional2.rq",// queryFileURL
+                "ticket-1202-additional2.ttl",// dataFileURL
+                "ticket-1202-additional2.srx"// resultFileURL
+                ).runTest();
+    }
+    
     
     
     

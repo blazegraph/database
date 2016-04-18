@@ -1,0 +1,9 @@
+# Unbound variables + implicit group + DISTINCT
+
+PREFIX : <http://example/>
+
+SELECT (COUNT(?w) AS ?wcnt)  (COUNT(DISTINCT ?v) AS ?S)
+{
+  ?s :p ?v .
+  OPTIONAL { ?s :q ?w }
+}
