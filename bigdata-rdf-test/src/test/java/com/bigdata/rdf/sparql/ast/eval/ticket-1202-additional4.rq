@@ -1,0 +1,10 @@
+# A variant of ticket-1202-group03.rq with COUNT(DISTINCT *)
+
+PREFIX : <http://example/>
+
+SELECT ?w (COUNT(DISTINCT *) AS ?c)
+{
+  ?s :p ?v .
+  OPTIONAL { ?s :q ?w }
+}
+GROUP BY ?w
