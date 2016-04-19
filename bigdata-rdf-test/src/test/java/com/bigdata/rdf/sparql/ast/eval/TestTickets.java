@@ -2063,5 +2063,33 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        assertTrue(idxOfB<idxOfA);
    }
    
+   /**^M
+    * BLZG-1763: Wildcard projection was not rewritten^M
+    * -> original example without data, producing the empty result^M
+    */^M
+   public void test_ticket_1763a() throws Exception {^M
+^M
+       new TestHelper(^M
+           "ticket_bg1763a",   // testURI,^M
+           "ticket_bg1763a.rq",// queryFileURL^M
+           "empty.trig",// dataFileURL^M
+           "ticket_bg1763a.srx"// resultFileURL^M
+           ).runTest();    ^M
+   }^M
+   ^M
+   /**^M
+    * BLZG-1763: Wildcard projection was not rewritten^M
+    * -> modified example with data^M
+    */^M
+   public void test_ticket_1763b() throws Exception {^M
+^M
+       new TestHelper(^M
+           "ticket_bg1763b",   // testURI,^M
+           "ticket_bg1763b.rq",// queryFileURL^M
+           "ticket_bg1763b.ttl",// dataFileURL^M
+           "ticket_bg1763b.srx"// resultFileURL^M
+           ).runTest();    ^M
+   }^M
+   
 
 }
