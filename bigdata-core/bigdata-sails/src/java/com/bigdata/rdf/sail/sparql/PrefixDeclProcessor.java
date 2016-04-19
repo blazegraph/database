@@ -361,6 +361,12 @@ public class PrefixDeclProcessor {
 						done = ch == -1;
 						
 						final String s = sb.toString();
+						
+						if(sb.length() == 0) {
+							//End of file with no input
+							break;
+						}
+					
 						sb.delete(0, sb.length());
 						// 0 1 2
 						// PREFIX wdref: <http://www.wikidata.org/reference/>
@@ -399,6 +405,8 @@ public class PrefixDeclProcessor {
 						// String < and >
 						final String uri = decls[2].substring(1,
 								decls[2].length() - 1);
+						
+						log.warn("Configured prefix: PREFIX " + prefix + ": " + uri);
 						
 						defaultDecls.put(prefix, uri);
 
