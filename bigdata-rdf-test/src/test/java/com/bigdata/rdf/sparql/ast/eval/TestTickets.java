@@ -2424,5 +2424,57 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            ).runTest();    
    }
 
+   /**
+    * BLZG-1763: Wildcard projection was not rewritten
+    * -> original example without data, producing the empty result
+    */
+   public void test_ticket_1763a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1763a",   // testURI,
+           "ticket_bg1763a.rq",// queryFileURL
+           "empty.trig",// dataFileURL
+           "ticket_bg1763a.srx"// resultFileURL
+           ).runTest();    
+   }
    
+   /**
+    * BLZG-1763: Wildcard projection was not rewritten
+    * -> modified example with data
+    */
+   public void test_ticket_1763b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1763b",   // testURI,
+           "ticket_bg1763b.rq",// queryFileURL
+           "ticket_bg1763b.ttl",// dataFileURL
+           "ticket_bg1763b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg911a",   // testURI,
+           "ticket_bg911a.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
+
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911b() throws Exception {
+       
+       new TestHelper(
+           "ticket_bg911b",   // testURI,
+           "ticket_bg911b.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
 }
