@@ -342,8 +342,32 @@ public class FileChannelUtility {
 				}
 				
 				return totalReads;
-			} catch (Exception e) {
-	            log.info("Error from async IO", e); // just log and retry
+            } catch (IllegalStateException ex) {
+                
+                // the channel could not be re-opened.
+                throw ex;
+                
+	                
+            } catch (ExecutionException ex) {
+                
+                final Throwable cause = ex.getCause();
+                
+                if (ClosedByInterruptException.class.isInstance(cause)) {
+                	continue;
+                }
+                if (AsynchronousCloseException.class.isInstance(cause)) {
+                	continue;
+                }
+                if (ClosedChannelException.class.isInstance(cause)) {
+                	continue;
+                }
+                
+                throw new RuntimeException(ex);
+	               
+	        } catch (Exception e) {
+	            	
+	            	throw new RuntimeException(e);
+
 			} finally {
 				for (AsyncTransfer transfer : transfers) {
 					transfer.cancel();

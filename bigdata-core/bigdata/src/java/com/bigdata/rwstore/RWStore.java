@@ -4889,6 +4889,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         private volatile AsynchronousFileChannel asyncChannel;
         
+        private int asyncChannelOpenCount = 0;;
+        
         public ReopenFileChannel(final File file, final RandomAccessFile raf,
                 final String mode) throws IOException {
 
@@ -4910,13 +4912,26 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         			return asyncChannel;
         	}
         	
-        	try {
-				asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-        	
-        	return asyncChannel;
+        	synchronized(this) {
+            	if (asyncChannel != null) { // check again while synchronized
+            		if (asyncChannel.isOpen())
+            			return asyncChannel;
+            	}
+
+	        	try {
+	            	asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+	        	
+	        	asyncChannelOpenCount++;
+	        	
+	        	return asyncChannel;
+    		}
+        }
+        
+        public int getAsyncChannelOpenCount() {
+        	return asyncChannelOpenCount;
         }
 
         public String toString() {
