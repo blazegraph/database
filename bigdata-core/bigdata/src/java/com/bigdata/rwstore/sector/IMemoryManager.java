@@ -80,7 +80,9 @@ public interface IMemoryManager extends IStore, ICounterSetAccess, IAllocationMa
 	public long allocate(ByteBuffer data, boolean blocks);
 
 	/**
-	 * Blocking version of {@link #allocate(ByteBuffer, boolean)}.
+	 * Version of {@link #allocate(ByteBuffer, boolean)} which is either 
+	 * blocking or non-blocking depending on whether or not the memory
+	 * manager is set in a blocking mode.
 	 * 
 	 * @param data
 	 *            The data will be copied to the backing resource. For each
