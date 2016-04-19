@@ -3365,10 +3365,6 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         
     } // test_aggregation_groupBy_by_error_values2()
     
-    
-    
-    
-    
-    
+    // See also TestMemoryGroupByOp.test_aggregation_groupBy_by_error_values3()
     
 }
