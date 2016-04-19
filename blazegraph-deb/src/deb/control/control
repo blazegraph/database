@@ -1,9 +1,9 @@
-Package: Blazegraph
+Package: blazegraph
 Version: [[version]]
 Section: misc
 Priority: optional
 Architecture: all
-Depends: oracle-java7-installer
+Depends: java7-runtime-headless | java8-runtime-headless
 Maintainer: Blazegraph <blazegraph@blazegraph.com>
 Description: High Performance Graph Database with RDF/SPARQL and Tinkerpop API Support
 Distribution: development
