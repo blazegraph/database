@@ -39,16 +39,19 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      */
     private static final long serialVersionUID = -2967861242470442497L;
     
-    /** value == null indicates this == errorValueConstant, representing 
+    /** Unique (for all E) Constant representing the error value as in
+     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra .
+     *  This allows efficient checking if a value is an error value by using 
+     *  the reference equality (val == Constant.ERROR_VALUE).
+     */
+    private static final Constant ERROR_VALUE = new Constant(); 
+    
+    /** value == null indicates this == errorValue, representing 
      *  an error value as in
      *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
      */
     final private E value;
     
-    /** Represents error value as in
-     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra
-     */
-    private static final Constant errorValueConstant = new Constant();
 
     public interface Annotations extends ImmutableBOp.Annotations {
 
@@ -94,11 +97,14 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      * 
-     * @param op may be errorValueConstant
+     * @param op != Constant.ERROR_VALUE
      */
     public Constant(final Constant<E> op) {
 
         super(op);
+        
+        if (op == Constant.ERROR_VALUE)
+            throw new IllegalArgumentException();
         
         this.value = op.value;
         
@@ -179,29 +185,21 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     }
     
-    /** Currently only used by errorValueConstant(). */
+    /** Currently only used to create {@link ERROR_VALUE}. */
     private Constant() {
         super(BOp.NOARGS, BOp.NOANNS);
         value = null;
     }
 
-    /** Always returns the same constant representing error values as in
+    /** Always returns the same constant representing the error value as in
      *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra .
-     *  Note that, however, copies of this Constant can be created,
-     *  so comparison of reference is not enough for equality checks.
+     *  Copies of this Constant cannot be created,
+     *  so comparison of reference is enough for equality checks.
      */
-    public static Constant errorValueConstant() {
-        return errorValueConstant;
+    public static Constant errorValue() {
+        return ERROR_VALUE;
     }
     
-    /** Checks if this Constant represents the error value. 
-     *  Equivalent to this.equals(Constant.errorValueConstant()), 
-     *  but not to (this == Constant.errorValueConstant()),
-     *  because copies of Constant.errorValueConstant() may be created.
-     */
-    final public boolean isErrorValueConstant() {
-        return value == null;
-    }
     
     /**
      * Clone is overridden to reduce heap churn.

@@ -241,7 +241,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
                 @SuppressWarnings({ "rawtypes", "unchecked" })
                 final IConstant<?> x = 
                         (exprValue == null)?
-                        Constant.errorValueConstant()
+                        Constant.errorValue()
                         :
                         new Constant(exprValue);
                 
@@ -360,7 +360,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
                     
                     if (varValue == null) {
                     
-                      val = Constant.errorValueConstant();
+                      val = Constant.errorValue();
                         
                     } else {
                       val = new Constant(varValue.getClass().cast(varValue));
@@ -389,7 +389,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
                     
                     if (exprValue == null) {
                     
-                      val = Constant.errorValueConstant();
+                      val = Constant.errorValue();
                         
                     } else {
                     

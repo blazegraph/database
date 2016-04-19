@@ -222,7 +222,7 @@ public class MemoryGroupByOp extends GroupByOp {
                 @SuppressWarnings({ "rawtypes", "unchecked" })
                 final IConstant<?> x = 
                         (exprValue == null)?
-                        Constant.errorValueConstant()
+                        Constant.errorValue()
                         :
                         new Constant(exprValue); 
                         
@@ -550,7 +550,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
                         if (varValue == null) {
 
-                            val = Constant.errorValueConstant();
+                            val = Constant.errorValue();
 
                         } else {
                             val = new Constant(varValue.getClass().cast(varValue));
@@ -580,7 +580,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
                         if (exprValue == null) {
 
-                            val = Constant.errorValueConstant();
+                            val = Constant.errorValue();
 
                         } else {
 

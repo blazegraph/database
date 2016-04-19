@@ -334,7 +334,7 @@ public class ListBindingSet implements IBindingSet {
         
     /**
      * Return a copy of the source list minus entries assigning error values
-     * (Constant.errorValueConstant() or its copies). The copy will use new
+     * (Constant.errorValue() or its copies). The copy will use new
      * {@link E}s to represent the bindings so changes to the copy will not
      * effect the source.
      *
@@ -355,8 +355,7 @@ public class ListBindingSet implements IBindingSet {
 
             final E e = itr.next();
 
-            if (e.val instanceof Constant &&
-                    ((Constant)e.val).isErrorValueConstant())
+            if (e.val == Constant.errorValue())
                 continue;
             
             boolean keep = true;
@@ -428,8 +427,7 @@ public class ListBindingSet implements IBindingSet {
     public final boolean containsErrorValues() {        
         for (E e : this.current) {
             
-            if (e.val instanceof Constant &&
-                    ((Constant)e.val).isErrorValueConstant())
+            if (e.val == Constant.errorValue())
                 return true;            
         }
         return false;

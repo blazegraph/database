@@ -325,7 +325,7 @@ public class HashBindingSet implements IBindingSet {
         
     /**
      * Return a copy of the source list minus entries assigning error values
-     * (Constant.errorValueConstant() or its copies). .
+     * (Constant.errorValue() or its copies). .
      *
      * @param src The source list.
      * @param variablesToKeep When non-<code>null</code>, only the bindings for
@@ -347,8 +347,7 @@ public class HashBindingSet implements IBindingSet {
 
             final Map.Entry<IVariable, IConstant> e = itr.next();
 
-            if (e.getValue() instanceof Constant
-                    && ((Constant) e.getValue()).isErrorValueConstant()) {
+            if (e.getValue() == Constant.errorValue()) {
                 continue;
             }
 
@@ -459,9 +458,8 @@ public class HashBindingSet implements IBindingSet {
      */
     @Override
     public final boolean containsErrorValues() {        
-        for (IConstant val : this.current.values()) {            
-            if (val instanceof Constant &&
-                    ((Constant)val).isErrorValueConstant())
+        for (IConstant val : this.current.values()) {  
+            if (val == Constant.errorValue())
                 return true;            
         }
         return false;
