@@ -502,6 +502,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
             if (isAggregate) {
 
+                final Set<IVariable<IV>> vars = new HashSet<IVariable<IV>>();
+                
+                StaticAnalysis.gatherVarsToMaterialize(having, vars, true /* includeAnnotations */);
+                vars.removeAll(doneSet);
+                if (!vars.isEmpty()) {
+                    left = addChunkedMaterializationStep(
+                        left, vars, ChunkedMaterializationOp.Annotations.DEFAULT_MATERIALIZE_INLINE_IVS, 
+                        null /* cutOffLimit */, having.getQueryHints(), ctx);
+                }
+                
                 left = addAggregation(left, projection, groupBy, having, ctx);
 
             } else {

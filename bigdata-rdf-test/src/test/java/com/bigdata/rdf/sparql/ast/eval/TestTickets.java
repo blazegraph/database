@@ -2202,7 +2202,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        assertTrue(idxOfB<idxOfA);
    }
 
-
    /**
     * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
     */
