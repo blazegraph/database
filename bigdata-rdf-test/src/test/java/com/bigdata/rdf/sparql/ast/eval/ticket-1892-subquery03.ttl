@@ -1,0 +1,7 @@
+# Converted from RDF XML.
+
+@prefix ex: <http://www.example.org/schema#> .
+@prefix in: <http://www.example.org/instance#> .
+
+in:a ex:p in:b .
+in:c ex:p <> .
