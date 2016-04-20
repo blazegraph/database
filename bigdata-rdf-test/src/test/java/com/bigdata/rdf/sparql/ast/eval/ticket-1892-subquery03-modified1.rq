@@ -1,10 +1,10 @@
-# http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03
+# Slight modification of ticket-1892-subquery03.rq : ?g ---> ?h
 
 prefix ex: <http://www.example.org/schema#>
 prefix in: <http://www.example.org/instance#>
 
 select ?x where {
-graph ?g {
+graph ?h {
   {select ?x where {?x ?p ?g}}
   }
 }
