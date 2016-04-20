@@ -687,7 +687,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		 * throw new UnificationException("illegal self-referential sid");
 		 * </pre>
 		 */
-		if (true && !statementIdentifiers && queueCapacity != 0) {
+    	//FIXME:  Workaround for BLZG-1889
+		if (false && !statementIdentifiers && queueCapacity != 0) {
 			
 			/*
 			 * Setup a deque that will be used allow the parser to race ahead.
@@ -1520,6 +1521,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 					maxValues += sb.numValues;
 					maxStmts += sb.numStmts;
 				}
+				
+				if(DEBUG) {
+					log.debug("maxValues=" + maxValues);
+				}
 
 				// we will de-dup the values below.
 				values = new BigdataValue[maxValues];
@@ -1603,6 +1608,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
 				throw new AssertionError();
 
+			}
+			
+			if(log.isDebugEnabled()) {
+				log.debug("numValues="+numValues + ": " + term);
 			}
 
 			values[numValues++] = term;
