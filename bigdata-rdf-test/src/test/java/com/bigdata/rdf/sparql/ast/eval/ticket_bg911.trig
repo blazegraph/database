@@ -1,0 +1,20 @@
+@prefix : <http://example.com/data/> .   
+@prefix base: <http://example.com/> .
+
+base:graph1
+{
+:person3                                                                                  
+    a :Person ; 
+    :age 3;                                                                     
+    :name "Person 3 - graph1".
+    
+                                                                                  
+}
+
+base:graph2
+{
+:person3                                                                                  
+    a :Person ; 
+    :age 13;                                                                     
+    :name "Person 3".
+}

@@ -1,0 +1,7 @@
+PREFIX ex: <http://example.org/>
+select ?p (count(?s) as ?cnt)
+WHERE
+{ ?s ?p ex:o }
+
+group by ?p
+having(count(?s) >= 2)

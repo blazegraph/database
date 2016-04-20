@@ -1,0 +1,22 @@
+PREFIX namespace2:<tag:example.com:namespace2#> 
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> 
+PREFIX namespace1:<tag:example.com:namespace1#>  
+SELECT DISTINCT * WHERE 
+{ 
+	VALUES ?object { <tag:example.com:myitem> } . 
+	?item namespace1:isRelationshipFor ?relationshipsFor. 
+	FILTER(?relationshipsFor in (?object)) 
+	{ 
+		?item a ?itemType . 
+	} 
+	UNION 
+	{
+		OPTIONAL {?item rdfs:label ?label .}
+		OPTIONAL {?item rdfs:comment ?comment .} 
+	} 
+	UNION 
+	{ 
+		?item ?predicate ?values . 
+		FILTER (IsLiteral(?values) && NOT EXISTS { ?item rdfs:label ?values} && NOT EXISTS { ?item rdfs:comment ?values }) 
+	}
+}
