@@ -1,0 +1,10 @@
+# https://www.w3.org/2009/sparql/docs/tests/data-sparql11/grouping/group05.rq
+
+PREFIX : <http://example/>
+
+SELECT ?s ?w (STR(?w) AS ?wstr)
+{
+  ?s :p ?v .
+  OPTIONAL { ?s :q ?w }
+}
+GROUP BY ?s ?w

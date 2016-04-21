@@ -1,0 +1,17 @@
+# https://www.w3.org/2009/sparql/docs/tests/data-sparql11/grouping/group-data-2.ttl
+
+@prefix : <http://example/> .
+
+:s1 :p 1 .
+:s3 :p 1 .
+:s1 :q 9 .
+:s2 :p 2 . 
+
+
+
+
+
+
+
+
+
