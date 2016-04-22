@@ -25,6 +25,8 @@ package com.bigdata.bop;
 
 import java.util.Collections;
 
+import com.bigdata.rdf.sparql.ast.FilterNode;
+
 
 /**
  * A constant.
@@ -167,11 +169,6 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     public Constant(final E value) {
 
         super(BOp.NOARGS, BOp.NOANNS);
-
-        // TODO: assert value != null
-        // Currently this may potentially break some hacks relying 
-        // on IllegalArgumentException,
-        // e.g., in PipelinedAggregationOp.call()
         
         if (value == null)
             throw new IllegalArgumentException();
