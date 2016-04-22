@@ -296,8 +296,8 @@ public class TestIVComparator extends TestCase2 {
 
         final IVComparator c = new IVComparator();
 
-        // plain LT languageCode
-        assertLT(c.compare(v.noninline_plain_lit1, v.noninline_languageCode_de_lit1));
+        // plain GT languageCode
+        assertGT(c.compare(v.noninline_plain_lit1, v.noninline_languageCode_de_lit1));
 
         // languageCode EQ string
         assertEQ(c.compare(v.noninline_plain_lit1, v.noninline_xsd_string_lit1));
