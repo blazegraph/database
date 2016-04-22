@@ -156,7 +156,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	@Override
 	public long allocate(final ByteBuffer data) {
 
-		return allocate(data, true/* blocks */);
+		return allocate(data, m_root.isBlocking()/* blocks */);
 
 	}
 	

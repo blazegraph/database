@@ -1,5 +1,6 @@
 package com.bigdata.bop.bindingSet;
 
+import com.bigdata.bop.Constant;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.Iterator;
@@ -271,6 +272,12 @@ public class ListBindingSet implements IBindingSet {
 
 	}
 
+       
+       private ListBindingSet(List<E> contents) {
+           current = contents;
+       }
+        
+        
 	/**
 	 * Return a copy of the source list. The copy will use new {@link E}s to
 	 * represent the bindings so changes to the copy will not effect the source.
@@ -322,6 +329,76 @@ public class ListBindingSet implements IBindingSet {
 		return dst;
 		
 	}
+        
+        
+        
+    /**
+     * Return a copy of the source list minus entries assigning error values
+     * (Constant.errorValue() or its copies). The copy will use new
+     * {@link E}s to represent the bindings so changes to the copy will not
+     * effect the source.
+     *
+     * @param src The source list.
+     * @param variablesToKeep When non-<code>null</code>, only the bindings for
+     * the variables listed in this array will copied.
+     *
+     * @return The copy.
+     */
+    @SuppressWarnings("rawtypes")
+    private List<E> copyMinusErrors(final List<E> src, final IVariable[] variablesToKeep) {
+
+        final List<E> dst = new LinkedList<E>();
+
+        final Iterator<E> itr = src.iterator();
+
+        while (itr.hasNext()) {
+
+            final E e = itr.next();
+
+            if (e.val == Constant.errorValue())
+                continue;
+            
+            boolean keep = true;
+
+            if (variablesToKeep != null) {
+
+                keep = false;
+
+                for (IVariable<?> x : variablesToKeep) {
+
+                    if (x == e.var) {
+
+                        keep = true;
+
+                        break;
+
+                    }
+
+                }
+
+            }
+
+            if (keep) {
+                dst.add(new E(e.var, e.val));
+            }
+
+        } // while (itr.hasNext())
+
+        return dst;
+
+    } // copyMinusErrors(final List<E> src, final IVariable[] variablesToKeep)
+
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
 	public ListBindingSet clone() {
 
@@ -336,6 +413,27 @@ public class ListBindingSet implements IBindingSet {
 		
 	}
 
+    @Override
+    @SuppressWarnings("rawtypes")
+    public final IBindingSet copyMinusErrors(final IVariable[] variablesToKeep) {
+        return new ListBindingSet(copyMinusErrors(this.current,
+                variablesToKeep));
+    }
+    
+    /** 
+     * @return true if this IBindingSet contains an assignment of an error value
+     */
+    @Override
+    public final boolean containsErrorValues() {        
+        for (E e : this.current) {
+            
+            if (e.val == Constant.errorValue())
+                return true;            
+        }
+        return false;
+    }
+    
+    
     @SuppressWarnings("rawtypes")
     public void clear(final IVariable var) {
 

@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="object"/>
+    <variable name="item"/>
+    <variable name="relationshipsFor"/>
+    <variable name="itemType"/>
+    <variable name="label"/>
+    <variable name="comment"/>
+    <variable name="predicate"/>
+    <variable name="values"/>    
+  </head>
+  <results>
+    <result>
+      <binding name="object"><uri>tag:example.com:myitem</uri></binding>
+      <binding name="item"><uri>http://my.item1</uri></binding>
+      <binding name="relationshipsFor"><uri>tag:example.com:myitem</uri></binding>
+      <binding name="label"><literal>Item 1</literal></binding>
+      <binding name="comment"><literal>This is item 1</literal></binding>
+    </result>
+    <result>
+      <binding name="object"><uri>tag:example.com:myitem</uri></binding>
+      <binding name="item"><uri>http://my.item2</uri></binding>
+      <binding name="relationshipsFor"><uri>tag:example.com:myitem</uri></binding>
+      <binding name="label"><literal>Item 2</literal></binding>
+    </result>
+    <result>
+      <binding name="object"><uri>tag:example.com:myitem</uri></binding>
+      <binding name="item"><uri>http://my.item4</uri></binding>
+      <binding name="relationshipsFor"><uri>tag:example.com:myitem</uri></binding>
+      <binding name="predicate"><uri>http://www.w3.org/2000/01/rdf-schema#propX</uri></binding>
+      <binding name="values"><literal>Some property value</literal></binding>
+    </result>        
+  </results>
+</sparql>

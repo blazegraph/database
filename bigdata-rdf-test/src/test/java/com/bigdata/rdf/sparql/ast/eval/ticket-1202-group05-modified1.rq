@@ -1,0 +1,11 @@
+# A variation of ticket-1202-group03.rq
+# intended to exercise MemoryGroupOp by using an aggregate with DISTINCT
+
+PREFIX : <http://example/>
+
+SELECT ?s ?w (COUNT(DISTINCT ?v) AS ?c)
+{
+  ?s :p ?v .
+  OPTIONAL { ?s :q ?w }
+}
+GROUP BY ?s ?w

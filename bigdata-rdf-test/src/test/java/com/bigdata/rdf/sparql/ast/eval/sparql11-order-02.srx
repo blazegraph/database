@@ -2,31 +2,21 @@
 <sparql xmlns='http://www.w3.org/2005/sparql-results#'>
 	<head>
 		<variable name='type'/>
-		<variable name='cnt'/>
 	</head>
 	<results>
 		<result>
 			<binding name='type'>
 				<uri>http://example.org/Letter</uri>
 			</binding>
-			<binding name='cnt'>
-				<literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal>
-			</binding>
 		</result>
 		<result>
 			<binding name='type'>
 				<uri>http://example.org/Day</uri>
 			</binding>
-			<binding name='cnt'>
-				<literal datatype="http://www.w3.org/2001/XMLSchema#integer">7</literal>
-			</binding>
 		</result>
 		<result>
 			<binding name='type'>
 				<uri>http://example.org/Number</uri>
-			</binding>
-			<binding name='cnt'>
-				<literal datatype="http://www.w3.org/2001/XMLSchema#integer">10</literal>
 			</binding>
  		</result>
 	</results>

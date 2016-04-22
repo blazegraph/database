@@ -38,29 +38,33 @@ public class Expanderator extends Prefetch implements ITailOp {
 	// -------------------------------------------------------------
 
 	protected Object getNext() {
-		if (m_child != null && m_child.hasNext()) {
-			final Object ret = m_child.next();
-			
-			// experimental tail optimisation
-			if (m_child instanceof ITailOp) {
-				m_child = ((ITailOp) m_child).availableTailOp();
-			}
-
-			return ret;
-		} else {
-			if (m_child != null && m_contextMgr != null)
-				m_contextMgr.popContext();
-			
-			if (m_src.hasNext()) {
-				final Object nxt = m_src.next();
-				if (m_contextMgr != null)
-					m_contextMgr.pushContext(nxt);
+		while (true) { // avoid previous simple recursive call (issue#376)
+			if (m_child != null && m_child.hasNext()) {
+				final Object ret = m_child.next();
 				
-				m_child = m_expander.expand(nxt);
-
-				return getNext();
+				// experimental tail optimisation
+				if (m_child instanceof ITailOp) {
+					m_child = ((ITailOp) m_child).availableTailOp();
+				}
+	
+				return ret;
 			} else {
-				return null;
+				if (m_child != null && m_contextMgr != null)
+					m_contextMgr.popContext();
+				
+				if (m_src.hasNext()) {
+					final Object nxt = m_src.next();
+					if (m_contextMgr != null)
+						m_contextMgr.pushContext(nxt);
+					
+					m_child = m_expander.expand(nxt);
+	
+					// Avoid unnecessary stack growth
+					// return getNext();
+					continue;
+				} else {
+					return null;
+				}
 			}
 		}
 	}

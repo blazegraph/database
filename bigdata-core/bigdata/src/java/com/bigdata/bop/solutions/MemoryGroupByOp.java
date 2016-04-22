@@ -110,7 +110,7 @@ public class MemoryGroupByOp extends GroupByOp {
             final Map<String, Object> annotations) {
 
         super(args, annotations);
-
+   
         switch (getEvaluationContext()) {
 		case CONTROLLER:
 			break;
@@ -185,8 +185,6 @@ public class MemoryGroupByOp extends GroupByOp {
          * @param bset
          *            The binding set.
          * 
-         * @return The new {@link SolutionGroup} -or- <code>null</code> if any
-         *         of the value expressions evaluates or a <code>null</code>
          *         -OR- throws a {@link SparqlTypeErrorException}.
          */
         static SolutionGroup newInstance(final IValueExpression<?>[] groupBy,
@@ -197,7 +195,9 @@ public class MemoryGroupByOp extends GroupByOp {
             for (int i = 0; i < groupBy.length; i++) {
 
                 final IValueExpression<?> expr = groupBy[i];
-                final Object asBound;
+                                
+                Object exprValue;
+                
                 try {
                     /*
                      * Note: This has a side-effect on the solution, which means
@@ -214,18 +214,18 @@ public class MemoryGroupByOp extends GroupByOp {
                      * developing a generalized aggregation operator backed by
                      * the HTree.]
                      */
-                    asBound = expr.get(bset);
+                    exprValue = expr.get(bset);
                 } catch (SparqlTypeErrorException ex) {
-                    TypeErrorLog.handleTypeError(ex, expr, stats);
-                    // Drop solution.
-                    return null;
+                    exprValue = null;
                 }
-                if (asBound == null) {
-                    // Drop solution.
-                    return null;
-                }
+                
                 @SuppressWarnings({ "rawtypes", "unchecked" })
-                final IConstant<?> x = new Constant(asBound);
+                final IConstant<?> x = 
+                        (exprValue == null)?
+                        Constant.errorValue()
+                        :
+                        new Constant(exprValue); 
+                        
                 r[i] = x;
 
             }
@@ -347,17 +347,8 @@ public class MemoryGroupByOp extends GroupByOp {
 
             final SolutionGroup s = SolutionGroup.newInstance(groupBy, bset,
                     stats);
-
-            if (s == null) {
-
-                // Drop the solution.
-
-                if (log.isDebugEnabled())
-                    log.debug("Dropping solution: " + bset);
-
-                return;
-
-            }
+            assert s != null;
+            
 
             SolutionMultiSet m = map.get(s);
 
@@ -553,10 +544,19 @@ public class MemoryGroupByOp extends GroupByOp {
 
                         final IVariable<?> var = (IVariable<?>) expr;
 
-                        // Note: MUST be a binding for each groupBy var.
-                        @SuppressWarnings({ "rawtypes", "unchecked" })
-                        final Constant<?> val = new Constant(var.get(aSolution));
+                  
+                        final Object varValue = var.get(aSolution);
+                        final Constant<?> val;
 
+                        if (varValue == null) {
+
+                            val = Constant.errorValue();
+
+                        } else {
+                            val = new Constant(varValue.getClass().cast(varValue));
+
+                        };
+                                                
                         // Bind on [aggregates].
                         aggregates.set(var, val);
 
@@ -574,10 +574,20 @@ public class MemoryGroupByOp extends GroupByOp {
                         final IBind<?> bindExpr = (IBind<?>) expr;
 
                         // Compute value expression.
-                        // Note: MUST be valid since group exists.
-                        @SuppressWarnings({ "rawtypes", "unchecked" })
-                        final Constant<?> val = new Constant(
-                                bindExpr.get(aSolution));
+                        
+                        final Constant<?> val;
+                        final Object exprValue = bindExpr.get(aSolution);
+
+                        if (exprValue == null) {
+
+                            val = Constant.errorValue();
+
+                        } else {
+
+                            val = new Constant(exprValue.getClass().cast(exprValue));
+                        }
+                        
+                        
 
                         // Variable to be projected out by SELECT.
                         final IVariable<?> ovar = ((IBind<?>) expr).getVar();
@@ -680,10 +690,26 @@ public class MemoryGroupByOp extends GroupByOp {
                 }
             }
 
-            // project out only selected variables.
-            final IBindingSet out = aggregates.copy(groupByState
-                    .getSelectVars().toArray(new IVariable[0]));
+            // project out only selected variables  that
+            // are not assigned error values:
+            // "solutions containing error values are 
+            // removed at projection time"
+            // https://www.w3.org/TR/sparql11-query/#defn_algGroup
+            
+            final IBindingSet out;
+            
+            if (groupBy == null) { // implicit group
 
+                assert !aggregates.containsErrorValues();
+                out = aggregates.copy(groupByState
+                        .getSelectVars().toArray(new IVariable[0]));
+
+            } else { // explicit group
+
+                out = aggregates.copyMinusErrors(groupByState
+                        .getSelectVars().toArray(new IVariable[0]));
+            }
+            
             return out;
 
         }

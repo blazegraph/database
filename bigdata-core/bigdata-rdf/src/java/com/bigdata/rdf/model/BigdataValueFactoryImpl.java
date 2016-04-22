@@ -283,8 +283,31 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     @Override
     public BigdataBNodeImpl createBNode(final BigdataStatement stmt) {
 
-        return new BigdataBNodeImpl(this, nextID(), stmt);
+    	// Subject, predicate, object and context should be processed to use the target value factory
+    	// See https://jira.blazegraph.com/browse/BLZG-1875
+    	final BigdataResource originalS = stmt.getSubject();
+    	final BigdataURI originalP = stmt.getPredicate();
+    	final BigdataValue originalO = stmt.getObject();
+    	final BigdataResource originalC = stmt.getContext();
+    	
+    	final BigdataResource s = asValue(originalS);
+    	final BigdataURI p = asValue(originalP);
+    	final BigdataValue o = asValue(originalO);
+    	final BigdataResource c = asValue(originalC);
 
+    	final BigdataStatement effectiveStmt;
+    	
+		if (originalS != s || originalP != p || originalO != o || originalC != c) {
+
+    		effectiveStmt = new BigdataStatementImpl(s, p, o, c, stmt.getStatementType(), stmt.getUserFlag());
+
+    	} else {
+
+    		effectiveStmt = stmt;
+    		
+    	}
+
+		return new BigdataBNodeImpl(this, nextID(), effectiveStmt);
     }
 
     @Override

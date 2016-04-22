@@ -1,0 +1,32 @@
+# High coverage test: it covers DESC and ASC, mixing aggregates and 
+# plain variables in ORDER BY, multiple aggregates in ORDER BY, 
+# aggregates before plain variables in ORDER BY, multiple projection variables.
+
+PREFIX ex: <http://example.org/>
+SELECT ?x ?y
+WHERE
+{
+  ?x ex:r ?y .
+  ?y ex:q ?z 
+}
+GROUP BY ?x ?y
+ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
