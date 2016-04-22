@@ -151,6 +151,25 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
          * id naming scheme than the sesame one.  Not technically a failure.
          */
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#bnode01",
+        
+        /*
+         * OpenRDF Sesame tests, which are not compatible with RDF 1.1
+         * @see https://jira.blazegraph.com/browse/BLZG-1147
+         */
+		// test case incompatible with RDF 1.1 - see
+		// http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
+		//"STRDT   TypeErrors",
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#strdt03",
+		// test case incompatible with RDF 1.1 - see
+		// http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
+		//"STRLANG   TypeErrors",
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#strlang03",
+		// known issue: SES-937
+		// sq03 - Subquery within graph pattern, graph variable is not bound
+		"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#sq03",
+		// issue with NOT IN comparison number to string, generating ValueExprEvaluationException
+		// sparql11-not-in-02 
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-not-in-02",
 
     });
 
@@ -1144,14 +1163,6 @@ The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
         throws Exception
     {
     	
-		// FIXME this reports a test error because we still rely on JUnit 3 here.
-		//org.junit.Assume.assumeFalse(Arrays.asList(ignoredTests).contains(this.getName()));
-		// FIXME temporary fix is to report as succeeded and just ignore.
-		if (Arrays.asList(ignoredTests).contains(this.getName())) {
-			logger.warn("Query test ignored: " + this.getName());
-			return;
-		}
-
         BigdataSailRepositoryConnection con = getQueryConnection(dataRep);
         // Some SPARQL Tests have non-XSD datatypes that must pass for the test
         // suite to complete successfully

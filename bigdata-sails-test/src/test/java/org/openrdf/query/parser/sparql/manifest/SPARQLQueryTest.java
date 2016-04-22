@@ -108,7 +108,6 @@ public abstract class SPARQLQueryTest extends TestCase {
 
 	protected final boolean checkOrder;
 
-	protected final String[] ignoredTests;
 	/*-----------*
 	 * Variables *
 	 *-----------*/
@@ -136,23 +135,6 @@ public abstract class SPARQLQueryTest extends TestCase {
 		this.dataset = dataSet;
 		this.laxCardinality = laxCardinality;
 		this.checkOrder = checkOrder;
-		this.ignoredTests =
-// Some tests are ignored due to RDF 1.1 definition contradicts with these tests
-// @See https://bitbucket.org/openrdf/sesame/pull-requests/406/ses-2212-re-enabled-automated-execution-of/diff
-//    	    	String[] ignoredTests = 
-    			new String[] {
-    	    			// test case incompatible with RDF 1.1 - see
-    	    			// http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
-    	    			"STRDT   TypeErrors",
-    	    			// test case incompatible with RDF 1.1 - see
-    	    			// http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
-    	    			"STRLANG   TypeErrors",
-    	    			// known issue: SES-937
-    	    			"sq03 - Subquery within graph pattern, graph variable is not bound",
-    	    			// issue with NOT IN comparison number to string, generating ValueExprEvaluationException
-    	    			"sparql11-not-in-02\n" 
-    	    			}
-;
 	}
 
 	/*---------*
@@ -215,13 +197,6 @@ public abstract class SPARQLQueryTest extends TestCase {
 	protected void runTest()
 		throws Exception
 	{
-		// FIXME this reports a test error because we still rely on JUnit 3 here.
-		//org.junit.Assume.assumeFalse(Arrays.asList(ignoredTests).contains(this.getName()));
-		// FIXME temporary fix is to report as succeeded and just ignore.
-		if (Arrays.asList(ignoredTests).contains(this.getName())) {
-			logger.warn("Query test ignored: " + this.getName());
-			return;
-		}
 		
 		RepositoryConnection con = dataRep.getConnection();
 		// Some SPARQL Tests have non-XSD datatypes that must pass for the test
