@@ -2477,4 +2477,19 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_bg911.srx"// resultFileURL
            ).runTest();    
    }
+   
+   /**
+    * Ticket: https://github.com/SYSTAP/bigdata-gpu/issues/368
+    * ClassCast Exception when Loading LUBM: com.bigdata.rdf.internal.impl.literal.XSDBooleanIV
+    * cannot be cast to com.bigdata.rdf.internal.impl.literal.NumericIV
+    */
+   public void testTicketBigdataGPU368() throws Exception {
+       
+       new TestHelper( 
+           "workbench1",      // test name
+           "workbench1.rq",   // query file
+           "data/lehigh/LUBM-U1.rdf.gz",  // data file
+           "workbench1.srx"   // result file
+           ).runTest();
+   }
 }
