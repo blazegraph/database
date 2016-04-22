@@ -34,8 +34,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
- * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
- * trac </a>.
+ * Test for https://github.com/SYSTAP/bigdata-gpu/issues/368
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
