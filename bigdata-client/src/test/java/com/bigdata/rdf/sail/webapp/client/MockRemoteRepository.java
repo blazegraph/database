@@ -18,12 +18,13 @@ import org.openrdf.rio.RDFFormat;
 public class MockRemoteRepository extends RemoteRepository {
 
 	public final static class Data {
-		public ConnectOptions opts;
-		public HttpRequest request;
-		public IPreparedTupleQuery query;
-		protected List<ResponseListener> listeners;
+		public volatile ConnectOptions opts;
+		public volatile HttpRequest request;
+		public volatile IPreparedTupleQuery query;
+		protected volatile List<ResponseListener> listeners;
 	}
-	public Data data;
+	public volatile Data data;
+    public final static Object SEND_MONITOR = new Object();
 
 	private MockRemoteRepository(RemoteRepositoryManager mgr, String sparqlEndpointURL, IRemoteTx tx, Data data) {
 		super(mgr, sparqlEndpointURL, tx);
@@ -51,7 +52,10 @@ public class MockRemoteRepository extends RemoteRepository {
 							};
 							
 						};
-						String requestMimeType = request.getHeaders().get(HttpHeader.ACCEPT).split(";")[0];
+						String requestMimeType = RDFFormat.NTRIPLES.toString();
+						if (request.getHeaders().get(HttpHeader.ACCEPT) != null) {
+						    requestMimeType = request.getHeaders().get(HttpHeader.ACCEPT).split(";")[0];
+						}
 						TupleQueryResultFormat tupleQueryMimeType = TupleQueryResultFormat.forMIMEType(requestMimeType);
 						String responseMimeType;
 						String responseContent;
@@ -62,16 +66,21 @@ public class MockRemoteRepository extends RemoteRepository {
 							responseMimeType = RDFFormat.NTRIPLES.getDefaultMIMEType();
 							responseContent = graphQueryResponse;
 						}
-						response.getHeaders().add(HttpHeader.CONTENT_TYPE, responseMimeType);
-						((JettyResponseListener)listener).onHeaders(response);
-						java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(responseContent.length());
-						buf.put(responseContent.getBytes(Charset.forName(StandardCharsets.UTF_8.name())));
-						buf.flip();
-						((JettyResponseListener)listener).onContent(response, buf);
-						((JettyResponseListener)listener).onSuccess(response);
-						((JettyResponseListener)listener).onComplete(new Result(request, response));
+						if (responseContent != null) {
+    						response.getHeaders().add(HttpHeader.CONTENT_TYPE, responseMimeType);
+    						((JettyResponseListener)listener).onHeaders(response);
+    						java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(responseContent.length());
+    						buf.put(responseContent.getBytes(Charset.forName(StandardCharsets.UTF_8.name())));
+    						buf.flip();
+    						((JettyResponseListener)listener).onContent(response, buf);
+    						((JettyResponseListener)listener).onSuccess(response);
+    						((JettyResponseListener)listener).onComplete(new Result(request, response));
+						}
 					}
 				}
+		        synchronized(SEND_MONITOR) {
+		            SEND_MONITOR.notify();
+		        }
 			}
 			@Override
 			public boolean isStopped() {
@@ -85,6 +94,7 @@ public class MockRemoteRepository extends RemoteRepository {
 			public JettyResponseListener doConnect(ConnectOptions opts) throws Exception {
 				// Store connection options
 				data.opts = opts;
+				System.out.println("Setting opts = "+opts);
 				return super.doConnect(opts);
 			}
 		};

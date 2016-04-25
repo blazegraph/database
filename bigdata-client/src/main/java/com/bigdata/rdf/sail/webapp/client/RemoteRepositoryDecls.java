@@ -57,6 +57,11 @@ public class RemoteRepositoryDecls {
    static protected final String QUERYID = "queryId";
    
    /**
+    * The name of the URL request parameter used to cancel a query.
+    */
+   static public final String CANCEL_QUERY = "cancelQuery";
+   
+   /**
     * The name of the system property that may be used to specify the default
     * HTTP method (GET or POST) for a SPARQL QUERY or other indempotent
     * request. 

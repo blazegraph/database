@@ -26,6 +26,7 @@ package com.bigdata.rdf.sail.webapp.client;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.ConnectException;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
@@ -514,10 +515,19 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             // Already closed.
             return;
         }
+        try {
+            
+            cancel();
+            
+        } catch (ConnectException e) {
+            
+            log.warn("Could not cancel running queries", e);
+            
+        }
         
-        cancel();
+        runningQueries.clear();
 
-        if (httpClient instanceof AutoCloseable) {
+        if (our_httpClient == httpClient && httpClient instanceof AutoCloseable) {
 
             /*
              * If the caller passed in an AutoCloseable HttpClient, then we shut
@@ -558,9 +568,17 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     //
     private void cancel() throws IOException, Exception {
 
+        if (runningQueries.isEmpty()) {
+            
+            // No cancellation needed
+            
+            return;
+            
+        }
+
         final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL + "/status", null, null/* txId */);
 
-        opts.addRequestParam("cancelQuery");
+        opts.addRequestParam(CANCEL_QUERY);
         
         opts.addRequestParam(QUERYID, runningQueries.toArray(new String[runningQueries.size()]));
 
@@ -571,6 +589,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         try {
             // Issue request, check response status code.
             checkResponseCode(response = doConnect(opts));
+            
         } finally {
             /*
              * Ensure that the http response entity is consumed so that the http
@@ -1652,12 +1671,22 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             final JettyResponseListener listener = new JettyResponseListener(request, queryTimeoutMillis) {
                 @Override
                 public void onComplete(Result result) {
+                    
                     super.onComplete(result);
-                    runningQueries.remove(opts.getRequestParam(QUERYID));
+                    
+                    if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
+                        if (opts.getRequestParam(QUERYID) != null) {
+                            runningQueries.remove(opts.getRequestParam(QUERYID));
+                        }
+                    }
                 }
             };
 
-            runningQueries.add(opts.getRequestParam(QUERYID));
+            if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
+                if (opts.getRequestParam(QUERYID) != null) {
+                    runningQueries.add(opts.getRequestParam(QUERYID));
+                }
+            }
             
             // Note: Send with a listener is non-blocking.
             request.send(listener);
