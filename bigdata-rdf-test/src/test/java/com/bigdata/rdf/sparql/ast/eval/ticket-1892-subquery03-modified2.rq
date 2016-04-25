@@ -1,0 +1,12 @@
+# The query itself is the same as ticket-1892-subquery03.rq
+# The difference is in ticket-1892-subquery03-modified1.trig and 
+# ticket-1892-subquery03-modified1.srx
+
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+select ?x where {
+graph ?g {
+  {select ?x where {?x ?p ?g}}
+  }
+}
