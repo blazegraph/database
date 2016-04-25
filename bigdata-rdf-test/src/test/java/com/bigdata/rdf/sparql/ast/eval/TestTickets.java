@@ -96,6 +96,16 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     
     public void test_ticket_1892d() throws Exception {
 
+        new TestHelper("ticket-1892-subquery03-modified3",// testURI,
+                "ticket-1892-subquery03-modified3.rq",// queryFileURL
+                "ticket-1892-subquery03-modified3.trig",// dataFileURL
+                "ticket-1892-subquery03-modified3.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    public void test_ticket_1892e() throws Exception {
+
         new TestHelper("ticket-1892-auxiliary1",// testURI,
                 "ticket-1892-auxiliary1.rq",// queryFileURL
                 "ticket-1892-auxiliary1.ttl",// dataFileURL
@@ -103,13 +113,23 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
-    
-    public void test_ticket_1892e() throws Exception {
+   
+    public void test_ticket_1892f() throws Exception {
 
         new TestHelper("ticket-1892-auxiliary2",// testURI,
                 "ticket-1892-auxiliary2.rq",// queryFileURL
                 "ticket-1892-auxiliary2.ttl",// dataFileURL
                 "ticket-1892-auxiliary2.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    public void test_ticket_1892g() throws Exception {
+
+        new TestHelper("ticket-1892-additional1",// testURI,
+                "ticket-1892-additional1.rq",// queryFileURL
+                "ticket-1892-additional1.trig",// dataFileURL
+                "ticket-1892-additional1.srx"// resultFileURL
                 ).runTest();
 
     }

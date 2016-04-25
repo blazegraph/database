@@ -1,0 +1,9 @@
+# Here the ?o in the outer SELECT is, essentially, distinct from the ?o in
+# the subquery, because of the variable scoping rules.
+
+select ?o 
+{
+ select (count(?o) as ?c) 
+  {?x ?p ?o}
+ group by ?x 
+}
