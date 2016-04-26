@@ -1,9 +1,22 @@
-# Here the ?o in the outer SELECT is, essentially, distinct from the ?o in
-# the subquery, because of the variable scoping rules.
 
-select ?o 
-{
- select (count(?o) as ?c) 
-  {?x ?p ?o}
- group by ?x 
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+select ?x where {
+
+  ?g a ex:graph_type2 .
+
+  graph ?g {
+
+    ?x ex:q ?z .
+
+    {select ?x where {
+
+      graph ?g {
+        ?x ex:p ?y
+      } .
+
+      ?g a ex:graph_type1 .  
+    }}
+  }
 }
