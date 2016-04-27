@@ -2,7 +2,7 @@ prefix ex: <http://www.example.org/schema#>
 prefix in: <http://www.example.org/instance#>
 
 select ?x where {
-graph ?h {
-  {select ?x where {?x ?p ?g}}
+graph ?g {
+  {select ?x where {?x ?p ?g1}}
   }
 }

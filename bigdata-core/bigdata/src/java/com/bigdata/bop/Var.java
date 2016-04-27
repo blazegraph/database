@@ -206,6 +206,20 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
         
     }
     
+    /** Generates an anonymous random variable whose name has the specified 
+     *  prefix. 
+     */
+    static public Var<?> freshVarWithPrefix(final String prefix) {
+        String name = prefix + UUID.randomUUID().toString();
+        while (vars.containsKey(name)) {
+            // try again
+            name = prefix + UUID.randomUUID().toString();
+        }
+        return Var.var(name);
+    }
+    
+    
+    
     /**
      * Singleton factory for {@link Var}s.
      * <p>
