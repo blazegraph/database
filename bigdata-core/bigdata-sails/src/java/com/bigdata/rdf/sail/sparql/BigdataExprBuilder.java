@@ -223,8 +223,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
                 // Keeping the name as a prefix for mnemonicity of AST and
                 // execution plan printing.
 
-                ASTSingleVariableRenamingVisitor renaming =
-                        new ASTSingleVariableRenamingVisitor(contextVarToRename, freshVar.getName());
+                VarRenamingVisitor renaming =
+                        new VarRenamingVisitor(contextVarToRename, freshVar.getName());
 
                 renaming.visit(astQuery, null /* data */);
             } // if (contextVarToRename != null)
@@ -252,6 +252,56 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         return queryRoot;
 
     }
+    
+    
+    /**
+     * Auxiliary class; recursively replaces a given variable with another given
+     * variable everywhere in a visited AST. The replacement is destructive:
+     * contents of ASTVar nodes are changed.
+     *
+     * @author <a href="mailto:ariazanov@blazegraph.com">Alexandre Riazanov</a>
+     *
+     * @since Apr 27, 2016
+     */
+    private static class VarRenamingVisitor extends ASTVisitorBase {
+
+        private final String replacedVar;
+        private final String replacingVar;
+
+        /**
+         * The constructed object can be used to recursively replace
+         * {@link replacedVariable} with {@link replacingVariable} everywhere in
+         * visited ASTs. The replacement is destructive: contents of ASTVar
+         * nodes are changed.
+         *
+         * @param replacedVariable non-null
+         * @param replacingVariable non-null
+         */
+        public VarRenamingVisitor(String replacedVariable,
+                String replacingVariable) {
+            replacedVar = replacedVariable;
+            replacingVar = replacingVariable;
+
+            if (replacedVariable == null) {
+                throw new IllegalArgumentException();
+            }
+            if (replacingVariable == null) {
+                throw new IllegalArgumentException();
+            }
+        }
+
+        @Override
+        public Object visit(ASTVar node, Object data)
+                throws VisitorException {
+
+            if (node.getName().equals(replacedVar)) {
+                node.setName(replacingVar);
+            }
+
+
+            return node.childrenAccept(this, data);
+        }
+    } // class VarRenamingVisitor
 
     /**
      * ASK query.
