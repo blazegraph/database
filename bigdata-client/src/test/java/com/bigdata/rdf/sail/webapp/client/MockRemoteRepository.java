@@ -15,6 +15,15 @@ import org.eclipse.jetty.http.HttpHeader;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
+/**
+ * The class is providing a test environment for a REST layer 
+ * without actually communicating with a remote server. 
+ * This approach is used as a reliable way is needed to catch 
+ * a particular moment when some queries are still running 
+ * at the time when RemoteRepositoryManager.close() is called. 
+ *
+ */
+
 public class MockRemoteRepository extends RemoteRepository {
 
 	public final static class Data {

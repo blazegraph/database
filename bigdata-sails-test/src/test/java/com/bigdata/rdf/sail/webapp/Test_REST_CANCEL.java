@@ -34,6 +34,12 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.MockRemoteRepository;
 
 /**
+ * The test verifies the correctness of the HTTP request
+ * for an auto-cancellation of running queries. 
+ * It uses {@link MockRemoteRepository} to emulate
+ * queries running on a server side without an actual 
+ * connection with a remote server.
+ * 
  */
 public class Test_REST_CANCEL<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {
