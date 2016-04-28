@@ -396,7 +396,7 @@ graph ?g {
          */
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery01",
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery02",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03", // BLZG-1892
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
 
