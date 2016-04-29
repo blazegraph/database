@@ -174,6 +174,20 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 //
 //    }
     
+//    This test is commented out because it produces an incorrect 
+//    result due to the same issue as in test_ticket_1892j().
+//    
+//    public void test_ticket_1892k() throws Exception {
+//
+//        new TestHelper("ticket-1892-additional5",// testURI,
+//                "ticket-1892-additional5.rq",// queryFileURL
+//                "ticket-1892-additional5.trig",// dataFileURL
+//                "ticket-1892-additional5.srx"// resultFileURL
+//                ).runTest();
+//
+//    }
+//    
+//    
     public void test_ticket_1202a() throws Exception {
 
         new TestHelper("ticket-1202-group03",// testURI,
