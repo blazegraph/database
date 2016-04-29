@@ -37,6 +37,7 @@ import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.CoreBaseBOp;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -356,5 +357,67 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         }
         
     }
+    
+    
+    /** Checks equality between <code>expected</code> and <code>actual</code>,
+     *  assuming that the specific variable names are irrelevant, as long as the
+     *  corresponding renaming of the variables is compatible with the
+     *  accumulated renaming.
+     */
+    protected static void assertSameASTModuloVarRenaming(final String queryStr,
+            final IQueryNode expected, final IQueryNode actual) {
+        
+        if (expected instanceof QueryRoot) {
+
+            if (((QueryRoot) expected).getQueryHints() == null) {
+                /*
+                 * Note: Discard the query hints since the unit tests are not
+                 * building those up from the AST at this time.
+                 */
+                ((QueryRoot) actual).setQueryHints(null);
+            }
+            
+            if (((QueryRoot) expected).getDataset() == null) {
+                /*
+                 * Note: Discard the data set since the unit tests are not
+                 * building those up from the AST at this time.
+                 */
+                ((QueryRoot) actual).setDataset(null);
+            }
+            
+        }
+        if (actual instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)actual).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
+        if (expected instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)expected).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
+        
+        if ((expected instanceof CoreBaseBOp &&
+              !((CoreBaseBOp) expected).equalsModuloVarRenaming(actual)) ||
+                !expected.equals(actual)) {
+
+            log.error("\nqueryStr:\n" + queryStr);
+            log.error("\nexpected:\n" + expected);
+            log.error("\nactual:\n" + actual);
+
+            // May be replaced with a variable renaming-tolerant
+            // version of diff in the future.
+            //AbstractQueryEngineTestCase.diff((BOp) expected, (BOp) actual);
+
+            
+            // No difference was detected?
+            throw new AssertionError();
+        }
+        
+    } // 
 
 }
