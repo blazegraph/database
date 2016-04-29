@@ -56,8 +56,8 @@ public class TestTicket1899 extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper(
                 "ticket_bg1899a", // testURI,
                 "ticket_bg1899a.rq",// queryFileURL
-                "ticket_bg1899.ttl",// dataFileURL
-                "ticket_bg1899.srx"// resultFileURL
+                "ticket_bg1899abcd.ttl",// dataFileURL
+                "ticket_bg1899abcd.srx"// resultFileURL
                 ).runTest();
     }
     
@@ -70,8 +70,8 @@ public class TestTicket1899 extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper(
                 "ticket_bg1899b", // testURI,
                 "ticket_bg1899b.rq",// queryFileURL
-                "ticket_bg1899.ttl",// dataFileURL
-                "ticket_bg1899.srx"// resultFileURL
+                "ticket_bg1899abcd.ttl",// dataFileURL
+                "ticket_bg1899abcd.srx"// resultFileURL
                 ).runTest();
     }
     
@@ -83,8 +83,8 @@ public class TestTicket1899 extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper(
                 "ticket_bg1899c", // testURI,
                 "ticket_bg1899c.rq",// queryFileURL
-                "ticket_bg1899.ttl",// dataFileURL
-                "ticket_bg1899.srx"// resultFileURL
+                "ticket_bg1899abcd.ttl",// dataFileURL
+                "ticket_bg1899abcd.srx"// resultFileURL
                 ).runTest();
     }
     
@@ -96,11 +96,66 @@ public class TestTicket1899 extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper(
                 "ticket_bg1899d", // testURI,
                 "ticket_bg1899d.rq",// queryFileURL
-                "ticket_bg1899.ttl",// dataFileURL
-                "ticket_bg1899.srx"// resultFileURL
+                "ticket_bg1899abcd.ttl",// dataFileURL
+                "ticket_bg1899abcd.srx"// resultFileURL
                 ).runTest();
     }
     
+    /**
+     * Test case for proper reconstruction of cache from HTree
+     * index for URIs.
+     */
+    public void test_ticket_bg1899_e() throws Exception {
+        
+        new TestHelper(
+                "ticket_bg1899e", // testURI,
+                "ticket_bg1899e.rq",// queryFileURL
+                "ticket_bg1899e.nt",// dataFileURL
+                "ticket_bg1899e.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    /**
+     * Test case for proper reconstruction of cache from HTree
+     * index for literals.
+     */
+    public void test_ticket_bg1899_f() throws Exception {
+        
+        new TestHelper(
+                "ticket_bg1899f", // testURI,
+                "ticket_bg1899f.rq",// queryFileURL
+                "ticket_bg1899f.nt",// dataFileURL
+                "ticket_bg1899f.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    /**
+     * Test case for proper reconstruction of cache from HTree
+     * index for large literals (BLOBS).
+     */
+    public void test_ticket_bg1899_g() throws Exception {
+        
+        new TestHelper(
+                "ticket_bg1899g", // testURI,
+                "ticket_bg1899g.rq",// queryFileURL
+                "ticket_bg1899g.nt",// dataFileURL
+                "ticket_bg1899g.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    /**
+     * Test case for proper reconstruction of cache from HTree
+     * index for numerics.
+     */
+    public void test_ticket_bg1899_h() throws Exception {
+        
+        new TestHelper(
+                "ticket_bg1899h", // testURI,
+                "ticket_bg1899h.rq",// queryFileURL
+                "ticket_bg1899h.n3",// dataFileURL
+                "ticket_bg1899h.srx"// resultFileURL
+                ).runTest();
+    }
     
     @Override
     public Properties getProperties() {
