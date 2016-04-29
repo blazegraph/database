@@ -404,16 +404,14 @@ abstract public class CoreBaseBOp implements BOp {
                 final String otherInverseRenamed =
                         accumulatedInverseVarRenaming.get(otherName);
 
-                assert !otherInverseRenamed.equals(thisName);
-
                 if (otherInverseRenamed == null) {
                     // add the new pair <thisName,otherName> to the bijection
                     accumulatedVarRenaming.put(thisName, otherName);
-                    accumulatedInverseVarRenaming.put(otherName, thisName);
-
-                    System.out.println(thisName + " <-> " + otherName);
-                    
+                    accumulatedInverseVarRenaming.put(otherName, thisName);                    
                 } else {
+                    
+                    
+                    assert !otherInverseRenamed.equals(thisName);
 
                     // a bijection cannot map two values into one
 
@@ -474,12 +472,11 @@ abstract public class CoreBaseBOp implements BOp {
 
         } // for (int i = 0; i < arity; i++)
         
-        return true; // temporary
-//
-//        return annotationsEqualModuloVarRenaming(this.annotations(),
-//                o.annotations(),
-//                accumulatedVarRenaming,
-//                accumulatedInverseVarRenaming);
+
+        return annotationsEqualModuloVarRenaming(this.annotations(),
+                o.annotations(),
+                accumulatedVarRenaming,
+                accumulatedInverseVarRenaming);
 
     } // equalsModuloVarRenaming(final Object other, 
 
