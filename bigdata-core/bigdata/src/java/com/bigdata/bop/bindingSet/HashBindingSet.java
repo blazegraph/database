@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.bindingSet;
 
+import com.bigdata.bop.Constant;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -260,6 +261,12 @@ public class HashBindingSet implements IBindingSet {
         current = copy(src.current, variablesToKeep);
 
 	}
+    
+   
+       private HashBindingSet(LinkedHashMap<IVariable,IConstant> contents) {
+           current = contents;
+       }
+        
 
 	/**
 	 * Return a copy of the source list.
@@ -314,6 +321,69 @@ public class HashBindingSet implements IBindingSet {
 		return dst;
 		
 	}
+        
+        
+    /**
+     * Return a copy of the source list minus entries assigning error values
+     * (Constant.errorValue() or its copies). .
+     *
+     * @param src The source list.
+     * @param variablesToKeep When non-<code>null</code>, only the bindings for
+     * the variables listed in this array will copied.
+     *
+     * @return The copy.
+     */
+    private LinkedHashMap<IVariable, IConstant> copyMinusErrors(
+            final LinkedHashMap<IVariable, IConstant> src,
+            final IVariable[] variablesToKeep) {
+
+        final LinkedHashMap<IVariable, IConstant> dst = new LinkedHashMap<IVariable, IConstant>(
+                variablesToKeep != null ? variablesToKeep.length : src.size());
+
+        final Iterator<Map.Entry<IVariable, IConstant>> itr = src.entrySet()
+                .iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<IVariable, IConstant> e = itr.next();
+
+            if (e.getValue() == Constant.errorValue()) {
+                continue;
+            }
+
+            boolean keep = true;
+
+            if (variablesToKeep != null) {
+
+                keep = false;
+
+                for (IVariable<?> x : variablesToKeep) {
+
+                    if (x == e.getKey()) {
+
+                        keep = true;
+
+                        break;
+
+                    }
+
+                }
+
+            }
+
+            if (keep) {
+                dst.put(e.getKey(), e.getValue());
+            }
+
+        }
+
+        return dst;
+
+
+    } // copyMinusErrors(..)
+        
+        
+        
 
     /**
      * Package private constructor used by the unit tests.
@@ -373,7 +443,28 @@ public class HashBindingSet implements IBindingSet {
 		return new HashBindingSet(this/* src */, variablesToKeep);
 
     }
-    
+               
+        
+    @Override
+    public IBindingSet copyMinusErrors(final IVariable[] variablesToKeep) {
+        return new HashBindingSet(copyMinusErrors(this.current,
+                variablesToKeep));
+        
+    }
+
+        
+    /** 
+     * @return true if this IBindingSet contains an assignment of an error value
+     */
+    @Override
+    public final boolean containsErrorValues() {        
+        for (IConstant val : this.current.values()) {  
+            if (val == Constant.errorValue())
+                return true;            
+        }
+        return false;
+    }
+        
     public boolean isBound(final IVariable var) {
      
         if (var == null)

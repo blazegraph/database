@@ -156,6 +156,186 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
+    public void test_ticket_1202a() throws Exception {
+
+        new TestHelper("ticket-1202-group03",// testURI,
+                "ticket-1202-group03.rq",// queryFileURL
+                "ticket-1202-group03.ttl",// dataFileURL
+                "ticket-1202-group03.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202b() throws Exception {
+
+        new TestHelper("ticket-1202-group05",// testURI,
+                "ticket-1202-group05.rq",// queryFileURL
+                "ticket-1202-group05.ttl",// dataFileURL
+                "ticket-1202-group05.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202c() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified1",// testURI,
+                "ticket-1202-group03-modified1.rq",// queryFileURL
+                "ticket-1202-group03-modified1.ttl",// dataFileURL
+                "ticket-1202-group03-modified1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202d() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified1",// testURI,
+                "ticket-1202-group05-modified1.rq",// queryFileURL
+                "ticket-1202-group05-modified1.ttl",// dataFileURL
+                "ticket-1202-group05-modified1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    
+    public void test_ticket_1202e() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified2",// testURI,
+                "ticket-1202-group03-modified2.rq",// queryFileURL
+                "ticket-1202-group03-modified2.ttl",// dataFileURL
+                "ticket-1202-group03-modified2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202f() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified3",// testURI,
+                "ticket-1202-group03-modified3.rq",// queryFileURL
+                "ticket-1202-group03-modified3.ttl",// dataFileURL
+                "ticket-1202-group03-modified3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202g() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified2",// testURI,
+                "ticket-1202-group05-modified2.rq",// queryFileURL
+                "ticket-1202-group05-modified2.ttl",// dataFileURL
+                "ticket-1202-group05-modified2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202h() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified3",// testURI,
+                "ticket-1202-group05-modified3.rq",// queryFileURL
+                "ticket-1202-group05-modified3.ttl",// dataFileURL
+                "ticket-1202-group05-modified3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+     
+    public void test_ticket_1202i() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified4",// testURI,
+                "ticket-1202-group03-modified4.rq",// queryFileURL
+                "ticket-1202-group03-modified4.ttl",// dataFileURL
+                "ticket-1202-group03-modified4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202j() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified5",// testURI,
+                "ticket-1202-group03-modified5.rq",// queryFileURL
+                "ticket-1202-group03-modified5.ttl",// dataFileURL
+                "ticket-1202-group03-modified5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202k() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified4",// testURI,
+                "ticket-1202-group05-modified4.rq",// queryFileURL
+                "ticket-1202-group05-modified4.ttl",// dataFileURL
+                "ticket-1202-group05-modified4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202l() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified5",// testURI,
+                "ticket-1202-group05-modified5.rq",// queryFileURL
+                "ticket-1202-group05-modified5.ttl",// dataFileURL
+                "ticket-1202-group05-modified5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202m() throws Exception {
+
+        new TestHelper("ticket-1202-additional1",// testURI,
+                "ticket-1202-additional1.rq",// queryFileURL
+                "ticket-1202-additional1.ttl",// dataFileURL
+                "ticket-1202-additional1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202n() throws Exception {
+
+        new TestHelper("ticket-1202-additional2",// testURI,
+                "ticket-1202-additional2.rq",// queryFileURL
+                "ticket-1202-additional2.ttl",// dataFileURL
+                "ticket-1202-additional2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202o() throws Exception {
+
+        new TestHelper("ticket-1202-additional3",// testURI,
+                "ticket-1202-additional3.rq",// queryFileURL
+                "ticket-1202-additional3.ttl",// dataFileURL
+                "ticket-1202-additional3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202p() throws Exception {
+
+        new TestHelper("ticket-1202-additional4",// testURI,
+                "ticket-1202-additional4.rq",// queryFileURL
+                "ticket-1202-additional4.ttl",// dataFileURL
+                "ticket-1202-additional4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202q() throws Exception {
+
+        new TestHelper("ticket-1202-additional5",// testURI,
+                "ticket-1202-additional5.rq",// queryFileURL
+                "ticket-1202-additional5.ttl",// dataFileURL
+                "ticket-1202-additional5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    public void test_ticket_1202r() throws Exception {
+
+        new TestHelper("ticket-1202-additional6",// testURI,
+                "ticket-1202-additional6.rq",// queryFileURL
+                "ticket-1202-additional6.ttl",// dataFileURL
+                "ticket-1202-additional6.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    
+    
+    
+    
     
     public void test_ticket_618a() throws Exception {
 
@@ -2387,5 +2567,20 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_bg911.trig",// dataFileURL
            "ticket_bg911.srx"// resultFileURL
            ).runTest();    
+   }
+   
+   /**
+    * Ticket: https://github.com/SYSTAP/bigdata-gpu/issues/368
+    * ClassCast Exception when Loading LUBM: com.bigdata.rdf.internal.impl.literal.XSDBooleanIV
+    * cannot be cast to com.bigdata.rdf.internal.impl.literal.NumericIV
+    */
+   public void testTicketBigdataGPU368() throws Exception {
+       
+       new TestHelper( 
+           "workbench1",      // test name
+           "workbench1.rq",   // query file
+           "data/lehigh/LUBM-U1.rdf.gz",  // data file
+           "workbench1.srx"   // result file
+           ).runTest();
    }
 }

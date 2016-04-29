@@ -55,6 +55,7 @@ import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.rdf.aggregate.COUNT;
+import com.bigdata.bop.rdf.aggregate.SAMPLE;
 import com.bigdata.bop.rdf.aggregate.SUM;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
@@ -76,6 +77,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.rwstore.sector.IMemoryManager;
+import static junit.framework.TestCase.assertEquals;
 
 /**
  * Abstract base class for testing {@link GroupByOp} operator implementations.
@@ -3036,5 +3038,333 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
           kb.getIndexManager().destroy();
        }
     }
+    
 
+
+    /**
+     * Based on 
+     * https://www.w3.org/2009/sparql/docs/tests/data-sparql11/grouping/group03.rq
+     * 
+     * <pre>
+     * @prefix : <http://example/> .
+     *
+     * :s1 :p 1 .
+     * :s1 :q 9 .
+     * :s2 :p 2 . 
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * 
+     * SELECT ?w (SAMPLE(?v) AS ?S)
+     * {
+     *   ?s :p ?v .
+     *   OPTIONAL { ?s :q ?w }
+     * }
+     * GROUP BY ?w
+     * </pre>
+     * 
+     * The solutions input to the GROUP_BY are:
+     * 
+     * <pre>
+     * ?w  ?s  ?v
+     *  9  s1   1
+     *     s2   2
+     * </pre>
+     * 
+     * The aggregated solutions groups are:
+     * 
+     * <pre>
+     * ?w  ?S  
+     *  9   1  
+     *      2  
+     * </pre>
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_aggregation_groupBy_by_error_values1() {
+                 
+       AbstractTripleStore kb = TestMockUtility.mockTripleStore(getName());
+       try {
+           final String lexiconNamespace = kb.getLexiconRelation().getNamespace();
+           final GlobalAnnotations globals = new GlobalAnnotations(lexiconNamespace, ITx.READ_COMMITTED);
+
+           final IVariable<IV> w = Var.var("w");
+           final IVariable<IV> v = Var.var("v");
+           final IVariable<IV> S = Var.var("S");
+           final IVariable<IV> s = Var.var("s");
+   
+           final IConstant<String> s1 = new Constant<String>("s1");
+           final IConstant<String> s2 = new Constant<String>("s2");
+           final IConstant<XSDNumericIV<BigdataLiteral>> num1 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(1));
+           final IConstant<XSDNumericIV<BigdataLiteral>> num2 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(2));
+           final IConstant<XSDNumericIV<BigdataLiteral>> num9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(9));
+           
+           // SAMPLE(?v) AS ?S
+           final IValueExpression<IV> sampleVAsS = new Bind(S,
+                   new SAMPLE(false/* distinct */, (IValueExpression<IV>) v));
+   
+   
+           
+           final GroupByOp query = newFixture(//
+                       new IValueExpression[] { w, sampleVAsS }, // select
+                       new IValueExpression[] { w }, // groupBy
+                       null // having
+               );
+           
+        
+           /**
+            * The test data:
+            *
+            * <pre>
+            * ?w  ?s  ?v
+            *  9  s1   1
+            *     s2   2
+            * </pre>
+            */
+           final IBindingSet data [] = new IBindingSet []
+           {
+               new ListBindingSet ( new IVariable<?> [] { w, s, v }, new IConstant [] { num9, s1, num1 } )
+             , new ListBindingSet ( new IVariable<?> [] { s, v }, new IConstant [] { s2, num2 } )
+           };
+   
+     
+           /**
+            * The expected solutions:
+            *
+            * <pre>
+            * ?w  ?S
+            *  9   1
+            *      2
+            * </pre>
+            *
+            * </pre>
+            */
+           
+           final IBindingSet expected[] = new IBindingSet[]
+           {
+                   new ListBindingSet ( new IVariable<?> [] { w, S },  new IConstant [] { num9, num1 } ),
+                   new ListBindingSet ( new IVariable<?> [] { S },  new IConstant [] { num2 } )
+           };
+   
+           final BOpStats stats = query.newStats();
+   
+           final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                   new IBindingSet[][] { data });
+   
+           final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                   query, stats);
+   
+           final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+           , kb.getIndexManager()/* indexManager */
+           , queryContext
+           );
+   
+           // Note: [lastInvocation:=true] forces the solutions to be emitted.
+           final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                   runningQuery, -1/* partitionId */
+                   , stats, query/* op */, true/* lastInvocation */, source, sink,
+                   null/* sink2 */
+           );
+      
+           final FutureTask<Void> ft = query.eval(context);
+           // Run the query.
+           {
+               final Thread t = new Thread() {
+                   public void run() {
+                       ft.run();
+                   }
+               };
+               t.setDaemon(true);
+               t.start();
+           }
+   
+           // Check the solutions.
+           AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                   ft);           
+           
+           assertEquals(1, stats.chunksIn.get());
+           assertEquals(2, stats.unitsIn.get());
+           assertEquals(2, stats.unitsOut.get());
+           assertEquals(1, stats.chunksOut.get());
+       } finally {
+          kb.getIndexManager().destroy();
+       }
+        
+        
+    } // test_aggregation_groupBy_by_error_values1()
+    
+
+    
+    
+    
+
+    /**
+     * Based on 
+     * https://www.w3.org/2009/sparql/docs/tests/data-sparql11/grouping/group05.rq
+     * 
+     * <pre>
+     * @prefix : <http://example/> .
+     *
+     * :s1 :p 1 .
+     * :s3 :p 1 .
+     * :s1 :q 9 .
+     * :s2 :p 2 .
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * 
+     * SELECT ?s ?w
+     * {
+     * ?s :p ?v .
+     * OPTIONAL { ?s :q ?w }
+     * }
+     * GROUP BY ?s ?w
+     * </pre>
+     * 
+     * The solutions input to the GROUP_BY are:
+     * 
+     * <pre>
+     * ?w  ?s  ?v
+     *  9  s1   1
+     *     s2   2
+     *     s3   1
+     * </pre>
+     * 
+     * The aggregated solutions groups are:
+     * 
+     * <pre>
+     * ?s  ?w
+     * s1   9  
+     * s2       
+     * s3      
+     * </pre>
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_aggregation_groupBy_by_error_values2() {
+                 
+       AbstractTripleStore kb = TestMockUtility.mockTripleStore(getName());
+       try {
+           final String lexiconNamespace = kb.getLexiconRelation().getNamespace();
+           final GlobalAnnotations globals = new GlobalAnnotations(lexiconNamespace, ITx.READ_COMMITTED);
+
+           final IVariable<IV> w = Var.var("w");
+           final IVariable<IV> v = Var.var("v");
+           final IVariable<IV> S = Var.var("S");
+           final IVariable<IV> s = Var.var("s");
+   
+           final IConstant<String> s1 = new Constant<String>("s1");
+           final IConstant<String> s2 = new Constant<String>("s2");
+           final IConstant<String> s3 = new Constant<String>("s3");
+           final IConstant<XSDNumericIV<BigdataLiteral>> num1 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(1));
+           final IConstant<XSDNumericIV<BigdataLiteral>> num2 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(2));
+           final IConstant<XSDNumericIV<BigdataLiteral>> num9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(9));
+           
+           
+   
+           
+           final GroupByOp query = newFixture(//
+                       new IValueExpression[] { s, w }, // select
+                       new IValueExpression[] { s, w }, // groupBy
+                       null // having
+               );
+           
+        
+           /**
+            * The test data:
+            *
+            * <pre>
+            * ?w  ?s  ?v
+            *  9  s1   1
+            *     s2   2
+            *     s3   1
+            * </pre>
+            */
+           final IBindingSet data [] = new IBindingSet []
+           {
+               new ListBindingSet ( new IVariable<?> [] { w, s, v }, new IConstant [] { num9, s1, num1 } )
+             , new ListBindingSet ( new IVariable<?> [] { s, v }, new IConstant [] { s2, num2 } )
+             , new ListBindingSet ( new IVariable<?> [] { s, v }, new IConstant [] { s3, num1 } )
+           };
+   
+     
+           /**
+            * The expected solutions:
+            *
+            * <pre>
+            * ?s  ?w
+            * s1   9
+            * s2
+            * s3
+            * </pre>
+            *
+            * </pre>
+            */
+           
+           final IBindingSet expected[] = new IBindingSet[]
+           {
+                   new ListBindingSet ( new IVariable<?> [] { s, w },  new IConstant [] { s1, num9 } ),
+                   new ListBindingSet ( new IVariable<?> [] { s },  new IConstant [] { s2 } ),
+                   new ListBindingSet ( new IVariable<?> [] { s },  new IConstant [] { s3 } )
+           };
+   
+           final BOpStats stats = query.newStats();
+   
+           final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                   new IBindingSet[][] { data });
+   
+           final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                   query, stats);
+   
+           final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+           , kb.getIndexManager()/* indexManager */
+           , queryContext
+           );
+   
+           // Note: [lastInvocation:=true] forces the solutions to be emitted.
+           final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                   runningQuery, -1/* partitionId */
+                   , stats, query/* op */, true/* lastInvocation */, source, sink,
+                   null/* sink2 */
+           );
+      
+           final FutureTask<Void> ft = query.eval(context);
+           // Run the query.
+           {
+               final Thread t = new Thread() {
+                   public void run() {
+                       ft.run();
+                   }
+               };
+               t.setDaemon(true);
+               t.start();
+           }
+   
+           // Check the solutions.
+           AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                   ft);           
+           
+           assertEquals(1, stats.chunksIn.get());
+           assertEquals(3, stats.unitsIn.get());
+           assertEquals(3, stats.unitsOut.get());
+           assertEquals(1, stats.chunksOut.get());
+       } finally {
+          kb.getIndexManager().destroy();
+       }
+        
+        
+    } // test_aggregation_groupBy_by_error_values2()
+    
+    // See also TestMemoryGroupByOp.test_aggregation_groupBy_by_error_values3()
+    
 }
