@@ -226,7 +226,13 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
                 VarRenamingVisitor renaming =
                         new VarRenamingVisitor(contextVarToRename, freshVar.getName());
 
-                renaming.visit(astQuery, null /* data */);
+                renaming.visit(astQuery.getWhereClause(), null /* data */);
+                // Note that the renaming is not applied to the projection 
+                // elements, only to the WHERE clause. This is because we
+                // may have something like SELECT (SAMPLE(?y) AS ?g) and 
+                // here ?g is actually the same as in the enclosing GRAPH ?g.
+                
+                
             } // if (contextVarToRename != null)
         } // if (astQuery.isSubSelect())
         
@@ -857,26 +863,18 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
                 final ASTProjectionElem e = itr.next();
 
-                final String varname;
-
                 if (!e.hasAlias()) {
-
-                    // Var
+                    // Otherwise, i.e., with (Expr AS Var),
+                    // the SELECT still overshadows contextVar.
+                    
                     final ASTVar aVar = (ASTVar) e.jjtGetChild(0/* index */);
 
-                    varname = aVar.getName();
+                    if (contextVar.equals(aVar.getName())) {
+                        return null;
+                        // contextVar is explicitly in the projection
+                    }
+                }; // if (!e.hasAlias())
 
-                } else {
-
-                    // Expression AS Var
-
-                    varname = e.getAlias();
-                }
-
-                if (contextVar != null && contextVar.equals(varname)) {
-                    return null;
-                    // contextVar is explicitly in the projection
-                }
 
             } // while (itr.hasNext())
 

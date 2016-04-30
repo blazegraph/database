@@ -1610,7 +1610,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_subselect_under_graph_05() throws MalformedQueryException,
             TokenMgrError, ParseException {
-    
+           
         String sparql1 = "" + //
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
