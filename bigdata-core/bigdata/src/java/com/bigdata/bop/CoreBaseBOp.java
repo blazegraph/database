@@ -360,9 +360,19 @@ abstract public class CoreBaseBOp implements BOp {
      * <code>true</code> if all arguments and annotations are the same, except
      * that the specific variable names are irrelevant, as long as there is a
      * bijection between them.
+     * @param other 
+     * @param difference must be a non-null array with 2 elements; if the equality
+     *        is not established, the elements will be assigned the parts of 
+     *        <code>this</code> and <code>other</code>, possibly null, 
+     *        that disprove the equality;
+     *        <code>difference[0]</code> will contain the part from 
+     *        <code>this</code> and <code>difference[1]</code> will contain
+     *        the part from <code>other</code> 
      */
-    public boolean equalsModuloVarRenaming(final Object other) {
+    public boolean equalsModuloVarRenaming(final Object other,
+            final Object[] difference) {
         return equalsModuloVarRenaming(other,
+                difference,
                 new HashMap<String, String>(),
                 new HashMap<String, String>());
     }
@@ -372,10 +382,21 @@ abstract public class CoreBaseBOp implements BOp {
      * that the specific variable names are irrelevant, as long as the
      * corresponding renaming of the variables is compatible with the
      * accumulated renaming.
+     * @param difference must be a non-null array with 2 elements; if the equality
+     *        is not established, the elements will be assigned the parts of 
+     *        <code>this</code> and <code>other</code>, possibly null, 
+     *        that disprove the equality;
+     *        <code>difference[0]</code> will contain the part from 
+     *        <code>this</code> and <code>difference[1]</code> will contain
+     *        the part from <code>other</code> 
      */
     private boolean equalsModuloVarRenaming(final Object other,
+            final Object[] difference,
             final Map<String, String> accumulatedVarRenaming,
             final Map<String, String> accumulatedInverseVarRenaming) {
+
+        difference[0] = this;
+        difference[1] = other;
 
         // We cannot check this == other here for efficiency, because 
         // the variable name correspondence has to be checked explicitly.
@@ -407,7 +428,7 @@ abstract public class CoreBaseBOp implements BOp {
                 if (otherInverseRenamed == null) {
                     // add the new pair <thisName,otherName> to the bijection
                     accumulatedVarRenaming.put(thisName, otherName);
-                    accumulatedInverseVarRenaming.put(otherName, thisName);                    
+                    accumulatedInverseVarRenaming.put(otherName, thisName);                  
                 } else {
                     
                     
@@ -442,7 +463,10 @@ abstract public class CoreBaseBOp implements BOp {
             final BOp x = get(i);
 
             final BOp y = o.get(i);
-
+           
+            difference[0] = x;
+            difference[1] = y;
+            
             if (x == null) {
                 if (y != null) {
                     return false;
@@ -458,6 +482,7 @@ abstract public class CoreBaseBOp implements BOp {
             if (x instanceof CoreBaseBOp) {
                 // CoreBaseBOp instances are compared modulo renaming
                 if (!(((CoreBaseBOp) x).equalsModuloVarRenaming(y,
+                        difference,
                         accumulatedVarRenaming,
                         accumulatedInverseVarRenaming))) {
                     return false;
@@ -475,6 +500,7 @@ abstract public class CoreBaseBOp implements BOp {
 
         return annotationsEqualModuloVarRenaming(this.annotations(),
                 o.annotations(),
+                difference,
                 accumulatedVarRenaming,
                 accumulatedInverseVarRenaming);
 
@@ -488,9 +514,13 @@ abstract public class CoreBaseBOp implements BOp {
     private static boolean annotationsEqualModuloVarRenaming(
             final Map<String, Object> m1,
             final Map<String, Object> m2,
+            final Object[] difference,
             final Map<String, String> accumulatedVarRenaming,
             final Map<String, String> accumulatedInverseVarRenaming) {
 
+        difference[0] = m1;
+        difference[1] = m2;
+        
         // We cannot check m1 == m2 here for efficiency, because 
         // the variable name correspondence has to be checked explicitly.
         
@@ -516,6 +546,7 @@ abstract public class CoreBaseBOp implements BOp {
 
             if (!annotationObjectsEqualModuloVariableRenaming(e.getValue(),
                    m2.get(name),
+                   difference,
                    accumulatedVarRenaming,
                    accumulatedInverseVarRenaming)) {
                 return false;
@@ -536,9 +567,12 @@ abstract public class CoreBaseBOp implements BOp {
      */
     private static boolean annotationObjectsEqualModuloVariableRenaming(final Object o1,
             final Object o2,
+            final Object[] difference,
             final Map<String, String> accumulatedVarRenaming,
             final Map<String, String> accumulatedInverseVarRenaming) {
 
+        difference[0] = o1;
+        difference[1] = o2;
 
         if (o1 == null) {
             if (o2 == null) {
@@ -572,6 +606,7 @@ abstract public class CoreBaseBOp implements BOp {
 
                 if (!annotationObjectsEqualModuloVariableRenaming(a1[i],
                         a2[i],
+                        difference,
                         accumulatedVarRenaming,
                         accumulatedInverseVarRenaming)) {
                     return false;
@@ -607,9 +642,13 @@ abstract public class CoreBaseBOp implements BOp {
                 
                 final Object v2 = m2.get(key);
                 
+                difference[0] = v1;
+                difference[1] = v2;
+        
                 if (v2 == null
                         || !annotationObjectsEqualModuloVariableRenaming(v1,
                         v2,
+                        difference,
                         accumulatedVarRenaming,
                         accumulatedInverseVarRenaming)) {
                     return false;
@@ -624,6 +663,7 @@ abstract public class CoreBaseBOp implements BOp {
         if (o1 instanceof CoreBaseBOp) {
 
             return ((CoreBaseBOp) o1).equalsModuloVarRenaming(o2,
+                    difference,
                     accumulatedVarRenaming,
                     accumulatedInverseVarRenaming);
 

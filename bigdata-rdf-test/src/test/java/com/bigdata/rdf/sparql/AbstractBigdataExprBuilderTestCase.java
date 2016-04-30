@@ -363,9 +363,21 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
      *  assuming that the specific variable names are irrelevant, as long as the
      *  corresponding renaming of the variables is compatible with the
      *  accumulated renaming.
+     *  @param queryStr
+     *  @param expected
+     *  @param actual
+     *  @param difference  must be a non-null array with 2 elements; if the equality
+     *        is not established, the elements will be assigned the parts of 
+     *        <code>expected</code> and <code>actuak</code>, possibly null, 
+     *        that disprove the equality;
+     *        <code>difference[0]</code> will contain the part from 
+     *        <code>expected</code> and <code>difference[1]</code> will contain
+     *        the part from <code>actual</code> 
      */
     protected static void assertSameASTModuloVarRenaming(final String queryStr,
-            final IQueryNode expected, final IQueryNode actual) {
+            final IQueryNode expected, 
+            final IQueryNode actual,
+            final Object[] difference) {
         
         if (expected instanceof QueryRoot) {
 
@@ -400,10 +412,16 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             }
         }
         
+        difference[0] = expected;        
+        difference[1] = actual;
         
-        if ((expected instanceof CoreBaseBOp &&
-              !((CoreBaseBOp) expected).equalsModuloVarRenaming(actual)) ||
-                !expected.equals(actual)) {
+        final boolean equal = 
+                (expected instanceof CoreBaseBOp)?
+                ((CoreBaseBOp) expected).equalsModuloVarRenaming(actual,difference) 
+                :
+                expected.equals(actual);
+        
+        if (!equal) {
 
             log.error("\nqueryStr:\n" + queryStr);
             log.error("\nexpected:\n" + expected);
@@ -411,13 +429,16 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
             // May be replaced with a variable renaming-tolerant
             // version of diff in the future.
-            //AbstractQueryEngineTestCase.diff((BOp) expected, (BOp) actual);
-
+//            AbstractQueryEngineTestCase.diff((BOp) expected, (BOp) actual);
+//
+//            
+//            // No difference was detected?
+//            throw new AssertionError();
             
-            // No difference was detected?
-            throw new AssertionError();
+            
+            fail("The ASTs differ even modulo variable renaming: part [" + difference[0] + "] differs from [" + difference[1] + "]");
         }
         
-    } // 
+    } // assertSameASTModuloVarRenaming(final String queryStr,
 
 }
