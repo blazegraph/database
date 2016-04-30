@@ -1,4 +1,4 @@
-# This is to exersise double overshadowing of context variables
+# This is to exercise double overshadowing of context variables
 # by sub-SELECT. It's possible to imagine a naive interpretation 
 # in which this query has no answers. 
 

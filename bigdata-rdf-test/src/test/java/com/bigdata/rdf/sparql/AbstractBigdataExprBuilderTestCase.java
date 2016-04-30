@@ -66,6 +66,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 import junit.framework.TestCase;
+import static junit.framework.TestCase.fail;
 
 /**
  * Abstract base class for tests of the {@link BigdataExprBuilder} and friends.
@@ -379,6 +380,79 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             final IQueryNode actual,
             final Object[] difference) {
         
+        if (!sameASTModuloVarRenaming(queryStr,
+            expected, 
+            actual,
+            difference)) {
+
+            log.error("\nqueryStr:\n" + queryStr);
+            log.error("\nexpected:\n" + expected);
+            log.error("\nactual:\n" + actual);
+                        
+            fail("The ASTs differ even modulo variable renaming: part [" + difference[0] + "] differs from [" + difference[1] + "]");
+        }
+        
+    } // assertSameASTModuloVarRenaming(final String queryStr,
+    
+    
+    
+    /** Checks disequality between <code>expected</code> and <code>actual</code>,
+     *  assuming that the specific variable names are irrelevant, as long as the
+     *  corresponding renaming of the variables is compatible with the
+     *  accumulated renaming.
+     *  @param queryStr
+     *  @param notExpected
+     *  @param actual
+     *  @param difference  must be a non-null array with 2 elements; 
+     *        if the disequality is established, the elements will be assigned 
+     *        the parts of 
+     *        <code>expected</code> and <code>actuak</code>, possibly null, 
+     *        that prove the disequality;
+     *        <code>difference[0]</code> will contain the part from 
+     *        <code>notExpected</code> and <code>difference[1]</code> will contain
+     *        the part from <code>actual</code> 
+     */
+    protected static void assertDifferentASTModuloVarRenaming(final String queryStr,
+            final IQueryNode notExpected, 
+            final IQueryNode actual,
+            final Object[] difference) {
+        
+        if (sameASTModuloVarRenaming(queryStr,
+            notExpected, 
+            actual,
+            difference)) {
+
+            log.error("\nqueryStr:\n" + queryStr);
+            log.error("\nnotExpected:\n" + notExpected);
+            log.error("\nactual:\n" + actual);
+                        
+            fail("The ASTs are equal, at least modulo variable renaming.");
+        }
+        
+    } // assertDifferentASTModuloVarRenaming(final String queryStr,
+    
+    
+    
+    /** Checks equality between <code>expected</code> and <code>actual</code>,
+     *  assuming that the specific variable names are irrelevant, as long as the
+     *  corresponding renaming of the variables is compatible with the
+     *  accumulated renaming.
+     *  @param queryStr
+     *  @param expected
+     *  @param actual
+     *  @param difference  must be a non-null array with 2 elements; if the equality
+     *        is not established, the elements will be assigned the parts of 
+     *        <code>expected</code> and <code>actuak</code>, possibly null, 
+     *        that disprove the equality;
+     *        <code>difference[0]</code> will contain the part from 
+     *        <code>expected</code> and <code>difference[1]</code> will contain
+     *        the part from <code>actual</code> 
+     */
+    private static boolean sameASTModuloVarRenaming(final String queryStr,
+            final IQueryNode expected, 
+            final IQueryNode actual,
+            final Object[] difference) {
+        
         if (expected instanceof QueryRoot) {
 
             if (((QueryRoot) expected).getQueryHints() == null) {
@@ -414,31 +488,11 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         
         difference[0] = expected;        
         difference[1] = actual;
+       
+        return (expected instanceof CoreBaseBOp)
+                ? ((CoreBaseBOp) expected).equalsModuloVarRenaming(actual, difference)
+                : expected.equals(actual);
         
-        final boolean equal = 
-                (expected instanceof CoreBaseBOp)?
-                ((CoreBaseBOp) expected).equalsModuloVarRenaming(actual,difference) 
-                :
-                expected.equals(actual);
-        
-        if (!equal) {
-
-            log.error("\nqueryStr:\n" + queryStr);
-            log.error("\nexpected:\n" + expected);
-            log.error("\nactual:\n" + actual);
-
-            // May be replaced with a variable renaming-tolerant
-            // version of diff in the future.
-//            AbstractQueryEngineTestCase.diff((BOp) expected, (BOp) actual);
-//
-//            
-//            // No difference was detected?
-//            throw new AssertionError();
-            
-            
-            fail("The ASTs differ even modulo variable renaming: part [" + difference[0] + "] differs from [" + difference[1] + "]");
-        }
-        
-    } // assertSameASTModuloVarRenaming(final String queryStr,
+    } // sameASTModuloVarRenaming(final String queryStr,
 
 }
