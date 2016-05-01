@@ -1721,4 +1721,102 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
     } // test_subselect_under_graph_07()
     
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * PREFIX ex: <http://www.example.org/schema#>
+     * SELECT ?y
+     * {
+     *   GRAPH ?g  
+     *   {
+     *     {SELECT (SAMPLE(?x) AS ?y) 
+     *      {
+     *        ?x ex:p ?g
+     *      }
+     *      GROUP BY ?g
+     *      HAVING (SAMPLE(?x) > ?g)
+     *      ORDER BY ?g
+     *      VALUES ?g { ex:graph1 }
+     *     }
+     *   }
+     * }
+     * </pre>
+     * 
+     * Here SELECT (SAMPLE(?x) AS ?y) overshadows the variable from GRAPH ?g, 
+     * so that ?g everywhere else is actually a different variable, 
+     * albeit with the same name.
+     * 
+     * The tested feature solves this by explicitly renaming ?g:
+     * 
+     * <pre>
+     * PREFIX ex: <http://www.example.org/schema#>
+     * SELECT ?y
+     * {
+     *   GRAPH ?g  
+     *   {
+     *     {SELECT (SAMPLE(?x) AS ?y) 
+     *      {
+     *        ?x ex:p ?g_12345
+     *      }
+     *      GROUP BY ?g_12345
+     *      HAVING (SAMPLE(?x) > ?g_12345)
+     *      ORDER BY ?g_12345
+     *      VALUES ?g_12345 { ex:graph1 }
+     *     }
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_subselect_under_graph_08() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //       
+                " PREFIX ex: <http://www.example.org/schema#>\n" + //
+                " SELECT ?y\n" + //
+                " {\n" + //
+                "   GRAPH ?g \n" + // 
+                "   {\n" + //
+                "     {SELECT (SAMPLE(?x) AS ?y) \n" + //
+                "      {\n" + //
+                "        ?x ex:p ?g\n" + //
+                "      }\n" + //
+                "      GROUP BY ?g\n" + //
+                "      HAVING (SAMPLE(?x) > ?g)\n" + //
+                "      ORDER BY ?g\n" + //
+                "      VALUES ?g { ex:graph1 }\n" + //
+                "     }\n" + //
+                "   }\n" + //
+                " }";
+
+        String sparql2 = "" + //       
+                " PREFIX ex: <http://www.example.org/schema#>\n" + //
+                " SELECT ?y\n" + //
+                " {\n" + //
+                "   GRAPH ?g \n" + // 
+                "   {\n" + //
+                "     {SELECT (SAMPLE(?x) AS ?y) \n" + //
+                "      {\n" + //
+                "        ?x ex:p ?g_12345\n" + //
+                "      }\n" + //
+                "      GROUP BY ?g_12345\n" + //
+                "      HAVING (SAMPLE(?x) > ?g_12345)\n" + //
+                "      ORDER BY ?g_12345\n" + //
+                "      VALUES ?g_12345 { ex:graph1 }\n" + //
+                "     }\n" + //
+                "   }\n" + //
+                " }";
+
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot expected = parse(sparql2, baseURI);
+         
+        assertSameASTModuloVarRenaming(sparql1, expected, actual, new Object[2]);
+        
+    } // test_subselect_under_graph_08()
+    
+    
+    
 }

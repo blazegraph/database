@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.bigdata.btree.Tuple;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import java.util.Collection;
 import java.util.HashMap;
 
 /**
@@ -414,10 +415,10 @@ abstract public class CoreBaseBOp implements BOp {
         }
 
 
-        if (this instanceof Var) {
+        if (this instanceof IVariable) {
 
-            final String thisName = ((Var) this).getName();
-            final String otherName = ((Var) other).getName();
+            final String thisName = ((IVariable) this).getName();
+            final String otherName = ((IVariable) other).getName();
 
             final String thisRenamed = accumulatedVarRenaming.get(thisName);
             if (thisRenamed == null) {
@@ -517,21 +518,25 @@ abstract public class CoreBaseBOp implements BOp {
             final Object[] difference,
             final Map<String, String> accumulatedVarRenaming,
             final Map<String, String> accumulatedInverseVarRenaming) {
-
+        
         difference[0] = m1;
         difference[1] = m2;
         
         // We cannot check m1 == m2 here for efficiency, because 
         // the variable name correspondence has to be checked explicitly.
         
-        if (m1 != null && m2 == null) {
-            return false;
+        if (m1 == null) {
+            if (m2 == null) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            if (m2 == null) {
+                return false;
+            };
         }
-        
-        if (m2 != null && m1 == null) {
-            return false;
-        }
-        
+               
         if (m1.size() != m2.size()) {
             return false;
         }
@@ -585,9 +590,9 @@ abstract public class CoreBaseBOp implements BOp {
                 return false;
             };
         }
-
-        // Annotation objects may be structures: arrays or 
-        // maps with String keys.
+        
+        // Annotation objects may be structures: arrays,
+        // maps with String keys or Collection instances.
         
         if (o1.getClass().isArray()) {
             
@@ -655,10 +660,140 @@ abstract public class CoreBaseBOp implements BOp {
                 }
                 
             } // for (Object e : m1.entrySet())
+
+            return true;
+            
         }; // if (o1 instanceof Map) 
         
+
+        if (o1 instanceof Collection) {
+
+            if (!(o2 instanceof Collection)) {
+                return false;
+            }
+
+
+            final Collection c1 = (Collection) o1;
+            final Collection c2 = (Collection) o2;
+
+            if (c1.size() != c2.size()) {
+                return false;
+            }
+     
+            Iterator iter1 = c1.iterator();
+            Iterator iter2 = c2.iterator();
+
+            while (iter1.hasNext()) {
+
+                Object el1 = iter1.next();
+                Object el2 = iter2.next();
+
+                if (!annotationObjectsEqualModuloVariableRenaming(el1,
+                        el2,
+                        difference,
+                        accumulatedVarRenaming,
+                        accumulatedInverseVarRenaming)) {
+                    return false;
+                }
+            } // while (iter1.hasNext())
+
+            return true;
+
+        } // if (o1 instanceof Collection)
+
         
-        // Neither array, nor Map:
+        // Annotation objects may be also instances of ad hoc classes:
+        // e.g., IVariable, IBindingSet:
+        
+        if (o1 instanceof IVariable) {
+
+            final String name1 = ((IVariable) o1).getName();
+            final String name2 = ((IVariable) o2).getName();
+
+            final String var1Renamed = accumulatedVarRenaming.get(name1);
+            if (var1Renamed == null) {
+
+                final String var2InverseRenamed =
+                        accumulatedInverseVarRenaming.get(name2);
+
+                if (var2InverseRenamed == null) {
+                    // add the new pair <name1,name2> to the bijection
+                    accumulatedVarRenaming.put(name1, name2);
+                    accumulatedInverseVarRenaming.put(name2, name1);                  
+                } else {
+                    
+                    
+                    assert !var2InverseRenamed.equals(name1);
+
+                    // a bijection cannot map two values into one
+
+                    return false;
+
+                } // if (var2InverseRenamed == null)
+
+            } else {
+
+                if (!name2.equals(var1Renamed)) {
+                    return false;
+                }
+
+            } // if (var1Renamed == null)
+
+            return true;
+            
+        } // if (o1 instanceof IVariable)
+        
+        
+        if (o1 instanceof IBindingSet) {
+
+            if (!(o2 instanceof IBindingSet)) {
+                return false;
+            }
+
+
+            final IBindingSet bs1 = (IBindingSet) o1;
+            final IBindingSet bs2 = (IBindingSet) o2;
+
+            if (bs1.size() != bs2.size()) {
+                return false;
+            }
+            
+            Iterator<IVariable> iter1 = bs1.vars();
+            Iterator<IVariable> iter2 = bs2.vars();
+            
+            while (iter1.hasNext()) {
+                
+                IVariable var1 = iter1.next();
+                IVariable var2 = iter2.next();
+                
+                
+                if (!annotationObjectsEqualModuloVariableRenaming(var1,
+                        var2,
+                        difference,
+                        accumulatedVarRenaming,
+                        accumulatedInverseVarRenaming)) {
+                    return false;
+                }
+                    
+                if (!annotationObjectsEqualModuloVariableRenaming(bs1.get(var1),
+                        bs2.get(var2),
+                        difference,
+                        accumulatedVarRenaming,
+                        accumulatedInverseVarRenaming)) {
+                    return false;
+                }
+                
+            } // while (iter1.hasNext())
+            
+
+            return true;
+            
+        } // if (o1 instanceof IBindingSet)
+
+        
+        
+        
+        // Not an instance of special classes: 
         
         if (o1 instanceof CoreBaseBOp) {
 

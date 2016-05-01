@@ -225,10 +225,33 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
                 VarRenamingVisitor renaming =
                         new VarRenamingVisitor(contextVarToRename, freshVar.getName());
+                
+                assert (ASTNamedSubquery) astQuery.
+                        jjtGetChild(ASTNamedSubquery.class) == null;
+                // because named subqueries are only allowed in top-level
+                // query nodes.
+                
+                if (astQuery.getWhereClause() != null) {
+                    renaming.visit(astQuery.getWhereClause(), null /* data */);
+                }
+                if (astQuery.getGroupClause() != null) {
+                    renaming.visit(astQuery.getGroupClause(), null /* data */);
+                }
+                if (astQuery.getHavingClause() != null) {
+                    renaming.visit(astQuery.getHavingClause(), null /* data */);
+                }
+                if (astQuery.getOrderClause() != null) {
+                    renaming.visit(astQuery.getOrderClause(), null /* data */);
+                }
 
-                renaming.visit(astQuery.getWhereClause(), null /* data */);
+                // nothing for slicing
+
+                if (astQuery.getBindingsClause() != null) {
+                    renaming.visit(astQuery.getBindingsClause(), null /* data */);
+                }
+
                 // Note that the renaming is not applied to the projection 
-                // elements, only to the WHERE clause. This is because we
+                // elements, only below the projection. This is because we
                 // may have something like SELECT (SAMPLE(?y) AS ?g) and 
                 // here ?g is actually the same as in the enclosing GRAPH ?g.
                 

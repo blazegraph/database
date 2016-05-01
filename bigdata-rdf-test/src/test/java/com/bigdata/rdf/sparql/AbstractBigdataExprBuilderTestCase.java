@@ -389,7 +389,13 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             log.error("\nexpected:\n" + expected);
             log.error("\nactual:\n" + actual);
                         
-            fail("The ASTs differ even modulo variable renaming: part [" + difference[0] + "] differs from [" + difference[1] + "]");
+            fail("The ASTs differ even modulo variable renaming: part [" + //
+                    difference[0] + "]" + //
+                    ((difference[0] == null)? "" : " : " + difference[0].getClass()) + //
+                    " differs from [" + //
+                    difference[1] + "]" + //
+                    ((difference[1] == null)? "" : " : " + difference[1].getClass()) + //
+                    "]");
         }
         
     } // assertSameASTModuloVarRenaming(final String queryStr,
