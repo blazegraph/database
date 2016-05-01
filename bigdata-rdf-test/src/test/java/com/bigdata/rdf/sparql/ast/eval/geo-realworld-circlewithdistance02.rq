@@ -1,0 +1,14 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+# 2000km radius around berlin, should match everything
+SELECT * WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inCircle" .
+    ?res geo:predicate <http://coord> .
+    ?res geo:spatialCircleCenter "52.516666#13.38333" .
+    ?res geo:spatialCircleRadius "2000" . 
+    ?res geo:timeStart "0" .
+    ?res geo:timeEnd "0" .
+    ?res geo:distanceValue ?dist .
+  }
+} ORDER BY ASC(?dist)

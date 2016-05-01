@@ -1567,11 +1567,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                         (Double)componentArr[lonIdx] : ((Long)componentArr[lonIdx]).doubleValue();
                     
                     final CoordinateDD cur = new CoordinateDD(curLatValue, curLonValue);
-                    final double distance = centerPoint.equals(cur) ? 0 : centerPoint.distance(cur, unit);
                     
                     bs.set(distanceVar, 
                         new Constant<IV>(
-                            literalSerializer.serializeDistance(vf, distance, unit)));
+                            literalSerializer.serializeDistance(vf, centerPoint.distance(cur, unit), unit)));
                 }
             }
             

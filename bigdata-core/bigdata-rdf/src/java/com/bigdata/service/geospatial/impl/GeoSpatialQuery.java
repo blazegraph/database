@@ -582,12 +582,13 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }
 
         // lookup of geospatial component in non-geospatial (custom) z-order index
-        if (locationVar!=null || locationAndTimeVar!=null || latVar!=null || lonVar!=null) {
+        if (locationVar!=null || locationAndTimeVar!=null || latVar!=null || lonVar!=null || distanceVar!=null) {
             if (!(datatypeConfig.hasLat() && datatypeConfig.hasLon())) {
                 throw new GeoSpatialSearchException(
                     "Requested extraction of geospatial coordinates (via " + GeoSpatial.LOCATION_AND_TIME_VALUE + ", "
-                    + GeoSpatial.LOCATION_AND_TIME_VALUE + ", " + GeoSpatial.LAT_VALUE + ", or " + GeoSpatial.LON_VALUE + ")"
-                    + " but the index contains no geospatial coordinates. Please remove the respective predicated from your query.");
+                    + GeoSpatial.LOCATION_AND_TIME_VALUE + ", " + GeoSpatial.LAT_VALUE + ", " + GeoSpatial.LON_VALUE + 
+                    " or " + GeoSpatial.DISTANCE_VALUE + ")" + " but the index contains no geospatial coordinates. " + 
+                    "Please remove the respective predicated from your query.");
             }
         }
         

@@ -967,6 +967,54 @@ public class TestGeoSpatialCorrectRejection extends AbstractDataDrivenSPARQLTest
 
         throw new RuntimeException("Expected to run into exception.");
     }
+    
+    /**
+     * Test case where we aim at extracting the distance, but the index contains no latitude/longitude.
+     */
+    public void testCRDistanceButNoGeospatialComponent() {
+        
+        try {
+            
+            new TestHelper(
+                "geo-cr-distancevaluebutnogeospatial",
+                "geo-cr-distancevaluebutnogeospatial.rq", 
+                "empty.trig",
+                "geo-cr-empty.srx").runTest();
+        
+        } catch (Exception e) {
+            
+            // check for wrapped exception
+            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
+            
+            return; // expected
+        }
+
+        throw new RuntimeException("Expected to run into exception.");
+    }
+    
+    /**
+     * Test case where we aim at extracting the distance, but the index contains no latitude/longitude.
+     */
+    public void testCRDistanceButRectangleQuery() {
+        
+        try {
+            
+            new TestHelper(
+                "geo-cr-distancevaluebutrectanglequery",
+                "geo-cr-distancevaluebutrectanglequery.rq", 
+                "empty.trig",
+                "geo-cr-empty.srx").runTest();
+        
+        } catch (Exception e) {
+            
+            // check for wrapped exception
+            assertTrue(e.toString().contains(GeoSpatialSearchException.class.getName()));
+            
+            return; // expected
+        }
+
+        throw new RuntimeException("Expected to run into exception.");
+    }
 
     /**
      * Test case where we aim at extracting the time value, but the index contains no time.
