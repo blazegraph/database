@@ -260,7 +260,13 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                     
                 } else {
                     IVUtility.encode(keyBuilder, iv);
-                    if (!iv.isInline() && iv.hasValue() && !filter) {
+                    /**
+                     *  BLZG-1899: we need to materialize all IVs that require materialization;
+                     *             before, this condition was !iv.isInline(), which did not consider
+                     *             cases such as LiteralExtensionIVs that are inline but nevertheless
+                     *             need to be materialized
+                     */
+                    if (iv.needsMaterialization() && iv.hasValue() && !filter) {
                         ivCacheSchema.add(v);
                         if (cache != null)
                             cache.put(iv, iv.getValue());
