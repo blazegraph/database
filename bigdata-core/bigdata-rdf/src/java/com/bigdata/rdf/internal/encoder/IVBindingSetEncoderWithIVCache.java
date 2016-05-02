@@ -394,6 +394,8 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         
         checkpointBTree(ivCache);
         
+        checkpointBTree(literalExtensionIVCache);
+        
         checkpointBTree(blobsCache);
         
     }

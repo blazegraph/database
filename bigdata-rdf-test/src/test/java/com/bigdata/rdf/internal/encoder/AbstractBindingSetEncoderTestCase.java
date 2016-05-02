@@ -68,6 +68,8 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -156,6 +158,7 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
     /** An inline IV whose {@link IVCache} is NOT set. */
     protected XSDBooleanIV<?> inlineIV4;
     
+    /** Fully inlined literal IVs (do not require materialization) */
     protected FullyInlineTypedLiteralIV<BigdataLiteral> fullyInlinedTypedLiteralIV;
     protected IPv4AddrIV<BigdataLiteral> ipV4AddrIv;
     protected LiteralArrayIV literalArrayIV;
@@ -166,9 +169,15 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
     protected XSDUnsignedLongIV<BigdataLiteral> unsignedLongIV;
     protected XSDUnsignedShortIV<BigdataLiteral> unsignedShortIV;
     
+    /** Extension IVs (require materialization) and the like */
     protected FullyInlineURIIV<BigdataURI> fullyInlineUriIV;
     protected LiteralExtensionIV<BigdataLiteral> literalExtensionIV;
     protected URIExtensionIV<?> uriExtensionIV;
+    
+    /** Other IVs requiring materialization */
+    protected VocabURIByteIV<BigdataURI> vocabUriByteIV;
+    protected VocabURIShortIV<BigdataURI> vocabUriShortIV;
+    
     
     /**
      * The encoder under test.
@@ -246,6 +255,13 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         
         uriExtensionIV = new URIExtensionIV(fullyInlinedTypedLiteralIV, fullyInlineUriIV);
         
+        // vocabUriByteIV and vocabUriShortIV both require materialization
+        vocabUriByteIV = new VocabURIByteIV((byte)3);
+        vocabUriByteIV.setValue((BigdataURI) valueFactory.createURI("http://some.vocab.item1"));
+        
+        vocabUriShortIV = new VocabURIShortIV((short)4);
+        vocabUriShortIV.setValue((BigdataURI) valueFactory.createURI("http://some.vocab.item2"));
+        
     }
 
     protected void tearDown() throws Exception {
@@ -281,6 +297,9 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         fullyInlineUriIV = null;
         literalExtensionIV = null;
         uriExtensionIV = null;
+        
+        vocabUriByteIV = null;
+        vocabUriShortIV = null;
                 
     }
 
@@ -935,7 +954,23 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         doEncodeDecodeTest(expected);
     }
     
+    public void testVocabUriByteIV() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(vocabUriByteIV));
+        
+        doEncodeDecodeTest(expected);
+    }
     
+    public void testVocabUriShortIV() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(vocabUriShortIV));
+        
+        doEncodeDecodeTest(expected);
+    }
     
     protected BlobIV<BigdataLiteral> getVeryLargeLiteral() {
         
