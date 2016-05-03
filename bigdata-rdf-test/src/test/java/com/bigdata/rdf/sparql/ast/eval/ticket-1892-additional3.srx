@@ -9,10 +9,5 @@
 	      <uri>http://www.example.org/instance#a</uri>
             </binding>
         </result>
-        <result>
-            <binding name='x'>
-	      <uri>http://www.example.org/instance#b</uri>
-            </binding>
-        </result>
     </results>
 </sparql>

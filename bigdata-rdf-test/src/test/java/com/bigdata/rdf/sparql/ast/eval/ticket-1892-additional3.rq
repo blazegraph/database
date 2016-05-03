@@ -6,8 +6,6 @@
 # so that the variable in GRAPH ?g #2 is a different variable, although 
 # with the same name, and it is in its turn overshadowed by SELECT ?x #3, 
 # so that ?g in ?x ?p ?g is essentially a singleton.
-# Note also that ?g a ex:graph_type2 and ?g a ex:graph_type1
-# have no effect.
 
 prefix ex: <http://www.example.org/schema#>
 prefix in: <http://www.example.org/instance#>
