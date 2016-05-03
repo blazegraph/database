@@ -46,6 +46,7 @@ import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
@@ -161,8 +162,9 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
             
             for (IGroupMemberNode child : subgroup.getChildren()) {
                 if (!(child instanceof StatementPatternNode ||
-                        child instanceof FilterNode)) {
-                    throw new RuntimeException("Complex groups not allowed in alp service");
+                        child instanceof FilterNode ||
+                        child instanceof ArbitraryLengthPathNode)) {
+                    throw new RuntimeException("Complex groups not allowed in alp service: " + child.getClass());
                 }
             }
 
