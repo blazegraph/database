@@ -149,8 +149,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 //    This test is commented out because it produces an incorrect 
 //    result due to an issue not directly related to BLZG-1892: 
 //    we don't segregate the different named graphs when we evaluate 
-//    a sub-SELECT inside a GRAPH ?var. There will be a separate ticket
-//    for this (search for "GRAPH ?var semantics violation").
+//    a sub-SELECT inside a GRAPH ?var. There is a separate ticket
+//    for this: https://jira.blazegraph.com/browse/BLZG-1907
 //    
 //    public void test_ticket_1892i() throws Exception {
 //
@@ -164,7 +164,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     
 //    This test is commented out because it produces an incorrect 
 //    result due to another manifestation of the issue mentioned in 
-//    test_ticket_1892i(): 
+//    test_ticket_1892i() (https://jira.blazegraph.com/browse/BLZG-1907):
 //    GROUP BY under GRAPH ?var is supposed to produce separate
 //    groups on different active graphs, but it mixes them all in 
 //    one group.
@@ -180,7 +180,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 //    }
     
 //    This test is commented out because it produces an incorrect 
-//    result due to the same issue as in test_ticket_1892j().
+//    result due to the same issue as in test_ticket_1892j()
+//    (https://jira.blazegraph.com/browse/BLZG-1907).
 //    
 //    public void test_ticket_1892k() throws Exception {
 //
