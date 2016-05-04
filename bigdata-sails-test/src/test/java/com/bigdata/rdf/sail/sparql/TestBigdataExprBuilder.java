@@ -1818,5 +1818,55 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
     } // test_subselect_under_graph_08()
     
     
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g}}
+     *   }
+     * }
+     * </pre>
+     * 
+     * This test is to ensure that the variable renaming approach
+     * to resolve variable name collision is not over-applied.
+     * Here SELECT ?x  (?g AS ?g) does not overshadow the variable from GRAPH ?g, 
+     * because it's equivalent to SELECT ?x ?g, so ?g must not be renamed.
+     */
+    public void test_subselect_under_graph_09() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g}}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql2 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g_12345}}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql3 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (?g_12345 AS ?g) WHERE {?x ?p ?g_12345}}\n" + //
+                " }\n" + //
+                "}";
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot notExpected2 = parse(sparql2, baseURI);
+        final QueryRoot notExpected3 = parse(sparql3, baseURI);
+        
+        assertDifferentASTModuloVarRenaming(sparql1, notExpected2, actual, new Object[2]);
+        assertDifferentASTModuloVarRenaming(sparql1, notExpected3, actual, new Object[2]);
+        
+    } // test_subselect_under_graph_09()
     
 }

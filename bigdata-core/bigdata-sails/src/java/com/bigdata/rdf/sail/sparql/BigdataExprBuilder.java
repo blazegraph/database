@@ -205,6 +205,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
             // a query plan AST already has context variables in triple pattern
             // objects. 
 
+            // See also https://jira.blazegraph.com/browse/BLZG-1892
 
             final String contextVarToRename =
                     contextVarOvershadowedBySelect(astQuery.getSelect(), queryRoot);
@@ -848,11 +849,12 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
     }
     
     
-        /** If the enclosing GRAPH pattern (accessible via super.graphPattern) 
-         *  is a variable which is projected away ("overshadowed") by the SELECT, 
-         *  the name of this variable is returned. Otherwise, null is returned.
-         */ 
-        private String contextVarOvershadowedBySelect(final ASTSelect select,
+    /**
+     * If the enclosing GRAPH pattern (accessible via super.graphPattern) is a
+     * variable which is projected away ("overshadowed") by the SELECT, the name
+     * of this variable is returned. Otherwise, null is returned.
+     */
+    private String contextVarOvershadowedBySelect(final ASTSelect select,
             final IProjectionDecl queryRoot) throws VisitorException {
 
         if (graphPattern == null
@@ -886,10 +888,24 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
                 final ASTProjectionElem e = itr.next();
 
-                if (!e.hasAlias()) {
-                    // Otherwise, i.e., with (Expr AS Var),
-                    // the SELECT still overshadows contextVar.
+                if (e.hasAlias()) {
+                    // (Expr AS Var)
+                    // We have to consider case SELECT (?g AS ?g)
+                    // because it's equivalent to SELECT ?g.
+                                        
+                    final String varname = e.getAlias();
                     
+                    final SimpleNode expr = (SimpleNode) e.jjtGetChild(0);
+                    
+                    if (contextVar.equals(varname) && 
+                            expr instanceof ASTVar && 
+                            ((ASTVar) expr).getName().equals(varname)) {                        
+                        // contextVar is explicitly in the projection
+                        // (not overshadowed)
+                        return null;
+                    }                    
+                    
+                } else {
                     final ASTVar aVar = (ASTVar) e.jjtGetChild(0/* index */);
 
                     if (contextVar.equals(aVar.getName())) {
