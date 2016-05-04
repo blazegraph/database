@@ -165,6 +165,11 @@ public interface IGeoSpatialQuery {
     public IVariable<?> getLiteralVar();
     
     /**
+     * @return the variable to which the distance value will be bound
+     */
+    public IVariable<?> getDistanceVar();
+    
+    /**
      * @return the incoming bindings to join with
      */
     public IBindingSet getIncomingBindings();

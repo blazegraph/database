@@ -70,6 +70,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.internal.gis.CoordinateDD;
 import com.bigdata.rdf.internal.gis.CoordinateUtility;
 import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -895,16 +896,23 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             final Var<?> customFieldsVar = varFromIVar(query.getCustomFieldsVar());
             final Var<?> locationAndTimeVar = varFromIVar(query.getLocationAndTimeVar());
             final Var<?> literalVar = varFromIVar(query.getLiteralVar());
+            final Var<?> distanceVar = varFromIVar(query.getDistanceVar());
             
             final Var<?> var = Var.var(vars[0].getName());
             final IBindingSet incomingBindingSet = query.getIncomingBindings();
+            
+            // calculate center point, if any
+            final PointLatLon centerPoint = query.getSpatialCircleCenter();
+            final CoordinateDD centerPointDD = 
+                centerPoint==null ? null : new CoordinateDD(centerPoint.getLat(), centerPoint.getLon());
+                   
 
             final GeoSpatialServiceCallResolver resolver = 
                 new GeoSpatialServiceCallResolver(var, incomingBindingSet, locationVar,
                     timeVar, locationAndTimeVar, latVar, lonVar, coordSystemVar, 
-                    customFieldsVar, literalVar, subjectPos, objectPos, vf, 
+                    customFieldsVar, literalVar, distanceVar, subjectPos, objectPos, vf, 
                     new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation(), datatypeConfig),
-                    query.getCustomFieldsConstraints().keySet());
+                    query.getCustomFieldsConstraints().keySet(), centerPointDD, query.getSpatialUnit());
             
             // and construct the sub range task
             return new GeoSpatialServiceCallSubRangeTask(
@@ -1382,6 +1390,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private Var<?> coordSystemVar;
          final private Var<?> customFieldsVar;
          final private Var<?> literalVar;
+         final private Var<?> distanceVar;
          
          final private int subjectPos;
          final private int objectPos;
@@ -1392,13 +1401,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final private int coordSystemIdx;
          final private int[] idxsOfCustomFields;
          
+         final private CoordinateDD centerPoint;
+         final private UNITS unit;
+         
          
          final private BigdataValueFactory vf;
          final private GeoSpatialLiteralExtension<BigdataValue> litExt;
          final private IGeoSpatialLiteralSerializer literalSerializer;
          
-         // true if the resolver reports any components from the object literal
-         final boolean reportsObjectComponents;
+         // true if the resolver needs to dereference the object, e.g. because
+         // the object's value or the distance to the object is reported back
+         final boolean requiresObjectDereferencing;
          
          // the position up to which we need to extract IVs
          final private int extractToPosition;
@@ -1406,9 +1419,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          public GeoSpatialServiceCallResolver(final Var<?> var, final IBindingSet incomingBindingSet,
             final Var<?> locationVar, final Var<?> timeVar, final Var<?> locationAndTimeVar, 
             final Var<?> latVar, final Var<?> lonVar, final Var<?> coordSystemVar, 
-            final Var<?> customFieldsVar, final Var<?> literalVar, final int subjectPos, 
-            final int objectPos, final BigdataValueFactory vf, 
-            final GeoSpatialLiteralExtension<BigdataValue> litExt, final Set<String> customFieldStrings) {
+            final Var<?> customFieldsVar, final Var<?> literalVar, final Var<?> distanceVar,
+            final int subjectPos, final int objectPos, final BigdataValueFactory vf, 
+            final GeoSpatialLiteralExtension<BigdataValue> litExt, final Set<String> customFieldStrings, 
+            final CoordinateDD centerPoint, final UNITS unit) {
             
             this.var = var;
             this.incomingBindingSet = incomingBindingSet;
@@ -1420,20 +1434,22 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.coordSystemVar = coordSystemVar;
             this.customFieldsVar = customFieldsVar;
             this.literalVar = literalVar;
+            this.distanceVar = distanceVar;
             this.subjectPos = subjectPos;
             this.objectPos = objectPos;
             this.vf = vf;
             this.litExt = litExt;
+            this.centerPoint = centerPoint;
+            this.unit = unit;
 
             literalSerializer = litExt.getDatatypeConfig().getLiteralSerializer();
 
-            
-            reportsObjectComponents =
+            requiresObjectDereferencing =
                locationVar!=null || timeVar!=null || locationAndTimeVar!=null ||coordSystemVar!=null
-               ||customFieldsVar!=null || latVar!=null || lonVar!=null || literalVar!=null;
+               ||customFieldsVar!=null || latVar!=null || lonVar!=null || literalVar!=null || distanceVar!=null;
             
             extractToPosition =
-               reportsObjectComponents ? 
+               requiresObjectDereferencing ? 
                Math.max(objectPos, subjectPos) + 1: 
                subjectPos + 1;
 
@@ -1464,7 +1480,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             bs.set(var, new Constant<IV>(ivs[subjectPos]));
             
             // handle request for binding index components
-            if (reportsObjectComponents) {
+            if (requiresObjectDereferencing) {
                 
                 final Object[] componentArr = 
                     litExt.toComponentArray((LiteralExtensionIV)ivs[objectPos]);
@@ -1540,6 +1556,21 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                                vf.createLiteral(literalSerializer.fromComponents(componentArr),
                                litExt.getDatatypeConfig().getUri()))));
                     
+                }
+                
+                if (distanceVar!=null) {
+                    
+                    // set up coordinate for the given point and calculate distance
+                    final Double curLatValue = componentArr[latIdx] instanceof Double ? 
+                        (Double)componentArr[latIdx] : ((Long)componentArr[latIdx]).doubleValue();
+                    final Double curLonValue = componentArr[lonIdx] instanceof Double ? 
+                        (Double)componentArr[lonIdx] : ((Long)componentArr[lonIdx]).doubleValue();
+                    
+                    final CoordinateDD cur = new CoordinateDD(curLatValue, curLonValue);
+                    
+                    bs.set(distanceVar, 
+                        new Constant<IV>(
+                            literalSerializer.serializeDistance(vf, centerPoint.distance(cur, unit), unit)));
                 }
             }
             
@@ -2036,6 +2067,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        private IVariable<?> coordSystemVar = null;
        private IVariable<?> customFieldsVar = null;
        private IVariable<?> literalVar = null;
+       private IVariable<?> distanceVar = null;
        
        public GeoSpatialServiceCallConfiguration(
            final GeoSpatialDefaults defaults, final GeoSpatialConfig geoSpatialConfig,
@@ -2114,7 +2146,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.LOCATION_VALUE);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                       "locationValue property must be a variable");
+                       "locationValue property must point to a variable");
                }
 
                this.locationVar = (IVariable<?>) sp.o().getValueExpression();
@@ -2125,7 +2157,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.TIME_VALUE);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                       "timeValue property must be a variable");
+                       "timeValue property must point to a variable");
                }
 
                this.timeVar = (IVariable<?>) sp.o().getValueExpression();
@@ -2137,7 +2169,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.LAT_VALUE);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                       "latValue property must be a variable");
+                       "latValue property must point to a variable");
                }
 
                this.latVar = (IVariable<?>) sp.o().getValueExpression();
@@ -2148,7 +2180,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.LON_VALUE);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                      "lonValue property must be a variable");
+                      "lonValue property must point to a variable");
                }
 
                this.lonVar = (IVariable<?>) sp.o().getValueExpression();
@@ -2159,7 +2191,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.COORD_SYSTEM_VALUE);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                       "coordSystemValue property must be a variable");
+                       "coordSystemValue property must point to a variable");
                }
 
                this.coordSystemVar = (IVariable<?>) sp.o().getValueExpression();
@@ -2170,7 +2202,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.CUSTOM_FIELDS_VALUES);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                       "customFieldsValues property must be a variable");
+                       "customFieldsValues property must point to a variable");
                }
 
                this.customFieldsVar = (IVariable<?>) sp.o().getValueExpression();
@@ -2181,7 +2213,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.LOCATION_AND_TIME_VALUE);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                       "locationAndTimeValue property must be a variable");
+                       "locationAndTimeValue property must point to a variable");
                }
 
                this.locationAndTimeVar = (IVariable<?>) sp.o().getValueExpression();
@@ -2192,10 +2224,22 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                final StatementPatternNode sp = sps.get(GeoSpatial.LITERAL_VALUE);
                if (!sp.o().isVariable()) {
                    throw new GeoSpatialSearchException(
-                       "locationAndTimeValue property must be a variable");
+                       "locationAndTimeValue property must point to a variable");
                }
 
                this.literalVar = (IVariable<?>) sp.o().getValueExpression();
+
+           }
+           
+           if (sps.containsKey(GeoSpatial.DISTANCE_VALUE)) {
+
+               final StatementPatternNode sp = sps.get(GeoSpatial.DISTANCE_VALUE);
+               if (!sp.o().isVariable()) {
+                   throw new GeoSpatialSearchException(
+                       "distanceValue property must point to a variable");
+               }
+
+               this.distanceVar = (IVariable<?>) sp.o().getValueExpression();
 
            }
        }
@@ -2260,7 +2304,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                      GeoSpatialQuery.toValidatedCustomFieldsConstraints(
                          customFields, customFieldsLowerBounds, customFieldsUpperBounds), 
                      locationVar, timeVar, locationAndTimeVar, latVar, lonVar,
-                     coordSystemVar, customFieldsVar, literalVar, bs);
+                     coordSystemVar, customFieldsVar, literalVar, distanceVar, bs);
 
              return sq;
        }
