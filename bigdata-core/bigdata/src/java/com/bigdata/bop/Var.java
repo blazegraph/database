@@ -37,6 +37,8 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
 
     private static final long serialVersionUID = -7100443208125002485L;
     
+    private static long nextFreshVarSubscript = 0l;
+    
     private boolean anonymous = false;
     
     public void setAnonymous(boolean anonymous) {
@@ -198,12 +200,23 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
     );
 
     /**
-     * Generate an anonymous random variable.
+     * Generate an anonymous random variable. Uniqueness guarantee: there will be no 
+     *  collisions with any variables created so far and with any variables 
+     *  created in the future with {@link freshVarWithPrefix()} and 
+     *  {@link var()}. In a nutshell, it's completely safe to use this
+     *  provided that the parsing of a query has been completed.
      */
     static public Var<?> var() {
         
-        return Var.var(UUID.randomUUID().toString());
+//        String name = UUID.randomUUID().toString();
         
+        
+        String name = "anon" + (++nextFreshVarSubscript);
+        while (vars.containsKey(name)) {
+            // try again
+            name = "anon" + (++nextFreshVarSubscript);
+        }
+        return Var.var(name);
     }
     
     /** Generates an anonymous random variable whose name has the specified 
@@ -222,10 +235,10 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
         if (prefix.trim().equals("")) {
             throw new IllegalArgumentException(); 
         }
-        String name = prefix + UUID.randomUUID().toString();
+        String name = prefix + (++nextFreshVarSubscript);
         while (vars.containsKey(name)) {
             // try again
-            name = prefix + UUID.randomUUID().toString();
+            name = prefix + (++nextFreshVarSubscript);
         }
         return Var.var(name);
     }
