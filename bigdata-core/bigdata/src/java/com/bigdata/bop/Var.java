@@ -37,8 +37,6 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
 
     private static final long serialVersionUID = -7100443208125002485L;
     
-    private static long nextFreshVarSubscript = 0l;
-    
     private boolean anonymous = false;
     
     public void setAnonymous(boolean anonymous) {
@@ -200,50 +198,13 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
     );
 
     /**
-     * Generate an anonymous random variable. Uniqueness guarantee: there will be no 
-     *  collisions with any variables created so far and with any variables 
-     *  created in the future with {@link freshVarWithPrefix()} and 
-     *  {@link var()}. In a nutshell, it's completely safe to use this
-     *  provided that the parsing of a query has been completed.
+     * Generate an anonymous random variable.
      */
     static public Var<?> var() {
         
-//        String name = UUID.randomUUID().toString();
+        return Var.var(UUID.randomUUID().toString());
         
-        
-        String name = "anon" + (++nextFreshVarSubscript);
-        while (vars.containsKey(name)) {
-            // try again
-            name = "anon" + (++nextFreshVarSubscript);
-        }
-        return Var.var(name);
     }
-    
-    /** Generates an anonymous random variable whose name has the specified 
-     *  prefix. Uniqueness guarantee: there will be no 
-     *  collisions with any variables created so far and with any variables 
-     *  created in the future with {@link freshVarWithPrefix()} and 
-     *  {@link var()}. In a nutshell, it's completely safe to use this
-     *  provided that the parsing of a query has been completed.
-     *  @param prefix non-null and non-empty non-whitespace 
-     *         (must satisfy <code>!prefix.trim().equals("")</code>)
-     */
-    static public Var<?> freshVarWithPrefix(final String prefix) {
-        if (prefix == null) {
-            throw new IllegalArgumentException(); 
-        }
-        if (prefix.trim().equals("")) {
-            throw new IllegalArgumentException(); 
-        }
-        String name = prefix + (++nextFreshVarSubscript);
-        while (vars.containsKey(name)) {
-            // try again
-            name = prefix + (++nextFreshVarSubscript);
-        }
-        return Var.var(name);
-    }
-    
-    
     
     /**
      * Singleton factory for {@link Var}s.

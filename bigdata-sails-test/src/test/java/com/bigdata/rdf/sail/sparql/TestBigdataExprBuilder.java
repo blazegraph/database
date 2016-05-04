@@ -1249,7 +1249,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT ?x WHERE {
      *   GRAPH ?g {
-     *     {SELECT ?x WHERE {?x ?p ?g_12345}}
+     *     {SELECT ?x WHERE {?x ?p ?g_1}}
      *   }
      * }
      * </pre>
@@ -1267,7 +1267,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         String sparql2 = "" + //
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
-                "    {SELECT ?x WHERE {?x ?p ?g_12345}}\n" + //
+                "    {SELECT ?x WHERE {?x ?p ?g_1}}\n" + //
                 " }\n" + //
                 "}";
     
@@ -1275,7 +1275,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot expected = parse(sparql2, baseURI);
         
-        assertSameASTModuloVarRenaming(sparql1, expected, actual, new Object[2]);
+        assertSameAST(sparql1, expected, actual);
         
     } // test_subselect_under_graph_01()
     
@@ -1306,7 +1306,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * SELECT ?x WHERE {
      *   GRAPH ?g {
      *     ?x ex:q ?g .
-     *     {SELECT ?x WHERE {?x ex:p ?g_12345}}
+     *     {SELECT ?x WHERE {?x ex:p ?g_1}}
      *   }
      * }
      * </pre>
@@ -1330,7 +1330,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
                 "    ?x ex:q ?g .\n" + //
-                "    {SELECT ?x WHERE {?x ex:p ?g_12345}}\n" + //
+                "    {SELECT ?x WHERE {?x ex:p ?g_1}}\n" + //
                 "  }\n" + //
                 "}";
     
@@ -1338,7 +1338,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot expected = parse(sparql2, baseURI);
         
-        assertSameASTModuloVarRenaming(sparql1, expected, actual, new Object[2]);
+        assertSameAST(sparql1, expected, actual);
         
     } // test_subselect_under_graph_02()
     
@@ -1392,11 +1392,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * 
      *     {select ?x where {
      * 
-     *       graph ?g_12345 {
+     *       graph ?g_1 {
      *         ?x ex:p ?y
      *       } .
      * 
-     *       ?g_12345 a ex:graph_type1 .  
+     *       ?g_1 a ex:graph_type1 .  
      *     }}
      *   }
      * }
@@ -1430,10 +1430,10 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 "   graph ?g {\n" + //
                 "     ?x ex:q ?z .\n" + //
                 "     {select ?x where {\n" + //
-                "       graph ?g_12345 {\n" + //
+                "       graph ?g_1 {\n" + //
                 "         ?x ex:p ?y\n" + //
                 "       } .\n" + //
-                "       ?g_12345 a ex:graph_type1 .  \n" + //
+                "       ?g_1 a ex:graph_type1 .  \n" + //
                 "     }}\n" + //
                 "   }\n" + //
                 " }";
@@ -1443,7 +1443,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot expected = parse(sparql2, baseURI);
         
-        assertSameASTModuloVarRenaming(sparql1, expected, actual, new Object[2]);
+        assertSameAST(sparql1, expected, actual);
         
     } // test_subselect_under_graph_03()
     
@@ -1500,13 +1500,13 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * 
      *     {SELECT ?x #2
      *      {
-     *        GRAPH ?g_12345 #2
+     *        GRAPH ?g_1 #2
      *        {
-     *          ?g_12345 a ex:graph_type1 .
+     *          ?g_1 a ex:graph_type1 .
      * 
      *         {SELECT ?x #3
      *          {
-     *             ?x ex:p ?g_54321          
+     *             ?x ex:p ?g_1_2          
      *           }
      *          }
      *        }
@@ -1554,12 +1554,12 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 "     ?g a ex:graph_type2 .\n" + //
                 "     {SELECT ?x #2\n" + //
                 "      {\n" + //
-                "        GRAPH ?g_12345 #2\n" + //
+                "        GRAPH ?g_1 #2\n" + //
                 "        {\n" + //
-                "          ?g_12345 a ex:graph_type1 .\n" + //
+                "          ?g_1 a ex:graph_type1 .\n" + //
                 "         {SELECT ?x #3\n" + //
                 "          {\n" + //
-                "             ?x ex:p ?g_54321\n" + //          
+                "             ?x ex:p ?g_1_2\n" + //          
                 "           }\n" + //
                 "          }\n" + //
                 "        }\n" + //
@@ -1574,7 +1574,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot expected = parse(sparql2, baseURI);
         
-        assertSameASTModuloVarRenaming(sparql1, expected, actual, new Object[2]);
+        assertSameAST(sparql1, expected, actual);
         
     } // test_subselect_under_graph_04()
     
@@ -1603,7 +1603,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT ?x WHERE {
      *   GRAPH ?g {
-     *     {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g_12345} GROUP BY ?x}
+     *     {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g_1} GROUP BY ?x}
      *   }
      * }
      * </pre>
@@ -1621,7 +1621,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         String sparql2 = "" + //
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
-                "    {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g_12345} GROUP BY ?x}\n" + //
+                "    {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g_1} GROUP BY ?x}\n" + //
                 " }\n" + //
                 "}";
     
@@ -1629,7 +1629,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot expected = parse(sparql2, baseURI);
         
-        assertSameASTModuloVarRenaming(sparql1, expected, actual, new Object[2]);
+        assertSameAST(sparql1, expected, actual);
         
     } // test_subselect_under_graph_05()
     
@@ -1666,7 +1666,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         String sparql2 = "" + //
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
-                "    {SELECT * WHERE {?x ?p ?g_12345}}\n" + //
+                "    {SELECT * WHERE {?x ?p ?g_1}}\n" + //
                 " }\n" + //
                 "}";
     
@@ -1674,7 +1674,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot notExpected = parse(sparql2, baseURI);
         
-        assertDifferentASTModuloVarRenaming(sparql1, notExpected, actual, new Object[2]);
+        assertDifferentAST(sparql1, notExpected, actual);
         
     } // test_subselect_under_graph_06()
     
@@ -1709,7 +1709,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         String sparql2 = "" + //
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
-                "    {SELECT ?x ?g WHERE {?x ?p ?g_12345}}\n" + //
+                "    {SELECT ?x ?g WHERE {?x ?p ?g_1}}\n" + //
                 " }\n" + //
                 "}";
     
@@ -1717,7 +1717,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot notExpected = parse(sparql2, baseURI);
         
-        assertDifferentASTModuloVarRenaming(sparql1, notExpected, actual, new Object[2]);
+        assertDifferentAST(sparql1, notExpected, actual);
         
     } // test_subselect_under_graph_07()
     
@@ -1759,12 +1759,12 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      *   {
      *     {SELECT (SAMPLE(?x) AS ?y) 
      *      {
-     *        ?x ex:p ?g_12345
+     *        ?x ex:p ?g_1
      *      }
-     *      GROUP BY ?g_12345
-     *      HAVING (SAMPLE(?x) > ?g_12345)
-     *      ORDER BY ?g_12345
-     *      VALUES ?g_12345 { ex:graph1 }
+     *      GROUP BY ?g_1
+     *      HAVING (SAMPLE(?x) > ?g_1)
+     *      ORDER BY ?g_1
+     *      VALUES ?g_1 { ex:graph1 }
      *     }
      *   }
      * }
@@ -1799,12 +1799,12 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 "   {\n" + //
                 "     {SELECT (SAMPLE(?x) AS ?y) \n" + //
                 "      {\n" + //
-                "        ?x ex:p ?g_12345\n" + //
+                "        ?x ex:p ?g_1\n" + //
                 "      }\n" + //
-                "      GROUP BY ?g_12345\n" + //
-                "      HAVING (SAMPLE(?x) > ?g_12345)\n" + //
-                "      ORDER BY ?g_12345\n" + //
-                "      VALUES ?g_12345 { ex:graph1 }\n" + //
+                "      GROUP BY ?g_1\n" + //
+                "      HAVING (SAMPLE(?x) > ?g_1)\n" + //
+                "      ORDER BY ?g_1\n" + //
+                "      VALUES ?g_1 { ex:graph1 }\n" + //
                 "     }\n" + //
                 "   }\n" + //
                 " }";
@@ -1813,7 +1813,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         
         final QueryRoot expected = parse(sparql2, baseURI);
          
-        assertSameASTModuloVarRenaming(sparql1, expected, actual, new Object[2]);
+        assertSameAST(sparql1, expected, actual);
         
     } // test_subselect_under_graph_08()
     
@@ -1848,14 +1848,14 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         String sparql2 = "" + //
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
-                "    {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g_12345}}\n" + //
+                "    {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g_1}}\n" + //
                 " }\n" + //
                 "}";
         
         String sparql3 = "" + //
                 "SELECT ?x WHERE {\n" + //
                 "  GRAPH ?g {\n" + //
-                "    {SELECT ?x (?g_12345 AS ?g) WHERE {?x ?p ?g_12345}}\n" + //
+                "    {SELECT ?x (?g_1 AS ?g) WHERE {?x ?p ?g_1}}\n" + //
                 " }\n" + //
                 "}";
     
@@ -1864,8 +1864,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot notExpected2 = parse(sparql2, baseURI);
         final QueryRoot notExpected3 = parse(sparql3, baseURI);
         
-        assertDifferentASTModuloVarRenaming(sparql1, notExpected2, actual, new Object[2]);
-        assertDifferentASTModuloVarRenaming(sparql1, notExpected3, actual, new Object[2]);
+        assertDifferentAST(sparql1, notExpected2, actual);
+        assertDifferentAST(sparql1, notExpected3, actual);
         
     } // test_subselect_under_graph_09()
     

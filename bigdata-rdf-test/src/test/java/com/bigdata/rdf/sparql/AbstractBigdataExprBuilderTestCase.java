@@ -360,105 +360,12 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     }
     
     
-    /** Checks equality between <code>expected</code> and <code>actual</code>,
-     *  assuming that the specific variable names are irrelevant, as long as the
-     *  corresponding renaming of the variables is compatible with the
-     *  accumulated renaming.
-     *  @param queryStr
-     *  @param expected
-     *  @param actual
-     *  @param difference  must be a non-null array with 2 elements; if the equality
-     *        is not established, the elements will be assigned the parts of 
-     *        <code>expected</code> and <code>actuak</code>, possibly null, 
-     *        that disprove the equality;
-     *        <code>difference[0]</code> will contain the part from 
-     *        <code>expected</code> and <code>difference[1]</code> will contain
-     *        the part from <code>actual</code> 
+    /** Checks that the two ASTs are different, as required by some 
+     *  unit tests.
      */
-    protected static void assertSameASTModuloVarRenaming(final String queryStr,
-            final IQueryNode expected, 
-            final IQueryNode actual,
-            final Object[] difference) {
-        
-        if (!sameASTModuloVarRenaming(queryStr,
-            expected, 
-            actual,
-            difference)) {
+        protected static void assertDifferentAST(final String queryStr,
+            final IQueryNode expected, final IQueryNode actual) {
 
-            log.error("\nqueryStr:\n" + queryStr);
-            log.error("\nexpected:\n" + expected);
-            log.error("\nactual:\n" + actual);
-                        
-            fail("The ASTs differ even modulo variable renaming: part [" + //
-                    difference[0] + "]" + //
-                    ((difference[0] == null)? "" : " : " + difference[0].getClass()) + //
-                    " differs from [" + //
-                    difference[1] + "]" + //
-                    ((difference[1] == null)? "" : " : " + difference[1].getClass()) + //
-                    "]");
-        }
-        
-    } // assertSameASTModuloVarRenaming(final String queryStr,
-    
-    
-    
-    /** Checks disequality between <code>expected</code> and <code>actual</code>,
-     *  assuming that the specific variable names are irrelevant, as long as the
-     *  corresponding renaming of the variables is compatible with the
-     *  accumulated renaming.
-     *  @param queryStr
-     *  @param notExpected
-     *  @param actual
-     *  @param difference  must be a non-null array with 2 elements; 
-     *        if the disequality is established, the elements will be assigned 
-     *        the parts of 
-     *        <code>expected</code> and <code>actuak</code>, possibly null, 
-     *        that prove the disequality;
-     *        <code>difference[0]</code> will contain the part from 
-     *        <code>notExpected</code> and <code>difference[1]</code> will contain
-     *        the part from <code>actual</code> 
-     */
-    protected static void assertDifferentASTModuloVarRenaming(final String queryStr,
-            final IQueryNode notExpected, 
-            final IQueryNode actual,
-            final Object[] difference) {
-        
-        if (sameASTModuloVarRenaming(queryStr,
-            notExpected, 
-            actual,
-            difference)) {
-
-            log.error("\nqueryStr:\n" + queryStr);
-            log.error("\nnotExpected:\n" + notExpected);
-            log.error("\nactual:\n" + actual);
-                        
-            fail("The ASTs are equal, at least modulo variable renaming.");
-        }
-        
-    } // assertDifferentASTModuloVarRenaming(final String queryStr,
-    
-    
-    
-    /** Checks equality between <code>expected</code> and <code>actual</code>,
-     *  assuming that the specific variable names are irrelevant, as long as the
-     *  corresponding renaming of the variables is compatible with the
-     *  accumulated renaming.
-     *  @param queryStr
-     *  @param expected
-     *  @param actual
-     *  @param difference  must be a non-null array with 2 elements; if the equality
-     *        is not established, the elements will be assigned the parts of 
-     *        <code>expected</code> and <code>actuak</code>, possibly null, 
-     *        that disprove the equality;
-     *        <code>difference[0]</code> will contain the part from 
-     *        <code>expected</code> and <code>difference[1]</code> will contain
-     *        the part from <code>actual</code> 
-     */
-    private static boolean sameASTModuloVarRenaming(final String queryStr,
-            final IQueryNode expected, 
-            final IQueryNode actual,
-            final Object[] difference) {
-        
         if (expected instanceof QueryRoot) {
 
             if (((QueryRoot) expected).getQueryHints() == null) {
@@ -492,13 +399,19 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             }
         }
         
-        difference[0] = expected;        
-        difference[1] = actual;
-       
-        return (expected instanceof CoreBaseBOp)
-                ? ((CoreBaseBOp) expected).equalsModuloVarRenaming(actual, difference)
-                : expected.equals(actual);
-        
-    } // sameASTModuloVarRenaming(final String queryStr,
+        if (expected.equals(actual)) {
+            
+            log.error("\nIndistringuishable ASTs:\n");
+            log.error("\nqueryStr:\n" + queryStr);
+            log.error("\nexpected:\n" + expected);
+            log.error("\nactual:\n" + actual);
+            
+            fail("Could not find any difference between two ASTs: " + //
+                 "\n  expected: " + expected + //
+                 "\n  actual: " + actual);
+        }
 
+        
+    } // assertDifferentAST(final String queryStr,
+    
 }

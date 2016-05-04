@@ -220,12 +220,18 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
                 // a fresh variable, to resolve the name collision, 
                 // except the occurrences in context references.
 
-                Var freshVar = Var.freshVarWithPrefix(contextVarToRename + "_");
+                final String freshVarName =
+                        context.
+                        createAnonVar(contextVarToRename + "_").
+                        getValueExpression().
+                        getName();
+                        
                 // Keeping the name as a prefix for mnemonicity of AST and
                 // execution plan printing.
+                final VarRenamingVisitor renaming =
+                        new VarRenamingVisitor(contextVarToRename, freshVarName);
 
-                VarRenamingVisitor renaming =
-                        new VarRenamingVisitor(contextVarToRename, freshVar.getName());
+
                 
                 assert (ASTNamedSubquery) astQuery.
                         jjtGetChild(ASTNamedSubquery.class) == null;
