@@ -1776,6 +1776,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
         }  // else: hash join is built-in, nothing to do here
 
+        
         /*
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
@@ -1937,13 +1938,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final ProjectionNode projection = subqueryRoot.getProjection();
 
-        // The variables projected by the subquery.
         
+        
+        // The variables projected by the subquery.
         final Set<IVariable<?>> projectedVars = 
             projection.getProjectionVars(new HashSet<IVariable<?>>());
-        projectedVars.retainAll(
-           ctx.sa.getMaybeIncomingBindings(
-              subqueryRoot, new HashSet<IVariable<?>>()));
+        
+        final Set<IVariable<?>> maybeIncomingBindings = 
+                ctx.sa.getMaybeIncomingBindings(subqueryRoot, new HashSet<IVariable<?>>());
+
+        projectedVars.retainAll(maybeIncomingBindings);
 
         @SuppressWarnings("rawtypes")
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
@@ -2075,7 +2079,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
                
         } // else: hash join is built-in, nothing to do here
            
-
+        
+        // BLZG-1899: for analytic hash joins, we don't cache materialized values
+        //            -> already variables that have not been projected into the subgroup
+        //               need to be marked as not done, in order to enforce re-materialization
+        //               where needed in later steps of the query plan
+        maybeIncomingBindings.removeAll(projectedVars); // variables that are *not* projected in
+        if (ctx.nativeHashJoins)
+            doneSet.removeAll(maybeIncomingBindings);
+        
+        
         /*
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
@@ -2383,6 +2396,20 @@ public class AST2BOpUtility extends AST2BOpRTO {
             }
         }
 
+        // BLZG-1899: for analytic hash joins, we don't cache materialized values
+        //            -> already variables that have not been projected into the subgroup
+        //               need to be marked as not done, in order to enforce re-materialization
+        //               where needed in later steps of the query plan
+        if (ctx.nativeHashJoins) {
+            
+            final Set<IVariable<?>> nonProjectInVariables = 
+                    ctx.sa.getMaybeIncomingBindings(subqueryRoot, new LinkedHashSet<IVariable<?>>());
+            nonProjectInVariables.removeAll(projectInVars);
+            
+            doneSet.removeAll(nonProjectInVariables);        
+        }
+                
+        
         /*
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
@@ -2725,13 +2752,20 @@ public class AST2BOpUtility extends AST2BOpRTO {
          */
         final Set<IVariable<?>> alpUsedVars = alpNode.getUsedVars();
         
+        // compute the variables that we project into the inner subgroup and those
+        // that we do *not* project in - both calculations start out with the set 
+        // of possibly bind variables
         final Set<IVariable<?>> projectInVars = ctx.sa.getMaybeIncomingBindings(
-              alpNode, new LinkedHashSet<IVariable<?>>());
-//        projectInVars.retainAll(alpVars);
+                alpNode, new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> nonProjectInVars = new HashSet<IVariable<?>>(projectInVars);
+
+        // we project in whatever's used inside the ALP
         projectInVars.retainAll(alpUsedVars);
         IVariable<?>[] projectInVarsArr =
               projectInVars.toArray(new IVariable<?>[projectInVars.size()]);
 
+        // the remaining variables are those that are not projected in
+        nonProjectInVars.removeAll(projectInVars);
         
         if (log.isDebugEnabled()) {
             log.debug(alpNode.getUsedVars());
@@ -2917,6 +2951,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
             } 
         } // else: hash join is built-in, nothing to do here
        
+        // BLZG-1899: for analytic hash joins, we don't cache materialized values
+        //            -> already variables that have not been projected into the subgroup
+        //               need to be marked as not done, in order to enforce re-materialization
+        //               where needed in later steps of the query plan
+        if (ctx.nativeHashJoins)
+            doneSet.removeAll(nonProjectInVars);
+        
         return left;
 
     }
@@ -3228,8 +3269,18 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
                 final boolean required = !(subgroup.isOptional() || subgroup
                         .isMinus());
-                left = addSubgroup(left, subgroup, required ? doneSet
-                        : new LinkedHashSet<IVariable<?>>(doneSet), ctx);
+                
+                final Set<IVariable<?>> groupLocalDoneSet = 
+                    required ? doneSet : new LinkedHashSet<IVariable<?>>(doneSet);
+                left = addSubgroup(left, subgroup, groupLocalDoneSet, ctx);
+                
+                /**
+                 * BLZG-1688: in the inner group, we may actuallt not only extend the (passed in)
+                 *            groupLocalDoneSet, but also remove variables from it again. Removing
+                 *            variables has global visibility, so we need to propagate this information
+                 *            to the doneSet.
+                 */
+                doneSet.retainAll(groupLocalDoneSet);
                 continue;
             } else if (child instanceof FilterNode) {
                 final FilterNode filter = (FilterNode) child;
@@ -4284,6 +4335,23 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
         } // else: hash join is built-in, nothing to do here
 
+        // BLZG-1899: for analytic hash joins, we don't cache materialized values
+        //            -> already variables that have not been projected into the subgroup
+        //               need to be marked as not done, in order to enforce re-materialization
+        //               where needed in later steps of the query plan
+        // TODO: THIS DOES NOT YET WORK
+        if (ctx.nativeHashJoins) {
+            
+            final Set<IVariable<?>> nonProjectInVariables = 
+                    ctx.sa.getMaybeIncomingBindings(subgroup, new LinkedHashSet<IVariable<?>>());
+            
+            for (int i=0; i< projectInVars.length; i++) {
+                nonProjectInVariables.remove(projectInVars[i]);
+    	    }
+
+            doneSet.removeAll(nonProjectInVariables);        
+        }
+        
         /*
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
@@ -5913,4 +5981,5 @@ public class AST2BOpUtility extends AST2BOpRTO {
       
       return noOrderBy;
    }
+
 }

@@ -65,6 +65,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.util.Bytes;
 
 /**
@@ -79,7 +80,14 @@ import com.bigdata.util.Bytes;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * This class is out of use. As part of https://jira.blazegraph.com/browse/BLZG-1899, 
+ * we carried out some experiments illustrating that caching the IVs (i.e., preserving
+ * them in HTree hash joins) is far slower than just re-materializing them. We decided
+ * to retire the class and, instead, do remove variables from the doneSet within the
+ * {@link AST2BOpUtility} update process whenever we set up an analytic hash join.
  */
+@Deprecated
 public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
     /**
