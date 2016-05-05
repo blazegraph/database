@@ -353,6 +353,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         String DEFAULT_META_BITS_DEMI_SPACE = "false";
         
         /**
+         * Defines whether blobs, which are stored in multiple slot locations, are
+         * read concurrently using Async NIO. This was introduced specifically to reduce
+         * commit latency in scenarios where large transactions can lead to very large
+         * deferred free lists (>> 10 million addresses), stored as blobs.
+         * BLZG-1884 indicated a possible problem with this approach so this had now been made optional.
+         */
+        String READ_BLOBS_ASYNC = RWStore.class.getName() + ".readBlobsAsync";
+
+        String DEFAULT_READ_BLOBS_ASYNC = "false";
+        
+        /**
          * Defines the number of bits that must be free in a FixedAllocator for
          * it to be added to the free list.  This is used to ensure a level
          * of locality when making large numbers of allocations within a single
@@ -922,6 +933,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     + " : Must be between 1 and 5000");
         }
         
+        m_readBlobsAsync = Boolean.valueOf(fileMetadata.getProperty(
+                Options.READ_BLOBS_ASYNC,
+                Options.DEFAULT_READ_BLOBS_ASYNC));
+
     	cSmallSlot = Integer.valueOf(fileMetadata.getProperty(
                 Options.SMALL_SLOT_TYPE,
                 Options.DEFAULT_SMALL_SLOT_TYPE));
@@ -2098,7 +2113,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * This should benefit all Blob reads but specifically helps large deferredFree data to reduce commit latency
      * as described in BLZG-1663.
      */
-    static boolean s_readBlobsAsync = true;
+    private boolean m_readBlobsAsync = false; // disabled by default
     
     public void getData(final long addr, final byte buf[], final int offset,
             final int length) {
@@ -2153,7 +2168,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         blobHdr[i] = hdrstr.readInt();
                     }
                     // Now we have the header addresses, we can read MAX_FIXED_ALLOCS until final buffer
-                    if (!s_readBlobsAsync) { // synchronous read of blob data
+                    if (!m_readBlobsAsync) { // synchronous read of blob data
 	                    int cursor = 0;
 	                    int rdlen = m_maxFixedAlloc;
 	                    for (int i = 0; i < nblocks; i++) {
