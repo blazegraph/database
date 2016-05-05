@@ -591,7 +591,7 @@ public class TestFileChannelUtility extends TestCase {
 	 * The idea is to write a large file and then read asynchronously across a large number of small buffers.
 	 * 
 	 */
-	public void testAsyncReadersCancelled() throws IOException, InterruptedException {
+	public void no_testAsyncReadersCancelled() throws IOException, InterruptedException {
 		final Random r = new Random();
 
 		final File sourceFile = new File("/Volumes/NonSSD/bigdata/interrupted.jnl"); // External non-SSD drive
@@ -648,7 +648,7 @@ public class TestFileChannelUtility extends TestCase {
 	 * The idea is to write a large file and then read asynchronously across a large number of small buffers.
 	 * 
 	 */
-	public void testAsyncReadersCloseChannel() throws IOException, InterruptedException {
+	public void no_testAsyncReadersCloseChannel() throws IOException, InterruptedException {
 		final Random r = new Random();
 
 		final File sourceFile = new File("/Volumes/NonSSD/bigdata/interrupted.jnl"); // External non-SSD drive
