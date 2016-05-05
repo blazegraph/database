@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.geospatial;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -95,13 +96,27 @@ public class GeoSpatialDefaultLiteralSerializer implements IGeoSpatialLiteralSer
     @Override
     @SuppressWarnings("rawtypes")
     public IV<?,?> serializeLatitude(final BigdataValueFactory vf, final Object latitude) {
-        return new XSDNumericIV((Double)latitude);
+        
+        if (latitude instanceof Double) {
+            return new XSDNumericIV((Double)latitude);
+        } else if (latitude instanceof Long) {
+            return new XSDNumericIV(((Long)latitude).doubleValue());            
+        } else {
+            throw new GeoSpatialSearchException("Latitude value expected to be either Double or Long");
+        }
     }
 
     @Override
     @SuppressWarnings("rawtypes")
     public IV<?,?> serializeLongitude(final BigdataValueFactory vf, final Object longitude) {
-        return new XSDNumericIV((Double)longitude);
+        
+        if (longitude instanceof Double) {
+            return new XSDNumericIV((Double)longitude);
+        } else if (longitude instanceof Long) {
+            return new XSDNumericIV(((Long)longitude).doubleValue());            
+        } else {
+            throw new GeoSpatialSearchException("Longitude value expected to be either Double or Long");
+        }
     }
 
     @Override
@@ -112,6 +127,13 @@ public class GeoSpatialDefaultLiteralSerializer implements IGeoSpatialLiteralSer
     @Override
     public IV<?,?> serializeCustomFields(final BigdataValueFactory vf, final Object... customFields) {
         return toSeparatedString(vf, customFields);
+    }
+    
+    @Override
+    @SuppressWarnings("rawtypes")
+    public IV<?,?> serializeDistance(final BigdataValueFactory vf, final Double distance, final UNITS unit) {
+        
+        return new XSDNumericIV(Math.round(distance*100)/100.0);
     }
     
     /**

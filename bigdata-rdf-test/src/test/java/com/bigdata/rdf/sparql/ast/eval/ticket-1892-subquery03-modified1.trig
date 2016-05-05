@@ -1,0 +1,9 @@
+# Converted from RDF XML.
+
+@prefix ex: <http://www.example.org/schema#> .
+@prefix in: <http://www.example.org/instance#> .
+
+<https://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/sq01.rdf> {
+in:a ex:p in:b .
+in:c ex:p <> .
+}

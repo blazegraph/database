@@ -29,6 +29,7 @@ package com.bigdata.service.geospatial;
 import java.io.Serializable;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 
@@ -62,6 +63,7 @@ public interface IGeoSpatialLiteralSerializer extends Serializable {
      * are either Double or Long values, so you should typically use the object's
      * toString() method to get to a valid string representation.
      * 
+     * @param vf
      * @param latitude
      * @param longitude
      */
@@ -73,6 +75,7 @@ public interface IGeoSpatialLiteralSerializer extends Serializable {
      * The parameters are either Double or Long values, so you should typically use
      * the object's toString() method to get to a valid string representation.
      * 
+     * @param vf
      * @param latitude
      * @param longitude
      * @param time
@@ -86,6 +89,7 @@ public interface IGeoSpatialLiteralSerializer extends Serializable {
      * is either a Double or Long value, so you should typically use the object's
      * toString() method to get to a valid string representation.
      * 
+     * @param vf
      * @param time
      */
     public IV<?,?> serializeTime(final BigdataValueFactory vf, final Object time);
@@ -95,6 +99,7 @@ public interface IGeoSpatialLiteralSerializer extends Serializable {
      * is either a Double or Long value, so you should typically use the object's
      * toString() method to get to a valid string representation.
      * 
+     * @param vf
      * @param latitude
      */
     public IV<?,?> serializeLatitude(final BigdataValueFactory vf, final Object latitude);
@@ -104,6 +109,7 @@ public interface IGeoSpatialLiteralSerializer extends Serializable {
      * is either a Double or Long value, so you should typically use the object's
      * toString() method to get to a valid string representation.
      * 
+     * @param vf
      * @param longitude
      */
     public IV<?,?> serializeLongitude(final BigdataValueFactory vf, final Object longitude);
@@ -113,6 +119,7 @@ public interface IGeoSpatialLiteralSerializer extends Serializable {
      * The parameter is either a Double or Long value, so you should typically
      * use the object's toString() method to get to a valid string representation.
      * 
+     * @param vf
      * @param coordinateSystem
      */
     public IV<?,?> serializeCoordSystem(final BigdataValueFactory vf, final Object coordinateSystem);
@@ -126,5 +133,16 @@ public interface IGeoSpatialLiteralSerializer extends Serializable {
      */
     public IV<?,?> serializeCustomFields(final BigdataValueFactory vf, final Object... customFields);
 
+    /**
+     * Serialize a distance value. The two parameters reflect the distance value (as Double)
+     * and the {@link UNITS} in which the value is represented. The {@link UNITS} depend on the 
+     * units that are specified within the query. Given that the user should be aware of the {@link UNITS},
+     * you may choose to return a numerical value, just ignoring the latter.
+     * 
+     * @param vf
+     * @param distance
+     * @param units
+     */
+    public IV<?,?> serializeDistance(final BigdataValueFactory vf, final Double distance, final UNITS unit);
     
 }

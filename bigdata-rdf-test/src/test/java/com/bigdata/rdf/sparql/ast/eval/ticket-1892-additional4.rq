@@ -1,0 +1,22 @@
+# The variable ?g in GRAPH ?g is overshadowed by SELECT (COUNT(DISTINCT ?s) AS ?x),
+# so ?g in GROUP BY ?g is essentially a different variable and a singleton.
+# Since it's not instantiated, the aggregation is applied to a single group of 
+# 2 different bindings for graph1 and 3 different bindings for graph2.
+
+
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+SELECT DISTINCT ?x 
+{
+  GRAPH ?g  
+  {
+    {SELECT (COUNT(DISTINCT ?s) AS ?x)
+     {
+       ?s ex:p ?o
+     }
+     GROUP BY ?g
+     # GROUP BY ?o # also produces wrong results
+    }
+  }
+}

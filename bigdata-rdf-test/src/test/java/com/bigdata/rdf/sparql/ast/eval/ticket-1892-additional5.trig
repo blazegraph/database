@@ -1,0 +1,21 @@
+@prefix ex: <http://www.example.org/schema#> .
+@prefix in: <http://www.example.org/instance#> .
+
+ex:graph1 {
+
+in:a ex:p ex:graph2 .
+in:b ex:p ex:graph2 .
+
+}
+
+
+ex:graph2 {
+
+in:c ex:p ex:graph2 .
+in:d ex:p ex:graph2 .
+in:e ex:p ex:graph2 .
+
+}
+
+
+

@@ -318,6 +318,10 @@ public class CoordinateUtility {
        final double lonP1 = p1.eastWest;
        final double lonP2 = p2.eastWest;
        
+       // BLZG-1897: distance calculation fails for identical points
+       if (latP1==latP2 && lonP1==lonP2)
+           return 0;
+       
        double distRad = 
           Math.acos(
              Math.sin(toRadians(latP1)) * Math.sin(toRadians(latP2)) + 
