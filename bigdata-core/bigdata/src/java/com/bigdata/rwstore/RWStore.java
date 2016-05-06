@@ -52,7 +52,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -353,15 +352,20 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         String DEFAULT_META_BITS_DEMI_SPACE = "false";
         
         /**
-         * Defines whether blobs, which are stored in multiple slot locations, are
-         * read concurrently using Async NIO. This was introduced specifically to reduce
-         * commit latency in scenarios where large transactions can lead to very large
-         * deferred free lists (>> 10 million addresses), stored as blobs.
-         * BLZG-1884 indicated a possible problem with this approach so this had now been made optional.
+         * Defines whether blobs, which are stored in multiple slot locations,
+         * are read concurrently using Async NIO. This was introduced
+         * specifically to reduce commit latency in scenarios where large
+         * transactions can lead to very large deferred free lists (>> 10
+         * million addresses), stored as blobs.
+         * <p>
+         * BLZG-1884 indicated a possible problem with this approach. The root
+         * causes of that problem (poor handling of exceptions) have been dealt
+         * with.  This option was also introduced so the async IO support can
+         * now be disabled if a problem does materialize.
          */
         String READ_BLOBS_ASYNC = RWStore.class.getName() + ".readBlobsAsync";
 
-        String DEFAULT_READ_BLOBS_ASYNC = "false";
+        String DEFAULT_READ_BLOBS_ASYNC = "true";
         
         /**
          * Defines the number of bits that must be free in a FixedAllocator for
@@ -986,7 +990,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         try {
             final RandomAccessFile m_raf = fileMetadata.getRandomAccessFile();
-            m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
+            m_reopener = new ReopenFileChannel(m_fd, m_raf, fileMetadata.readOnly);
         } catch (IOException e1) {
             throw new RuntimeException(e1);
         }
@@ -2106,14 +2110,18 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
     }
     
-    /*
+    /**
      * Set the option below to true to enable asynchronous reads of blob data.
-     * The aim is to reduce latency when reading blobs from disk as it will enable the disk controllers
-     * to re-order IO requests nd where possible process in parallel.
-     * This should benefit all Blob reads but specifically helps large deferredFree data to reduce commit latency
-     * as described in BLZG-1663.
+     * The aim is to reduce latency when reading blobs from disk as it will
+     * enable the disk controllers to re-order IO requests nd where possible
+     * process in parallel. This should benefit all Blob reads but specifically
+     * helps large deferredFree data to reduce commit latency as described in
+     * BLZG-1663.
+     * 
+     * @see BLZG-1663
+     * @see BLZG-1884 RWStore ASYNC IO fails to make progress (apparent deadlock)
      */
-    private boolean m_readBlobsAsync = false; // disabled by default
+    final private boolean m_readBlobsAsync;
     
     public void getData(final long addr, final byte buf[], final int offset,
             final int length) {
@@ -4896,6 +4904,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         final private File file;
 
+        private final boolean readOnly;
+        
         private final String mode;
 
         private volatile RandomAccessFile raf;
@@ -4907,11 +4917,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         private int asyncChannelOpenCount = 0;;
         
         public ReopenFileChannel(final File file, final RandomAccessFile raf,
-                final String mode) throws IOException {
+                final boolean readOnly) throws IOException {
 
             this.file = file;
 
-            this.mode = mode;
+            this.readOnly = readOnly;
+            
+            this.mode = readOnly == true ? "r" : "rw";
             
             this.raf = raf;
             
@@ -4921,6 +4933,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         }
         
+        @Override
         public AsynchronousFileChannel getAsyncChannel() {
         	if (asyncChannel != null) {
         		if (asyncChannel.isOpen())
@@ -4934,7 +4947,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             	}
 
 	        	try {
-	            	asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
+	        	    if(readOnly) {
+	        	        asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
+	        	    } else {
+	                    asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
+	        	    }
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
@@ -4949,12 +4966,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         	return asyncChannelOpenCount;
         }
 
+        @Override
         public String toString() {
 
             return file.toString();
 
         }
 
+        @Override
         public FileChannel reopenChannel() throws IOException {
 
             /*
