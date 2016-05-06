@@ -92,6 +92,8 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  * because one uses the {@link RemoteRepository} to communicate with the NSS
  * while the other uses the local API.
  * 
+ * @openrdf
+ * 
  * @param <S>
  * 
  * @see SPARQLUpdateTest

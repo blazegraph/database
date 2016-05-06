@@ -250,6 +250,7 @@ import info.aduna.iteration.CloseableIteration;
  *       your Sail class.)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  */
 public class BigdataSail extends SailBase implements Sail {
 

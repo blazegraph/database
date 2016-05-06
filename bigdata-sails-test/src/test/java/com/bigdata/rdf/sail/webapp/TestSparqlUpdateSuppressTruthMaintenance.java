@@ -63,6 +63,9 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 
+/**
+ * @openrdf
+ */
 
 public class TestSparqlUpdateSuppressTruthMaintenance<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {

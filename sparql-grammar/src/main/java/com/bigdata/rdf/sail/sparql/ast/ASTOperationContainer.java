@@ -12,6 +12,7 @@ import java.util.List;
  * {@link ASTUpdateContainer}
  * 
  * @author Jeen Broekstra
+ * @openrdf
  */
 public abstract class ASTOperationContainer extends SimpleNode {
 

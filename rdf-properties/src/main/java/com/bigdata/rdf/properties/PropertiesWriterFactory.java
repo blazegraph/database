@@ -65,6 +65,7 @@ import java.io.Writer;
  * specific {@link PropertiesFormat}.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public interface PropertiesWriterFactory {
 

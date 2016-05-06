@@ -99,6 +99,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * {@link QueryEngine}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  * @version $Id$
  */
 abstract public class AbstractQueryEngineTestCase extends TestCase2 {

@@ -63,6 +63,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * @author Arjohn Kampman
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @openrdf
  * @version $Id$
  */
 public class IVComparator implements Comparator<IV>, Serializable {

@@ -31,6 +31,7 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
  *      StackOverflowError for ArbitraryLengthPath </a>
  * 
  * @author james
+ * @openrdf
  * 
  * @see ArbitraryLengthPathTest
  * @since openrdf 2.6.10
