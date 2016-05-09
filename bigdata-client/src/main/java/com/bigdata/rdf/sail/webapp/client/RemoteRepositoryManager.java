@@ -160,7 +160,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     private final RemoteTransactionManager transactionManager;
 
     /**
-     * <code>true</code> iff open.
+     * <code>true</code> iff already closed.
      */
     private volatile boolean m_closed = false;
 
@@ -509,20 +509,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     @Override
     public void close() throws Exception {
 
-        if (!m_closed) {
+        if (m_closed) {
             // Already closed.
             return;
         }
 
-        if (httpClient instanceof AutoCloseable) {
-
-            /*
-             * If the caller passed in an AutoCloseable HttpClient, then we shut
-             * it down now.
-             */
-            ((AutoCloseable) httpClient).close();
-
-        }
 
         if (our_httpClient != null) {
 
@@ -538,6 +529,13 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             }
 
         }
+        
+        // Note that we do not close httpClient here, because it came as 
+        // a parameter to a constructor, may be shared by multiple 
+        // RemoteRepositoryManager instances and other objects, and 
+        // thus has to be closed elswhere (e.g., QueryEngine.shutdown()).
+        
+        
 
         if (our_executor != null) {
 
