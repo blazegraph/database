@@ -1,0 +1,5 @@
+<http://s1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://test.com/P12> .
+<http://s2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://test.com/P13> .
+<http://s3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>  <http://test.com/P14> .
+<http://s4> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>  <http://test.com/P14> .
+<http://s5> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>  <http://test.com/P15> .

@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -235,6 +235,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         	
 			// RWSTORE SPECIFIC TEST SUITE.
 			suite.addTestSuite(TestRWStoreTxBehaviors.class);
+			//BLZG-1727 Needs RWStore mode
+	        suite.addTestSuite(TestBackupServlet.class);
+
         	
         } else {
 
@@ -280,6 +283,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(Test_REST_DELETE_WITH_BODY.class);
          suite.addTestSuite(TestNanoSparqlClient.class);
          suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
+         suite.addTestSuite(TestDataLoaderServlet.class); // Data Loader Servlet
 
          // Transaction management API.
          suite.addTestSuite(Test_REST_TX_API.class);

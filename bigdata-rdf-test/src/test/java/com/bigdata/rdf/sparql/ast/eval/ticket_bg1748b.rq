@@ -1,0 +1,6 @@
+SELECT * WHERE {
+   ?s <http://begin> ?begin.
+   ?s <http://end> ?end.
+   FILTER("-0521-01-01"^^<http://www.w3.org/2001/XMLSchema#date> >= ?begin)
+   FILTER("-0522-01-01"^^<http://www.w3.org/2001/XMLSchema#date> <= ?end)
+}

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ModifiableBOpBase;
@@ -68,6 +69,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
@@ -93,6 +95,10 @@ public abstract class AbstractOptimizerTestCase extends
 			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations,
 			com.bigdata.rdf.sparql.ast.StatementPatternNode.Annotations
 			{
+	}
+	
+	public interface ApplyAnnotation {
+		public void apply(ASTBase target);
 	}
 
 	enum HelperFlag {
@@ -160,7 +166,14 @@ public abstract class AbstractOptimizerTestCase extends
 			public void apply(ASTBase rslt) {
 				((QueryBase) rslt).getProjection().setReduced(false);
 			}
-		};
+		},
+        
+        SUBGROUP_OF_ALP {
+         @Override
+         public void apply(ASTBase sp) {
+            ((JoinGroupNode) sp).setSubgroupOfALPNode(true);
+         }
+      };
 
 		/**
 		 * 
@@ -279,8 +292,7 @@ public abstract class AbstractOptimizerTestCase extends
 
 			final IASTOptimizer rewriter = newOptimizer();
 
-			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
-					given), store);
+			final AST2BOpContext context = getAST2BOpContext(given);
 
 			final IQueryNode actual = rewriter.optimize(context,
 			      new QueryNodeWithBindingSet(given, new IBindingSet[] {})).
@@ -288,6 +300,10 @@ public abstract class AbstractOptimizerTestCase extends
 
 			assertSameAST(expected, actual);
 			
+		}
+
+		AST2BOpContext getAST2BOpContext(QueryRoot given) {
+			return new AST2BOpContext(new ASTContainer(given), store);
 		}
 		
 		/**
@@ -300,8 +316,7 @@ public abstract class AbstractOptimizerTestCase extends
 
 			final IASTOptimizer rewriter = newOptimizer();
 
-			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
-					given), store);
+			final AST2BOpContext context = getAST2BOpContext(given);
 
 			final IQueryNode actual = rewriter.optimize(context,
 			      new QueryNodeWithBindingSet(given, new IBindingSet[] {})).
@@ -514,7 +529,8 @@ public abstract class AbstractOptimizerTestCase extends
 		 * @return The named subquyery.
 		 */
 		protected NamedSubqueryRoot namedSubQuery(final String name,
-				final VarNode varNode, final JoinGroupNode where) {
+				final VarNode varNode, final JoinGroupNode where,
+				ApplyAnnotation ... annotations) {
 			
 			final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
 					QueryType.SELECT, name);
@@ -526,14 +542,22 @@ public abstract class AbstractOptimizerTestCase extends
 			
 			namedSubquery.setWhereClause(where);
 			
-			return namedSubquery;
+			return applyAnnotations(namedSubquery, annotations);
 			
 		}
 
-		protected GroupMemberNodeBase namedSubQueryInclude(final String name) {
+		protected GroupMemberNodeBase namedSubQueryInclude(
+				final String name, ApplyAnnotation ... annotations) {
 			
-			return new NamedSubqueryInclude(name);
+			return applyAnnotations(new NamedSubqueryInclude(name), annotations);
 			
+		}
+		
+		protected <T extends ASTBase> T applyAnnotations(T target, ApplyAnnotation ... annotations) {
+			for (ApplyAnnotation annotation: annotations) {
+				annotation.apply(target);
+			}
+			return target;
 		}
 		
 		protected VarNode leftVar() {
@@ -868,10 +892,14 @@ public abstract class AbstractOptimizerTestCase extends
 			return existsNode;
 		}
 
-		private IVariable<? extends IV> toValueExpression(VarNode v) {
+		protected IVariable<? extends IV> toValueExpression(VarNode v) {
 			return (IVariable<? extends IV>) AST2BOpUtility.toVE(getBOpContext(), globals, v);
 		}
 
+		protected IConstant<? extends IV> toValueExpression(ConstantNode v) {
+			return (IConstant<? extends IV>) AST2BOpUtility.toVE(getBOpContext(), globals, v);
+		}
+		
 		private IValueExpression<? extends IV> toValueExpression(FunctionNode n) {
 			return AST2BOpUtility.toVE(getBOpContext(), globals, n);
 		}
@@ -882,7 +910,32 @@ public abstract class AbstractOptimizerTestCase extends
 
 		protected ASTBase getTmp() {
          return tmp;
-      }
+        }
+		protected ApplyAnnotation joinOn(final VarNode ... joinVars) {
+			return new ApplyAnnotation() {
+				@Override
+				public void apply(ASTBase target) {
+			        target.setProperty(Annotations.JOIN_VARS, joinVars);
+				}};
+			
+		}
+		protected ApplyAnnotation dependsOn(final String ... dependsOn) {
+			return new ApplyAnnotation() {
+				@Override
+				public void apply(ASTBase target) {
+					((NamedSubqueryRoot)target).setDependsOn(dependsOn);
+				}};
+			
+		}
+		protected ApplyAnnotation slice(final long offset, final long limit) {
+			return new ApplyAnnotation() {
+				@Override
+				public void apply(ASTBase target) {
+					((QueryBase)target).setSlice(new SliceNode(offset, limit));
+				}};
+			
+		}
+		
 	}
 
 	protected static final class ASTPropertyPathOptimizerInTest extends ASTPropertyPathOptimizer {

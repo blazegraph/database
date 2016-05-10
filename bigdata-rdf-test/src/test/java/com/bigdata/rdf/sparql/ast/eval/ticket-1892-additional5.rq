@@ -1,0 +1,18 @@
+# The variable ?g in GRAPH ?g is not overshadowed by SELECT ?x (SAMPLE(?y) AS ?g).
+
+
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+SELECT ?x
+{
+  GRAPH ?g  
+  {
+    {SELECT ?x (SAMPLE(?y) AS ?g)
+     {
+       ?x ex:p ?y
+     }
+     GROUP BY ?x
+    }
+  }
+}

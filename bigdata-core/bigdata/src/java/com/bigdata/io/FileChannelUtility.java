@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,14 +33,21 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
+import java.nio.channels.NonReadableChannelException;
+import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.util.InnerCause;
 
 /**
  * A helper class for operations on {@link FileChannel}s.
@@ -267,6 +274,210 @@ public class FileChannelUtility {
         
         return nreads;
         
+    }
+    
+    /**
+     * Define interface to support callback from readAllAsync
+     */
+    public interface IAsyncOpener {
+        AsynchronousFileChannel getAsyncChannel();
+    }
+    
+    /**
+     * The AsyncTransfer class encapsulates the state required to make
+     * asynchronous transfer requests.  It was written explicitly to support
+     * asynchronous transfer of blob data that requires multiple reads.
+     */
+    static public class AsyncTransfer {
+    	private final long m_addr;
+    	private final int m_bytesToRead;
+    	private final ByteBuffer m_buffer;
+    	private Future<Integer> m_fut = null;
+    	
+    	public AsyncTransfer(final long addr, final ByteBuffer buffer) {
+    		m_addr = addr;
+    		m_buffer = buffer;
+    		m_bytesToRead = buffer.remaining();
+    		m_buffer.mark(); // mark buffer to support reset on any retries
+    	}
+
+    	/**
+         * Schedule a read on the channel. If the operation was previously
+         * schedule and is done (normal completion), then return immediately. If
+         * the operation was previously schedule and was cancelled, then throws
+         * out a CancellationException. If the operation was previously schedule
+         * and failed, then the future is cleared and the operation is
+         * rescheduled. This is done in order to allow us to complete a high
+         * level read on the channel when the backing channel may have been
+         * closed by an interrupt in another thread due to Java IO channel
+         * semantics (e.g., driven by query termination during reads).
+         * 
+         * @param channel The channel.
+         * 
+         * @throws IllegalArgumentException
+         * @throws NonReadableChannelException
+         * @throws CancellationException
+         * @throws InterruptedException
+         */
+        private void read(final AsynchronousFileChannel channel)
+                throws IllegalArgumentException, NonReadableChannelException, CancellationException, InterruptedException {
+            if (isDone()) { // Check for re-scheduling of the read().
+    		    try {
+                    /*
+                     * Note: It is either unlikely or impossible to have an
+                     * InterruptedException thrown out here since we know that
+                     * the Future isDone().
+                     */
+    		        m_fut.get(); // throws CancellationException, ExecutionException, InterruptedException. 
+                } catch (ExecutionException ex) {
+                    /*
+                     * This read() had failed. We clear future so we can re-do
+                     * the read.
+                     */
+    		        m_fut = null;
+    		    }
+    		}
+    		if(!isDone()) {
+    			// ensure buffer is ready
+    			m_buffer.reset();
+    			m_fut = channel.read(m_buffer,  m_addr); // throws IllegalArgumentException, NonReadableChannelException
+    		}
+    	}
+
+        public int complete() throws InterruptedException, ExecutionException, IllegalStateException {
+            if (m_fut == null) {
+                // Future is not set.
+                throw new IllegalStateException("Future is not set");
+            }
+            return m_fut.get();
+		}
+
+		public void cancel() {
+            if (m_fut != null)
+                m_fut.cancel(true/* mayInterruptIfRunning */);
+		}
+
+		public boolean isDone() {
+			return m_fut != null && m_fut.isDone();
+		}
+    }
+
+    /**
+     * readAllAsync will make repeated attempts to read data into the transfer buffers defined
+     * in the List of AsyncTransfer instances.
+     * 
+     * @param opener provides AsynchronouseFileChannel
+     * @param transfers defines the list of required transfers
+     * @return the total number of bytes read asynchronously
+     * @throws IOException 
+     */
+    static public long readAllAsync(final IAsyncOpener opener, final List<AsyncTransfer> transfers) throws IOException {
+        int ntries = 0;
+        long totalBytesRead = 0;
+        final long totalBytesExpected;
+        {
+            long n = 0;
+            for (AsyncTransfer transfer : transfers) {
+                n += transfer.m_bytesToRead;
+            }
+            totalBytesExpected = n;
+        }
+        try {
+        	while (true) {
+                ntries++;
+                if (ntries == 100) {
+
+                    log.warn("reading on channel: remaining=" + (totalBytesExpected - totalBytesRead) + ", ntransfers="
+                            + transfers.size() + ", ntries=" + ntries + ", bytesRead=" + totalBytesRead);
+
+                } else if (ntries == 1000) {
+
+                    log.error("reading on channel: remaining=" + (totalBytesExpected - totalBytesRead) + ", ntransfers="
+                            + transfers.size() + ", ntries=" + ntries + ", bytesRead=" + totalBytesRead);
+
+                } else if (ntries > 10000) {
+
+                    throw new RuntimeException(
+                            "reading on channel: remaining=" + (totalBytesExpected - totalBytesRead) + ", ntransfers="
+                                    + transfers.size() + ", ntries=" + ntries + ", bytesRead=" + totalBytesRead);
+
+                }
+                // Re-open the channel if the backing channel was closed.
+    	        final AsynchronousFileChannel channel = opener.getAsyncChannel();
+    			try {
+    			    // Schedule transfer requests (does not re-schedule if already done)
+    				for (AsyncTransfer transfer : transfers) {
+    					// The AsyncTransfer object handles retries by checking any existing transfer state
+    					transfer.read(channel); // throws IllegalArgumentException,
+    					                        //        NonReadableChannelException (extends IllegalStateException),
+    					                        //        CancellationException (extends IllegalStateException), 
+    					                        //        InterruptedException
+    				}
+    				
+                    // Await completion of transfers, totaling up bytes read.
+                    totalBytesRead = 0;
+                    for (AsyncTransfer transfer : transfers) {
+                        totalBytesRead += transfer.complete(); // throws InterruptedException, ExecutionException.
+                    }
+
+                    return totalBytesRead;
+
+                } catch (InterruptedException ex) {
+
+                    // Wrap and throw.
+                    throw new RuntimeException(ex);
+
+                } catch (ExecutionException ex) {
+
+                    final Throwable cause = ex.getCause();
+
+                    if (InnerCause.isInnerCause(cause, ClosedByInterruptException.class)) {
+
+                        /*
+                         * This indicates that this thread was interrupted. We
+                         * always abort in this case.
+                         */
+
+                        throw new IOException(ex);
+
+                    } else if (InnerCause.isInnerCause(cause, AsynchronousCloseException.class)) {
+
+                        /*
+                         * The channel was closed asynchronously while blocking
+                         * during the read. We will continue to read if the
+                         * channel can be reopened.
+                         */
+                        continue;
+
+                    } else if (InnerCause.isInnerCause(cause, ClosedChannelException.class)) {
+
+                        /*
+                         * The channel is closed. This could have occurred
+                         * between the moment when we got the FileChannel
+                         * reference and the moment when we tried to read on the
+                         * FileChannel. We will continue to read if the channel
+                         * can be reopened.
+                         */
+                        continue;
+
+                    } else {
+
+                        /*
+                         * Wrap and thrown anything else.
+                         */
+                        throw new RuntimeException(ex);
+
+                    }
+                }
+            } // while(true)
+        } finally {
+            /*
+             * Ensure that transfer requests are cancelled.
+             */
+            for (AsyncTransfer transfer : transfers) {
+                transfer.cancel();
+            }
+        }
     }
 
     /**

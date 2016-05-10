@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,13 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.List;
+
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -59,6 +64,423 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         super(name);
     }
 
+    public void test_ticket_1892a() throws Exception {
+
+        new TestHelper("ticket-1892-subquery03",// testURI,
+                "ticket-1892-subquery03.rq",// queryFileURL
+                "ticket-1892-subquery03.trig",// dataFileURL
+                "ticket-1892-subquery03.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    public void test_ticket_1892b() throws Exception {
+
+        new TestHelper("ticket-1892-subquery03-modified1",// testURI,
+                "ticket-1892-subquery03-modified1.rq",// queryFileURL
+                "ticket-1892-subquery03-modified1.trig",// dataFileURL
+                "ticket-1892-subquery03-modified1.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    public void test_ticket_1892c() throws Exception {
+
+        new TestHelper("ticket-1892-subquery03-modified2",// testURI,
+                "ticket-1892-subquery03-modified2.rq",// queryFileURL
+                "ticket-1892-subquery03-modified2.trig",// dataFileURL
+                "ticket-1892-subquery03-modified2.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    
+    public void test_ticket_1892d() throws Exception {
+
+        new TestHelper("ticket-1892-subquery03-modified3",// testURI,
+                "ticket-1892-subquery03-modified3.rq",// queryFileURL
+                "ticket-1892-subquery03-modified3.trig",// dataFileURL
+                "ticket-1892-subquery03-modified3.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    
+    public void test_ticket_1892e() throws Exception {
+
+        new TestHelper("ticket-1892-auxiliary1",// testURI,
+                "ticket-1892-auxiliary1.rq",// queryFileURL
+                "ticket-1892-auxiliary1.ttl",// dataFileURL
+                "ticket-1892-auxiliary1.srx"// resultFileURL
+                ).runTest();
+
+    }
+   
+    public void test_ticket_1892f() throws Exception {
+
+        new TestHelper("ticket-1892-auxiliary2",// testURI,
+                "ticket-1892-auxiliary2.rq",// queryFileURL
+                "ticket-1892-auxiliary2.ttl",// dataFileURL
+                "ticket-1892-auxiliary2.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    public void test_ticket_1892g() throws Exception {
+
+        new TestHelper("ticket-1892-additional1",// testURI,
+                "ticket-1892-additional1.rq",// queryFileURL
+                "ticket-1892-additional1.trig",// dataFileURL
+                "ticket-1892-additional1.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    public void test_ticket_1892h() throws Exception {
+
+        new TestHelper("ticket-1892-additional2",// testURI,
+                "ticket-1892-additional2.rq",// queryFileURL
+                "ticket-1892-additional2.trig",// dataFileURL
+                "ticket-1892-additional2.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+//    This test is commented out because it produces an incorrect 
+//    result due to an issue not directly related to BLZG-1892: 
+//    we don't segregate the different named graphs when we evaluate 
+//    a sub-SELECT inside a GRAPH ?var. There is a separate ticket
+//    for this: https://jira.blazegraph.com/browse/BLZG-1907
+//    
+//    public void test_ticket_1892i() throws Exception {
+//
+//        new TestHelper("ticket-1892-additional3",// testURI,
+//                "ticket-1892-additional3.rq",// queryFileURL
+//                "ticket-1892-additional3.trig",// dataFileURL
+//                "ticket-1892-additional3.srx"// resultFileURL
+//                ).runTest();
+//
+//    }
+    
+//    This test is commented out because it produces an incorrect 
+//    result due to another manifestation of the issue mentioned in 
+//    test_ticket_1892i() (https://jira.blazegraph.com/browse/BLZG-1907):
+//    GROUP BY under GRAPH ?var is supposed to produce separate
+//    groups on different active graphs, but it mixes them all in 
+//    one group.
+//    
+//    public void test_ticket_1892j() throws Exception {
+//
+//        new TestHelper("ticket-1892-additional4",// testURI,
+//                "ticket-1892-additional4.rq",// queryFileURL
+//                "ticket-1892-additional4.trig",// dataFileURL
+//                "ticket-1892-additional4.srx"// resultFileURL
+//                ).runTest();
+//
+//    }
+    
+//    This test is commented out because it produces an incorrect 
+//    result due to the same issue as in test_ticket_1892j()
+//    (https://jira.blazegraph.com/browse/BLZG-1907).
+//    
+//    public void test_ticket_1892k() throws Exception {
+//
+//        new TestHelper("ticket-1892-additional5",// testURI,
+//                "ticket-1892-additional5.rq",// queryFileURL
+//                "ticket-1892-additional5.trig",// dataFileURL
+//                "ticket-1892-additional5.srx"// resultFileURL
+//                ).runTest();
+//
+//    }
+//    
+    
+    
+    public void test_ticket_1892l() throws Exception {
+
+        new TestHelper("ticket-1892-additional6",// testURI,
+                "ticket-1892-additional6.rq",// queryFileURL
+                "ticket-1892-additional6.trig",// dataFileURL
+                "ticket-1892-additional6.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    
+    public void test_ticket_1202a() throws Exception {
+
+        new TestHelper("ticket-1202-group03",// testURI,
+                "ticket-1202-group03.rq",// queryFileURL
+                "ticket-1202-group03.ttl",// dataFileURL
+                "ticket-1202-group03.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202b() throws Exception {
+
+        new TestHelper("ticket-1202-group05",// testURI,
+                "ticket-1202-group05.rq",// queryFileURL
+                "ticket-1202-group05.ttl",// dataFileURL
+                "ticket-1202-group05.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202c() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified1",// testURI,
+                "ticket-1202-group03-modified1.rq",// queryFileURL
+                "ticket-1202-group03-modified1.ttl",// dataFileURL
+                "ticket-1202-group03-modified1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202d() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified1",// testURI,
+                "ticket-1202-group05-modified1.rq",// queryFileURL
+                "ticket-1202-group05-modified1.ttl",// dataFileURL
+                "ticket-1202-group05-modified1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    
+    public void test_ticket_1202e() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified2",// testURI,
+                "ticket-1202-group03-modified2.rq",// queryFileURL
+                "ticket-1202-group03-modified2.ttl",// dataFileURL
+                "ticket-1202-group03-modified2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202f() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified3",// testURI,
+                "ticket-1202-group03-modified3.rq",// queryFileURL
+                "ticket-1202-group03-modified3.ttl",// dataFileURL
+                "ticket-1202-group03-modified3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202g() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified2",// testURI,
+                "ticket-1202-group05-modified2.rq",// queryFileURL
+                "ticket-1202-group05-modified2.ttl",// dataFileURL
+                "ticket-1202-group05-modified2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202h() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified3",// testURI,
+                "ticket-1202-group05-modified3.rq",// queryFileURL
+                "ticket-1202-group05-modified3.ttl",// dataFileURL
+                "ticket-1202-group05-modified3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+     
+    public void test_ticket_1202i() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified4",// testURI,
+                "ticket-1202-group03-modified4.rq",// queryFileURL
+                "ticket-1202-group03-modified4.ttl",// dataFileURL
+                "ticket-1202-group03-modified4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202j() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified5",// testURI,
+                "ticket-1202-group03-modified5.rq",// queryFileURL
+                "ticket-1202-group03-modified5.ttl",// dataFileURL
+                "ticket-1202-group03-modified5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202k() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified4",// testURI,
+                "ticket-1202-group05-modified4.rq",// queryFileURL
+                "ticket-1202-group05-modified4.ttl",// dataFileURL
+                "ticket-1202-group05-modified4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202l() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified5",// testURI,
+                "ticket-1202-group05-modified5.rq",// queryFileURL
+                "ticket-1202-group05-modified5.ttl",// dataFileURL
+                "ticket-1202-group05-modified5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202m() throws Exception {
+
+        new TestHelper("ticket-1202-additional1",// testURI,
+                "ticket-1202-additional1.rq",// queryFileURL
+                "ticket-1202-additional1.ttl",// dataFileURL
+                "ticket-1202-additional1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202n() throws Exception {
+
+        new TestHelper("ticket-1202-additional2",// testURI,
+                "ticket-1202-additional2.rq",// queryFileURL
+                "ticket-1202-additional2.ttl",// dataFileURL
+                "ticket-1202-additional2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202o() throws Exception {
+
+        new TestHelper("ticket-1202-additional3",// testURI,
+                "ticket-1202-additional3.rq",// queryFileURL
+                "ticket-1202-additional3.ttl",// dataFileURL
+                "ticket-1202-additional3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202p() throws Exception {
+
+        new TestHelper("ticket-1202-additional4",// testURI,
+                "ticket-1202-additional4.rq",// queryFileURL
+                "ticket-1202-additional4.ttl",// dataFileURL
+                "ticket-1202-additional4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202q() throws Exception {
+
+        new TestHelper("ticket-1202-additional5",// testURI,
+                "ticket-1202-additional5.rq",// queryFileURL
+                "ticket-1202-additional5.ttl",// dataFileURL
+                "ticket-1202-additional5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    public void test_ticket_1202r() throws Exception {
+
+        new TestHelper("ticket-1202-additional6",// testURI,
+                "ticket-1202-additional6.rq",// queryFileURL
+                "ticket-1202-additional6.ttl",// dataFileURL
+                "ticket-1202-additional6.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    public void test_ticket_618a() throws Exception {
+
+        new TestHelper("sparql11-order-02",// testURI,
+                "sparql11-order-02.rq",// queryFileURL
+                "sparql11-order-02.ttl",// dataFileURL
+                "sparql11-order-02.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618b() throws Exception {
+
+        new TestHelper("sparql11-order-03",// testURI,
+                "sparql11-order-03.rq",// queryFileURL
+                "sparql11-order-03.ttl",// dataFileURL
+                "sparql11-order-03.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618c() throws Exception {
+
+        new TestHelper("sparql11-subquery-04",// testURI,
+                "sparql11-subquery-04.rq",// queryFileURL
+                "sparql11-subquery-04.ttl",// dataFileURL
+                "sparql11-subquery-04.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618d() throws Exception {
+
+        new TestHelper("ticket-618d",// testURI,
+                "ticket-618d.rq",// queryFileURL
+                "ticket-618d.ttl",// dataFileURL
+                "ticket-618d.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618e() throws Exception {
+
+        new TestHelper("ticket-618e",// testURI,
+                "ticket-618e.rq",// queryFileURL
+                "ticket-618e.ttl",// dataFileURL
+                "ticket-618e.srx",// resultFileURL
+                true /* checkOrder */).runTest();
+
+    }
+    
+    /* Currently disabled due to parsing problems. 
+    
+    //CONSTRUCT { ?x ex:p ?y }
+    //WHERE 
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+    public void test_ticket_618f() throws Exception {
+
+        new TestHelper("ticket-618f",// testURI,
+                "ticket-618f.rq",// queryFileURL
+                "ticket-618f.ttl",// dataFileURL
+                "ticket-618f.srx").runTest();
+
+    }
+    */
+    
+    /* Currently disabled due to parsing problems. 
+    
+    //ASK
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+
+    
+    public void test_ticket_618g() throws Exception {
+
+        new TestHelper("ticket-618g",// testURI,
+                "ticket-618g.rq",// queryFileURL
+                "ticket-618g.ttl",// dataFileURL
+                "ticket-618g.srx").runTest();
+
+    }
+    */
+    
+    
+    
+    
     /**
      * <pre>
      * SELECT * WHERE {{}}
@@ -1451,6 +1873,34 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
+     * Ticket 1648: proper handling of join constraints in merge join.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1648a() throws Exception {
+       new TestHelper(
+             "ticket_bg1648a",// testURI,
+             "ticket_bg1648a.rq",// queryFileURL
+             "ticket_bg1648.trig",// dataFileURL
+             "ticket_bg1648.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1648: proper handling of join constraints in merge join.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1648b() throws Exception {
+       new TestHelper(
+             "ticket_bg1648b",// testURI,
+             "ticket_bg1648b.rq",// queryFileURL
+             "ticket_bg1648.trig",// dataFileURL
+             "ticket_bg1648.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /*
      * Ticket 1524: MINUS being ignored.
      * 
      * @throws Exception
@@ -1478,4 +1928,709 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_bg1542b.srx"// resultFileURL
           ).runTest();   
     }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611a_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611a_analytic",// testURI,
+             "ticket_bg611a_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611a_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611a_nonanalytic",// testURI,
+             "ticket_bg611a_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611b_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611b_nonanalytic",// testURI,
+             "ticket_bg611b_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611b_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611b_analytic",// testURI,
+             "ticket_bg611b_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611c_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611c_nonanalytic",// testURI,
+             "ticket_bg611c_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611c_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611c_analytic",// testURI,
+             "ticket_bg611c_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611d_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611d_nonanalytic",// testURI,
+             "ticket_bg611d_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611d_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611d_analytic",// testURI,
+             "ticket_bg611d_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (non-analytic equivalent).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611e_nonanalytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611e_nonanalytic",// testURI,
+             "ticket_bg611e_nonanalytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611e.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 611: Mock IV / TermId hashCode()/equals() problems
+     * (analytic mode).
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_611e_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg611e_analytic",// testURI,
+             "ticket_bg611e_analytic.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg611e.srx"// resultFileURL
+          ).runTest();   
+    }
+
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * with literal in object position (analytic version). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643a_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643a_analytic",// testURI,
+             "ticket_bg1643a_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643a.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service,
+     * with literal in object position (non-analytic equivalent). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643a_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643a_nonanalytic",// testURI,
+           "ticket_bg1643a_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643a.srx"// resultFileURL
+          ).runTest();   
+    }
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * with URI in object position (analytic version). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643b_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643b_analytic",// testURI,
+             "ticket_bg1643b_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service,
+     * with URI in object position (non-analytic equivalent). Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643b_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643b_nonanalytic",// testURI,
+           "ticket_bg1643b_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643b.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode). Version with MINUS. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643c_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643c_analytic",// testURI,
+             "ticket_bg1643c_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643c.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with MINUS. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643c_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643c_nonanalytic",// testURI,
+           "ticket_bg1643c_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643c.srx"// resultFileURL
+          ).runTest();   
+    }    
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode). Version with URI where FILTER removes element. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643d_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643d_analytic",// testURI,
+             "ticket_bg1643d_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643d.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent).  Version with URI where FILTER removes element. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643d_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643d_nonanalytic",// testURI,
+           "ticket_bg1643d_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643d.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode).  Version with literal where FILTER removes element. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643e_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643e_analytic",// testURI,
+             "ticket_bg1643e_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643e.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with literal where FILTER removes element.  Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643e_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643e_nonanalytic",// testURI,
+           "ticket_bg1643e_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643e.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode).Version with literal where FILTER does not apply
+     * because of datatype in literal. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643f_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643f_analytic",// testURI,
+             "ticket_bg1643f_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643f.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with literal where FILTER does not apply
+     * because of datatype in literal.  Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643f_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643f_nonanalytic",// testURI,
+           "ticket_bg1643f_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643f.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (analytic mode).Version with literal where FILTER applies
+     * because of datatype in literal. Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643g_analytic() throws Exception {
+       new TestHelper(
+             "ticket_bg1643g_analytic",// testURI,
+             "ticket_bg1643g_analytic.rq",// queryFileURL
+             "ticket_bg1643.trig",// dataFileURL
+             "ticket_bg1643g.srx"// resultFileURL
+          ).runTest();   
+    }
+    
+    /**
+     * Ticket 1643: DELETE does not delete properly with Wikidata Query service
+     * (non-analytic equivalent). Version with literal where FILTER applies
+     * because of datatype in literal.  Related to BLZG-611.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1643g_nonanalytic() throws Exception {
+       new TestHelper(
+           "ticket_bg1643g_nonanalytic",// testURI,
+           "ticket_bg1643g_nonanalytic.rq",// queryFileURL
+           "ticket_bg1643.trig",// dataFileURL
+           "ticket_bg1643g.srx"// resultFileURL
+          ).runTest();   
+    }  
+    
+   /**
+    * BLZG-1683: Required property relationName for HTreeDistinctBindingSetsOp
+    * (analytic version).
+    */
+   public void test_ticket_1683a() throws Exception {
+      new TestHelper(
+          "ticket_bg1683a",// testURI,
+          "ticket_bg1683a.rq",// queryFileURL
+          "ticket_bg1683.trig",// dataFileURL
+          "ticket_bg1683.srx"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+    * BLZG-1683: Required property relationName for HTreeDistinctBindingSetsOp
+    * (non-analytic version).
+    */
+   public void test_ticket_1683b() throws Exception {
+      new TestHelper(
+          "ticket_bg1683b",// testURI,
+          "ticket_bg1683b.rq",// queryFileURL
+          "ticket_bg1683.trig",// dataFileURL
+          "ticket_bg1683.srx"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+     * BLZG-852: MINUS and UNION.
+     */
+   public void test_ticket_852a() throws Exception {
+
+      new TestHelper(
+          "ticket_bg852a",// testURI,
+          "ticket_bg852a.rq",// queryFileURL
+          "empty.trig",// dataFileURL
+          "ticket_bg852a.srx"// resultFileURL
+         ).runTest();   
+   }
+
+   /**
+    * BLZG-852: MINUS and UNION.
+    */
+   public void test_ticket_852b() throws Exception {
+
+      new TestHelper(
+          "ticket_bg852b",// testURI,
+          "ticket_bg852b.rq",// queryFileURL
+          "empty.trig",// dataFileURL
+          "ticket_bg852b.srx"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+    * BLZG-1750: DESCRIBE and UNION.
+    */
+   public void test_ticket_1750() throws Exception {
+
+      new TestHelper(
+          "ticket_bg1750",// testURI,
+          "ticket_bg1750.rq",// queryFileURL
+          "ticket_bg1750-data.trig",// dataFileURL
+          "ticket_bg1750-res.trig"// resultFileURL
+         ).runTest();   
+   }
+   
+   /**
+    * BLZG-1748: Regressions in date comparison
+    */
+   public void test_ticket_1748a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1748a",// testURI,
+           "ticket_bg1748a.rq",// queryFileURL
+           "ticket_bg1748.trig",// dataFileURL
+           "ticket_bg1748.srx"// resultFileURL
+          ).runTest();   
+    }
+   
+   /**
+    * BLZG-1748: Regressions in date comparison
+    */
+   public void test_ticket_1748b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1748b",// testURI,
+           "ticket_bg1748b.rq",// queryFileURL
+           "ticket_bg1748.trig",// dataFileURL
+           "ticket_bg1748.srx"// resultFileURL
+          ).runTest();   
+    }
+
+   /**
+    * BLZG-1267a: Unable to bind result of EXISTS operator
+    * -> query with exists evaluating to true
+    */
+   public void test_ticket_1267a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267a",   // testURI,
+           "ticket_bg1267a.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267a.srx"// resultFileURL
+          ).runTest();   
+    }
+
+   /**
+    * BLZG-1267b: Unable to bind result of EXISTS operator
+    * -> query with exists evaluating to false
+    */
+   public void test_ticket_1267b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267b",   // testURI,
+           "ticket_bg1267b.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1267c: Unable to bind result of EXISTS operator
+    * -> query with two EXISTS that compare equal
+    */
+   public void test_ticket_1267c() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267c",   // testURI,
+           "ticket_bg1267c.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267c.srx"// resultFileURL
+           ).runTest();    
+    }
+   
+   /**
+    * BLZG-1267d: Unable to bind result of EXISTS operator
+    * -> query with two NOT EXISTS that compare unequal
+    */
+   public void test_ticket_1267d() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1267d",   // testURI,
+           "ticket_bg1267d.rq",// queryFileURL
+           "ticket_bg1267.ttl",// dataFileURL
+           "ticket_bg1267d.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395a",   // testURI,
+           "ticket_bg1395a.rq",// queryFileURL
+           "ticket_bg1395a.ttl",// dataFileURL
+           "ticket_bg1395a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395b",   // testURI,
+           "ticket_bg1395b.rq",// queryFileURL
+           "ticket_bg1395bc.ttl",// dataFileURL
+           "ticket_bg1395bc.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395c() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395c",   // testURI,
+           "ticket_bg1395c.rq",// queryFileURL
+           "ticket_bg1395bc.ttl",// dataFileURL
+           "ticket_bg1395bc.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   
+   /**
+    * BLZG-1817: reordering inside complex subqueries that will
+    * be translated into NSIs.
+    */
+   public void test_ticket_1817() throws Exception {
+
+       final ASTContainer ast = new TestHelper(
+                                   "ticket_bg1817",   // testURI,
+                                   "ticket_bg1817.rq",// queryFileURL
+                                   "ticket_bg1817.ttl",// dataFileURL
+                                   "ticket_bg1817.srx"// resultFileURL
+                                   ).runTest();    
+       
+       // assert that ?b wdt:P31 ?tgt_class is placed in front of ?a ?p ?b .
+       final List<StatementPatternNode> spns = 
+               BOpUtility.toList(ast.getOptimizedAST(), StatementPatternNode.class);
+       
+       int idxOfB = -1;
+       int idxOfA = -1;       
+       for (int i=0; i<spns.size(); i++) {
+           
+           final StatementPatternNode spn = spns.get(i);
+           
+           final TermNode subjectTN = spn.get(0);
+           if (subjectTN instanceof VarNode) {
+               final VarNode subjectVN = (VarNode)subjectTN;
+               final String varName = ((Var<?>)subjectVN.get(0)).getName();
+               if ("a".equals(varName)) {
+                   idxOfA = i;
+               } else if ("b".equals(varName)) {
+                   idxOfB = i;
+               }
+           }
+           
+       }
+       
+       assertTrue(idxOfB<idxOfA);
+   }
+
+
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1760a",   // testURI,
+           "ticket_bg1760a.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1760b",   // testURI,
+           "ticket_bg1760b.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760c() throws Exception {
+
+
+       new TestHelper(
+           "ticket_bg1760c",   // testURI,
+           "ticket_bg1760c.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760c.srx"// resultFileURL
+           ).runTest();    
+   }
+
+   /**
+    * BLZG-1763: Wildcard projection was not rewritten
+    * -> original example without data, producing the empty result
+    */
+   public void test_ticket_1763a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1763a",   // testURI,
+           "ticket_bg1763a.rq",// queryFileURL
+           "empty.trig",// dataFileURL
+           "ticket_bg1763a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1763: Wildcard projection was not rewritten
+    * -> modified example with data
+    */
+   public void test_ticket_1763b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1763b",   // testURI,
+           "ticket_bg1763b.rq",// queryFileURL
+           "ticket_bg1763b.ttl",// dataFileURL
+           "ticket_bg1763b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg911a",   // testURI,
+           "ticket_bg911a.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
+
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911b() throws Exception {
+       
+       new TestHelper(
+           "ticket_bg911b",   // testURI,
+           "ticket_bg911b.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * Ticket: https://github.com/SYSTAP/bigdata-gpu/issues/368
+    * ClassCast Exception when Loading LUBM: com.bigdata.rdf.internal.impl.literal.XSDBooleanIV
+    * cannot be cast to com.bigdata.rdf.internal.impl.literal.NumericIV
+    */
+   public void testTicketBigdataGPU368() throws Exception {
+       
+       new TestHelper( 
+           "workbench1",      // test name
+           "workbench1.rq",   // query file
+           "data/lehigh/LUBM-U1.rdf.gz",  // data file
+           "workbench1.srx"   // result file
+           ).runTest();
+   }
 }

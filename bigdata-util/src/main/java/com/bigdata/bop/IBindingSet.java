@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -137,7 +137,23 @@ public interface IBindingSet extends Cloneable, Serializable {
 	 *            retained.
 	 */
     public IBindingSet copy(IVariable[] variablesToKeep);
-
+    
+	/**
+	 * Return a shallow copy of the binding set, eliminating unnecessary
+	 * variables and error values (equal to Constant.errorValueConstant()).
+	 * 
+	 * @param variablesToKeep
+	 *            When non-<code>null</code>, only the listed variables are
+	 *            retained.
+	 */
+    public IBindingSet copyMinusErrors(IVariable[] variablesToKeep);
+    
+    
+    /** 
+     * @return true if this IBindingSet contains an assignment of an error value
+     */
+    public boolean containsErrorValues();
+    
     /**
      * True iff the variables and their bound values are the same
      * for the two binding sets.

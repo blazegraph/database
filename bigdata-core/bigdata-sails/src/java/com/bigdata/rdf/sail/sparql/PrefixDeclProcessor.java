@@ -5,6 +5,9 @@
  */
 package com.bigdata.rdf.sail.sparql;
 
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.DC;
 import org.openrdf.model.vocabulary.FN;
 import org.openrdf.model.vocabulary.FOAF;
@@ -46,9 +50,39 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  * @openrdf
  */
 public class PrefixDeclProcessor {
+	
+    private static final Logger log = Logger.getLogger(PrefixDeclProcessor.class);
+
 
     public static final Map<String,String> defaultDecls =
             new LinkedHashMap<String, String>();
+    
+    public static interface Options {
+        
+        /**
+         * 
+         * This optional property defines the path to a file containing the prefix declarations.  
+         * 
+         * Example file contents are shown below.
+         * 
+         * <code>
+         * PREFIX wdref: <http://www.wikidata.org/reference/>
+		 * PREFIX wikibase: <http://wikiba.se/ontology#>
+         * </code>
+         * 
+         * This should be passed as a Java Property as:
+         * 
+         * <code>
+         * -Dcom.bigdata.rdf.sail.sparql.PrefixDeclProcessor.additionalDeclsFile=/path/to/file
+         * </code>
+         * 
+         * {@see https://jira.blazegraph.com/browse/BLZG-1773}
+         *      
+         */
+        public static final String ADDITIONAL_DECLS_FILE = PrefixDeclProcessor.class.getName()
+                + ".additionalDeclsFile"; 
+        
+    }
     
     static {
         defaultDecls.put("rdf", RDF.NAMESPACE);
@@ -62,6 +96,9 @@ public class PrefixDeclProcessor {
         defaultDecls.put("hint", QueryHints.NAMESPACE);
         defaultDecls.put("bd", BD.NAMESPACE);
         defaultDecls.put("bds", BDS.NAMESPACE);
+        //Add any additional decls passed via property
+        //SEE BLZG-1773
+    	processAdditionalDecls();
     }
     
     /**
@@ -243,7 +280,8 @@ public class PrefixDeclProcessor {
         /**
          * Provide silent declaration for some well known namspaces.
          */
-        private String checkForWellKnownNamespacePrefix(final String prefix) {
+        @SuppressWarnings("unused")
+		private String checkForWellKnownNamespacePrefix(final String prefix) {
             final String namespace;
             if (prefix.equals("bd")) {
                 prefixMap.put("bd", namespace = BD.NAMESPACE);
@@ -275,5 +313,122 @@ public class PrefixDeclProcessor {
         }
 
     }
+    
+    /**
+     * 
+     * Static helper method to process the {@link PrefixDeclProcessor.Options.ADDTIONAL_DECLS_FILE}
+     * property if present and add the decls.  It ignores IO errors, etc. and
+     * provides a warning. 
+     * 
+     * {@see BLZG-1773}
+     * 
+     * @author beebs
+     * 
+     */
+	public static void processAdditionalDecls() {
+
+		final String declsFile = System
+				.getProperty(Options.ADDITIONAL_DECLS_FILE);
+
+		if (declsFile != null && !declsFile.equals("")) {
+
+			final File f = new File(declsFile);
+
+			if (!f.exists()) {
+				log.warn(declsFile
+						+ " passed by -D"
+						+ Options.ADDITIONAL_DECLS_FILE
+						+ " does not exist.  Ignoring.  Additional Decls will not be set.");
+				return;
+			}
+
+			if (!f.canRead()) {
+				log.warn(declsFile
+						+ " passed by -D"
+						+ Options.ADDITIONAL_DECLS_FILE
+						+ " is not readable.  Ignoring.  Additional Decls will not be set.");
+				return;
+			}
+
+			try {
+				FileReader r = new FileReader(f);
+				int ch = r.read();
+				final StringBuffer sb = new StringBuffer();
+				boolean done = false;
+				while (!done) {
+					if ((char) ch == '\n' || ch == -1) { // End of line or last line
+						
+						done = ch == -1;
+						
+						final String s = sb.toString();
+						
+						if(sb.length() == 0) {
+							//End of file with no input
+							break;
+						}
+					
+						sb.delete(0, sb.length());
+						// 0 1 2
+						// PREFIX wdref: <http://www.wikidata.org/reference/>
+						final String[] decls = s.split(" ");
+
+						if (decls.length != 3) {
+							log.warn(declsFile + " line:  " + s
+									+ " is not valid.  Ignoring.");
+							log.warn("Expecting lines formatted as: \"PREFIX wdref: <http://www.wikidata.org/reference/>\"");
+							ch = r.read();
+							continue; // process the next line
+						}
+
+						if (!decls[1].endsWith(":")) {
+							log.warn(declsFile + " line:  " + s
+									+ " is not valid. Ignoring.");
+							log.warn(decls[1] + " does not end with :");
+							ch = r.read();
+							continue; // process the next line
+						}
+
+						// String :
+						final String prefix = decls[1].substring(0,
+								decls[1].length() - 1);
+
+						if (!decls[2].endsWith(">")
+								&& !decls[2].startsWith("<")) {
+							log.warn(declsFile + " line:  " + s
+									+ " is not valid.  Ignoring.");
+							log.warn(decls[2]
+									+ " does not start and end with < and >, respectively.");
+							ch = r.read();
+							continue; // process the next line
+						}
+
+						// String < and >
+						final String uri = decls[2].substring(1,
+								decls[2].length() - 1);
+						
+						log.warn("Configured prefix: PREFIX " + prefix + ": " + uri);
+						
+						defaultDecls.put(prefix, uri);
+
+					} else {
+						sb.append((char)ch);
+					}
+					ch = r.read();
+
+				}
+				
+				r.close();
+
+			} catch (IOException e) {
+				log.warn(e.toString()
+						+ "\n while processing "
+						+ declsFile
+						+ " passed by -D"
+						+ Options.ADDITIONAL_DECLS_FILE
+						+ "does not exist.  Ignoring.  Additional Decls will not be set.");
+			}
+		}
+
+	}
 
 }

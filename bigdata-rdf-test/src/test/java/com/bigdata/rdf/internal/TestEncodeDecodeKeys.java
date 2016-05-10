@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -39,6 +40,7 @@ import javax.xml.datatype.DatatypeFactory;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.ColorsEnumExtension.Color;
 import com.bigdata.rdf.internal.impl.AbstractIV;
@@ -48,6 +50,7 @@ import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
+import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
@@ -64,6 +67,8 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -71,6 +76,7 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * having variable component lengths while others are term identifiers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:ms@metaphacts.com">M</a>
  * @version $Id: TestEncodeDecodeKeys.java 2756 2010-05-03 22:26:18Z
  *          thompsonbry$
  * 
@@ -79,6 +85,20 @@ import com.bigdata.rdf.vocab.Vocabulary;
  */
 public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
+    final String GEO_SPATIAL_DATATYPE = "http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral";
+    
+    final URI GEO_SPATIAL_DATATYPE_URI = new URIImpl(GEO_SPATIAL_DATATYPE);
+    
+    final String GEO_SPATIAL_DATATYPE_CONFIG = 
+        "{\"config\": "
+        + "{ \"uri\": \"" + GEO_SPATIAL_DATATYPE + "\", "
+        + "\"fields\": [ "
+        + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LATITUDE\" }, "
+        + "{ \"valueType\": \"DOUBLE\", \"multiplier\": \"100000\", \"serviceMapping\": \"LONGITUDE\" }, "
+        + "{ \"valueType\": \"LONG\", \"serviceMapping\" : \"TIME\"  } "
+        + "]}}";
+    
+    
     public TestEncodeDecodeKeys() {
         super();
     }
@@ -93,6 +113,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
             for (DTE dte : DTE.values()) {
 
+                @SuppressWarnings("rawtypes")
                 final IV<?, ?> v = new AbstractIV(vte,
                         true/* inline */, false/* extension */, dte) {
 
@@ -645,8 +666,6 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        final DatatypeFactory df = DatatypeFactory.newInstance();
-
         final DerivedNumericsExtension<BigdataValue> ext = 
             new DerivedNumericsExtension<BigdataValue>(new IDatatypeURIResolver() {
                 public BigdataURI resolve(URI uri) {
@@ -690,6 +709,116 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         
     }
 
+    /**
+     * Unit test for round-trip of GeoSpatial literals
+     */
+    public void test_encodeDecodeGeoSpatialLiterals01() throws Exception {
+        
+        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+        
+        /**
+         * Initialize geo spatial config with default
+         */
+        final List<String> datatypeConfigs = new ArrayList<String>();
+        datatypeConfigs.add(GEO_SPATIAL_DATATYPE_CONFIG);
+        final GeoSpatialConfig conf = new GeoSpatialConfig(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
+        final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
+        final GeoSpatialLiteralExtension<BigdataValue> ext = 
+            new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
+                public BigdataURI resolve(URI uri) {
+                    final BigdataURI buri = vf.createURI(uri.stringValue());
+                    buri.setIV(newTermId(VTE.URI));
+                    return buri;
+                }
+            }, datatypeConfig);
+        
+        final BigdataLiteral[] dt = {
+           vf.createLiteral("2#2#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("3#3#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("4#4#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("5#5#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("6#6#1", GEO_SPATIAL_DATATYPE_URI),
+           vf.createLiteral("7#7#1", GEO_SPATIAL_DATATYPE_URI),
+        };
+        
+        final IV<?, ?>[] e = new IV[dt.length];
+        
+        for (int i = 0; i < dt.length; i++) {
+
+            e[i] = ext.createIV(dt[i]);
+            
+        }
+        
+        final IV<?, ?>[] a = doEncodeDecodeTest(e);
+
+        if (log.isInfoEnabled()) {
+            for (int i = 0; i < e.length; i++) {
+                log.info("original: " + dt[i]);
+                log.info("asValue : " + ext.asValue((LiteralExtensionIV<?>) e[i], vf));
+                log.info("decoded : " + ext.asValue((LiteralExtensionIV<?>) a[i], vf));
+                log.info("");
+            }
+//          log.info(svf.createLiteral(
+//                df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")));
+        }
+        
+        doComparatorTest(e);
+        
+    }
+    
+    /**
+     * Unit test for round-trip of GeoSpatial literals
+     */
+    public void test_encodeDecodeGeoSpatialLiterals02() throws Exception {
+        
+        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+        
+        /**
+         * Initialize geo spatial config with default
+         */
+        final List<String> datatypeConfigs = new ArrayList<String>();
+        datatypeConfigs.add(GEO_SPATIAL_DATATYPE_CONFIG);
+        final GeoSpatialConfig conf = new GeoSpatialConfig(datatypeConfigs, GEO_SPATIAL_DATATYPE /* default */);
+        final GeoSpatialDatatypeConfiguration datatypeConfig = conf.getDatatypeConfigs().get(0);
+        final GeoSpatialLiteralExtension<BigdataValue> ext = 
+            new GeoSpatialLiteralExtension<BigdataValue>(new IDatatypeURIResolver() {
+                public BigdataURI resolve(URI uri) {
+                    final BigdataURI buri = vf.createURI(uri.stringValue());
+                    buri.setIV(newTermId(VTE.URI));
+                    return buri;
+                }
+            }, datatypeConfig);
+        
+        final BigdataLiteral[] dt = {
+           vf.createLiteral("8#8#1", GEO_SPATIAL_DATATYPE_URI)
+        };
+        
+        final IV<?, ?>[] e = new IV[dt.length];
+        
+        for (int i = 0; i < dt.length; i++) {
+
+            e[i] = ext.createIV(dt[i]);
+            
+        }
+        
+        final IV<?, ?>[] a = doEncodeDecodeTest(e);
+
+        if (log.isInfoEnabled()) {
+            for (int i = 0; i < e.length; i++) {
+                log.info("original: " + dt[i]);
+                log.info("asValue : " + ext.asValue((LiteralExtensionIV<?>) e[i], vf));
+                log.info("decoded : " + ext.asValue((LiteralExtensionIV<?>) a[i], vf));
+                log.info("");
+            }
+//          log.info(svf.createLiteral(
+//                df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")));
+        }
+        
+        doComparatorTest(e);
+        
+    }
+    
+    
     /**
      * Unit test for {@link SidIV}.
      */

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -137,10 +137,10 @@ public class TestASTExistsAndJoinOrderByTypeOptimizers extends AbstractOptimizer
 
     		varCount = 0;
 			final ArbitraryLengthPathNode alpp1 = arbitartyLengthPropertyPath(varNode(w), constantNode(b), HelperFlag.ONE_OR_MORE,
-					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()) ) );
+					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()), HelperFlag.SUBGROUP_OF_ALP ) );
     		varCount = 0;
 			final ArbitraryLengthPathNode alpp2 = arbitartyLengthPropertyPath(varNode(w), constantNode(b), HelperFlag.ONE_OR_MORE,
-					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()) ) );
+					joinGroupNode( statementPatternNode(leftVar(), constantNode(b),  rightVar()), HelperFlag.SUBGROUP_OF_ALP ) );
             final SubqueryRoot askQuery1, askQuery2;
 			expected = select( varNode(w), 
 					where (joinGroupNode(

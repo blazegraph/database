@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -49,6 +49,8 @@ public class MultiSourceSequentialCloseableIterator<E> implements
 
     private final static Logger log = Logger.getLogger(MultiSourceSequentialCloseableIterator.class);
     
+    private final static boolean INFO = log.isInfoEnabled();
+    
     private final ReentrantLock lock = new ReentrantLock();
 
     private final Queue<ICloseableIterator<E>> sources = new LinkedBlockingQueue<ICloseableIterator<E>>();
@@ -82,13 +84,13 @@ public class MultiSourceSequentialCloseableIterator<E> implements
             final ICloseableIterator<E> current = this.current;
             this.current = null;
             if (current != null) {
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Closing source: " + current);
                 current.close();
             }
             // Close any sources still in the queue.
             for(ICloseableIterator<E> t : sources) {
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Closing source: " + t);
                 t.close();
             }
@@ -144,7 +146,7 @@ public class MultiSourceSequentialCloseableIterator<E> implements
             ICloseableIterator<E> t = this.current;
             {
                 if (t != null) {
-                    if (log.isInfoEnabled())
+                    if (INFO)
                         log.info("Closing source: " + t);
                     t.close();
                 }

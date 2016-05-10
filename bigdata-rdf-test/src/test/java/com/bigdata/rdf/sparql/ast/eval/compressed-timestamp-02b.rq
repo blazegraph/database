@@ -1,0 +1,19 @@
+SELECT * WHERE {
+ 
+  <http://s0> <http://p> ?s0 .
+  <http://s1> <http://p> ?s1 .
+  <http://s2> <http://p> ?s2 .
+  <http://s10> <http://p> ?s10 .
+  <http://s20> <http://p> ?s20 .
+  
+  BIND(?s0 + ?s1 AS ?s0pluss1)
+  BIND(?s20 - ?s10 AS ?s20minuss10)
+  
+  FILTER(?s0 + 10 <= ?s20)
+  FILTER(?s0 + 100 > ?s20)
+  FILTER(?s0 + "100"^^xsd:int > ?s20)
+  FILTER(?s0 + "100"^^xsd:integer > ?s20)
+  FILTER(?s0 + "100"^^xsd:unsignedLong > ?s20)
+
+  
+}

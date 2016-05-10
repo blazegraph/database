@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -164,6 +164,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         return l;
 
     }
+
         
     /**
      * Convert an xsd:dateTime into its milliseconds from the epoch 
@@ -229,6 +230,8 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
             final XMLGregorianCalendar xmlGC = f.newXMLGregorianCalendar(c);
 
             String s = xmlGC.toString();
+            
+            final int offset = s.startsWith("-") ? 1 : 0;
             if (dt.equals(XSD.DATETIME)) {
                 if (BSBMHACK) {
                     // Chopping off the milliseconds part and the trailing 'Z'.
@@ -239,25 +242,25 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
                 }
             } else if (dt.equals(XSD.DATE)) {
                 // YYYY-MM-DD (10 chars)
-                s = s.substring(0, 10);
+                s = s.substring(0, 10+offset);
             } else if (dt.equals(XSD.TIME)) {
                 // everything after the date (from 11 chars in)
-                s = s.substring(10);
+                s = s.substring(11+offset);
             } else if (dt.equals(XSD.GDAY)) {
                 // gDay Defines a part of a date - the day (---DD)
-                s = "---" + s.substring(8, 10);
+                s = "---" + s.substring(8+offset, 10+offset);
             } else if (dt.equals(XSD.GMONTH)) {
                 // gMonth Defines a part of a date - the month (--MM)
-                s = "--" + s.substring(5, 7);
+                s = "--" + s.substring(5+offset, 7+offset);
             } else if (dt.equals(XSD.GMONTHDAY)) {
                 // gMonthDay Defines a part of a date - the month and day (--MM-DD)
-                s = "--" + s.substring(5, 10);
+                s = "--" + s.substring(5+offset, 10+offset);
             } else if (dt.equals(XSD.GYEAR)) {
                 // gYear Defines a part of a date - the year (YYYY)
-                s = s.substring(0, 4);
+                s = s.substring(0, 4+offset);
             } else if (dt.equals(XSD.GYEARMONTH)) {
                 // gYearMonth    Defines a part of a date - the year and month (YYYY-MM)
-                s = s.substring(0, 7);
+                s = s.substring(0, 7+offset);
             } 
             
             return (V) vf.createLiteral(s, dt);

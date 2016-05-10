@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -62,10 +62,13 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ISnapshotResult;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.BasicSnapshotFactory;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.QueryCancellationHelper;
 import com.bigdata.rdf.sail.model.JsonHelper;
@@ -82,6 +85,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.ClassPathUtil;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -169,11 +173,14 @@ public class StatusServlet extends BigdataRDFServlet {
     protected static final String CANCEL_QUERY = "cancelQuery";
 
     /**
-     * Request a snapshot of the journal (HA only). The snapshot will be written
-     * into the configured directory on the server. If a snapshot is already
-     * being taken then this is a NOP.
+     * Request a snapshot of the journal (HA Mode). The snapshot will be written
+     * into the configured directory on the server.  
+     * If a snapshot is already being taken then this is a NOP.
      */
     static final String SNAPSHOT = "snapshot";
+    
+    
+    
 
     /**
      * Request to generate the digest for the journals, HALog files, and
@@ -215,6 +222,11 @@ public class StatusServlet extends BigdataRDFServlet {
      * Request basic server health information.
      */
     static final String HEALTH = "health";
+    
+    /**
+     * Request information on the mapgraph-runtime.
+     */
+    static final String MAPGRAPH = "mapgraph";
     
     /**
      * Handles CANCEL requests (terminate a running query).
@@ -455,18 +467,35 @@ public class StatusServlet extends BigdataRDFServlet {
                 && getIndexManager() instanceof AbstractJournal
         		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
 
-            HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doHAStatus(req, resp);
+            new HAStatusServletUtilProxy.HAStatusServletUtilFactory().getInstance(getIndexManager()).doHAStatus(req, resp);
 
             return;
         }
 
-      if (req.getParameter(HEALTH) != null) {
+        if (req.getParameter(HEALTH) != null) {
 
-    	  HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doHealthStatus(req, resp);
+            new HAStatusServletUtilProxy.HAStatusServletUtilFactory().getInstance(getIndexManager()).doHealthStatus(req,
+                    resp);
 
-         return;
-      }
-      
+            return;
+        }
+
+        if (req.getParameter(MAPGRAPH) != null) {
+
+            final IServletDelegate delegate = ClassPathUtil.classForName(//
+                        "com.blazegraph.gpu.webapp.MapgraphStatusServletDelegate", // preferredClassName,
+                        ServletDelegateBase.class, // defaultClass,
+                        IServletDelegate.class, // sharedInterface,
+                        getClass().getClassLoader() // classLoader
+                );
+
+            delegate.doGet(req, resp);
+
+            return;
+        }
+        
+        
+        
 		final String acceptHeader = ConnegUtil
 				.getMimeTypeForQueryParameterServiceRequest(
 						req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
@@ -677,8 +706,6 @@ public class StatusServlet extends BigdataRDFServlet {
 
             }
 
-            // final boolean showQuorum = req.getParameter(SHOW_QUORUM) != null;
-
             if (getIndexManager() instanceof AbstractJournal) {
 
                 final Quorum<HAGlue, QuorumService<HAGlue>> quorum = ((AbstractJournal) getIndexManager())
@@ -686,7 +713,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 if (quorum != null) {//&& quorum.isHighlyAvailable()) {
 
-                	HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doGet(req, resp,
+                	new HAStatusServletUtilProxy.HAStatusServletUtilFactory().getInstance(getIndexManager()).doGet(req, resp,
                             current);
 
                 }
@@ -702,6 +729,24 @@ public class StatusServlet extends BigdataRDFServlet {
 						.close();
 			}
 
+			{ // Report the git commit when available.  See BLZG-1688
+				String gitCommit = Banner.getBuildInfo().get(Banner.BuildInfoMeta.gitCommit);
+				if (gitCommit == null || "${git.commit}".equals(gitCommit))
+					gitCommit = "N/A";
+				current.node("p").text("Build Git Commit=").node("span")
+						.attr("id", "gitCommit").text(gitCommit).close()
+						.close();
+			}
+
+			{ // Report the git branch when available.  See BLZG-1688
+				String gitBranch = Banner.getBuildInfo().get(Banner.BuildInfoMeta.gitBranch);
+				if (gitBranch == null || "${git.branch}".equals(gitBranch))
+					gitBranch = "N/A";
+				current.node("p").text("Build Git Branch=").node("span")
+						.attr("id", "gitBranch").text(gitBranch).close()
+						.close();
+			}	
+			
             current.node("p").text("Accepted query count=")
                .node("span").attr("id", "accepted-query-count")
                .text("" +getBigdataRDFContext().getQueryIdFactory().get())

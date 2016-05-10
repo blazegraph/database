@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -206,7 +206,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	 * @see <a href="http://trac.blazegraph.com/ticket/1075" > LaunderThrowable
 	 *      should never throw an exception </a>
 	 */
-    protected static void launderThrowable(final Throwable t,
+    public static void launderThrowable(final Throwable t,
             final HttpServletResponse resp, final String queryStr) {
         final boolean isQuery = queryStr != null && queryStr.length() > 0;
         try {
@@ -549,7 +549,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    static protected void sendGraph(final HttpServletRequest req,
+    static public void sendGraph(final HttpServletRequest req,
             final HttpServletResponse resp, final Graph g) throws IOException {
         /*
          * CONNEG for the MIME type.
@@ -572,8 +572,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
 		if (writerFactory == null) {
 
-			log.warn("No writer for format: format=" + format + ", Accept=\""
-					+ acceptStr + "\"");
+			if (log.isDebugEnabled()) {
+				log.debug("No writer for format: format=" + format
+						+ ", Accept=\"" + acceptStr + "\"");
+			}
 
 			format = RDFFormat.RDFXML;
 			

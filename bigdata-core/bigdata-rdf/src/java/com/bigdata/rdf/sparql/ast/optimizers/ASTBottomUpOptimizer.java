@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -544,7 +544,13 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         final JoinGroupNode pp = p.getParentJoinGroup();
 
         if (pp == null)
-            throw new AssertionError();
+            /**
+             * BLZG-1760: in case we have multiple OPTIONALs nested inside one
+             * group, we may enter this method multiple times and, as replacement
+             * is taking place in the first one, there's nothing that needs to be
+             * done in following iterations, so just return.
+             */
+            return;
 
         final String namedSet = context.createVar(NAMED_SET_PREFIX);
 

@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -118,6 +118,16 @@ public class QueryServlet extends BigdataRDFServlet {
      * a SPARQL DESCRIBE query.
      */
     static final transient String ATTR_QUERY = "query";
+    
+    /**
+     * The name of the parameter/attribute that contains boolean flag to
+     * suppress incremental truth maintenance.
+     * <p>
+     * Note: This can be either a URL query parameter or a servlet request
+     * attribute. The latter is used to support chaining of a linked data GET as
+     * a SPARQL DESCRIBE query.
+     */
+    static final transient String ATTR_TRUTH_MAINTENANCE = "suppressTruthMaintenance";
 
     /**
      * The name of the parameter/attribute that contains boolean flag to include

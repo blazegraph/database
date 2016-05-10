@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@ import java.util.List;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.repository.sail.helpers.SPARQLUpdateDataBlockParser;
 import org.openrdf.rio.RDFHandlerException;
@@ -734,7 +735,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      
         final ASTUnparsedQuadDataBlock dataBlock = node.jjtGetChild(ASTUnparsedQuadDataBlock.class);
         
-        final SPARQLUpdateDataBlockParser parser = new SPARQLUpdateDataBlockParser(context.valueFactory);
+        final SPARQLStarUpdateDataBlockParser parser = new SPARQLStarUpdateDataBlockParser(context.valueFactory);
         final Collection<Statement> stmts = new LinkedList<Statement>();
         final StatementCollector sc = new StatementCollector(stmts);
         parser.setRDFHandler(sc);
@@ -778,9 +779,9 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
                 * 
                 * See http://trac.bigdata.com/ticket/1076#comment:5
                 */
-               if (stmt.getSubject() instanceof BNode
+               if (isInvalidBlankNode(stmt.getSubject())
                      || stmt.getPredicate() instanceof BNode
-                     || stmt.getObject() instanceof BNode
+                     || isInvalidBlankNode(stmt.getObject())
                      || (stmt.getContext() != null && stmt.getContext() instanceof BNode)) {
    
                   throw new VisitorException(
@@ -797,6 +798,14 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         return a;
         
     }
+
+	private boolean isInvalidBlankNode(Value v) {
+		if (v instanceof BigdataBNode && ((BigdataBNode)v).isStatementIdentifier()) {
+			return false;
+		} else {
+			return v instanceof BNode;
+		}
+	}
     
     /**
      * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation. This form

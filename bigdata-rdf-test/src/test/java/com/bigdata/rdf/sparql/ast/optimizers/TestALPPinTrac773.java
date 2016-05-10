@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.ONE_OR_MORE;
+import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.SUBGROUP_OF_ALP;
 import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.ZERO_OR_MORE;
 import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.ZERO_OR_ONE;
 
@@ -97,11 +98,11 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     	}
 		ArbitraryLengthPathNode alpp1(HelperFlag zero_or_one_to_one_or_more) {
 			return arbitartyLengthPropertyPath(varNode(x), constantNode(b), zero_or_one_to_one_or_more,
-							joinGroupNode( statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26) ) );
+							joinGroupNode( statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26), SUBGROUP_OF_ALP ) );
 		}
 		ArbitraryLengthPathNode alpp2(HelperFlag zero_or_one_to_one_or_more) {
 			return arbitartyLengthPropertyPath(varNode(x), varNode(z), zero_or_one_to_one_or_more,
-					joinGroupNode( statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135) ) );
+					joinGroupNode( statementPatternNode(leftVar(), constantNode(c),  rightVar(), 3135), SUBGROUP_OF_ALP ) );
 		}
 	}
 	private class NestedHelper extends Helper {
@@ -122,11 +123,13 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     		varCount = 0;
     		ArbitraryLengthPathNode alpp1 = arbitartyLengthPropertyPath(varNode(x), constantNode(b), zero_or_one_to_one_or_more,
 							joinGroupNode( 
-									statementPatternNode(leftVar(), constantNode(d),  rightVar(), 26)
+									statementPatternNode(leftVar(), constantNode(d),  rightVar(), 26),
+									SUBGROUP_OF_ALP
 									) );
 			ArbitraryLengthPathNode alpp2 = arbitartyLengthPropertyPath(varNode(x), varNode(z), zero_or_one_to_one_or_more,
 							joinGroupNode( 
-									statementPatternNode(leftVar(), constantNode(d),  rightVar(), 3135)
+									statementPatternNode(leftVar(), constantNode(d),  rightVar(), 3135),
+									SUBGROUP_OF_ALP
 									) );
 
          /**
@@ -159,12 +162,17 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 					@Override
 
 
-					protected void estimateCardinalities(StatementPatternNode sp, final IV<?, ?> s, final IV<?, ?> p,
-							final IV<?, ?> o, final IV<?, ?> c, final AST2BOpContext ctx) {
+					protected void estimateCardinalities(
+							StatementPatternNode sp, final IV<?, ?> s,
+							final IV<?, ?> p, final IV<?, ?> o,
+							final IV<?, ?> c, final AST2BOpContext ctx,
+							final int exogenousBindingsAdjustmentFactor) {
 						if (o != null)
-						    sp.setProperty(Annotations.ESTIMATED_CARDINALITY, 26l);
-						else 
-							sp.setProperty(Annotations.ESTIMATED_CARDINALITY, 3135l);
+							sp.setProperty(Annotations.ESTIMATED_CARDINALITY,
+									26l);
+						else
+							sp.setProperty(Annotations.ESTIMATED_CARDINALITY,
+									3135l);
 					}
 					
 				},
@@ -189,7 +197,8 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     				where (
     						arbitartyLengthPropertyPath(varNode(x), constantNode(b), ZERO_OR_MORE,
     										joinGroupNode( 
-    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26)
+    												statementPatternNode(leftVar(), constantNode(c),  rightVar(), 26),
+    												SUBGROUP_OF_ALP
     												) )
     				) );
     		

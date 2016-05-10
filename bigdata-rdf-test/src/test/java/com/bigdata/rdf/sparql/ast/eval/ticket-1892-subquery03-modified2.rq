@@ -1,0 +1,11 @@
+# Here ?g is not overshadowed by select * because * leaves ?g in the projection 
+# results.
+
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+select ?x where {
+graph ?g {
+  {select * where {?x ?p ?g}}
+  }
+}

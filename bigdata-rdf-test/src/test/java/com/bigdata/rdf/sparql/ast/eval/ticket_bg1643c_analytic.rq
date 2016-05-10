@@ -1,0 +1,12 @@
+SELECT ?entity ?p ?o
+WHERE {
+  hint:Query hint:analytic "true" .
+  
+  VALUES ?entity { <http://s2> }
+  ?entity ?p ?o .
+  FILTER NOT EXISTS {
+    VALUES ( ?entity ?p ?o ) {
+      ( <http://s2> <http://o> <http://some.uri> )
+    }
+  }
+}

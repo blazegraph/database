@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2013.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -100,6 +100,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	private String accept = null;
 	private boolean permit400s = false;
 	private Header[] headers = null;
+	private String suppressTruthMaintenance = "false";
 
     private final String getSparqlURL(final String serviceURL) {
         return serviceURL + "/sparql";
@@ -155,6 +156,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		accept = null;
 		permit400s = false;
 		headers = null;
+		suppressTruthMaintenance = "false";
 	}
 
 	/**
@@ -356,6 +358,9 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 					}
 					sep='&';
 				}
+				if(suppressTruthMaintenance.equals("true")){
+					url.append(sep).append("suppressTruthMaintenance=true");
+				}
 				final HttpPost rslt = new HttpPost(url.toString());
 				rslt.setEntity(toPost);
 				return rslt;
@@ -396,5 +401,9 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 
 	public AbstractProtocolTest(String name)  {
 		this(new QueryServlet(), name);
+	}
+	
+	public void setSuppressTruthMaintenance(String suppressTruthMaintenance) {
+		this.suppressTruthMaintenance = suppressTruthMaintenance;
 	}
 }

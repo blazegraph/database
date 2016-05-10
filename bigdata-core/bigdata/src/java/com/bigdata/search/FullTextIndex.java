@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,9 +48,9 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+import org.apache.lucene.analysis.core.LowerCaseFilter;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -825,18 +825,25 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         final TokenStream tokenStream = getTokenStream(languageCode, r,
                 filterStopwords);
 
+        
         try {
+
+            tokenStream.reset();   
 
             while (tokenStream.incrementToken()) {
                 
-                final TermAttribute term = tokenStream
-                        .getAttribute(TermAttribute.class);
+                final CharTermAttribute term = tokenStream
+                        .getAttribute(CharTermAttribute.class);
                 
-                buffer.add(docId, fieldId, term.term());
+                buffer.add(docId, fieldId, term.toString());
 
                 n++;
 
             }
+            
+            tokenStream.end();
+            
+            tokenStream.close();
 
         } catch (IOException ioe) {
             
@@ -876,13 +883,13 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
          */
         final Analyzer a = getAnalyzer(languageCode, filterStopwords);
         
-        TokenStream tokenStream = a.tokenStream(null/* @todo field? */, r);
-        
-        // force to lower case.
-        tokenStream = new LowerCaseFilter(tokenStream);
-        
-        return tokenStream;
-        
+        TokenStream tokenStream;
+		tokenStream = a.tokenStream(null/* @todo field? */, r);
+
+		// force to lower case.
+		tokenStream = new LowerCaseFilter(tokenStream);
+
+		return tokenStream;
     }
 
     /**

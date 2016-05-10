@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -113,6 +113,24 @@ public class TestAll extends TestCase {
          * Test suite for registering and managing services.
          */
         suite.addTestSuite(TestServiceRegistry.class);
+        
+        /*
+         * GeoSpatial Service test cases
+         */
+        suite.addTestSuite(TestGeoSpatialServiceEvaluation.class);
+        suite.addTestSuite(TestGeoSpatialServiceEvaluationQuads.class);
+        suite.addTestSuite(TestGeoSpatialServiceConfiguration.class);
+        suite.addTestSuite(TestGeoSpatialServiceConfigurationCustomDatatype.class);
+        suite.addTestSuite(TestGeoSpatialCustomSerializer.class);
+        suite.addTestSuite(TestGeoSpatialCustomSerializerWKT.class);
+        suite.addTestSuite(TestGeoSpatialCustomFields.class);
+        suite.addTestSuite(TestGeoSpatialCorrectRejection.class);
+        suite.addTestSuite(TestGeoSpatialDefaults.class);
+        suite.addTestSuite(TestGeoSpatialExamplesFromDocumentation.class);
+        suite.addTestSuite(TestGeoSpatialServiceConfigurationParsing.class);
+        suite.addTestSuite(TestGeoSpatialQueryIfGeospatialDisabled.class);
+        suite.addTestSuite(TestGeoSpatialDisableBuiltinDatatypes.class);
+        suite.addTestSuite(TestGeoSpatialQueryVaryOneDimension.class);
         
         return suite;
         

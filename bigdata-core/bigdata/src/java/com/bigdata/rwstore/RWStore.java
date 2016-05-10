@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,9 +33,13 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -79,6 +83,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.FileChannelUtility.AsyncTransfer;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.MergeStreamWithSnapshotData;
@@ -347,6 +352,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         String DEFAULT_META_BITS_DEMI_SPACE = "false";
         
         /**
+         * Defines whether blobs, which are stored in multiple slot locations,
+         * are read concurrently using Async NIO. This was introduced
+         * specifically to reduce commit latency in scenarios where large
+         * transactions can lead to very large deferred free lists (>> 10
+         * million addresses), stored as blobs.
+         * <p>
+         * BLZG-1884 indicated a possible problem with this approach. The root
+         * causes of that problem (poor handling of exceptions) have been dealt
+         * with.  This option was also introduced so the async IO support can
+         * now be disabled if a problem does materialize.
+         */
+        String READ_BLOBS_ASYNC = RWStore.class.getName() + ".readBlobsAsync";
+
+        String DEFAULT_READ_BLOBS_ASYNC = "true";
+        
+        /**
          * Defines the number of bits that must be free in a FixedAllocator for
          * it to be added to the free list.  This is used to ensure a level
          * of locality when making large numbers of allocations within a single
@@ -567,7 +588,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     // private final ArrayList<BlobAllocator> m_freeBlobs;
 
     /** lists of blocks requiring commitment. */
-    private final ArrayList<FixedAllocator> m_commitList;
+    // private final ArrayList<FixedAllocator> m_commitList;
+    FixedAllocator m_commitHead;
+    FixedAllocator m_commitTail;
 
 //  private WriteBlock m_writes;
     
@@ -914,6 +937,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     + " : Must be between 1 and 5000");
         }
         
+        m_readBlobsAsync = Boolean.valueOf(fileMetadata.getProperty(
+                Options.READ_BLOBS_ASYNC,
+                Options.DEFAULT_READ_BLOBS_ASYNC));
+
     	cSmallSlot = Integer.valueOf(fileMetadata.getProperty(
                 Options.SMALL_SLOT_TYPE,
                 Options.DEFAULT_SMALL_SLOT_TYPE));
@@ -957,15 +984,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
         final IRootBlockView m_rb = fileMetadata.rootBlock;
 
-        m_commitList = new ArrayList<FixedAllocator>();
-
         m_allocs = new ArrayList<FixedAllocator>();
         
         // m_freeBlobs = new ArrayList<BlobAllocator>();
 
         try {
             final RandomAccessFile m_raf = fileMetadata.getRandomAccessFile();
-            m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
+            m_reopener = new ReopenFileChannel(m_fd, m_raf, fileMetadata.readOnly);
         } catch (IOException e1) {
             throw new RuntimeException(e1);
         }
@@ -1914,7 +1939,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         final ArrayList<FixedAllocator> list = m_freeFixed[block];
         for (int i = 0; i < list.size(); i++) {
             FixedAllocator f = list.get(i);
-            if (!m_commitList.contains(f)) {
+            if (!isOnCommitList(f)) {
                 list.remove(i);
                 return f;
             }
@@ -2085,6 +2110,19 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
     }
     
+    /**
+     * Set the option below to true to enable asynchronous reads of blob data.
+     * The aim is to reduce latency when reading blobs from disk as it will
+     * enable the disk controllers to re-order IO requests nd where possible
+     * process in parallel. This should benefit all Blob reads but specifically
+     * helps large deferredFree data to reduce commit latency as described in
+     * BLZG-1663.
+     * 
+     * @see BLZG-1663
+     * @see BLZG-1884 RWStore ASYNC IO fails to make progress (apparent deadlock)
+     */
+    final private boolean m_readBlobsAsync;
+    
     public void getData(final long addr, final byte buf[], final int offset,
             final int length) {
 
@@ -2138,15 +2176,80 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         blobHdr[i] = hdrstr.readInt();
                     }
                     // Now we have the header addresses, we can read MAX_FIXED_ALLOCS until final buffer
-                    int cursor = 0;
-                    int rdlen = m_maxFixedAlloc;
-                    for (int i = 0; i < nblocks; i++) {
-                        if (i == (nblocks - 1)) {
-                            rdlen = length - cursor;
-                        }
-                        getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
-                        cursor += rdlen-4; // but only increase cursor by data
-                    }
+                    if (!m_readBlobsAsync) { // synchronous read of blob data
+	                    int cursor = 0;
+	                    int rdlen = m_maxFixedAlloc;
+	                    for (int i = 0; i < nblocks; i++) {
+	                        if (i == (nblocks - 1)) {
+	                            rdlen = length - cursor;
+	                        }
+	                        getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
+	                        cursor += rdlen-4; // but only increase cursor by data
+	                    }
+//                    } else { // s_readBlobsAsync
+//	                    final AsynchronousFileChannel channel = m_reopener.getAsyncChannel();
+//						final ArrayList<Future<Integer>> reads = new ArrayList<Future<Integer>>();
+//						try {
+//							int cursor = 0;
+//							int rdlen = m_maxFixedAlloc;
+//							int cacheReads = 0;
+//							for (int i = 0; i < nblocks; i++) {
+//								if (i == (nblocks - 1)) {
+//									rdlen = length - cursor;
+//								}
+//								final ByteBuffer bb = ByteBuffer.wrap(buf,
+//										cursor, rdlen-4); // strip off checksum to avoid overlapping buffer reads!
+//								final long paddr = physicalAddress(blobHdr[i]);
+//								final ByteBuffer cache = m_writeCacheService._readFromCache(paddr, rdlen);
+//								if (cache != null) {
+//									bb.put(cache); // write cached data!
+//									cacheReads++;
+//								} else {
+//									reads.add(channel.read(bb,
+//											paddr));
+//								}
+//								cursor += rdlen - 4; // but only increase cursor by data
+//							}
+//							for (Future<Integer> r : reads) {
+//								r.get();
+//							}
+//						} catch (Exception e) {
+//	                         throw new IOException("Error from async IO", e);
+//	    				} finally {
+//							for (Future r : reads) {
+//								r.cancel(true);
+//							}
+//	                    }
+					} else { // read non-cached data with FileChannelUtility
+						final ArrayList<AsyncTransfer> transfers = new ArrayList<AsyncTransfer>();
+							int cursor = 0;
+							int rdlen = m_maxFixedAlloc;
+							for (int i = 0; i < nblocks; i++) {
+								if (i == (nblocks - 1)) {
+									rdlen = length - cursor;
+								}
+								final ByteBuffer bb = ByteBuffer.wrap(buf,
+										cursor, rdlen - 4); // strip off
+															// checksum to avoid
+															// overlapping
+															// buffer reads!
+								final long paddr = physicalAddress(blobHdr[i]);
+								final ByteBuffer cache;
+								try {
+									cache = m_writeCacheService._readFromCache(paddr, rdlen);
+								} catch (Exception e) {
+									throw new IOException("Error from async IO", e);
+								}
+								if (cache != null) {
+									bb.put(cache); // write cached data!
+								} else {
+									transfers.add(new AsyncTransfer(paddr, bb));
+								}
+								cursor += rdlen - 4; // but only increase cursor
+														// by data
+							}
+							FileChannelUtility.readAllAsync(m_reopener, transfers);
+					}
                     
                     return;
                     
@@ -2154,7 +2257,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     log.error(e,e);
                     
                     throw new IllegalStateException("Unable to restore Blob allocation", e);
-                }
+				}
             }
 
             {
@@ -2622,8 +2725,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             }
             final long pa = alloc.getPhysicalAddress(addrOffset);
             
-            if (log.isTraceEnabled())
-                log.trace("Freeing allocation at " + addr + ", physical address: " + pa);
+            // In a tight loop, this log level test shows up as a hotspot
+//            if (log.isTraceEnabled())
+//                log.trace("Freeing allocation at " + addr + ", physical address: " + pa);
             alloc.free(addr, sze, overrideSession);
             // must clear after free in case is a blobHdr that requires reading!
             // the allocation lock protects against a concurrent re-allocation
@@ -2653,8 +2757,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             if (alloc.isAllocated(addrOffset))
                 throw new IllegalStateException("Reallocation problem with WriteCache");
 
-            if (alloc.isUnlocked() && !m_commitList.contains(alloc)) {
-                m_commitList.add(alloc);
+            if (alloc.isUnlocked()) {
+                addToCommit(alloc);
             }
             
             m_recentAlloc = true;
@@ -2750,7 +2854,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     if (allocator.checkBlock0()) {
                     	if (log.isInfoEnabled())
                     		log.info("Adding new shadowed allocator, index: " + allocator.getIndex() + ", diskAddr: " + allocator.getDiskAddr());
-                    	m_commitList.add(allocator);
+                    	addToCommit(allocator);
                     }
 
                 } else {
@@ -2800,7 +2904,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     	}
 
                         if (allocator.checkBlock0()) {
-                        	m_commitList.add(allocator);
+                        	addToCommit(allocator);
                         }
                     } else {
                         // Verify free list only has allocators with free bits
@@ -2826,8 +2930,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 	throw new IllegalStateException("Free Allocator unable to allocate address: " + allocator.getSummaryStats());
                 }
 
-                if (allocator.isUnlocked() && !m_commitList.contains(allocator)) {
-                    m_commitList.add(allocator);
+                if (allocator.isUnlocked()) {
+                	addToCommit(allocator);
                 }
 
                 m_recentAlloc = true;
@@ -3199,7 +3303,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 // FIXME: we should be able to clear the dirty list, but this currently causes
                 //  problems in HA.
                 // If the allocators are torn down correctly, we should be good to clear the commitList
-                 m_commitList.clear();
+                 clearCommitList();
                 
                 // Flag no allocations since last commit
                 m_recentAlloc = false;
@@ -3543,11 +3647,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             // assert m_deferredFreeOut.getBytesWritten() == 0;
 
             // save allocation headers
-            final Iterator<FixedAllocator> iter = m_commitList.iterator();
+            FixedAllocator fa = m_commitHead;
             
-            while (iter.hasNext()) {
+            while (fa != null) {
                 
-                final FixedAllocator allocator = iter.next();
+                final FixedAllocator allocator = fa;
                 
                 // the bit in metabits for the old allocator version.
                 final int old = allocator.getDiskAddr();
@@ -3576,6 +3680,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     throw new RuntimeException(e);
                     
                 }
+                
+                fa = fa.m_nextCommit;
             }
             // DO NOT clear the commit list until the writes have been flushed
             // m_commitList.clear();
@@ -3661,17 +3767,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             
         }
         
-        for (FixedAllocator fa : m_commitList) {
-
-            fa.postCommit();
-            
+        {
+        	FixedAllocator fa = m_commitHead;
+	        while (fa != null) {
+	
+	            fa.postCommit();
+	            
+	            fa = fa.m_nextCommit;
+	            
+	        }
         }
 
         if (m_storageStats != null) {
         	m_storageStats.commit();
         }
 
-        m_commitList.clear();
+        clearCommitList();
 
     }
 
@@ -3795,7 +3906,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
         // add the maximum number of new metaBits storage that may be
         //  needed to save the current committed objects
-        final int commitInts = ((32 + m_commitList.size()) / 32);
+        final int commitInts = ((32 + commitListSize()) / 32);
         final int allocBlocks = (cDefaultMetaBitsSize - 1 + commitInts)/(cDefaultMetaBitsSize-1);
         ints += cDefaultMetaBitsSize * allocBlocks;
         
@@ -4404,6 +4515,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         str.append("\nChecking regions.....");
         
         // Now check all allocators to confirm that each file region maps to only one allocator
+        final Lock lock = m_allocationLock.readLock();
+        lock.lock();
         try {
 	        final HashMap<Integer, FixedAllocator> map = new HashMap<Integer, FixedAllocator>();
 	        for (FixedAllocator fa : m_allocs) {
@@ -4412,6 +4525,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	        str.append("okay\n");
         } catch (IllegalStateException is) {
         	str.append(is.getMessage() + "\n");
+        } finally {
+        	lock.unlock();
         }
         
     }
@@ -4734,15 +4849,47 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //  }
 
     void addToCommit(final FixedAllocator allocator) {
-        if (!m_commitList.contains(allocator)) {
-            m_commitList.add(allocator);
+    	if (allocator.m_prevCommit == null && m_commitHead != allocator) { // not on list
+    		allocator.m_prevCommit = m_commitTail;
+    		if (allocator.m_prevCommit != null) {
+    			allocator.m_prevCommit.m_nextCommit = allocator;
+    			m_commitTail = allocator;
+    		} else {
+    			m_commitHead = m_commitTail = allocator;
+    		}   		
         }
     }
 
-
-    void removeFromCommit(final Allocator allocator) {
-        m_commitList.remove(allocator);
+    final boolean isOnCommitList(final FixedAllocator allocator) {
+    	return allocator.m_prevCommit != null || allocator == m_commitHead;
     }
+    
+    final void clearCommitList() {
+    	FixedAllocator cur = m_commitHead;
+    	while (cur != null) {
+    		final FixedAllocator t = cur;
+    		cur = t.m_nextCommit;
+    		
+    		t.m_prevCommit = t.m_nextCommit = null;
+    	}
+    	
+    	m_commitHead = m_commitTail = null;
+    }
+    
+    final int commitListSize() {
+    	int count = 0;
+    	FixedAllocator cur = m_commitHead;
+    	while (cur != null) {
+    		count++;
+    		cur = cur.m_nextCommit;
+    	}
+    	
+    	return count;
+    }
+    
+//    void removeFromCommit(final Allocator allocator) {
+//        m_commitList.remove(allocator);
+//    }
 
     public Allocator getAllocator(final int i) {
         return (Allocator) m_allocs.get(i);
@@ -4753,33 +4900,80 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * backing store.
      */
     private class ReopenFileChannel implements
-            IReopenChannel<FileChannel> {
+            IReopenChannel<FileChannel>, FileChannelUtility.IAsyncOpener {
 
         final private File file;
 
+        private final boolean readOnly;
+        
         private final String mode;
 
         private volatile RandomAccessFile raf;
+        
+        private final Path path;
 
+        private volatile AsynchronousFileChannel asyncChannel;
+        
+        private int asyncChannelOpenCount = 0;;
+        
         public ReopenFileChannel(final File file, final RandomAccessFile raf,
-                final String mode) throws IOException {
+                final boolean readOnly) throws IOException {
 
             this.file = file;
 
-            this.mode = mode;
+            this.readOnly = readOnly;
+            
+            this.mode = readOnly == true ? "r" : "rw";
             
             this.raf = raf;
+            
+            this.path = Paths.get(file.getAbsolutePath());
 
             reopenChannel();
 
         }
+        
+        @Override
+        public AsynchronousFileChannel getAsyncChannel() {
+        	if (asyncChannel != null) {
+        		if (asyncChannel.isOpen())
+        			return asyncChannel;
+        	}
+        	
+        	synchronized(this) {
+            	if (asyncChannel != null) { // check again while synchronized
+            		if (asyncChannel.isOpen())
+            			return asyncChannel;
+            	}
 
+	        	try {
+	        	    if(readOnly) {
+	        	        asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
+	        	    } else {
+	                    asyncChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
+	        	    }
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+	        	
+	        	asyncChannelOpenCount++;
+	        	
+	        	return asyncChannel;
+    		}
+        }
+        
+        public int getAsyncChannelOpenCount() {
+        	return asyncChannelOpenCount;
+        }
+
+        @Override
         public String toString() {
 
             return file.toString();
 
         }
 
+        @Override
         public FileChannel reopenChannel() throws IOException {
 
             /*
@@ -4853,8 +5047,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             extendFile(convertFromAddr(extent - currentExtent));
             
         } else if (extent < currentExtent) {
-            throw new IllegalArgumentException(
-                    "Cannot shrink RWStore extent: currentExtent="
+        	//See https://github.com/SYSTAP/db-enterprise/issues/12
+        	//TODO:  Determine if there is a more graceful way to handle this.
+            // throw new IllegalArgumentException(
+        	log.warn("Cannot shrink RWStore extent: currentExtent="
                             + currentExtent + ", fileSize=" + m_fileSize
                             + ", newValue=" + extent);
         }
@@ -4956,9 +5152,63 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     public void deferFree(final int rwaddr, final int sze) {
         m_allocationWriteLock.lock();
         try {
-            if (sze > (this.m_maxFixedAlloc-4)) {
+            if (sze > (this.m_maxFixedAlloc-4)) {          	
                 m_deferredFreeOut.writeInt(-rwaddr);
                 m_deferredFreeOut.writeInt(sze);
+                
+            	/*
+            	 * rather than write out blob address, instead flatten the blob addresses and
+            	 * write all to remove the latency on commit caused by reading potentially many blob headers.
+            	 * 
+            	 * This idea was propposed to support BLZG-641/BLZG-1663 to redcue commit latency.
+            	 * 
+            	 * However, it appears that deferFree is not called with the raw blob size and is already
+            	 * reduced to the blob part addrs.
+            	 */
+                log.debug("Unexpected code path deferring free of direct blob address");
+
+//                final int alloc = m_maxFixedAlloc-4;
+//                final int nblocks = (alloc - 1 + (sze-4))/alloc;
+//                if (nblocks < 0)
+//                    throw new IllegalStateException(
+//                            "Allocation error, m_maxFixedAlloc: "
+//                                    + m_maxFixedAlloc);
+//
+//                final byte[] hdrbuf = new byte[4 * (nblocks + 1) + 4]; // plus 4 bytes for checksum
+//                if (hdrbuf.length > m_maxFixedAlloc) {
+//                    if (log.isInfoEnabled()) {
+//                        log.info("LARGE BLOB - header is BLOB");
+//                    }
+//                }
+//                
+//                getData(rwaddr, hdrbuf); // will work even if header is also a blob
+//                
+//                // deferFree header
+//                deferFree(rwaddr, hdrbuf.length);
+//                
+//                // Now read all blob part addresses
+//                final DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
+//                final int rhdrs = hdrstr.readInt();
+//                if (rhdrs != nblocks) {
+//                    throw new IllegalStateException(
+//                            "Incompatible BLOB header record, expected: "
+//                                    + nblocks + ", got: " + rhdrs);
+//                }
+//                
+//                int remaining = sze;
+//                int partSize = alloc;
+//                for (int i = 0; i < nblocks; i++) {
+//                    final int blobpartAddr = hdrstr.readInt();
+//                    // deferFree(blobpartAddr, partSize);
+//                    m_deferredFreeOut.writeInt(blobpartAddr);             
+//                    
+//                    remaining -= partSize;
+//                    
+//                    if (remaining < partSize) {
+//                    	partSize = remaining;
+//                    }                  
+//                }
+
             } else {
                 m_deferredFreeOut.writeInt(rwaddr);             
             }

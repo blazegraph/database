@@ -10,10 +10,16 @@ ${BASE_DIR}/clean.sh
 
 if [ -z "${ECLIPSE_WORKSPACE}" ] ; then
 
- 	mvn -f "${BASE_DIR}"/../blazegraph-parent/pom.xml eclipse:eclipse $*
+    #Development projects
+ 	mvn -f "${BASE_DIR}"/../pom.xml eclipse:eclipse  $*
+    #Deployment artifacts used in Eclipse
+ 	mvn -f "${BASE_DIR}"/../pom.xml eclipse:eclipse -P Deployment --projects bigdata-war,bigdata-jar,blazegraph-war,blazegraph-jar $*
 
 else 
 
-	mvn -f "${BASE_DIR}"/../blazegraph-parent/pom.xml eclipse:eclipse -Declipse.workspace="${ECLIPSE_WORKSPACE}" $*
+    #Development projects
+	mvn -f "${BASE_DIR}"/../pom.xml eclipse:eclipse -Declipse.workspace="${ECLIPSE_WORKSPACE}" 
+    #Deployment artifacts used in Eclipse
+ 	mvn -f "${BASE_DIR}"/../pom.xml eclipse:eclipse -Declipse.workspace="${ECLIPSE_WORKSPACE}" -P Deployment --projects bigdata-war,bigdata-jar,blazegraph-war,blazegraph-jar $*
 
 fi

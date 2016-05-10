@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -113,6 +113,13 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1388.class);
         
+		suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1747.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1753.class);
+
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1755.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1785.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1788.class);
+
         return suite;
         
     }

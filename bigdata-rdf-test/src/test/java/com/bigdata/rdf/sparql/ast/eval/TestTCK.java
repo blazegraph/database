@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -724,30 +724,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
         if(!BigdataStatics.runKnownBadTests) return;
         new TestHelper("sparql11-order-02", // testURI,
                 "sparql11-order-02.rq",// queryFileURL
-                "sparql11-order-02.ttl",// dataFileURL
-                "sparql11-order-02.srx"// resultFileURL
-                ,true// checkOrder
-        ).runTest();
-
-    }
-
-    /**
-     * Variant of {@link #test_sparql11_order_02()} which works around the LCWC
-     * change in SPARQL ORDER BY semantics.
-     * 
-     * <pre>
-     * SELECT  ?type (count(?subj) as ?cnt)
-     * WHERE { ?subj a ?type } 
-     * GROUP BY ?type 
-     * ORDER BY ?cnt
-     * </pre>
-     * 
-     * @throws Exception
-     */
-    public void test_sparql11_order_02_workaround() throws Exception {
-
-        new TestHelper("sparql11-order-02-workaround", // testURI,
-                "sparql11-order-02-workaround.rq",// queryFileURL
                 "sparql11-order-02.ttl",// dataFileURL
                 "sparql11-order-02.srx"// resultFileURL
                 ,true// checkOrder

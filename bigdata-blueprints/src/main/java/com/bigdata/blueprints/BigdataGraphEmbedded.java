@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -35,8 +35,6 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.sail.SailRepository;
-import org.openrdf.sail.Sail;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -242,8 +240,21 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	public void stopTransaction(Conclusion arg0) {
 	}
 	
-	public StringBuilder dumpStore() {
-	    return ((BigdataSailRepository)repo).getDatabase().dumpStore();
+	public StringBuilder dumpStore() throws Exception {
+	    final BigdataSailRepositoryConnection cxn =
+	            super.readFromWriteConnection ? 
+	                    getWriteConnection() : getReadConnection();
+	                    
+        try {
+            if (super.readFromWriteConnection) {
+                cxn.flush();
+            }
+            return cxn.getTripleStore().dumpStore();
+        } finally {
+            if (!super.readFromWriteConnection) {
+                cxn.close();
+            }
+        }
 	}
 	
 	

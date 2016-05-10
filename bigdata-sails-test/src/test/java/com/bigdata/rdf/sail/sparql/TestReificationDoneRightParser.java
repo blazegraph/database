@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -907,13 +908,10 @@ public class TestReificationDoneRightParser extends
     public void test_update_insert_data_RDR() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
-      if (!BigdataStatics.runKnownBadTests) // FIXME RDR TEST KNOWN TO FAIL.
-          return;
-        
       final String sparql = "PREFIX : <http://example/>\n"//
             + "INSERT DATA {\n"//
-            + "   <:s> <:p> \"d\" . \n"//
-            + "   << <:s> <:p> \"d\" >> <:order> 5 . \n"//
+            + "   :s :p \"d\" . \n"//
+            + "   << :s :p \"d\" >> :order \"5\"^^xsd:int . \n"//
             + "}";
 
         final UpdateRoot expected = new UpdateRoot();
@@ -941,18 +939,14 @@ public class TestReificationDoneRightParser extends
             final BigdataStatement s1 = valueFactory.createStatement(//
                   (BigdataResource)s,//
                   (BigdataURI)p,//
-                  (BigdataValue)d, //
-                  null,
-                  StatementEnum.Explicit);
-            final IV sid1 = s1.getStatementIdentifier();
+                  (BigdataValue)d);
+            final BigdataBNode sid1 = valueFactory.createBNode(s1);
 
             // SP(?sid, :p, 5).
             final BigdataStatement s2 = valueFactory.createStatement(//
                   (Resource)sid1, //
                   (BigdataURI)order, //
-                  (BigdataValue) five, //
-                  null,//
-                  StatementEnum.Explicit);
+                  (BigdataValue) five);
             final BigdataStatement[] data = new BigdataStatement[] { //
                   s1, s2
             };

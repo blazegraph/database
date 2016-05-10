@@ -1,12 +1,12 @@
 /**
 
- Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+ Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
  Contact:
- SYSTAP, LLC
+ SYSTAP, LLC DBA Blazegraph
  2501 Calvert ST NW #106
  Washington, DC 20008
- licenses@systap.com
+ licenses@blazegraph.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -139,11 +140,10 @@ import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.spo.XXXCShardSplitHandler;
 import com.bigdata.rdf.vocab.BaseVocabulary;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
-import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20151106;
+import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20160317;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -167,6 +167,8 @@ import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
+import com.bigdata.service.geospatial.GeoSpatialConfigOptions;
 import com.bigdata.sparse.GlobalRowStoreUtil;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
@@ -200,6 +202,11 @@ abstract public class AbstractTripleStore extends
         IRawTripleStore, IMutableDatabase<AbstractTripleStore> {
 
     final static private Logger log = Logger.getLogger(AbstractTripleStore.class);
+    
+    final protected static boolean INFO = log.isInfoEnabled();
+    final protected static boolean DEBUG = log.isDebugEnabled();
+    
+    
 
     /*
      * TODO I have held back this change until I can test it on a cluster.  I am
@@ -516,7 +523,8 @@ abstract public class AbstractTripleStore extends
      */
     public static interface Options extends AbstractResource.Options,
             InferenceEngine.Options, com.bigdata.journal.Options,
-            KeyBuilder.Options, DataLoader.Options, FullTextIndex.Options {
+            KeyBuilder.Options, DataLoader.Options, FullTextIndex.Options,
+            GeoSpatialConfigOptions.Options {
 
         /**
          * Boolean option (default <code>true</code>) enables support for the
@@ -686,7 +694,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20151106.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = BigdataCoreVocabulary_v20160317.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -1297,7 +1305,7 @@ abstract public class AbstractTripleStore extends
          */
         String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".rdrHistoryClass";
-
+                
         /**
          * If this option is set to false, do not compute closure for sids.
          */
@@ -1676,7 +1684,7 @@ abstract public class AbstractTripleStore extends
     @Override
     public void create() {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info(toString());
 
         assertWritable();
@@ -1747,7 +1755,84 @@ abstract public class AbstractTripleStore extends
                     ((BaseVocabulary) vocabRef.get()).init();
 
                 }
-                
+
+                /*
+                 * For performance reasons, we also store the geospatial configuration
+                 * in the global row store, in case geospatial is enabled.
+                 */
+                {
+                    assert geoSpatialConfigRef.get() == null;
+                    
+                    final Boolean geoSpatial = Boolean.parseBoolean(getProperty(
+                            AbstractTripleStore.Options.GEO_SPATIAL,
+                            AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
+        
+                    if (geoSpatial!=null && geoSpatial) { // geospatial enabled
+                          
+                        final Boolean geoSpatialIncludeBuiltinDatatypes = Boolean.parseBoolean(getProperty(
+                            AbstractTripleStore.Options.GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES,
+                            AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES));
+                      
+                        final String geoSpatialDefaultDatatype = getProperty(
+                            AbstractTripleStore.Options.GEO_SPATIAL_DEFAULT_DATATYPE,
+                            AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL_DEFAULT_DATATYPE);
+          
+                        // initialized geospatial configuration if geospatial is enabled
+                        if (geoSpatial) {
+                          
+                            /**
+                             * We have configuration strings of the form 
+                             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].0 = ...
+                             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].1 = ...
+                             * - [AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG].2 = ...
+                             * ...
+                             * 
+                             * We read this configuration up to the first index that is not defined.
+                             * If no explicit configuration is provided, we fallback on our single
+                             * latitude-longitude-time default.
+                             */
+                            final List<String> geoSpatialDatatypeConfigs = new LinkedList<String>();
+                            boolean finished = false;
+                            for (int i=0; !finished; i++) {
+
+                                final String curId = AbstractTripleStore.Options.GEO_SPATIAL_DATATYPE_CONFIG + "." + i;
+                                final String curVal = getProperty(curId, null /* fallback */);
+                              
+                                if (curVal!=null) {
+                                    if (INFO)
+                                        log.info("Adding geospatial datatype #" + i);
+                                    
+                                    geoSpatialDatatypeConfigs.add(curVal);
+                                } else {
+                                    finished = true; // we're done
+                                }
+                            }
+              
+                            // also register built-in datatypes, if enabled
+                            if (geoSpatialIncludeBuiltinDatatypes) {
+                              
+                                if (INFO)
+                                    log.info("Adding geospatial built-in datatype v1/LAT+LON");
+
+                                geoSpatialDatatypeConfigs.add(
+                                    AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_CONFIG);
+
+                                if (INFO)
+                                    log.info("Adding geospatial built-in datatype v1/LAT+LON+TIME");
+
+                                geoSpatialDatatypeConfigs.add(
+                                    AbstractTripleStore.Options.GEO_SPATIAL_LITERAL_V1_LAT_LON_TIME_CONFIG);
+                            }
+              
+                            final GeoSpatialConfig geoSpatialConfig = 
+                                new GeoSpatialConfig(geoSpatialDatatypeConfigs, geoSpatialDefaultDatatype);
+
+                            geoSpatialConfigRef.compareAndSet(null, geoSpatialConfig);
+                        }
+                    }
+                }
+
+
                 lexiconRelation = new LexiconRelation(this/* container */,
                         getIndexManager(), LEXICON_NAMESPACE, getTimestamp(),
                         new Properties(tmp)// Note: Must wrap properties!
@@ -1799,6 +1884,7 @@ abstract public class AbstractTripleStore extends
                 }
 
             }
+
         
             /**
              * Write on the global row store. We atomically set all
@@ -1829,6 +1915,12 @@ abstract public class AbstractTripleStore extends
                     // vocabulary.
                     map.put(TripleStoreSchema.VOCABULARY, vocabRef.get());
                     // setProperty(TripleStoreSchema.VOCABULARY,vocab);
+                }
+                
+                if (geoSpatialConfigRef.get() != null) {
+                    // geospatial config.
+                    map.put(TripleStoreSchema.GEO_SPATIAL_CONFIG, geoSpatialConfigRef.get());
+                    // setProperty(TripleStoreSchema.GEO_SPATIAL_CONFIG,geoSpatoalConfig)
                 }
 
                 /*
@@ -2014,7 +2106,7 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No axioms defined? : "
                                 + this);
 
-                    if (log.isInfoEnabled())
+                    if (INFO)
 						log.info("read axioms: " + axioms.getClass().getName()
 								+ ", size=" + axioms.size());
                     
@@ -2075,7 +2167,7 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No vocabulary defined? : "
                                 + this);
                     
-					if (log.isInfoEnabled())
+					if (INFO)
 						log.info("read vocabulary: "
 								+ vocab.getClass().getName() + ", size="
 								+ vocab.size());
@@ -2097,11 +2189,79 @@ abstract public class AbstractTripleStore extends
     }
     
     /**
+     * Return the configured {@link GeoSpatialConfig}. The GeoSpatialConfig
+     * defines the structure and storage details of registered geospatial
+     * datatypes. 
+     * 
+     * @return the geospatial configuration
+     * 
+     * @throws IllegalStateException
+     *             if there is no lexicon.
+     * 
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL_DATATYPE_CONFIG
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL_DEFAULT_DATATYPE
+     * @see GeoSpatialConfigOptions.Options#GEO_SPATIAL_INCLUDE_BUILTIN_DATATYPES
+     */
+    final public GeoSpatialConfig getGeoSpatialConfig() {
+
+        if (!lexicon)
+            throw new IllegalStateException();
+
+        GeoSpatialConfig geoSpatialConfig = geoSpatialConfigRef.get();
+        
+        if (geoSpatialConfig == null) {
+
+            synchronized (geoSpatialConfigRef) {
+
+                geoSpatialConfig = geoSpatialConfigRef.get();
+                
+                if (geoSpatialConfig == null) {
+
+                    /*
+                     * The vocabulary is stored in properties for the triple
+                     * store instance in the global row store. However, we
+                     * pre-materialize those properties so we can directly
+                     * retrieve the vocabulary from the materialized properties.
+                     */
+
+                    geoSpatialConfig = (GeoSpatialConfig) getBareProperties().get(
+                            TripleStoreSchema.GEO_SPATIAL_CONFIG);
+
+                    if (geoSpatialConfig == null)
+                        throw new RuntimeException("No geospatial config defined? : " + this);
+                    
+
+                    if (!this.geoSpatialConfigRef.compareAndSet(null/* expect */, geoSpatialConfig)) {
+                        
+                        throw new AssertionError();
+                        
+                    }
+                    
+                }
+                
+            }
+            
+        }
+        
+        return geoSpatialConfig;
+        
+    }    
+    
+    /**
      * Note: This is used both as a monitor object and as an atomic reference.
      * 
      * @see #getVocabulary()
      */
     private final AtomicReference<Vocabulary> vocabRef = new AtomicReference<Vocabulary>();
+    
+    /**
+     * The geospatial configuration -- if null, geospatial is disabled.
+     * 
+     * @see #getGeoSpatialConfig()
+     */
+    private final AtomicReference<GeoSpatialConfig> geoSpatialConfigRef =
+        new AtomicReference<GeoSpatialConfig>();
     
     /**
      * The {@link SPORelation} (triples and their access paths).
@@ -2360,7 +2520,14 @@ abstract public class AbstractTripleStore extends
 
         rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount();
 
-        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
+        IIndex blobsIndex = null;
+        try {
+            blobsIndex = getLexiconRelation().getBlobsIndex();
+            rangeCount += blobsIndex.rangeCount();
+        } catch(IllegalStateException ex) {
+            // No blobs index.  fall through
+        }
+//        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
 
         return rangeCount;
 
@@ -2396,8 +2563,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
 
         }
 
@@ -2405,6 +2577,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getLiteralCount() {
 
         long rangeCount = 0L;
@@ -2434,8 +2607,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
         }
  
         return rangeCount;
@@ -2448,6 +2626,7 @@ abstract public class AbstractTripleStore extends
      * Note: Will always return zero (0) if {@value Options#STORE_BLANK_NODES}
      * is <code>false</code>.
      */
+    @Override
     final public long getBNodeCount() {
 
         if (!getLexiconRelation().isStoreBlankNodes())
@@ -2480,8 +2659,13 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
-                    fromKey, toKey);
+            IIndex blobsIndex = null;
+            try {
+                blobsIndex = getLexiconRelation().getBlobsIndex();
+                rangeCount += blobsIndex.rangeCount(fromKey, toKey);
+            } catch(IllegalStateException ex) {
+                // No blobs index.  fall through
+            }
 
         }
 
@@ -2731,7 +2915,7 @@ abstract public class AbstractTripleStore extends
 
             final boolean found = ndx.contains(key);
 
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug(spo + " : found=" + found + ", key="
                         + BytesUtil.toString(key));
@@ -3985,7 +4169,7 @@ abstract public class AbstractTripleStore extends
 
                 }
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log
                             .info("Copied "
                                     + nwritten
@@ -4211,7 +4395,7 @@ abstract public class AbstractTripleStore extends
                 
                 if (numStmts > 1000) {
 
-                    if(log.isInfoEnabled())
+                    if(INFO)
                     log.info("Wrote "
                             + numStmts
                             + " statements (mutationCount="
@@ -4529,7 +4713,7 @@ abstract public class AbstractTripleStore extends
             // note: count will be exact.
             statementCount1 = tempStore.getStatementCount();
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Finished " + nrounds + " rounds: statementBefore="
                         + statementCount0 + ", statementsAfter="
                         + statementCount1);
@@ -4898,7 +5082,8 @@ abstract public class AbstractTripleStore extends
 
             if (nknown == 0) {
 
-                log.warn("No known predicates: preds=" + Arrays.toString(preds));
+                if (log.isInfoEnabled())
+                    log.warn("No known predicates: preds=" + Arrays.toString(preds));
 
                 return new EmptyChunkedIterator<IBindingSet>(null/* keyOrder */);
 
@@ -4913,7 +5098,8 @@ abstract public class AbstractTripleStore extends
 
         if (_cls == null) {
 
-            log.warn("Unknown class: class=" + cls);
+            if (log.isInfoEnabled())
+                log.warn("Unknown class: class=" + cls);
 
             return new EmptyChunkedIterator<IBindingSet>(null/* keyOrder */);
             
@@ -5003,7 +5189,7 @@ abstract public class AbstractTripleStore extends
 
             final IRule tmp = r.specialize(constants, null/* constraints */);
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(tmp.toString());
             
             program.addStep(tmp);

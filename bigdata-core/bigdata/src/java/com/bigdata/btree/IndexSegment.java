@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1051,8 +1051,8 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
                     // no more leaves.
 
-                    if (INFO)
-                        log.info("No more leaves");
+                    if (DEBUG)
+                        log.debug("No more leaves");
 
                     return null;
 
@@ -1071,8 +1071,8 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
                     // no more leaves.
 
-                    if (INFO)
-                        log.info("No more leaves");
+                    if (DEBUG)
+                        log.debug("No more leaves");
 
                     return null;
 

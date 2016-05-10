@@ -1,0 +1,5 @@
+wdref: <http://www.wikidata.org/reference/>
+PREFIX wikibase <http://wikiba.se/ontology#>
+PREFIX wikibase: http://wikiba.se/ontology#>
+PREFIX wikibase: <http://wikiba.se/ontology#
+PREFIX wikibase: http://wikiba.se/ontology#

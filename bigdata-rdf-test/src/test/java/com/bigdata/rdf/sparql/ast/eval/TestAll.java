@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -153,6 +153,9 @@ public class TestAll extends TestCase {
 
         // additional bottom-up evaluation tests.
         suite.addTestSuite(TestTicket1087.class);
+        
+        //BLZG-1200 SPARQL REGEX Literals
+        suite.addTestSuite(TestTicket1200_1780.class);
 
         // test static analysis for quads constructs in triples mode, raising
         // an early exception when accessing named graphs in triples mode
@@ -195,6 +198,8 @@ public class TestAll extends TestCase {
 
         // test suite for a sub-select with an empty PROJECTION.
         suite.addTestSuite(TestTicket946.class);
+        
+        suite.addTestSuite(TestCompressedTimestampExtensionSPARQL.class);
 
         // SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern}
         // @see #1037 (fast-range-count optimizer)
@@ -207,6 +212,11 @@ public class TestAll extends TestCase {
         // SELECT (COUNT(*) as ?count) ?z WHERE {  ?x rdf:type ?z  } GROUP BY ?z
         // @see #1059 (combination of fast-range-count and distinct-term-scan)
         suite.addTest(TestSimpleGroupByAndCountOptimizer.suite());
+        
+        // Ticket: https://github.com/SYSTAP/bigdata-gpu/issues/368
+        // ClassCast Exception when Loading LUBM: com.bigdata.rdf.internal.impl.literal.XSDBooleanIV
+        // cannot be cast to com.bigdata.rdf.internal.impl.literal.NumericIV
+        suite.addTestSuite(TestTicketBigdataGPU368.class);
         
         /*
          * Runtime Query Optimizer (RTO).

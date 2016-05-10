@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -80,7 +80,9 @@ public interface IMemoryManager extends IStore, ICounterSetAccess, IAllocationMa
 	public long allocate(ByteBuffer data, boolean blocks);
 
 	/**
-	 * Blocking version of {@link #allocate(ByteBuffer, boolean)}.
+	 * Version of {@link #allocate(ByteBuffer, boolean)} which is either 
+	 * blocking or non-blocking depending on whether or not the memory
+	 * manager is set in a blocking mode.
 	 * 
 	 * @param data
 	 *            The data will be copied to the backing resource. For each

@@ -1,0 +1,14 @@
+# ?g from graph ?g is overshadowed by the inner select ?x.
+
+
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+select ?x where {
+graph ?g {
+  
+  ?x ex:q ?g .
+  
+  {select ?x where {?x ex:p ?g}}
+  }
+}

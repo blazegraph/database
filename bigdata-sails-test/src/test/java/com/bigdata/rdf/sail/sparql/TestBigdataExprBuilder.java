@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1223,9 +1223,650 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         }
 
         final QueryRoot actual = parse(sparql, baseURI);
-
+      
         assertSameAST(sparql, expected, actual);
 
     }
 
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT ?x WHERE {?x ?p ?g}}
+     *   }
+     * }
+     * </pre>
+     * 
+     * Here SELECT ?x overshadows the variable from GRAPH ?g, 
+     * so that ?g in ?x ?p ?g is actually a different variable, 
+     * albeit with the same name.
+     * 
+     * The tested feature solves this by explicitly renaming ?g:
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT ?x WHERE {?x ?p ?g_1}}
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_subselect_under_graph_01() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x WHERE {?x ?p ?g}}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql2 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x WHERE {?x ?p ?g_1}}\n" + //
+                " }\n" + //
+                "}";
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot expected = parse(sparql2, baseURI);
+        
+        assertSameAST(sparql1, expected, actual);
+        
+    } // test_subselect_under_graph_01()
+    
+    
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * PREFIX ex: <http://www.example.org/schema#>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     ?x ex:q ?g .
+     *     {SELECT ?x WHERE {?x ex:p ?g}}
+     *   }
+     * }
+     * </pre>
+     * 
+     * Here SELECT ?x overshadows the variable from GRAPH ?g, 
+     * so that ?g in ?x ex:p ?g is actually a different variable, 
+     * albeit with the same name.
+     * 
+     * The tested feature solves this by explicitly renaming ?g:
+     * 
+     * <pre>
+     * PREFIX ex: <http://www.example.org/schema#>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     ?x ex:q ?g .
+     *     {SELECT ?x WHERE {?x ex:p ?g_1}}
+     *   }
+     * }
+     * </pre>
+    
+     */
+    public void test_subselect_under_graph_02() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                "PREFIX ex: <http://www.example.org/schema#>\n" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    ?x ex:q ?g .\n" + //
+                "    {SELECT ?x WHERE {?x ex:p ?g}}\n" + //
+                "  }\n" + //
+                "}";
+        
+        
+        String sparql2 = "" + //
+                "PREFIX ex: <http://www.example.org/schema#>\n" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    ?x ex:q ?g .\n" + //
+                "    {SELECT ?x WHERE {?x ex:p ?g_1}}\n" + //
+                "  }\n" + //
+                "}";
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot expected = parse(sparql2, baseURI);
+        
+        assertSameAST(sparql1, expected, actual);
+        
+    } // test_subselect_under_graph_02()
+    
+      
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * prefix ex: <http://www.example.org/schema#>
+     * prefix in: <http://www.example.org/instance#>
+     * 
+     * select ?x where {
+     * 
+     *   ?g a ex:graph_type2 .
+     * 
+     *   graph ?g {
+     * 
+     *     ?x ex:q ?z .
+     * 
+     *     {select ?x where {
+     * 
+     *       graph ?g {
+     *         ?x ex:p ?y
+     *       } .
+     * 
+     *       ?g a ex:graph_type1 .  
+     *     }}
+     *   }
+     * }
+     * </pre>
+     * 
+     * Here ?g from the outer graph ?g is overshadowed by the inner select ?x. 
+     * The inner graph ?g is actually non-redundant because ?g there is 
+     * a different variable, although it has the same name as the variable 
+     * in the outer graph ?g.
+     * 
+     * The tested feature solves this by explicitly renaming ?g:
+     * 
+     * <pre>
+     * prefix ex: <http://www.example.org/schema#>
+     * prefix in: <http://www.example.org/instance#>
+     * 
+     * select ?x where {
+     * 
+     *   ?g a ex:graph_type2 .
+     * 
+     *   graph ?g {
+     * 
+     *     ?x ex:q ?z .
+     * 
+     *     {select ?x where {
+     * 
+     *       graph ?g_1 {
+     *         ?x ex:p ?y
+     *       } .
+     * 
+     *       ?g_1 a ex:graph_type1 .  
+     *     }}
+     *   }
+     * }
+     * </pre>
+    
+     */
+    public void test_subselect_under_graph_03() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                " prefix ex: <http://www.example.org/schema#>\n" + //
+                " prefix in: <http://www.example.org/instance#>\n" + //
+                " select ?x where {\n" + //
+                "   ?g a ex:graph_type2 .\n" + //
+                "   graph ?g {\n" + //
+                "     ?x ex:q ?z .\n" + //
+                "     {select ?x where {\n" + //
+                "       graph ?g {\n" + //
+                "         ?x ex:p ?y\n" + //
+                "       } .\n" + //
+                "       ?g a ex:graph_type1 .  \n" + //
+                "     }}\n" + //
+                "   }\n" + //
+                " }";
+        
+        String sparql2 = "" + //
+                " prefix ex: <http://www.example.org/schema#>\n" + //
+                " prefix in: <http://www.example.org/instance#>\n" + //
+                " select ?x where {\n" + //
+                "   ?g a ex:graph_type2 .\n" + //
+                "   graph ?g {\n" + //
+                "     ?x ex:q ?z .\n" + //
+                "     {select ?x where {\n" + //
+                "       graph ?g_1 {\n" + //
+                "         ?x ex:p ?y\n" + //
+                "       } .\n" + //
+                "       ?g_1 a ex:graph_type1 .  \n" + //
+                "     }}\n" + //
+                "   }\n" + //
+                " }";
+        
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot expected = parse(sparql2, baseURI);
+        
+        assertSameAST(sparql1, expected, actual);
+        
+    } // test_subselect_under_graph_03()
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * prefix ex: <http://www.example.org/schema#>
+     * prefix in: <http://www.example.org/instance#>
+     * 
+     * SELECT ?x #1 
+     * {
+     *   GRAPH ?g #1 
+     *   {
+     *     ?g a ex:graph_type2 .
+     * 
+     *     {SELECT ?x #2
+     *      {
+     *        GRAPH ?g #2
+     *        {
+     *          ?g a ex:graph_type1 .
+     * 
+     *         {SELECT ?x #3
+     *          {
+     *             ?x ex:p ?g          
+     *           }
+     *          }
+     *        }
+     *      }
+     *     }
+     *   }
+     * }
+     * 
+     * </pre>
+     * 
+     * This test exercises double overshadowing of context variables
+     * by sub-SELECT. The variable ?g from GRAPH ?g #1 is overshadowed by 
+     * SELECT ?x #2, so that the variable in GRAPH ?g #2 is a different 
+     * variable, although with the same name, and it is in its turn overshadowed
+     * by SELECT ?x #3, so that ?g in ?x ?p ?g is essentially a singleton.
+     * 
+     * The tested feature solves this by explicitly renaming ?g two times:
+     * 
+     * <pre>
+     * prefix ex: <http://www.example.org/schema#>
+     * prefix in: <http://www.example.org/instance#>
+     * 
+     * SELECT ?x #1 
+     * {
+     *   GRAPH ?g #1 
+     *   {
+     *     ?g a ex:graph_type2 .
+     * 
+     *     {SELECT ?x #2
+     *      {
+     *        GRAPH ?g_1 #2
+     *        {
+     *          ?g_1 a ex:graph_type1 .
+     * 
+     *         {SELECT ?x #3
+     *          {
+     *             ?x ex:p ?g_1_2          
+     *           }
+     *          }
+     *        }
+     *      }
+     *     }
+     *   }
+     * }
+     * 
+     * </pre>    
+     */
+    public void test_subselect_under_graph_04() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                " prefix ex: <http://www.example.org/schema#>\n" + //
+                " prefix in: <http://www.example.org/instance#>\n" + //
+                " SELECT ?x #1\n \n" + //
+                " {\n" + //
+                "   GRAPH ?g #1\n" + // 
+                "   {\n" + //
+                "     ?g a ex:graph_type2 .\n" + //
+                "     {SELECT ?x #2\n" + //
+                "      {\n" + //
+                "        GRAPH ?g #2\n" + //
+                "        {\n" + //
+                "          ?g a ex:graph_type1 .\n" + //
+                "         {SELECT ?x #3\n" + //
+                "          {\n" + //
+                "             ?x ex:p ?g\n" + //          
+                "           }\n" + //
+                "          }\n" + //
+                "        }\n" + //
+                "      }\n" + //
+                "     }\n" + //
+                "   }\n" + //
+                " }";
+        
+        String sparql2 = "" + //
+                " prefix ex: <http://www.example.org/schema#>\n" + //
+                " prefix in: <http://www.example.org/instance#>\n" + //
+                " SELECT ?x #1\n \n" + //
+                " {\n" + //
+                "   GRAPH ?g #1\n" + // 
+                "   {\n" + //
+                "     ?g a ex:graph_type2 .\n" + //
+                "     {SELECT ?x #2\n" + //
+                "      {\n" + //
+                "        GRAPH ?g_1 #2\n" + //
+                "        {\n" + //
+                "          ?g_1 a ex:graph_type1 .\n" + //
+                "         {SELECT ?x #3\n" + //
+                "          {\n" + //
+                "             ?x ex:p ?g_1_2\n" + //          
+                "           }\n" + //
+                "          }\n" + //
+                "        }\n" + //
+                "      }\n" + //
+                "     }\n" + //
+                "   }\n" + //
+                " }";
+        
+        
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot expected = parse(sparql2, baseURI);
+        
+        assertSameAST(sparql1, expected, actual);
+        
+    } // test_subselect_under_graph_04()
+    
+    
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g} GROUP BY ?x}
+     *   }
+     * }
+     * </pre>
+     * 
+     * Here SELECT ?x (SAMPLE(?y) AS ?g) overshadows the variable from GRAPH ?g,
+     * because ?g is introduced anew in (SAMPLE(?y) AS ?g),
+     * so that ?g in ?x ?p ?g is actually a different variable, 
+     * albeit with the same name.
+     * 
+     * The tested feature solves this by explicitly renaming ?g in ?x ?p ?g,
+     * but not in SELECT ?x (SAMPLE(?y) AS ?g):
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g_1} GROUP BY ?x}
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_subselect_under_graph_05() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+           
+        String sparql1 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g} GROUP BY ?x}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql2 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (SAMPLE(?y) AS ?g) WHERE {?x ?p ?y . ?x ?p ?g_1} GROUP BY ?x}\n" + //
+                " }\n" + //
+                "}";
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot expected = parse(sparql2, baseURI);
+        
+        assertSameAST(sparql1, expected, actual);
+        
+    } // test_subselect_under_graph_05()
+    
+    
+    
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT * WHERE {?x ?p ?g}}
+     *   }
+     * }
+     * </pre>
+     * 
+     * This test is to ensure that the variable renaming approach
+     * to resolve variable name collision is not over-applied.
+     * Here SELECT * does not overshadow the variable from GRAPH ?g, 
+     * because * covers ?g, so ?g must not be renamed.
+     */
+    public void test_subselect_under_graph_06() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT * WHERE {?x ?p ?g}}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql2 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT * WHERE {?x ?p ?g_1}}\n" + //
+                " }\n" + //
+                "}";
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot notExpected = parse(sparql2, baseURI);
+        
+        assertDifferentAST(sparql1, notExpected, actual);
+        
+    } // test_subselect_under_graph_06()
+    
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT ?x ?g WHERE {?x ?p ?g}}
+     *   }
+     * }
+     * </pre>
+     * 
+     * This test is to ensure that the variable renaming approach
+     * to resolve variable name collision is not over-applied.
+     * Here SELECT ?x ?g does not overshadow the variable from GRAPH ?g, 
+     * because the projection includes ?g, so ?g must not be renamed.
+     */
+    public void test_subselect_under_graph_07() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x ?g WHERE {?x ?p ?g}}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql2 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x ?g WHERE {?x ?p ?g_1}}\n" + //
+                " }\n" + //
+                "}";
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot notExpected = parse(sparql2, baseURI);
+        
+        assertDifferentAST(sparql1, notExpected, actual);
+        
+    } // test_subselect_under_graph_07()
+    
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * PREFIX ex: <http://www.example.org/schema#>
+     * SELECT ?y
+     * {
+     *   GRAPH ?g  
+     *   {
+     *     {SELECT (SAMPLE(?x) AS ?y) 
+     *      {
+     *        ?x ex:p ?g
+     *      }
+     *      GROUP BY ?g
+     *      HAVING (SAMPLE(?x) > ?g)
+     *      ORDER BY ?g
+     *      VALUES ?g { ex:graph1 }
+     *     }
+     *   }
+     * }
+     * </pre>
+     * 
+     * Here SELECT (SAMPLE(?x) AS ?y) overshadows the variable from GRAPH ?g, 
+     * so that ?g everywhere else is actually a different variable, 
+     * albeit with the same name.
+     * 
+     * The tested feature solves this by explicitly renaming ?g:
+     * 
+     * <pre>
+     * PREFIX ex: <http://www.example.org/schema#>
+     * SELECT ?y
+     * {
+     *   GRAPH ?g  
+     *   {
+     *     {SELECT (SAMPLE(?x) AS ?y) 
+     *      {
+     *        ?x ex:p ?g_1
+     *      }
+     *      GROUP BY ?g_1
+     *      HAVING (SAMPLE(?x) > ?g_1)
+     *      ORDER BY ?g_1
+     *      VALUES ?g_1 { ex:graph1 }
+     *     }
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_subselect_under_graph_08() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //       
+                " PREFIX ex: <http://www.example.org/schema#>\n" + //
+                " SELECT ?y\n" + //
+                " {\n" + //
+                "   GRAPH ?g \n" + // 
+                "   {\n" + //
+                "     {SELECT (SAMPLE(?x) AS ?y) \n" + //
+                "      {\n" + //
+                "        ?x ex:p ?g\n" + //
+                "      }\n" + //
+                "      GROUP BY ?g\n" + //
+                "      HAVING (SAMPLE(?x) > ?g)\n" + //
+                "      ORDER BY ?g\n" + //
+                "      VALUES ?g { ex:graph1 }\n" + //
+                "     }\n" + //
+                "   }\n" + //
+                " }";
+
+        String sparql2 = "" + //       
+                " PREFIX ex: <http://www.example.org/schema#>\n" + //
+                " SELECT ?y\n" + //
+                " {\n" + //
+                "   GRAPH ?g \n" + // 
+                "   {\n" + //
+                "     {SELECT (SAMPLE(?x) AS ?y) \n" + //
+                "      {\n" + //
+                "        ?x ex:p ?g_1\n" + //
+                "      }\n" + //
+                "      GROUP BY ?g_1\n" + //
+                "      HAVING (SAMPLE(?x) > ?g_1)\n" + //
+                "      ORDER BY ?g_1\n" + //
+                "      VALUES ?g_1 { ex:graph1 }\n" + //
+                "     }\n" + //
+                "   }\n" + //
+                " }";
+
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot expected = parse(sparql2, baseURI);
+         
+        assertSameAST(sparql1, expected, actual);
+        
+    } // test_subselect_under_graph_08()
+    
+    
+    /**
+     * Unit test for the treatment of graph variables overshadowed
+     * by sub-SELECTs.
+     * 
+     * <pre>
+     * SELECT ?x WHERE {
+     *   GRAPH ?g {
+     *     {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g}}
+     *   }
+     * }
+     * </pre>
+     * 
+     * This test is to ensure that the variable renaming approach
+     * to resolve variable name collision is not over-applied.
+     * Here SELECT ?x  (?g AS ?g) does not overshadow the variable from GRAPH ?g, 
+     * because it's equivalent to SELECT ?x ?g, so ?g must not be renamed.
+     */
+    public void test_subselect_under_graph_09() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+    
+        String sparql1 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g}}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql2 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (?g AS ?g) WHERE {?x ?p ?g_1}}\n" + //
+                " }\n" + //
+                "}";
+        
+        String sparql3 = "" + //
+                "SELECT ?x WHERE {\n" + //
+                "  GRAPH ?g {\n" + //
+                "    {SELECT ?x (?g_1 AS ?g) WHERE {?x ?p ?g_1}}\n" + //
+                " }\n" + //
+                "}";
+    
+        final QueryRoot actual = parse(sparql1, baseURI);
+        
+        final QueryRoot notExpected2 = parse(sparql2, baseURI);
+        final QueryRoot notExpected3 = parse(sparql3, baseURI);
+        
+        assertDifferentAST(sparql1, notExpected2, actual);
+        assertDifferentAST(sparql1, notExpected3, actual);
+        
+    } // test_subselect_under_graph_09()
+    
 }

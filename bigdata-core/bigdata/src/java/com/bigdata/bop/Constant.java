@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -25,6 +25,8 @@ package com.bigdata.bop;
 
 import java.util.Collections;
 
+import com.bigdata.rdf.sparql.ast.FilterNode;
+
 
 /**
  * A constant.
@@ -39,7 +41,19 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      */
     private static final long serialVersionUID = -2967861242470442497L;
     
+    /** Unique (for all E) Constant representing the error value as in
+     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra .
+     *  This allows efficient checking if a value is an error value by using 
+     *  the reference equality (val == Constant.ERROR_VALUE).
+     */
+    private static final Constant ERROR_VALUE = new Constant(); 
+    
+    /** value == null indicates this == errorValue, representing 
+     *  an error value as in
+     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
+     */
     final private E value;
+    
 
     public interface Annotations extends ImmutableBOp.Annotations {
 
@@ -85,11 +99,14 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      * 
-     * @param op
+     * @param op != Constant.ERROR_VALUE
      */
     public Constant(final Constant<E> op) {
 
         super(op);
+        
+        if (op == Constant.ERROR_VALUE)
+            throw new IllegalArgumentException();
         
         this.value = op.value;
         
@@ -152,7 +169,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     public Constant(final E value) {
 
         super(BOp.NOARGS, BOp.NOANNS);
-
+        
         if (value == null)
             throw new IllegalArgumentException();
 
@@ -164,7 +181,23 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         this.value = value;
 
     }
+    
+    /** Currently only used to create {@link ERROR_VALUE}. */
+    private Constant() {
+        super(BOp.NOARGS, BOp.NOANNS);
+        value = null;
+    }
 
+    /** Always returns the same constant representing the error value as in
+     *  https://www.w3.org/TR/sparql11-query/#aggregateAlgebra .
+     *  Copies of this Constant cannot be created,
+     *  so comparison of reference is enough for equality checks.
+     */
+    public static Constant errorValue() {
+        return ERROR_VALUE;
+    }
+    
+    
     /**
      * Clone is overridden to reduce heap churn.
      */
@@ -175,6 +208,10 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     }
 
     public String toString() {
+        
+        if (value == null) {
+            return "<error value>";
+        }
         
         @SuppressWarnings("unchecked")
         final IVariable<E> var = (IVariable<E>) getProperty(Annotations.VAR);
@@ -192,14 +229,16 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     final public boolean equals(final IVariableOrConstant<E> o) {
 
-        if (o.isConstant() && value.equals(o.get())) {
-
-            return true;
-
+        if (!o.isConstant()) {
+            return false;
         }
-
-        return false;
-
+            
+        if (value == null) {
+            return ((Constant) o).value == null;
+        }
+        
+        return ((Constant) o).value != null && 
+                value.equals(((Constant) o).value);
     }
     
     final public boolean equals(final Object o) {
@@ -244,16 +283,26 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     final public int hashCode() {
         
 //        return (int) (id ^ (id >>> 32));
+        
+        if (value == null) {
+            return 747282; // arbitrary, not too small
+        }
         return value.hashCode();
         
     }
 
+    /** @return possibly null if this Constant represents an error value 
+     *  as in https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
+     */
     final public E get() {
         
         return value;
         
     }
-
+    
+    /** @return possibly null if this Constant represents an error value 
+     *  as in https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
+     */
     final public E get(final IBindingSet bindingSet) {
         
         return value;

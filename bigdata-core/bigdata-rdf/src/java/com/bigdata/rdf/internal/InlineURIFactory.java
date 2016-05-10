@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -88,14 +88,14 @@ public class InlineURIFactory implements IInlineURIFactory {
     protected void addHandler(final InlineURIHandler handler) {
 
     	//        this.handlers.add(handler);
-        handlersByNamespace.put(handler.getNamespace(), handler);
+        getHandlersByNamespace().put(handler.getNamespace(), handler);
         
     }
 
     @Override
     public void init(final Vocabulary vocab) {
 
-    	for (InlineURIHandler handler : handlersByNamespace.values()) {
+    	for (InlineURIHandler handler : getHandlersByNamespace().values()) {
         
     		handler.init(vocab);
     		
@@ -110,7 +110,7 @@ public class InlineURIFactory implements IInlineURIFactory {
 		final String str = uri.stringValue();
 
 		// Find handler with longest prefix match LTE the given URI.
-		final Map.Entry<String, InlineURIHandler> floorEntry = handlersByNamespace.floorEntry(str);
+		final Map.Entry<String, InlineURIHandler> floorEntry = getHandlersByNamespace().floorEntry(str);
 
 		if (floorEntry == null) {
 
@@ -162,7 +162,7 @@ public class InlineURIFactory implements IInlineURIFactory {
     public String getLocalNameFromDelegate(final URI namespace,
             final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
 
-		final InlineURIHandler handler = handlersByNamespace.get(namespace.stringValue());
+		final InlineURIHandler handler = getHandlersByNamespace().get(namespace.stringValue());
 		
 		if (handler == null) {
 			throw new IllegalArgumentException(
@@ -171,6 +171,10 @@ public class InlineURIFactory implements IInlineURIFactory {
 		
 		return handler.getLocalNameFromDelegate(delegate);
 		
+	}
+
+	public TreeMap<String, InlineURIHandler> getHandlersByNamespace() {
+		return handlersByNamespace;
 	}
 
 }

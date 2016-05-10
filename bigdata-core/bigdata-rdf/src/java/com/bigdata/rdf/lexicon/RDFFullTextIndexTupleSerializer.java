@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
+import org.apache.lucene.search.similarities.DefaultSimilarity;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
@@ -40,9 +41,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
@@ -142,8 +141,8 @@ public class RDFFullTextIndexTupleSerializer extends
          * 
          * For more information on the round-trip of normalized term weight.
          */
-        final byte termWeightCompact =
-        	org.apache.lucene.search.Similarity.encodeNorm((float) termWeight);
+        final DefaultSimilarity similarity = new DefaultSimilarity(); 
+        final long termWeightCompact = similarity.encodeNormValue((float) termWeight);
         
         final IV docId = (IV)entry.getDocId();
 
@@ -258,8 +257,10 @@ public class RDFFullTextIndexTupleSerializer extends
          * 
          * For more information on the round-trip of normalized term weight.
          */
-        final double termWeight = 
-        	org.apache.lucene.search.Similarity.decodeNorm(termWeightCompact);
+        
+        final DefaultSimilarity similarity = new DefaultSimilarity(); 
+
+        final double termWeight = similarity.decodeNormValue(termWeightCompact);
 
         if (keyOnly) {
 

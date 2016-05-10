@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -118,6 +118,8 @@ public class QueryHintRegistry {
         add(new RemoteAPHint());
         add(new AccessPathSampleLimitHint());
         add(new AccessPathScanAndFilterHint());
+        add(new NumTasksPerThreadHint());
+        add(new MinDatapointsPerTaskHint());
         
         // DESCRIBE
         add(new DescribeModeHint());
@@ -186,6 +188,13 @@ public class QueryHintRegistry {
          * Disable default graph distinct filter
          */
         add(new DefaultGraphDistinctFilterHint());
+        
+        /*
+         * Automatically convert non-String Literals to strings for SPARQL REGEX
+         * 
+         * {@see BLZG-1780}
+         */
+        add(new RegexMatchNonStringHint());
         
     }
 

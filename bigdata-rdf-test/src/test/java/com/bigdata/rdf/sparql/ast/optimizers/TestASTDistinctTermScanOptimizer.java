@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -185,8 +185,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						 * the arity and cardinality of the underlying triple or
 						 * quad pattern access path.
 						 */
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						/*
 						 * Update the estimated cardinality on the SP.
 						 */
@@ -246,8 +246,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						StatementPatternNode sp = 
 							statementPatternNode(
@@ -338,8 +338,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						StatementPatternNode sp =
 							statementPatternNode(
@@ -387,8 +387,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						StatementPatternNode sp = statementPatternNode(
 								varNode(s), varNode(p), varNode(o), varNode(z),
@@ -438,8 +438,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					}
 					
 					{
-						final long newRangeCount = (long) (1.0 / (store
-								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						final long newRangeCount = (long) ((1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1);
 						
 						expected = 
 								select(

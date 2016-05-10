@@ -1,0 +1,12 @@
+prefix person: <http://example.com/person/> 
+prefix foaf: <http://xmlns.com/foaf/0.1/>  
+
+SELECT * WHERE {                    
+  hint:Query hint:analytic "true" .
+  {
+    SELECT ?s ?p ?o WHERE {
+      VALUES (?s ?p ?o) { (person:peter foaf:knows person:michael) }
+    }
+  }
+  FILTER(?o=person:michael)
+}

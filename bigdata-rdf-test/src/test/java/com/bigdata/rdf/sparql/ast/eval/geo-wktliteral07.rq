@@ -1,0 +1,16 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT ?res ?location WHERE {
+
+  <http://s.0.5#0.5> <http://p> ?southWest .
+  <http://s.1#1> <http://p>  ?northEast .
+  
+  SERVICE geo:search {
+    ?res geo:searchDatatype <http://www.opengis.net/ont/geosparql#wktLiteral> .
+    ?res geo:search "inRectangle" .
+    ?res geo:predicate <http://p> .
+    ?res geo:spatialRectangleSouthWest ?southWest .
+    ?res geo:spatialRectangleNorthEast ?northEast .
+    ?res geo:locationValue ?location .
+  }
+} 

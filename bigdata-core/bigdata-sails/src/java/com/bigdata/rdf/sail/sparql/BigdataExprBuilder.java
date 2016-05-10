@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -42,17 +42,15 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.solutions.GroupByState;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTAskQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTBaseDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTBindingSet;
@@ -62,7 +60,6 @@ import com.bigdata.rdf.sail.sparql.ast.ASTConstruct;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstructQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTDescribe;
 import com.bigdata.rdf.sail.sparql.ast.ASTDescribeQuery;
-import com.bigdata.rdf.sail.sparql.ast.ASTGraphGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTGroupClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTHavingClause;
@@ -171,6 +168,104 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         final QueryBase queryRoot = getQueryBase(astQuery, data,
                 QueryType.SELECT);
 
+
+        if (astQuery.isSubSelect()) {
+
+            // Here we check if the sub-SELECT overshadows the current context
+            // variable (if any) and ensure that there is no collision between
+            // the name of this context variable and some other variables 
+            // inside the sub-SELECT by renaming such occurences under 
+            // the sub-SELECT. 
+            
+            // Example:
+            //
+            // SELECT ?x WHERE {
+            //   GRAPH ?g {
+            //     {SELECT ?x WHERE {?x ?p ?g}}
+            // }}
+            //
+            // In this query, the context variable ?g is overshadowed 
+            // by SUBSELECT ?x (it's not included in the projection). 
+            // This means that the occurence of ?g in ?x ?p ?g is a different
+            // variable with the same name. We resolve this collision by 
+            // replacing it with a fresh variable, say ?g_12345:
+            //
+            // SELECT ?x WHERE {
+            //   GRAPH ?g {
+            //     {SELECT ?x WHERE {?x ?p ?g_12345}}
+            // }}
+            
+
+            // The variable renaming should be done before the parse tree is converted
+            // i.e., before handleX() calls. This allows very simple replacement 
+            // logic: ?g is simply replaced in all its occurences in astQuery with 
+            // a simple visitor.
+            // Doing the replacement after the parse tree has been
+            // converted into a query plan AST would be more difficult because 
+            // a query plan AST already has context variables in triple pattern
+            // objects. 
+
+            // See also https://jira.blazegraph.com/browse/BLZG-1892
+
+            final String contextVarToRename =
+                    contextVarOvershadowedBySelect(astQuery.getSelect(), queryRoot);
+
+            if (contextVarToRename != null) {
+                // must be replaced with a fresh variable to resolve
+                // the name collision, except the occurrences in context references
+
+
+                // The variables inside the sub-SELECT whose names coincide 
+                // with the context variable name, should be renamed into 
+                // a fresh variable, to resolve the name collision, 
+                // except the occurrences in context references.
+
+                final String freshVarName =
+                        context.
+                        createAnonVar(contextVarToRename + "_").
+                        getValueExpression().
+                        getName();
+                        
+                // Keeping the name as a prefix for mnemonicity of AST and
+                // execution plan printing.
+                final VarRenamingVisitor renaming =
+                        new VarRenamingVisitor(contextVarToRename, freshVarName);
+
+
+                
+                assert (ASTNamedSubquery) astQuery.
+                        jjtGetChild(ASTNamedSubquery.class) == null;
+                // because named subqueries are only allowed in top-level
+                // query nodes.
+                
+                if (astQuery.getWhereClause() != null) {
+                    renaming.visit(astQuery.getWhereClause(), null /* data */);
+                }
+                if (astQuery.getGroupClause() != null) {
+                    renaming.visit(astQuery.getGroupClause(), null /* data */);
+                }
+                if (astQuery.getHavingClause() != null) {
+                    renaming.visit(astQuery.getHavingClause(), null /* data */);
+                }
+                if (astQuery.getOrderClause() != null) {
+                    renaming.visit(astQuery.getOrderClause(), null /* data */);
+                }
+
+                // nothing for slicing
+
+                if (astQuery.getBindingsClause() != null) {
+                    renaming.visit(astQuery.getBindingsClause(), null /* data */);
+                }
+
+                // Note that the renaming is not applied to the projection 
+                // elements, only below the projection. This is because we
+                // may have something like SELECT (SAMPLE(?y) AS ?g) and 
+                // here ?g is actually the same as in the enclosing GRAPH ?g.
+                
+                
+            } // if (contextVarToRename != null)
+        } // if (astQuery.isSubSelect())
+        
         // Accept optional NamedSubquery(s).
         handleNamedSubqueryClause(astQuery, queryRoot);
 
@@ -193,6 +288,56 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         return queryRoot;
 
     }
+    
+    
+    /**
+     * Auxiliary class; recursively replaces a given variable with another given
+     * variable everywhere in a visited AST. The replacement is destructive:
+     * contents of ASTVar nodes are changed.
+     *
+     * @author <a href="mailto:ariazanov@blazegraph.com">Alexandre Riazanov</a>
+     *
+     * @since Apr 27, 2016
+     */
+    private static class VarRenamingVisitor extends ASTVisitorBase {
+
+        private final String replacedVar;
+        private final String replacingVar;
+
+        /**
+         * The constructed object can be used to recursively replace
+         * {@link replacedVariable} with {@link replacingVariable} everywhere in
+         * visited ASTs. The replacement is destructive: contents of ASTVar
+         * nodes are changed.
+         *
+         * @param replacedVariable non-null
+         * @param replacingVariable non-null
+         */
+        public VarRenamingVisitor(String replacedVariable,
+                String replacingVariable) {
+            replacedVar = replacedVariable;
+            replacingVar = replacingVariable;
+
+            if (replacedVariable == null) {
+                throw new IllegalArgumentException();
+            }
+            if (replacingVariable == null) {
+                throw new IllegalArgumentException();
+            }
+        }
+
+        @Override
+        public Object visit(ASTVar node, Object data)
+                throws VisitorException {
+
+            if (node.getName().equals(replacedVar)) {
+                node.setName(replacingVar);
+            }
+
+
+            return node.childrenAccept(this, data);
+        }
+    } // class VarRenamingVisitor
 
     /**
      * ASK query.
@@ -638,7 +783,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
      */
     protected void handleSelect(final ASTSelect select,
             final IProjectionDecl queryRoot) throws VisitorException {
-
+        
         final ProjectionNode projection = new ProjectionNode();
         
         queryRoot.setProjection(projection);
@@ -652,7 +797,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         if (select.isWildcard()) {
         
             projection.addProjectionVar(new VarNode("*"));
-        
+            
         } else {
 
             // Used to detect duplicate variables in a projection.
@@ -702,12 +847,90 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
                 if (!vars.add(varname))
                     throw new VisitorException(
                             "duplicate variable in projection: " + varname);
-
+                
             }
             
         }
 
     }
+    
+    
+    /**
+     * If the enclosing GRAPH pattern (accessible via super.graphPattern) is a
+     * variable which is projected away ("overshadowed") by the SELECT, the name
+     * of this variable is returned. Otherwise, null is returned.
+     */
+    private String contextVarOvershadowedBySelect(final ASTSelect select,
+            final IProjectionDecl queryRoot) throws VisitorException {
+
+        if (graphPattern == null
+                || graphPattern.getContext() == null
+                || !graphPattern.getContext().isVariable()) // no context var at all
+        {
+            return null;
+        }
+
+        final String contextVar =
+                ((Var) ((VarNode) graphPattern.getContext())
+                .getValueExpression()).getName();
+        assert contextVar != null;
+
+
+        if (select.isWildcard()) {
+
+            return null;
+            // contextVar is implicitly in the projection
+
+        } else {
+
+            // check if contextVar is explicitly in the projection and, thus,
+            // definitely not overshadowed here
+
+
+            final Iterator<ASTProjectionElem> itr = select
+                    .getProjectionElemList().iterator();
+
+            while (itr.hasNext()) {
+
+                final ASTProjectionElem e = itr.next();
+
+                if (e.hasAlias()) {
+                    // (Expr AS Var)
+                    // We have to consider case SELECT (?g AS ?g)
+                    // because it's equivalent to SELECT ?g.
+                                        
+                    final String varname = e.getAlias();
+                    
+                    final SimpleNode expr = (SimpleNode) e.jjtGetChild(0);
+                    
+                    if (contextVar.equals(varname) && 
+                            expr instanceof ASTVar && 
+                            ((ASTVar) expr).getName().equals(varname)) {                        
+                        // contextVar is explicitly in the projection
+                        // (not overshadowed)
+                        return null;
+                    }                    
+                    
+                } else {
+                    final ASTVar aVar = (ASTVar) e.jjtGetChild(0/* index */);
+
+                    if (contextVar.equals(aVar.getName())) {
+                        return null;
+                        // contextVar is explicitly in the projection
+                    }
+                }; // if (!e.hasAlias())
+
+
+            } // while (itr.hasNext())
+
+        } // if (select.isWildcard())   
+
+        return contextVar; // overshadowed by the projection
+
+    } // contextVarOvershadowedBySelect(final ASTSelect select,
+
+    
+    
     
     /**
      * Handle the optional WHERE clause. (For example, DESCRIBE may be used

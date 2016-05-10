@@ -1,13 +1,18 @@
 package com.bigdata.rdf.internal;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
+import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.service.geospatial.GeoSpatialDatatypeConfiguration;
 
 /**
  * Default {@link IExtensionFactory}. The following extensions are supported:
@@ -24,16 +29,15 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public class DefaultExtensionFactory implements IExtensionFactory {
 
-    private final Collection<IExtension> extensions;
-    
-    private volatile IExtension[] extensionsArray;
+    private final List<IExtension<? extends BigdataValue>> extensions;
     
     public DefaultExtensionFactory() {
         
-        extensions = new LinkedList<IExtension>(); 
+        extensions = new LinkedList<IExtension<? extends BigdataValue>>(); 
             
     }
     
+    @Override
     public void init(final IDatatypeURIResolver resolver,
             final ILexiconConfiguration<BigdataValue> config) {
 
@@ -41,6 +45,21 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	 * Always going to inline the derived numeric types.
     	 */
     	extensions.add(new DerivedNumericsExtension<BigdataLiteral>(resolver));
+    	
+    	/*
+    	 * Set up the configuration of the geospatial module
+    	 */
+    	if (config.isGeoSpatial()) {
+    	    
+    	    // register the extensions, adding one extension per datatype config
+    	    final List<GeoSpatialDatatypeConfiguration> datatypeConfigs = 
+    	        config.getGeoSpatialConfig().getDatatypeConfigs();
+    	    for (int i=0; i<datatypeConfigs.size(); i++) {
+    	        extensions.add(
+    	            new GeoSpatialLiteralExtension<BigdataLiteral>(
+    	                resolver, datatypeConfigs.get(i)));    	
+    	    }
+    	}
     	
     	if (config.isInlineDateTimes()) {
     		
@@ -61,26 +80,35 @@ public class DefaultExtensionFactory implements IExtensionFactory {
         }
         
         _init(resolver, config, extensions);
-
-		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         
     }
     
     /**
      * Give subclasses a chance to add extensions.
+     * 
+     * @param resolver
+     *            {@link IDatatypeURIResolver} from
+     *            {@link #init(IDatatypeURIResolver, ILexiconConfiguration)}.
+     * @param config
+     *            The {@link ILexiconConfiguration} from
+     *            {@link #init(IDatatypeURIResolver, ILexiconConfiguration)}.
+     * 
+     * @param extensions
+     *            The extensions that have already been registered.
+     * 
+     * @see #init(IDatatypeURIResolver, ILexiconConfiguration)
      */
     protected void _init(final IDatatypeURIResolver resolver,
             final ILexiconConfiguration<BigdataValue> config,
-            final Collection<IExtension> extensions) {
+            final Collection<IExtension<? extends BigdataValue>> extensions) {
 
     	// noop
     	
     }
     
-    public IExtension[] getExtensions() {
-        
-        return extensionsArray;
-        
+    @Override
+    public Iterator<IExtension<? extends BigdataValue>> getExtensions() {
+        return Collections.unmodifiableList(extensions).iterator();
     }
     
 }

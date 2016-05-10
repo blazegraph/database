@@ -31,6 +31,11 @@ public class TripleStoreSchema extends RelationSchema {
     public static final String VOCABULARY = ns + "vocabulary";
 
     /**
+     * The serialized {@link GeoSpatialConfig} as configured for the database.
+     */
+    public static final String GEO_SPATIAL_CONFIG = ns + "geospatialconfig";
+
+    /**
      * De-serialization ctor.
      */
     public TripleStoreSchema() {

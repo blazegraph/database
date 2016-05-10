@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,16 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -211,68 +208,9 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
                 
             }
 
-            if (subqueryRoot.hasSlice()) {
-
-                /*
-                 * Lift out SPARQL 1.1 subqueries which use LIMIT and/or OFFSET.
-                 * 
-                 * The SliceOp in the subquery will cause the IRunningQuery in
-                 * which it appears to be interrupted. Therefore, when a SLICE
-                 * is required for a subquery we need to lift it out to run it
-                 * as a named subquery.
-                 * 
-                 * TODO There may well be other cases that we have to handle
-                 * with as-bound evaluation of a Subquery with a LIMIT/OFFSET.
-                 * If so, then the subquery will have to be run using the
-                 * SubqueryOp.
-                 */
+            if (needsLifting(subqueryRoot)) {
 
                 liftSparql11Subquery(context, sa, subqueryRoot);
-
-                continue;
-
-            }
-            if (subqueryRoot.hasSlice() 
-                    && subqueryRoot.getOrderBy() != null) {
-
-                /*
-                 * Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER
-                 * BY. Due to the interaction of the LIMIT and ORDER BY clause,
-                 * these subqueries MUST be run first since they can produce
-                 * different results if they are run "as-bound".
-                 */
-
-                liftSparql11Subquery(context, sa, subqueryRoot);
-
-                continue;
-
-            }
-
-            if (StaticAnalysis.isAggregate(subqueryRoot)) {
-
-                /*
-                 * Lift out SPARQL 1.1 subqueries which use {@link IAggregate}s.
-                 * This typically provides more efficient evaluation than
-                 * repeated as-bound evaluation of the sub-select. It also
-                 * prevents inappropriate sharing of the internal state of the
-                 * {@link IAggregate} functions.
-                 */
-
-                liftSparql11Subquery(context, sa, subqueryRoot);
-
-                continue;
-
-            }
-
-            if (subqueryRoot.isRunOnce()) {
-
-                /*
-                 * Lift out SPARQL 1.1 subqueries for which the RUN_ONCE
-                 * annotation was specified.
-                 */
-
-                liftSparql11Subquery(context, sa, subqueryRoot);
-
                 continue;
 
             }
@@ -283,26 +221,80 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
              * has been commented out for now because it will otherwise cause
              * all sub-selects to be lifted out.
              */
-            if(false) {
-            final Set<IVariable<?>> joinVars = sa.getJoinVars(
-                    subqueryRoot, new LinkedHashSet<IVariable<?>>());
-
-            if (joinVars.isEmpty()) {
-
-                /*
-                 * Lift out SPARQL 1.1 subqueries for which the RUN_ONCE
-                 * annotation was specified.
-                 */
-
-                liftSparql11Subquery(context, sa, subqueryRoot);
-
-                continue;
-
-            }
-            }
+//            if(false) {
+//            final Set<IVariable<?>> joinVars = sa.getJoinVars(
+//                    subqueryRoot, new LinkedHashSet<IVariable<?>>());
+//
+//            if (joinVars.isEmpty()) {
+//
+//                /*
+//                 * Lift out SPARQL 1.1 subqueries for which the RUN_ONCE
+//                 * annotation was specified.
+//                 */
+//
+//                liftSparql11Subquery(context, sa, subqueryRoot);
+//
+//                continue;
+//
+//            }
+//            }
 
         }
         
+    }
+    
+    /**
+     * Returns true iff the subquery needs to be lifted into a named subquery include.
+     * 
+     * @param subqueryRoot
+     * @return
+     */
+    public static boolean needsLifting(final SubqueryRoot subqueryRoot) {
+        if (subqueryRoot==null)
+            return false;
+        
+        boolean needsLifting = false;
+        /*
+         * A. Lift out SPARQL 1.1 subqueries which use LIMIT and/or OFFSET.
+         * 
+         * The SliceOp in the subquery will cause the IRunningQuery in
+         * which it appears to be interrupted. Therefore, when a SLICE
+         * is required for a subquery we need to lift it out to run it
+         * as a named subquery.
+         * 
+         * TODO There may well be other cases that we have to handle
+         * with as-bound evaluation of a Subquery with a LIMIT/OFFSET.
+         * If so, then the subquery will have to be run using the
+         * SubqueryOp.
+         */
+        needsLifting |= subqueryRoot.hasSlice();
+
+        /*
+         * Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER
+         * BY. Due to the interaction of the LIMIT and ORDER BY clause,
+         * these subqueries MUST be run first since they can produce
+         * different results if they are run "as-bound".
+         * 
+         * NOTE: this is redundant with the previous case and outcommented.
+         */
+        // needsLifting |= subqueryRoot.hasSlice() && subqueryRoot.getOrderBy() != null;
+        
+        /*
+         * Lift out SPARQL 1.1 subqueries which use {@link IAggregate}s.
+         * This typically provides more efficient evaluation than
+         * repeated as-bound evaluation of the sub-select. It also
+         * prevents inappropriate sharing of the internal state of the
+         * {@link IAggregate} functions.
+         */
+        needsLifting |= StaticAnalysis.isAggregate(subqueryRoot);
+
+        /*
+         * Lift out SPARQL 1.1 subqueries for which the RUN_ONCE
+         * annotation was specified.
+         */
+        needsLifting |= subqueryRoot.isRunOnce();
+            
+        return needsLifting;
     }
 
     private void rewriteSparql11Subqueries(final AST2BOpContext context,

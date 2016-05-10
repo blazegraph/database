@@ -123,9 +123,19 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      */
 	final public int MAX_ADDRESS_BITS = 16;
 	
-	private static final transient Logger log = Logger
+	protected static final transient Logger log = Logger
 			.getLogger(AbstractHTree.class);
 
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static protected boolean INFO = log.isInfoEnabled();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static protected boolean DEBUG = log.isDebugEnabled();
+    
 	/**
 	 * Log for {@link AbstractHTree#dump(PrintStream)} and friends.
 	 */
@@ -760,6 +770,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      *                HTree and there are mutations that have not been written
      *                through to the store)
      */
+    @Override
     synchronized public void close() {
 
         if (root == null) {
@@ -768,7 +779,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 
         }
 
-        if (log.isInfoEnabled() || BigdataStatics.debug) {
+        if (INFO || BigdataStatics.debug) {
 
             final String msg = "HTree close: name="
                     + metadata.getName()
@@ -784,7 +795,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
                     + (this instanceof HTree ? ((HTree) this).getCheckpoint()
                             .toString() : getClass().getSimpleName());
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(msg);
 
         }
@@ -1560,7 +1571,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 	 */
 	private final void doSyncTouch(final AbstractPage node) {
 
-        final long beginNanos = System.nanoTime();
+//        final long beginNanos = System.nanoTime();
         
         synchronized (this) {
 
@@ -1568,19 +1579,19 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 
         }
 
-        final long elapsedNanos = System.nanoTime() - beginNanos;
-
-        // See BLZG-1664
-        btreeCounters.syncTouchNanos.add(elapsedNanos);
+//        final long elapsedNanos = System.nanoTime() - beginNanos;
+//
+//        // See BLZG-1664
+//        btreeCounters.syncTouchNanos.add(elapsedNanos);
 
 	}
 
 	private final void doTouch(final AbstractPage node) {
 
-        final long beginNanos = System.nanoTime();
-        
-        // See BLZG-1664
-        btreeCounters.touchCount.increment();
+//        final long beginNanos = System.nanoTime();
+//        
+//        // See BLZG-1664
+//        btreeCounters.touchCount.increment();
         
 		/*
 		 * We need to guarantee that touching this node does not cause it to be
@@ -1649,10 +1660,10 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 		//
 		// }
 
-        final long elapsedNanos = System.nanoTime() - beginNanos;
-        
-        // See BLZG-1664
-        btreeCounters.touchNanos.add(elapsedNanos);
+//        final long elapsedNanos = System.nanoTime() - beginNanos;
+//        
+//        // See BLZG-1664
+//        btreeCounters.touchNanos.add(elapsedNanos);
 
 	}
 

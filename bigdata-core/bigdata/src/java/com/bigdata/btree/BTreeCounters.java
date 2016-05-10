@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -173,9 +173,9 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         serializeNanos.add(o.serializeNanos.get());
         rawRecordsWritten.add(o.rawRecordsWritten.get());
         rawRecordsBytesWritten.add(o.rawRecordsBytesWritten.get());
-        // touch()
-        syncTouchNanos.add(o.syncTouchNanos.get());
-        touchNanos.add(o.touchNanos.get());
+//        // touch()
+//        syncTouchNanos.add(o.syncTouchNanos.get());
+//        touchNanos.add(o.touchNanos.get());
         // write eviction queue
         
     }
@@ -245,9 +245,9 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         t.writeNanos.add(-o.writeNanos.get());
         t.rawRecordsWritten.add(-o.rawRecordsWritten.get());
         t.rawRecordsBytesWritten.add(-o.rawRecordsBytesWritten.get());
-        // touch()
-        syncTouchNanos.add(-o.syncTouchNanos.get());
-        touchNanos.add(-o.touchNanos.get());
+//        // touch()
+//        syncTouchNanos.add(-o.syncTouchNanos.get());
+//        touchNanos.add(-o.touchNanos.get());
         
         return t;
         
@@ -381,47 +381,55 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
     public CAT rawRecordsWritten = new CAT();
     public CAT rawRecordsBytesWritten = new CAT();
 
-    // touch()
-	/**
-	 * Nanoseconds inside of doSyncTouch().
-	 * 
-     * @see BLZG-1664
+	/*
+	 * Note: The introduction of these performance counters caused a significant
+	 * performance regression for both load and query.  See BLZG-1693.
 	 */
-    public final CAT syncTouchNanos = new CAT();
-    /**
-     * Nanoseconds inside of doTouch() (this is also invoked from within
-     * doSyncTouch()).
-     * 
-     * @see BLZG-1664
-     */
-    public final CAT touchNanos = new CAT();
-    /**
-     * doTouch() call counter.
-     * 
-     * @see BLZG-1664
-     */
-    public final CAT touchCount = new CAT();
+//    // touch()
+//	/**
+//	 * Nanoseconds inside of doSyncTouch().
+//	 * 
+//     * @see BLZG-1664
+//	 */
+//    public final CAT syncTouchNanos = new CAT();
+//    /**
+//     * Nanoseconds inside of doTouch() (this is also invoked from within
+//     * doSyncTouch()).
+//     * 
+//     * @see BLZG-1664
+//     */
+//    public final CAT touchNanos = new CAT();
+//    /**
+//     * doTouch() call counter.
+//     * 
+//     * @see BLZG-1664
+//     */
+//    public final CAT touchCount = new CAT();
 
     //
     // write eviction queue
     //
     
-    /**
-     * The #of node or leaf references evicted from the write retention queue.
+    /*
+     * Note: The introduction of these performance counters might have caused
+     * some performance regression for both load and query.  See BLZG-1693.
      */
-    public final AtomicLong queueEvict = new AtomicLong();
-    /**
-     * The #of node or leave references evicted from the write retention queue
-     * that are no longer referenced on that queue. If the reference is dirty,
-     * it will be serialized and written on the backing store.
-     */
-    public final AtomicLong queueEvictNoRef = new AtomicLong();
-    /**
-     * The #of node or leave references evicted from the write retention queue
-     * that are no longer referenced on that queue and are dirty and thus will
-     * be immediately serialized and written on the backing store.
-     */
-    public final AtomicLong queueEvictDirty = new AtomicLong();
+//    /**
+//     * The #of node or leaf references evicted from the write retention queue.
+//     */
+//    public final AtomicLong queueEvict = new AtomicLong();
+//    /**
+//     * The #of node or leave references evicted from the write retention queue
+//     * that are no longer referenced on that queue. If the reference is dirty,
+//     * it will be serialized and written on the backing store.
+//     */
+//    public final AtomicLong queueEvictNoRef = new AtomicLong();
+//    /**
+//     * The #of node or leave references evicted from the write retention queue
+//     * that are no longer referenced on that queue and are dirty and thus will
+//     * be immediately serialized and written on the backing store.
+//     */
+//    public final AtomicLong queueEvictDirty = new AtomicLong();
 
 	/**
 	 * The #of bytes in the unisolated view of the index which are being used to
@@ -1108,107 +1116,107 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
             }
 
-            /*
-             * touch() stats.
-             */
-            {
+//            /*
+//             * touch() stats.
+//             */
+//            {
+//
+//                final CounterSet tmp = counterSet.makePath(IBTreeCounters.TOUCH);
+//                
+//                tmp.addCounter("touchCount", new Instrument<Long>() {
+//                    @Override
+//                    public void sample() {
+//                        setValue(touchCount.get());
+//                    }
+//                });
+//
+//                tmp.addCounter("syncTouchSecs", new Instrument<Double>() {
+//                    @Override
+//                    public void sample() {
+//                        final double secs = (syncTouchNanos.get() / 1000000000.);
+//                        setValue(secs);
+//                    }
+//                });
+//
+//                tmp.addCounter("syncTouchLatencyNanos",
+//                        new Instrument<Double>() {
+//                    @Override
+//                            public void sample() {
+//                                final long n = touchCount.get();
+//                                final double latencyNanos = (n == 0L ? 0d : (syncTouchNanos.get() / n));
+//                                setValue(latencyNanos);
+//                            }
+//                        });
+//
+//                tmp.addCounter("syncTouchPerSec",
+//                        new Instrument<Double>() {
+//                    @Override
+//                            public void sample() {
+//                                final long n = touchCount.get();
+//                                final double secs = (syncTouchNanos.get() / 1000000000.);
+//                                final double perSec = (secs == 0L ? 0d : (n / secs));
+//                                setValue(perSec);
+//                            }
+//                        });
+//
+//                tmp.addCounter("touchSecs", new Instrument<Double>() {
+//                    @Override
+//                    public void sample() {
+//                        final double secs = (touchNanos.get() / 1000000000.);
+//                        setValue(secs);
+//                    }
+//                });
+//
+//                tmp.addCounter("touchLatencyNanos",
+//                        new Instrument<Double>() {
+//                    @Override
+//                            public void sample() {
+//                                final long n = touchCount.get();
+//                                final double latencyNanos = (n == 0L ? 0d : (touchNanos.get() / n));
+//                                setValue(latencyNanos);
+//                            }
+//                        });
+//
+//                tmp.addCounter("touchPerSec",
+//                        new Instrument<Double>() {
+//                    @Override
+//                            public void sample() {
+//                                final long n = touchCount.get();
+//                                final double secs = (touchNanos.get() / 1000000000.);
+//                                final double perSec = (secs == 0L ? 0d : (n / secs));
+//                                setValue(perSec);
+//                            }
+//                        });
+//
+//            }
 
-                final CounterSet tmp = counterSet.makePath(IBTreeCounters.TOUCH);
-                
-                tmp.addCounter("touchCount", new Instrument<Long>() {
-                    @Override
-                    public void sample() {
-                        setValue(touchCount.get());
-                    }
-                });
-
-                tmp.addCounter("syncTouchSecs", new Instrument<Double>() {
-                    @Override
-                    public void sample() {
-                        final double secs = (syncTouchNanos.get() / 1000000000.);
-                        setValue(secs);
-                    }
-                });
-
-                tmp.addCounter("syncTouchLatencyNanos",
-                        new Instrument<Double>() {
-                    @Override
-                            public void sample() {
-                                final long n = touchCount.get();
-                                final double latencyNanos = (n == 0L ? 0d : (syncTouchNanos.get() / n));
-                                setValue(latencyNanos);
-                            }
-                        });
-
-                tmp.addCounter("syncTouchPerSec",
-                        new Instrument<Double>() {
-                    @Override
-                            public void sample() {
-                                final long n = touchCount.get();
-                                final double secs = (syncTouchNanos.get() / 1000000000.);
-                                final double perSec = (secs == 0L ? 0d : (n / secs));
-                                setValue(perSec);
-                            }
-                        });
-
-                tmp.addCounter("touchSecs", new Instrument<Double>() {
-                    @Override
-                    public void sample() {
-                        final double secs = (touchNanos.get() / 1000000000.);
-                        setValue(secs);
-                    }
-                });
-
-                tmp.addCounter("touchLatencyNanos",
-                        new Instrument<Double>() {
-                    @Override
-                            public void sample() {
-                                final long n = touchCount.get();
-                                final double latencyNanos = (n == 0L ? 0d : (touchNanos.get() / n));
-                                setValue(latencyNanos);
-                            }
-                        });
-
-                tmp.addCounter("touchPerSec",
-                        new Instrument<Double>() {
-                    @Override
-                            public void sample() {
-                                final long n = touchCount.get();
-                                final double secs = (touchNanos.get() / 1000000000.);
-                                final double perSec = (secs == 0L ? 0d : (n / secs));
-                                setValue(perSec);
-                            }
-                        });
-
-            }
-
-            // writeRetentionQueue
-            {
-                
-                final CounterSet tmp = counterSet.makePath(IBTreeCounters.WriteRetentionQueue);
-                
-                tmp.addCounter("evictCount", new Instrument<Long>() {
-                    @Override
-                    public void sample() {
-                        setValue(queueEvict.get());
-                    }
-                });
-
-                tmp.addCounter("evictCountNoRef", new Instrument<Long>() {
-                    @Override
-                    public void sample() {
-                        setValue(queueEvictNoRef.get());
-                    }
-                });
-
-                tmp.addCounter("evictCountDirty", new Instrument<Long>() {
-                    @Override
-                    public void sample() {
-                        setValue(queueEvictDirty.get());
-                    }
-                });
-
-            }
+//            // writeRetentionQueue
+//            {
+//                
+//                final CounterSet tmp = counterSet.makePath(IBTreeCounters.WriteRetentionQueue);
+//                
+//                tmp.addCounter("evictCount", new Instrument<Long>() {
+//                    @Override
+//                    public void sample() {
+//                        setValue(queueEvict.get());
+//                    }
+//                });
+//
+//                tmp.addCounter("evictCountNoRef", new Instrument<Long>() {
+//                    @Override
+//                    public void sample() {
+//                        setValue(queueEvictNoRef.get());
+//                    }
+//                });
+//
+//                tmp.addCounter("evictCountDirty", new Instrument<Long>() {
+//                    @Override
+//                    public void sample() {
+//                        setValue(queueEvictDirty.get());
+//                    }
+//                });
+//
+//            }
             
 //        }
         

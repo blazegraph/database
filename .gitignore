@@ -374,3 +374,5 @@ bigdata-rdf-test/test_small.out
 *.out
 
 *.seg
+**/blazegraph.jnl
+**/bigdata.jnl

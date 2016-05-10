@@ -1,0 +1,17 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT * WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inRectangle" .
+    ?res geo:searchDatatype <http://my.custom.datatype/x-y-z-lat-lon-time> .
+    ?res geo:predicate <http://p> .
+    ?res geo:spatialRectangleSouthWest "1#1" .     
+    ?res geo:spatialRectangleNorthEast "2#2" .   
+    ?res geo:customFields "x#y#z" .
+    ?res geo:customFieldsLowerBounds "0#0.4#1" .
+    ?res geo:customFieldsUpperBounds "1#1#1" .
+    ?res geo:timeStart "1" .
+    ?res geo:timeEnd "1" .
+    ?res geo:distanceValue ?distance .    
+  }
+}

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -187,6 +187,24 @@ public class ASTBase extends ModifiableBOpBase {
                 Boolean.toString(defaultValue)));
 
     }
+
+    /**
+     * Return the Integer value of the query hint.
+     * 
+     * @param name
+     *            The name of the query hint.
+     * @param defaultValue
+     *            The default value to use if the query hint is not defined.
+     */
+    public Integer getQueryHintAsInteger(final String name,
+            final Integer defaultValue) {
+
+        return Integer.valueOf(getQueryHint(name, 
+              Integer.toString(defaultValue)));
+
+    }
+
+    
 
     /**
      * Set the query hints.

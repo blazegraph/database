@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -129,10 +129,13 @@ public class ASTEvalHelper {
             final Dataset dataset)
             throws QueryEvaluationException {
 
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
         final DeferredResolutionResult resolved;
         try {
         	// @see https://jira.blazegraph.com/browse/BLZG-1176
-            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
+            resolved = ASTDeferredIVResolution.resolveQuery(
+                store, astContainer, globallyScopedBS, dataset, context);
         } catch (MalformedQueryException e) {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
@@ -142,7 +145,6 @@ public class ASTEvalHelper {
                 new DatasetNode(resolved.dataset, false/* update */));
         }
 
-        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();
@@ -204,30 +206,11 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS,
             final Dataset dataset) throws QueryEvaluationException {
 
-        final DeferredResolutionResult resolved;
-        try {
-        	// @see https://jira.blazegraph.com/browse/BLZG-1176
-            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
-        } catch (MalformedQueryException e) {
-            throw new QueryEvaluationException(e.getMessage(), e);
-        }
-
-        if (resolved.dataset != null) {
-            astContainer.getOriginalAST().setDataset(
-                new DatasetNode(resolved.dataset, false/* update */));
-        }
-
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
-        // Clear the optimized AST.
-        astContainer.clearOptimizedAST();
-
-        // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
-
-        // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, globallyScopedBSAsList);
-
+        final QueryRoot optimizedQuery = 
+                optimizeQuery(astContainer, context, globallyScopedBS, dataset);
+        
         // Get the projection for the query.
         final IVariable<?>[] projected = astContainer.getOptimizedAST()
                 .getProjection().getProjectionVars();
@@ -236,9 +219,6 @@ public class ASTEvalHelper {
 
         for (IVariable<?> var : projected)
             projectedSet.add(var.getName());
-
-        // The optimized AST.
-        final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
 
         final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
                 && !optimizedQuery.hasSlice();
@@ -308,7 +288,7 @@ public class ASTEvalHelper {
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
-
+        
         // true iff we can materialize the projection inside of the query plan.
         final boolean materializeProjectionInQuery = materialize && context.materializeProjectionInQuery
                 && !optimizedQuery.hasSlice();
@@ -415,28 +395,35 @@ public class ASTEvalHelper {
      * @throws QueryEvaluationException
      */
     static public QueryRoot optimizeQuery(
-            final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
+            final ASTContainer astContainer,
+            final AST2BOpContext context,
+            final QueryBindingSet globallyScopedBS,
+            final Dataset dataset) throws QueryEvaluationException {
 
-        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+        final AbstractTripleStore store = context.getAbstractTripleStore();
+
+        final DeferredResolutionResult resolved;
+        try {
+            // @see https://jira.blazegraph.com/browse/BLZG-1176
+            resolved = ASTDeferredIVResolution.resolveQuery(
+                store, astContainer, globallyScopedBS, dataset, context);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
+
+        if (resolved.dataset != null) {
+            astContainer.getOriginalAST().setDataset(
+                new DatasetNode(resolved.dataset, false/* update */));
+        }
 
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = toBindingSet(globallyScopedBS) ;
+        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
-
-//        // Get the projection for the query.
-//        final IVariable<?>[] projected = astContainer.getOptimizedAST()
-//                .getProjection().getProjectionVars();
-//
-//        final List<String> projectedSet = new LinkedList<String>();
-//
-//        for (IVariable<?> var : projected)
-//            projectedSet.add(var.getName());
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -468,26 +455,7 @@ public class ASTEvalHelper {
             final QueryBindingSet globallyScopedBS,
             final Dataset dataset) throws QueryEvaluationException {
 
-        final DeferredResolutionResult resolved;
-        try {
-        	// @see https://jira.blazegraph.com/browse/BLZG-1176
-            resolved = ASTDeferredIVResolution.resolveQuery(store, astContainer, globallyScopedBS, dataset);
-        } catch (MalformedQueryException e) {
-            throw new QueryEvaluationException(e.getMessage(), e);
-        }
-
-        if (resolved.dataset != null) {
-            astContainer.getOriginalAST().setDataset(
-                new DatasetNode(resolved.dataset, false/* update */));
-        }
-
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
-
-        // Clear the optimized AST.
-        astContainer.clearOptimizedAST();
-        
-        // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] globallyScopedBSAsList = toBindingSet(resolved.bindingSet) ;
 
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
@@ -527,11 +495,8 @@ public class ASTEvalHelper {
             
         }
         
-        // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, globallyScopedBSAsList);
-
-        // The optimized AST.
-        final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
+        final QueryRoot optimizedQuery = 
+                optimizeQuery(astContainer, context, globallyScopedBS, dataset);
         
         final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
                 && !optimizedQuery.hasSlice();

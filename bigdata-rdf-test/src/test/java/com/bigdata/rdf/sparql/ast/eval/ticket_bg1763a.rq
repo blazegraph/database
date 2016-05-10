@@ -1,0 +1,48 @@
+base <https://customer.syapse.com/>
+prefix owl: <http://www.w3.org/2002/07/owl#>
+prefix based: </bdm/api/appindividual/based:>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+prefix dc: <http://purl.org/dc/elements/1.1/>
+prefix sys: </bdm/api/kbobject/sci:sys:>
+prefix s: </bdm/api/>
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix scid: </bdm/api/appindividual/scid:>
+prefix bds: <http://www.bigdata.com/rdf/search#>
+prefix sysd: </bdm/api/appindividual/sysd:>
+prefix base: </bdm/api/kbobject/sci:base:>
+prefix skos: <http://www.w3.org/2004/02/skos/core#>
+prefix syapse: </graph/syapse#>
+prefix sci: </bdm/api/kbobject/sci:sci:>
+SELECT *
+WITH {
+SELECT *
+WHERE {
+  INCLUDE %__MainQuery
+  {  SELECT ?RxNorms_C ( CONCAT( '"', GROUP_CONCAT( DISTINCT 
+                 REPLACE($j__2,'[\\\\"]','\\\\$0') ;
+                 SEPARATOR='" "' ), '"') AS $j__1 )
+    WHERE {
+      { SELECT ?RxNorms_C $j__2 {
+        INCLUDE %__MainQuery
+        OPTIONAL {
+          ?RxNorms_C </bdm/api/kbobject/sci:sci:genericDrug#literal> $j__2
+        }
+      } ORDER BY $j__2
+    } } GROUP BY ?RxNorms_C
+  }
+}} AS %__FullQuery
+WITH {
+SELECT *
+WHERE {
+  ?MedicationOrder_B rdf:type sci:MedicationOrder .
+  ?RxNorms_C rdf:type sci:RxNorms .
+  ?MedicationOrder_B sci:hasMedicationName/sci:hasRxNorms / sci:genericDrug  
+                     </vocabulary/nlm/rxnorm_generic#8410> . 
+  ?MedicationOrder_B rdf:type sci:MedicationOrder .
+  ?MedicationOrder_B syapse:partlet $j__4 .
+} LIMIT 100
+} AS %__MainQuery
+WHERE {
+ INCLUDE %__FullQuery
+}

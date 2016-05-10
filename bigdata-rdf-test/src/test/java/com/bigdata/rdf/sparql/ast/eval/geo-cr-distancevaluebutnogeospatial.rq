@@ -1,0 +1,12 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+SELECT * WHERE {
+  SERVICE geo:search {
+    ?res geo:searchDatatype <http://my.custom.datatype/x-y-z> .
+    ?res geo:predicate <http://p> .
+    ?res geo:customFields "x#y#z" .
+    ?res geo:customFieldsLowerBounds "0#0.4#1" .
+    ?res geo:customFieldsUpperBounds "1#1#1" .
+    ?res geo:distanceValue ?distance .
+  }
+}

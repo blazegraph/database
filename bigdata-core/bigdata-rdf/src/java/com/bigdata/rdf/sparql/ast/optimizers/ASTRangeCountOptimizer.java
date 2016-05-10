@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
@@ -74,8 +75,10 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
 		
         if (!spNodes.isEmpty()) {
 
+            
             // Always attach the range counts.
-            attachRangeCounts(ctx, spNodes, getExogenousBindings(bSets));
+            final int nrExogeneousBindings = bSets==null ? 0 : bSets.length;
+            attachRangeCounts(ctx, spNodes, getExogenousBindings(bSets), nrExogeneousBindings);
 
         }
         
@@ -90,7 +93,8 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
      */
     protected void attachRangeCounts(final AST2BOpContext ctx,
             final List<StatementPatternNode> spNodes,
-            final IBindingSet exogenousBindings) {
+            final IBindingSet exogenousBindings,
+            final int nrExogeneousBindings) {
 
         final AbstractTripleStore db = ctx.getAbstractTripleStore();
 
@@ -100,7 +104,7 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
 
             if (sp.getProperty(Annotations.ESTIMATED_CARDINALITY) == null) {
 
-                tasks.add(new RangeCountTask(sp, ctx, exogenousBindings));
+                tasks.add(new RangeCountTask(sp, ctx, exogenousBindings, nrExogeneousBindings));
 
             }
 
@@ -157,19 +161,22 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
         private final StatementPatternNode sp;
         private final AST2BOpContext ctx;
         private final IBindingSet exogenousBindings;
+        private final int nrExogeneousBindings;
         
         public RangeCountTask(final StatementPatternNode sp,
                 final AST2BOpContext ctx,
-                final IBindingSet exogenousBindings) {
+                final IBindingSet exogenousBindings,
+                final int nrExogeneousBindings) {
             this.sp = sp;
             this.ctx = ctx;
             this.exogenousBindings = exogenousBindings;
+            this.nrExogeneousBindings = nrExogeneousBindings;
         }
         
         @Override
         public Void call() throws Exception {
 
-            estimateCardinality(sp, ctx, exogenousBindings);
+            estimateCardinality(sp, ctx, exogenousBindings, nrExogeneousBindings);
             
             return null;
         }
@@ -184,17 +191,26 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
      */
 	protected void estimateCardinality(StatementPatternNode sp, 
 	      final AST2BOpContext ctx,
-			final IBindingSet exogenousBindings) {
-		final IV<?, ?> s = getIV(sp.s(), exogenousBindings);
-		final IV<?, ?> p = getIV(sp.p(), exogenousBindings);
-		final IV<?, ?> o = getIV(sp.o(), exogenousBindings);
-		final IV<?, ?> c = getIV(sp.c(), exogenousBindings);
-		
-		estimateCardinalities(sp, s, p, o, c, ctx);
+			final IBindingSet exogenousBindings,
+			final int nrExogeneousBindings) {
+
+        final AtomicBoolean usesExogeneousBindings = new AtomicBoolean(false); // unless proven otherwise
+        
+		final IV<?, ?> s = getIV(sp.s(), exogenousBindings, usesExogeneousBindings);
+		final IV<?, ?> p = getIV(sp.p(), exogenousBindings, usesExogeneousBindings);
+		final IV<?, ?> o = getIV(sp.o(), exogenousBindings, usesExogeneousBindings);
+		final IV<?, ?> c = getIV(sp.c(), exogenousBindings, usesExogeneousBindings);
+
+		final int exogenousBindingsAdjustmentFactor = 
+		    usesExogeneousBindings.get() ? Math.max(1, nrExogeneousBindings) : 1;
+		    
+		estimateCardinalities(sp, s, p, o, c, ctx, exogenousBindingsAdjustmentFactor);
 	}
 
+
 	protected void estimateCardinalities(StatementPatternNode sp, final IV<?, ?> s, final IV<?, ?> p,
-			final IV<?, ?> o, final IV<?, ?> c, final AST2BOpContext ctx) {
+			final IV<?, ?> o, final IV<?, ?> c, final AST2BOpContext ctx, 
+			final int exogenousBindingsAdjustmentFactor) {
 	   
 	   final AbstractTripleStore db = ctx.getAbstractTripleStore();
 		final RangeNode rangeNode = sp.getRange();
@@ -208,11 +224,11 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
 		
 		final long cardinality = ap.rangeCount(false/* exact */);
 
-      saStats.registerRangeCountCall(System.nanoTime() - start);
+        saStats.registerRangeCountCall(System.nanoTime() - start);
 		
 		
 		// Annotate with the fast range count.
-		sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
+		sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality*exogenousBindingsAdjustmentFactor);
 		
 		/*
 		 * Annotate with the index which would be used if we did not run
@@ -241,7 +257,7 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
      */
     @SuppressWarnings("rawtypes")
     static protected IV getIV(final TermNode term,
-            final IBindingSet exogenousBindings) {
+            final IBindingSet exogenousBindings, final AtomicBoolean usesExogeneousBinding) {
 
         if (term != null && term.isVariable() && exogenousBindings != null) {
 
@@ -251,6 +267,7 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
             
             if(c != null) {
                 
+                usesExogeneousBinding.set(true);
                 return c.get();
                 
             }

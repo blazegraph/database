@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -134,7 +134,7 @@ public class DumpJournal {
         
 		if (args.length == 0) {
             
-            System.err.println("usage: (-history|-indices|-pages|-tuples) <filename>+");
+            System.err.println("usage: (-namespace <namespace>|-history|-indices|-pages|-tuples|-addr <address>) <filename>+");
             
             System.exit(1);
             
@@ -179,6 +179,7 @@ public class DumpJournal {
                 
                 namespaces.add(args[i + 1]);
                 
+                i++;
             }
             
             else if(arg.equals("-indices")) {

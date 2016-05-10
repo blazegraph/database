@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -115,8 +115,8 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
         // The set of all INCLUDEs in the query.
         final NamedSubqueryInclude[] allIncludes = findAllIncludes(queryRoot);
 
-        // Verify that a named subquery exists for each INCLUDE.
-        assertNamedSubqueryForEachInclude(namedSubqueries, allIncludes);
+        // Verify that a named subquery or solution set exists for each INCLUDE.
+        assertNamedSubqueryForEachInclude(context, namedSubqueries, allIncludes);
 
         /*
          * Verify that each named subquery is consumed by at least one include
@@ -217,12 +217,14 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
     }
 
     /**
-     * Verify that a named subquery exists for each INCLUDE.
+     * Verify that a named subquery of solution set exists for each INCLUDE.
      *
+     * @param context For querying solution sets
      * @param namedSubqueries
      * @param allIncludes
      */
     static private void assertNamedSubqueryForEachInclude(
+    		final AST2BOpContext context,
             final NamedSubqueriesNode namedSubqueries,
             final NamedSubqueryInclude[] allIncludes) {
 
@@ -245,9 +247,16 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
             }
 
-            if (!found)
-                throw new RuntimeException(
-                        "No subquery produces that solution set: " + namedSet);
+            if (!found) {
+            	try {
+            	    context.getSolutionSetStats(namedSet);
+            	    // There is a named solution set so we are OK.
+            	}
+            	catch (RuntimeException e) {
+	                throw new RuntimeException(
+	                        "No subquery produces the solution set: " + namedSet, e);
+            	}
+            }
 
         }
 
@@ -497,6 +506,9 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * TODO This should reuse the same arrays/collections that are generated for
      * the other logic in this class. No need to repeatedly traverse the query
      * looking for INCLUDEs.
+     * 
+     * TODO This should use some generic topological sort algorithm. e.g. it is not obvious that
+     * this code covers the case where two named subqueries include each other.
      */
     static private void orderNamedSubqueries(final QueryRoot queryRoot,
             final NamedSubqueriesNode namedSubqueries) {
@@ -524,16 +536,24 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
 
                 final List<String> includes = new LinkedList<String>();
+                final List<String> includesNamedSubqueries = new LinkedList<String>();
 
-                subqueryToIncludes.put(aNamedSubquery, includes);
+                subqueryToIncludes.put(aNamedSubquery, includesNamedSubqueries);
 
                 for (NamedSubqueryInclude include : findSubqueryIncludes(aNamedSubquery)) {
+                	
+                	String name = include.getName();
+                	includes.add(name);
+                	
+                	if ( nameToSubquery.containsKey(name) ) {
 
-                    includes.add(include.getName());
+                		includesNamedSubqueries.add(name);
+                        
+                	} // else name gives a named solution set.
 
                 }
 
-                // Set the DEPENDS_ON annotation.
+                // Set the DEPENDS_ON annotation: named subqueries and solution sets
                 aNamedSubquery.setDependsOn(includes.toArray(new String[0]));
 
             }

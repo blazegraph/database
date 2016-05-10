@@ -1,13 +1,13 @@
 
 /**
 
- Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+ Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
  Contact:
- SYSTAP, LLC
+ SYSTAP, LLC DBA Blazegraph
  2501 Calvert ST NW #106
  Washington, DC 20008
- licenses@systap.com
+ licenses@blazegraph.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -76,8 +76,10 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
@@ -104,11 +106,14 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.sail.BigdataSailHelper;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ArrayAccessPath;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
@@ -117,6 +122,8 @@ import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.geospatial.GeoSpatialConfig;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -580,9 +587,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
                     AbstractTripleStore.Options.DEFAULT_REJECT_INVALID_XSD_VALUES));
             
+
             // Resolve the vocabulary.
             vocab = getContainer().getVocabulary();
+
             
+            // Resolve the geospatial configuration, if geospatial is enabled
+            final Boolean geoSpatial = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.GEO_SPATIAL,
+                    AbstractTripleStore.Options.DEFAULT_GEO_SPATIAL));
+            
+            final GeoSpatialConfig geoSpatialConfig = 
+                geoSpatial!=null && geoSpatial ?  getContainer().getGeoSpatialConfig() : null;
+
+
             final IExtensionFactory xFactory;
             try {
                 
@@ -632,7 +650,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
                     rejectInvalidXSDValues, xFactory, vocab, valueFactory,
-                    uriFactory);
+                    uriFactory, geoSpatial, geoSpatialConfig);
 
         }
         
@@ -835,7 +853,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      * @see AbstractTripleStore.Options#TEXT_INDEX
      */
-    private final boolean textIndex;
+    private boolean textIndex;
     
     /**
 	 * When <code>true</code> a secondary subject-centric full text index is
@@ -920,7 +938,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	 * {@link AbstractTripleStore.Options#DEFAULT_INLINE_DATE_TIMES_TIMEZONE}.
 	 */
     final private TimeZone inlineDateTimesTimeZone;
-    
+
     /**
      * Return <code>true</code> if datatype literals are being inlined into
      * the statement indices.
@@ -2146,24 +2164,64 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link AbstractTripleStore.Options#TEXT_INDEX} must be enabled. This
      * operation is only supported when the {@link IValueCentricTextIndexer} uses the
      * {@link FullTextIndex} class.
+     * 
+     * @param forceCreate
+     *            When <code>true</code> a new text index will be created
+     *            for a namespace that had no it before.
      */
     @SuppressWarnings("unchecked")
-    public void rebuildTextIndex() {
+    public void rebuildTextIndex(final boolean forceCreate) {
 
         if (getTimestamp() != ITx.UNISOLATED)
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException("Unisolated connection required to rebuild full text index");
+        
+        final IValueCentricTextIndexer<?> textIndexer;
+        
+        if (textIndex) {
+        	
+        	IValueCentricTextIndexer<?> oldTextIndexer = getSearchEngine();
 
-        if (!textIndex)
-            throw new UnsupportedOperationException();
+        	// destroy the existing text index.
+        	oldTextIndexer.destroy();
 
-        final IValueCentricTextIndexer<?> textIndexer = getSearchEngine();
+        	// clear reference to the old FTS
+        	viewRef.set(null);
 
-        // destroy the existing text index.
-        textIndexer.destroy();
+        	// get a new instance of FTS
+            textIndexer = getSearchEngine();
+
+        } else if (forceCreate) {
+        	
+        	textIndex = true;
+        	
+        	textIndexer = getSearchEngine();
+        	
+        	SparseRowStore global = indexManager.getGlobalRowStore();
+        	
+        	// Update "namespace" properties
+            updateTextIndexConfiguration(global, getContainerNamespace());
+
+            // Update "namespace.lex" properties
+            updateTextIndexConfiguration(global, getNamespace());
+        	
+            // Warning: only container and lexicon properties are updated
+            // with new text index configuration, other indexes may require update as well 
+        } else {
+        	
+        	throw new UnsupportedOperationException("Could not rebuild full text index, because it is not enabled");
+        	
+        }
 
         // create a new index.
         textIndexer.create();
 
+    	if (indexManager instanceof IJournal) {
+
+            // make the changes restart safe (not required for federation).
+            ((IJournal) indexManager).commit();
+
+        }
+    	
         // TermIVs
         {
             // The index to scan for the RDF Literals.
@@ -2211,11 +2269,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             final int capacity = 10000;
 
-            while (itr.hasNext()) {
-
-                textIndexer.index(capacity, itr);
-
-            }
+            textIndexer.index(capacity, itr);
 
         }
 
@@ -2273,6 +2327,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             }
 
         }
+
+    }
+
+    private void updateTextIndexConfiguration(final SparseRowStore global, final String namespace) {
+
+        Map<String, Object> map = global.read(
+             RelationSchema.INSTANCE, namespace);
+
+        map.put(AbstractTripleStore.Options.TEXT_INDEX, "true");
+
+        map.put(FullTextIndex.Options.FIELDS_ENABLED, "false");
+        
+        if (getNamespace().equals(namespace)) {
+            map.put(FullTextIndex.Options.OVERWRITE, "false");
+
+        }
+
+        global.write(RelationSchema.INSTANCE, map);
 
     }
     

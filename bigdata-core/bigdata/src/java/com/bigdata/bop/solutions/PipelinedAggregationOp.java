@@ -209,9 +209,10 @@ public class PipelinedAggregationOp extends GroupByOp implements
          *            The value expressions to be computed.
          *            The binding set.
          * 
-         * @return The new {@link SolutionGroup} -or- <code>null</code> if any
-         *         of the value expressions evaluates to a <code>null</code>
-         *         -OR- throws a {@link SparqlTypeErrorException}.
+//         * @return The new {@link SolutionGroup} -or- <code>null</code> if any
+//         *         of the value expressions evaluates to a <code>null</code>
+//         *         -OR- throws a {@link SparqlTypeErrorException}.
+         * @return The new {@link SolutionGroup} (non-null)
          */
         static SolutionGroup newInstance(final IValueExpression<?>[] groupBy,
                 final IBindingSet bset, final BOpStats stats) {
@@ -221,7 +222,9 @@ public class PipelinedAggregationOp extends GroupByOp implements
             for (int i = 0; i < groupBy.length; i++) {
 
                 final IValueExpression<?> expr = groupBy[i];
-                final Object asBound;
+                
+                Object exprValue;
+                
                 try {
                     /*
                      * Note: This has a side-effect on the solution and causes
@@ -229,18 +232,19 @@ public class PipelinedAggregationOp extends GroupByOp implements
                      * on the solution. This is necessary in order for us to
                      * compute the aggregates incrementally.
                      */
-                    asBound = expr.get(bset);
+                    exprValue = expr.get(bset);
                 } catch (SparqlTypeErrorException ex) {
-                    TypeErrorLog.handleTypeError(ex, expr, stats);
-                    // Drop solution.
-                    return null;
+                    exprValue = null; 
+                    // Corresponds to the error value in the SPARQL 1.1 spec 
                 }
-                if (asBound == null) {
-                    // Drop solution.
-                    return null;
-                }
+                
                 @SuppressWarnings({ "rawtypes", "unchecked" })
-                final IConstant<?> x = new Constant(asBound);
+                final IConstant<?> x = 
+                        (exprValue == null)?
+                        Constant.errorValue()
+                        :
+                        new Constant(exprValue);
+                
                 r[i] = x;
 
             }
@@ -321,7 +325,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
             this.aggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
 
             for (Map.Entry<IAggregate<?>, IVariable<?>> e : aggExpr.entrySet()) {
-
+               
                 // Note: IAggregates MUST be cloned to avoid side-effects.
                 this.aggExpr.put((IAggregate<?>) e.getKey().clone(),
                         e.getValue());
@@ -337,7 +341,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
             final IBindingSet aSolution = bset;
             
             for (IValueExpression<?> expr : groupBy) {
-
+                
                 if (expr instanceof IVariable<?>) {
 
                     /**
@@ -350,14 +354,21 @@ public class PipelinedAggregationOp extends GroupByOp implements
                      */
 
                     final IVariable<?> var = (IVariable<?>) expr;
-
-                    // Note: MUST be a binding for each groupBy var.
-                    @SuppressWarnings({ "rawtypes", "unchecked" })
-                    final Constant<?> val = new Constant(var.get(aSolution));
-
+                  
+                    final Object varValue = var.get(aSolution);
+                    final Constant<?> val;
+                    
+                    if (varValue == null) {
+                    
+                      val = Constant.errorValue();
+                        
+                    } else {
+                      val = new Constant(varValue.getClass().cast(varValue));
+                    };
+                    
                     // Bind on [aggregates].
                     aggregates.set(var, val);
-
+                    
                 } else if (expr instanceof IBind<?>) {
 
                     /**
@@ -370,13 +381,21 @@ public class PipelinedAggregationOp extends GroupByOp implements
                      */
 
                     final IBind<?> bindExpr = (IBind<?>) expr;
-
+  
                     // Compute value expression.
-                    // Note: MUST be valid since group exists.
-                    @SuppressWarnings({ "rawtypes", "unchecked" })
-                    final Constant<?> val = new Constant(
-                            bindExpr.get(aSolution));
-
+                    
+                    final Constant<?> val;
+                    final Object exprValue = bindExpr.get(aSolution);
+                    
+                    if (exprValue == null) {
+                    
+                      val = Constant.errorValue();
+                        
+                    } else {
+                    
+                    val = new Constant(exprValue.getClass().cast(exprValue));
+                    }
+                    
                     // Variable to be projected out by SELECT.
                     final IVariable<?> ovar = ((IBind<?>) expr).getVar();
 
@@ -592,20 +611,11 @@ public class PipelinedAggregationOp extends GroupByOp implements
 
             if (bset == null)
                 throw new IllegalArgumentException();
-
+   
             final SolutionGroup s = SolutionGroup.newInstance(groupBy, bset,
                     stats);
-
-            if (s == null) {
-
-                // Drop the solution.
-
-                if (log.isDebugEnabled())
-                    log.debug("Dropping solution: " + bset);
-
-                return;
-
-            }
+            assert s != null;
+            
 
             SolutionGroupState m = map.get(s);
 
@@ -738,6 +748,11 @@ public class PipelinedAggregationOp extends GroupByOp implements
 
                         if (!drop) {
 
+                            assert !aggregates.containsErrorValues();
+                            // Because this is imlicit grouping.
+                            // The invariant implies that we don't have to use 
+                            // the more expensive copyMinusErrors() below.
+                            
                             // project out only selected variables.
                             final IBindingSet out = aggregates
                                     .copy(groupByState.getSelectVars().toArray(
@@ -806,9 +821,13 @@ public class PipelinedAggregationOp extends GroupByOp implements
 
                             if (!drop) {
 
-                                // project out only selected variables.
+                                // project out only selected variables that
+                                // are not assigned error values:
+                                // "solutions containing error values are 
+                                // removed at projection time"
+                                // https://www.w3.org/TR/sparql11-query/#defn_algGroup
                                 final IBindingSet out = aggregates
-                                        .copy(groupByState.getSelectVars()
+                                        .copyMinusErrors(groupByState.getSelectVars()
                                                 .toArray(new IVariable[0]));
 
                                 outList.add(out);
@@ -818,7 +837,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
                         }
 
                     }
-
+                
                     if (!outList.isEmpty()) {
 
                         // Write the solutions onto the sink.

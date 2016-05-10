@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,41 +29,61 @@ import com.bigdata.rdf.model.BigdataLiteral;
 /**
  * 
  * Utility IV to generate IVs for URIs in the form of
- * http://example./org/value/STRPREFIX1234234513 where the localName of the URI
+ * http://example.org/value/STRPREFIX1234234513 where the localName of the URI
  * is a string prefix followed by an integer value.
  * 
  * You should extend this class with implementation for specific instances of
  * URIs that follow this form such as:
- * http://rdf.ncbi.nlm.nih.gov/pubchem/compound/1234234_CID would be create as
+ * http://rdf.ncbi.nlm.nih.gov/pubchem/compound/1234234_CID would be created as
  * 
+ * <code>
  * InlineSuffixedIntegerURIHandler handler = new InlineSuffixedIntegerURIHandler( "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","_CID");
+ * </code>
  * 
+ * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
+ * @author beebs
  */
 
 public class InlineSuffixedIntegerURIHandler extends
-		InlineSignedIntegerURIHandler {
+		InlineLocalNameIntegerURIHandler implements ISuffixedURIHandler {
 
 	private String suffix = null;
 
-	public InlineSuffixedIntegerURIHandler(String namespace, String suffix) {
+	public InlineSuffixedIntegerURIHandler(final String namespace, final String suffix) {
 		super(namespace);
 		this.suffix = suffix;
 	}
 
+	public InlineSuffixedIntegerURIHandler(final String namespace,
+			final String suffix, final int id) {
+		super(namespace);
+		this.suffix = suffix;
+		this.packedId = id;
+	}
+
 	@Override
 	@SuppressWarnings("rawtypes")
-	protected AbstractLiteralIV createInlineIV(String localName) {
+	protected AbstractLiteralIV createInlineIV(final String localName) {
 		if (!localName.endsWith(this.suffix)) {
 			return null;
 		}
-		return super.createInlineIV(localName.substring(0, localName.length()
+		
+		final String intVal = getPackedValueString(localName.substring(0, localName.length()
 				- this.suffix.length()));
+		
+		return super.createInlineIV(intVal);
 	}
 
 	@Override
 	public String getLocalNameFromDelegate(
-			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		return super.getLocalNameFromDelegate(delegate) + this.suffix;
+			final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+
+		return getUnpackedValueFromString(super
+				.getLocalNameFromDelegate(delegate)) + this.suffix;
+	}
+
+	public String getSuffix() {
+		return suffix;
 	}
 }

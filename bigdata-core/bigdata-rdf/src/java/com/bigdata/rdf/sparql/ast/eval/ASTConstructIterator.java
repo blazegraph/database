@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -53,6 +53,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataQuadWrapper;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -91,6 +92,8 @@ public class ASTConstructIterator implements
     private static final Logger log = Logger
             .getLogger(ASTConstructIterator.class);
     
+    private static final boolean DEBUG = log.isDebugEnabled();
+
     /**
      * When <code>false</code>, no DISTINCT SPO filter will be imposed.
      * 
@@ -272,7 +275,7 @@ public class ASTConstructIterator implements
 //                        pat.c() == null ? null : (Resource) pat.c().getValue()//
 //                        );
 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug("Ground statement:\npattern=" + pat + "\nstmt="
                             + stmt);
 
@@ -755,7 +758,7 @@ public class ASTConstructIterator implements
 
         }
         
-        if (ngenerated == 0 && log.isDebugEnabled()) {
+        if (ngenerated == 0 && DEBUG) {
 
             log.debug("No statements generated for this solution: " + solution);
             
@@ -777,7 +780,7 @@ public class ASTConstructIterator implements
      */
     private void addStatementToBuffer(final BigdataStatement stmt) {
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug(stmt.toString());
 
         if (filter != null) {
@@ -933,6 +936,16 @@ public class ASTConstructIterator implements
                  * 
                  * Note: The blank nodes will be scoped to the solution.
                  */
+                
+                if (value.getIV() instanceof SidIV) {
+                	
+                	// @see https://jira.blazegraph.com/browse/BLZG-1229
+                	// To support TRefs in construct clause we should keep TRef as it was prepared by 
+                	// com.bigdata.rdf.sail.sparql.TriplePatternExprBuilder.visit(ASTTRefPattern, Object)
+                	
+                	return value;
+                	
+                }
                 
                 final String id = ((BigdataBNode) value).getID();
 

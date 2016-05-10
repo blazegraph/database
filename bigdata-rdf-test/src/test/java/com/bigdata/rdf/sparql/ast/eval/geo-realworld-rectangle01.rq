@@ -1,0 +1,13 @@
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+
+# all cities with -50 < lat < 50 -> Barcelona, SF, Johannesburg
+SELECT ?res WHERE {
+  SERVICE geo:search {
+    ?res geo:search "inRectangle" .
+    ?res geo:predicate <http://coord> .
+    ?res geo:spatialRectangleSouthWest "-50#-180" .
+    ?res geo:spatialRectangleNorthEast "50#180" .
+    ?res geo:timeStart "0" .
+    ?res geo:timeEnd "0" .
+  }
+}

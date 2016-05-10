@@ -1,0 +1,9 @@
+SELECT * WHERE {
+ 
+  <http://s0> <http://p> ?s0 .
+  <http://s1> <http://p> ?s1 .
+  <http://s2> <http://p> ?s2 .
+  <http://s10> <http://p> ?s10 .
+  <http://s20> <http://p> ?s20 .
+
+}

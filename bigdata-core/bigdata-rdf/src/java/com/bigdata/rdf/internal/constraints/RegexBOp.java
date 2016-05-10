@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,6 +39,8 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
  * SPARQL REGEX operator.
@@ -52,8 +54,22 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     private static final long serialVersionUID = 1357420268214930143L;
     
     private static final transient Logger log = Logger.getLogger(RegexBOp.class);
+    
+    private static final boolean debug = log.isDebugEnabled();
 
-    public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
+    private static final boolean info = log.isInfoEnabled();
+    
+    /**
+     * 
+     * Local member to implement {@link QueryHints.REGEX_MATCH_NON_STRING}
+     * 
+     * {@link BLZG-1780}
+     * 
+     */
+    private boolean matchNonString = QueryHints.DEFAULT_REGEX_MATCH_NON_STRING;
+    
+	public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
+		
         
         /**
          * The cached regex pattern.
@@ -93,7 +109,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
             
         } catch (Exception ex) {
         
-            if (log.isInfoEnabled()) {
+            if (info) {
                 log.info("could not create pattern for: " + pattern + ", " + flags);
             }
             
@@ -164,8 +180,8 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 
         @SuppressWarnings("rawtypes")
         final IV flags = arity() > 2 ? get(2).get(bs) : null;
-
-        if (log.isDebugEnabled()) {
+        
+        if (debug) {
             log.debug("regex var: " + var);
             log.debug("regex pattern: " + pattern);
             log.debug("regex flags: " + flags);
@@ -187,16 +203,35 @@ public class RegexBOp extends XSDBooleanIVValueExpression
      */
     private boolean accept(final Value arg, final Value parg, final Value farg) {
 
-        if (log.isDebugEnabled()) {
+        if (debug) {
             log.debug("regex var: " + arg);
             log.debug("regex pattern: " + parg);
             log.debug("regex flags: " + farg);
+            //Fixme not sure why we weren't able pick up via properties
+			log.debug(QueryHints.REGEX_MATCH_NON_STRING
+					+ ": "
+					+ this.getProperty(QueryHints.REGEX_MATCH_NON_STRING,
+							QueryHints.DEFAULT_REGEX_MATCH_NON_STRING));
+			log.debug("matchNonString:  " + this.matchNonString);
         }
+        
+        //BLZG-1200 changed to isPlainLiteral
+		if (QueryEvaluationUtil.isPlainLiteral(arg)
+				// BLZG-1780:  Query Hint to cast to string
+				|| matchNonString ) {
 
-        if (QueryEvaluationUtil.isSimpleLiteral(arg)) {
+            final String text; 
 
-            final String text = ((Literal) arg).getLabel();
+            if(QueryEvaluationUtil.isPlainLiteral(arg)) {
+            	text = ((Literal) arg).getLabel();
+            } else { //Query Hint Override with explicit conversion
+            	text = arg.stringValue();
+            }
 
+            if(debug) {
+            	log.debug("regex text:  " + text);
+            }
+            
             try {
 
                 // first check for cached pattern
@@ -234,6 +269,12 @@ public class RegexBOp extends XSDBooleanIVValueExpression
             }
 
         } else {
+        	
+
+        	
+        	if(debug) {
+        		log.debug("Unknown type:  " + arg);
+        	}
 
             throw new SparqlTypeErrorException();
 
@@ -244,13 +285,14 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     private static Pattern getPattern(final Value parg, final Value farg)
             throws IllegalArgumentException {
         
-        if (log.isDebugEnabled()) {
+        if (debug) {
             log.debug("regex pattern: " + parg);
             log.debug("regex flags: " + farg);
         }
         
-        if (QueryEvaluationUtil.isSimpleLiteral(parg)
-                && (farg == null || QueryEvaluationUtil.isSimpleLiteral(farg))) {
+        //BLZG-1200 Literals with language types are not included in REGEX
+        if (QueryEvaluationUtil.isPlainLiteral(parg)
+                && (farg == null || QueryEvaluationUtil.isPlainLiteral(farg))) {
 
             final String ptn = ((Literal) parg).getLabel();
             String flags = "";
@@ -302,5 +344,14 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         throw new IllegalArgumentException();
         
     }
+
+    public boolean isMatchNonString() {
+		return matchNonString;
+	}
+
+	public void setMatchNonString(boolean matchNonString) {
+		this.matchNonString = matchNonString;
+	}
+
     
 }

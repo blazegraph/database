@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,26 +28,35 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Utility IV to generate IVs for URIs in the form of http://example./org/value/STRPREFIX1234234513
+ * Utility IV to generate IVs for URIs in the form of http://example.org/value/STRPREFIX1234234513
  * where the localName of the URI is a string  prefix followed by an integer  value.
  * 
  * You should extend this class with implementation for specific instances of URIs that follow
  * this form such as:  http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID_1234234 would be
- * create as
- * 
+ * created as
+ * <code> 
  * InlinePrefixedIntegerURIHandler handler = new InlinePrefixedIntegerURIHandler("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/","CID_");
+ * <code> 
+ * This has support for overloading on a single namespace {@link InlineLocalNameIntegerURIHandler}. 
  * 
- * 
+ * @author beebs
  */
 
 public class InlinePrefixedIntegerURIHandler extends
-		InlineSignedIntegerURIHandler {
+		InlineLocalNameIntegerURIHandler implements IPrefixedURIHandler {
 
 	private String prefix = null;
 
-	public InlinePrefixedIntegerURIHandler(String namespace, String prefix) {
+	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix) {
+		
 		super(namespace);
 		this.prefix = prefix;
+	}
+
+	public InlinePrefixedIntegerURIHandler(final String namespace, final String prefix, final int id) {
+		super(namespace);
+		this.prefix = prefix;
+		this.packedId = id;
 	}
 
 	@Override
@@ -56,8 +65,8 @@ public class InlinePrefixedIntegerURIHandler extends
 		if (!localName.startsWith(this.prefix)) {
 			return null;
 		}
-	
-		final String intValue = localName.substring(this.prefix.length(), localName.length());
+		
+		final String intValue = getPackedValueString(localName.substring(this.prefix.length(), localName.length()));
 				
 		return super.createInlineIV(intValue);
 	}
@@ -65,6 +74,11 @@ public class InlinePrefixedIntegerURIHandler extends
 	@Override
 	public String getLocalNameFromDelegate(
 			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		return this.prefix + super.getLocalNameFromDelegate(delegate);
+		return this.prefix + getUnpackedValueFromString(super.getLocalNameFromDelegate(delegate));
 	}
+
+	public String getPrefix() {
+		return prefix;
+	}
+
 }

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
 Contact:
-     SYSTAP, LLC
+     SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
      Washington, DC 20008
-     licenses@systap.com
+     licenses@blazegraph.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -54,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -318,8 +319,25 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 	                
 	                final IBindingSet tmp = exogenousBindings == null ? null
 	                        : exogenousBindings.copy(variablesToKeep);
+
+	                /**
+	                 * See https://jira.blazegraph.com/browse/BLZG-1817:
+	                 * 
+	                 * In the normal case, we pass in the current ancestry. There is one
+	                 * exception to this rule though: whenever we're recursing into complex
+	                 * subquery roots that will be translated into named subquery includes,
+	                 * there is no ancestry at all (named subquery includes will be evaluated
+	                 * independently, bottom up). This is, for instance, the case for subqueries
+	                 * with aggregation or slices.
+	                 */
+	                final boolean voidAncestry = 
+	                    subquery instanceof SubqueryRoot &&
+	                    ASTSparql11SubqueryOptimizer.needsLifting((SubqueryRoot)subquery);
 	                
-	                optimize(ctx, tmp, queryRoot, getAncestry(), childGroup);
+	                final IBindingProducerNode[] ancestry = 
+	                    voidAncestry ? new IBindingProducerNode[0] : getAncestry();
+	                
+	                optimize(ctx, tmp, queryRoot, ancestry, childGroup);
 
 	            }
 	            
@@ -349,6 +367,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 			 * will get run before the statement pattern nodes. Add them into 
 			 * the ancestry.
 			 */
+			// TODO: imho, both assumptions are not valid anymore with the given refactoring
+			//       -> we should compute the ancestry the same way we do in ASTJoinGroupOrderOptimizer
 			addToAncestry(joinGroup.getServiceNodes(),"service node");
 			addToAncestry(joinGroup.getNamedSubqueryIncludes(),"named subquery include");
 		}
