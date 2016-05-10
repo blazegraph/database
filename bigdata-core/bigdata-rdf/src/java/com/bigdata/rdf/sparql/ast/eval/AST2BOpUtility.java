@@ -2084,6 +2084,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
         //            -> already variables that have not been projected into the subgroup
         //               need to be marked as not done, in order to enforce re-materialization
         //               where needed in later steps of the query plan
+        //
+        // Note: we always have joinType==JoinTypeEnum.NORMAL for SPARQL 1.1 subqueries,
+        //       so we don't need to special case (as we do for subgroups, for instance)
         maybeIncomingBindings.removeAll(projectedVars); // variables that are *not* projected in
         if (ctx.nativeHashJoins)
             doneSet.removeAll(maybeIncomingBindings);
@@ -2397,18 +2400,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
         }
 
         // BLZG-1899: for analytic hash joins, we don't cache materialized values
-        //            -> already variables that have not been projected into the subgroup
-        //               need to be marked as not done, in order to enforce re-materialization
-        //               where needed in later steps of the query plan
-        if (ctx.nativeHashJoins) {
-            
-            final Set<IVariable<?>> nonProjectInVariables = 
-                    ctx.sa.getMaybeIncomingBindings(subqueryRoot, new LinkedHashSet<IVariable<?>>());
-            nonProjectInVariables.removeAll(projectInVars);
-            
-            doneSet.removeAll(nonProjectInVariables);        
-        }
-                
+        //            -> for joinType==JoinTypeEnum.EXISTS we don't have any guarantees
+        //            that materialized values are preserved, so we need to clear the doneSet
+        doneSet.clear();                
         
         /*
          * For each filter which requires materialization steps, add the
@@ -2955,6 +2949,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
         //            -> already variables that have not been projected into the subgroup
         //               need to be marked as not done, in order to enforce re-materialization
         //               where needed in later steps of the query plan
+        //
+        // Note: we always have joinType==JoinTypeEnum.NORMAL for arbitrary length paths
+        //       so we don't need to special case (as we do for subgroups, for instance)        
         if (ctx.nativeHashJoins)
             doneSet.removeAll(nonProjectInVars);
         
@@ -4339,17 +4336,27 @@ public class AST2BOpUtility extends AST2BOpRTO {
         //            -> already variables that have not been projected into the subgroup
         //               need to be marked as not done, in order to enforce re-materialization
         //               where needed in later steps of the query plan
-        // TODO: THIS DOES NOT YET WORK
         if (ctx.nativeHashJoins) {
             
-            final Set<IVariable<?>> nonProjectInVariables = 
-                    ctx.sa.getMaybeIncomingBindings(subgroup, new LinkedHashSet<IVariable<?>>());
+            if (joinType.equals(JoinTypeEnum.Normal)) {
             
-            for (int i=0; i< projectInVars.length; i++) {
-                nonProjectInVariables.remove(projectInVars[i]);
-    	    }
-
-            doneSet.removeAll(nonProjectInVariables);        
+                final Set<IVariable<?>> nonProjectInVariables = 
+                        ctx.sa.getMaybeIncomingBindings(subgroup, new LinkedHashSet<IVariable<?>>());
+                
+                for (int i=0; i< projectInVars.length; i++) {
+                    nonProjectInVariables.remove(projectInVars[i]);
+        	    }
+    
+                doneSet.removeAll(nonProjectInVariables);        
+                
+            } else {
+                
+                // for non normal joins (such as OPTIONALs) we don't have any
+                // materialization guarantees; non-join solutions for OPTIONALs,
+                // for instance are taken from the hash index, which does not
+                // cache the materialized values (see BLZG-1899)
+                doneSet.clear();
+            }
         }
         
         /*

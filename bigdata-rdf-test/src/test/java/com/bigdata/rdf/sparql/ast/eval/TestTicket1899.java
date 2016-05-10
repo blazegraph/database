@@ -32,7 +32,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 
 
 /**
- * Test suite for an NotMaterializedException caused by HTree hash index built.
+ * Test suite for a NotMaterializedException caused by HTree hash index built.
  * The test is defined over geospatial data, which gives us LiteralExtensionIVs
  * allowing to reproduce the problem.
  * 
@@ -154,6 +154,34 @@ public class TestTicket1899 extends AbstractDataDrivenSPARQLTestCase {
                 "ticket_bg1899h.rq",// queryFileURL
                 "ticket_bg1899h.n3",// dataFileURL
                 "ticket_bg1899h.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    /**
+     * Test case for OPTIONAL join, where we have no materialization
+     * guarantees at all.
+     */
+    public void test_ticket_bg1899_i() throws Exception {
+        
+        new TestHelper(
+                "ticket_bg1899c", // testURI,
+                "ticket_bg1899i.rq",// queryFileURL
+                "ticket_bg1899abcd.ttl",// dataFileURL
+                "ticket_bg1899abcd.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    /**
+     * Test case for EXISTS join, where we have no materialization
+     * guarantees at all.
+     */
+    public void test_ticket_bg1899_j() throws Exception {
+        
+        new TestHelper(
+                "ticket_bg1899c", // testURI,
+                "ticket_bg1899j.rq",// queryFileURL
+                "ticket_bg1899abcd.ttl",// dataFileURL
+                "ticket_bg1899abcd.srx"// resultFileURL
                 ).runTest();
     }
     
