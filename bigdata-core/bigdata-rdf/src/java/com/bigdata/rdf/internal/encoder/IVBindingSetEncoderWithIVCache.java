@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.encoder;
 
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -102,6 +104,20 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
      */
     private final BigdataValueFactory valueFactory;
 
+    /**
+     * The set of variables for which materialized {@link IV}s have been
+     * observed.
+     */
+    final protected LinkedHashSet<IVariable<?>> ivCacheSchema;
+
+    /**
+     * A cache mapping from non-inline {@link IV}s ({@link TermId}s and
+     * {@link BlobIV}s) whose {@link IVCache} association was set to the
+     * corresponding {@link BigdataValue}. Used to batch updates into
+     * the ID2TERM and BLOBS indices.
+     */
+    final Map<IV<?, ?>, BigdataValue> cache;    
+    
     /**
      * The {@link IV}:{@link BigdataValue} mapping for non-{@link BlobIV}s. This
      * captures any cached BigdataValue references encountered on {@link IV}s.
@@ -347,7 +363,7 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
         super(BigdataValueFactoryImpl.getInstance(((String[]) op
                 .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0]), filter);
-
+        
         if (!filter) {
 
             /*
@@ -367,11 +383,19 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
             
             blobsCache.set(BTree.create(store, getBlobsCacheIndexMetadata(op)));
 
+            ivCacheSchema = new LinkedHashSet<IVariable<?>>();
+
+            cache = new HashMap<IV<?, ?>, BigdataValue>();
+
         } else {
 
             namespace = null;
             
             valueFactory = null;
+            
+            ivCacheSchema = null;
+            
+            cache = null;
             
         }
 
@@ -458,6 +482,13 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
             
         }
 
+
+        if (ivCacheSchema != null) {
+
+            ivCacheSchema.clear();
+            
+        }
+        
         super.release();
         
     }
@@ -563,8 +594,10 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
         }
 
+        if (cache != null)
+            cache.clear();
+        
         super.flush();
-
     }
 
     /**
@@ -697,5 +730,23 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         }
 
     }
+    
+    @Override
+    void cacheSchemaAndValue(final IVariable<?> v, final IV<?,?> iv, final boolean updateCache) {
+
+        /**
+         *  BLZG-1899: we need to materialize all IVs that require materialization;
+         *             before, this condition was !iv.isInline(), which did not consider
+         *             cases such as LiteralExtensionIVs that are inline but nevertheless
+         *             need to be materialized
+         */
+        if (iv.needsMaterialization() && iv.hasValue() && !filter) {
+            ivCacheSchema.add(v);
+            if (updateCache && cache != null)
+                cache.put(iv, iv.getValue());
+        }
+        
+    }
+    
 
 }
