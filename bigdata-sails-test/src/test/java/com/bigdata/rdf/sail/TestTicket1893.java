@@ -24,6 +24,7 @@
  */
 package com.bigdata.rdf.sail;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
@@ -35,6 +36,7 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.model.BigdataURIImpl;
@@ -53,11 +55,20 @@ import com.bigdata.rdf.store.LocalTripleStore;
 public class TestTicket1893 extends
 	ProxyBigdataSailTestCase {
     
-     private final String fileName = "TestTicket1893.nt";
+     private final static String DATA = "<http://s> <http://p> 1 .\n" + 
+     		"<http://s> <http://p> \"2\"^^xsd:int .\n" + 
+     		"<http://s> <http://p> 3.0 .\n" + 
+     		"<http://s> <http://p> \"4.0\"^^xsd:double .\n" + 
+     		"<http://s> <http://p> true .\n" + 
+     		"<http://s> <http://p> \"false\"^^xsd:boolean .\n" + 
+     		"<http://s> <http://p> \"plain string\" .\n" + 
+     		"<http://s> <http://p> \"datatyped string\"^^xsd:string .\n" + 
+     		"<http://s> <http://p> \"english string\"@en .\n" + 
+     		"_:s1 <http://refers> _:s2 .\n"; 
     
-    private final RDFFormat format = RDFFormat.TURTLE;
+    private final static RDFFormat DATA_FORMAT = RDFFormat.TURTLE;
     
-    private final String loadSparql = "INSERT DATA {" //
+    private final static String INSERT_SPARQL = "INSERT DATA {" //
     		+ "<http://s> <http://p> 1 . " //
     		+ "<http://s> <http://p> \"2\"^^xsd:int . " //
     		+ "<http://s> <http://p> 3.0 . " //
@@ -93,7 +104,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
             true /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -125,7 +136,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
                 true /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -156,7 +167,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -188,7 +199,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(1, searchEngine.count(query("1")));
@@ -219,7 +230,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -251,7 +262,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -282,7 +293,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
             true /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -314,7 +325,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
                 true /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -345,7 +356,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
             true /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -377,7 +388,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
                 true /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -408,7 +419,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -440,7 +451,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -471,7 +482,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -503,7 +514,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -534,7 +545,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
             true /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -566,7 +577,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
                 true /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -598,7 +609,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
             true /*inlineXSDDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -644,7 +655,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
                 true /*inlineXSDDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -690,7 +701,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -736,7 +747,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -784,7 +795,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/);
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -833,7 +844,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, true /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/);
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -882,7 +893,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
             true /*inlineXSDDatatypeLiterals*/ );
         
-        loadFromFile(cxn, fileName, format);
+        loadData(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -928,7 +939,7 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
                 true /*inlineXSDDatatypeLiterals*/ );
         
-        loadViaSparql(cxn, loadSparql);
+        insertSparql(cxn);
         
         BigdataValueFactory vf = cxn.getValueFactory();
 		BigdataValue[] values = new BigdataValue[]{
@@ -1015,19 +1026,19 @@ public class TestTicket1893 extends
         
     }
     
-    private void loadFromFile(final BigdataSailRepositoryConnection cxn, final String fileName, final RDFFormat format) throws RepositoryException, RDFParseException, IOException {
+    private void loadData(final BigdataSailRepositoryConnection cxn) throws RepositoryException, RDFParseException, IOException {
         
     	cxn.clear();
     	
-        cxn.add(getClass().getResourceAsStream(fileName), "", format);
+        cxn.add(new ByteArrayInputStream(DATA.getBytes()), "", DATA_FORMAT);
         
         cxn.commit();
         
     }
     
-    private void loadViaSparql(final BigdataSailRepositoryConnection cxn, final String loadSparql) throws Exception {
+    private void insertSparql(final BigdataSailRepositoryConnection cxn) throws Exception {
 
-        cxn.prepareUpdate(QueryLanguage.SPARQL, loadSparql).execute();
+        cxn.prepareUpdate(QueryLanguage.SPARQL, INSERT_SPARQL).execute();
         
     }
     
