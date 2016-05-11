@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.encoder;
 
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -48,6 +50,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Tuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.rawstore.IRawStore;
@@ -56,6 +59,7 @@ import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.BlobsTupleSerializer;
 import com.bigdata.rdf.lexicon.Id2TermTupleSerializer;
@@ -63,6 +67,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.util.Bytes;
 
 /**
@@ -77,7 +82,14 @@ import com.bigdata.util.Bytes;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * This class is out of use. As part of https://jira.blazegraph.com/browse/BLZG-1899, 
+ * we carried out some experiments illustrating that caching the IVs (i.e., preserving
+ * them in HTree hash joins) is far slower than just re-materializing them. We decided
+ * to retire the class and, instead, do remove variables from the doneSet within the
+ * {@link AST2BOpUtility} update process whenever we set up an analytic hash join.
  */
+@Deprecated
 public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
     /**
@@ -92,6 +104,20 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
      */
     private final BigdataValueFactory valueFactory;
 
+    /**
+     * The set of variables for which materialized {@link IV}s have been
+     * observed.
+     */
+    final protected LinkedHashSet<IVariable<?>> ivCacheSchema;
+
+    /**
+     * A cache mapping from non-inline {@link IV}s ({@link TermId}s and
+     * {@link BlobIV}s) whose {@link IVCache} association was set to the
+     * corresponding {@link BigdataValue}. Used to batch updates into
+     * the ID2TERM and BLOBS indices.
+     */
+    final Map<IV<?, ?>, BigdataValue> cache;    
+    
     /**
      * The {@link IV}:{@link BigdataValue} mapping for non-{@link BlobIV}s. This
      * captures any cached BigdataValue references encountered on {@link IV}s.
@@ -110,6 +136,14 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
      * Note: This is precisely the same mapping we use for the BLOBS index.
      */
     private final AtomicReference<BTree> blobsCache = new AtomicReference<BTree>();
+    
+    /**
+     * The {@link IV}:{@link BigdataValue} mapping for {@link LiteralExtensionIV}s
+     * with cached {@link BigdataValue}s. This captures any cached BigdataValue
+     * references encountered on {@link LiteralExtensionIV}s. This map does not
+     * store duplicate entries for the same {@link IV}.
+     */
+    private final AtomicReference<BTree> literalExtensionIVCache = new AtomicReference<BTree>();
 
     public String toString() {
         /*
@@ -132,6 +166,20 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
     private long getIVCacheSize() {
 
         final BTree ndx = ivCache.get();
+
+        if (ndx != null) {
+
+            return ndx.getEntryCount();
+
+        }
+
+        return 0L;
+        
+    }
+    
+    private long getLiteralExtensionIVCacheSize() {
+
+        final BTree ndx = literalExtensionIVCache.get();
 
         if (ndx != null) {
 
@@ -206,6 +254,53 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
     }
     
     /**
+     * Setup the {@link IndexMetadata} for {@link #literalExtensionIVCache}.
+     * <p>
+     * Note: This is basically the same setup as the ID2TERM index.
+     */
+    private IndexMetadata getLiteralExtensionIVCacheIndexMetadata(final BOp op) {
+        
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+        final int branchingFactor = 256;// TODO Config/tune.
+        
+        final int ratio = 32; // TODO Config/tune.
+        
+        metadata.setBranchingFactor(branchingFactor);
+
+        metadata.setWriteRetentionQueueCapacity(op.getProperty(
+                IndexAnnotations.WRITE_RETENTION_QUEUE_CAPACITY,
+                IndexAnnotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
+
+        metadata.setTupleSerializer(new Id2TermTupleSerializer(namespace,
+                valueFactory, new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
+                new FrontCodedRabaCoder(ratio), SimpleRabaCoder.INSTANCE));
+
+        // a bloom filter should help avoid lookups when IVs do not have cached
+        // values.
+        metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
+
+        if (true) {
+          
+            // enable raw record support.
+            metadata.setRawRecords(true);
+
+            /*
+             * Very small RDF values can be inlined into the index, but after
+             * that threshold we want to have the values out of line on the
+             * backing store.
+             * 
+             * TODO Tune this and the threshold at which we use the BLOBS index
+             * instead.
+             */
+            metadata.setMaxRecLen(16);
+            
+        }
+        
+        return metadata;
+    }
+    
+    /**
      * Setup the {@link IndexMetadata} for {@link #blobsCache}.
      * <p>
      * Note: This is basically the same setup as the BLOBS index.
@@ -268,7 +363,7 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
         super(BigdataValueFactoryImpl.getInstance(((String[]) op
                 .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0]), filter);
-
+        
         if (!filter) {
 
             /*
@@ -284,13 +379,23 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
             ivCache.set(BTree.create(store, getIVCacheIndexMetadata(op)));
 
+            literalExtensionIVCache.set(BTree.create(store, getLiteralExtensionIVCacheIndexMetadata(op)));
+            
             blobsCache.set(BTree.create(store, getBlobsCacheIndexMetadata(op)));
+
+            ivCacheSchema = new LinkedHashSet<IVariable<?>>();
+
+            cache = new HashMap<IV<?, ?>, BigdataValue>();
 
         } else {
 
             namespace = null;
             
             valueFactory = null;
+            
+            ivCacheSchema = null;
+            
+            cache = null;
             
         }
 
@@ -320,6 +425,8 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         flush();
         
         checkpointBTree(ivCache);
+        
+        checkpointBTree(literalExtensionIVCache);
         
         checkpointBTree(blobsCache);
         
@@ -366,7 +473,22 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
             tmp2.close();
 
         }
+        
+        tmp2 = literalExtensionIVCache.getAndSet(null/* newValue */);
+        
+        if (tmp2 != null) {
+            
+            tmp2.close();
+            
+        }
 
+
+        if (ivCacheSchema != null) {
+
+            ivCacheSchema.clear();
+            
+        }
+        
         super.release();
         
     }
@@ -390,6 +512,8 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         final BTree ivCache = this.ivCache.get();
 
         final BTree blobsCache = this.blobsCache.get();
+        
+        final BTree literalExtensionIVCache = this.literalExtensionIVCache.get();
 
         // Lazily resolved.
         BlobsIndexHelper h = null;
@@ -438,6 +562,24 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
                 }
 
+            /**
+             * BLZG-1899: we also need to encode literal extension IVs: these IVs
+             *            require materialization although they are inlined, since
+             *            their interpretation depends on the LexiconConfiguration
+             */
+            } else if (iv instanceof LiteralExtensionIV) {
+
+                final IKeyBuilder keyBuilder = new KeyBuilder();
+
+                final byte[] key = iv.encode(keyBuilder.reset()).getKey();
+                
+                final byte[] val = valueFactory.getValueSerializer().serialize(value);
+                
+                if (!literalExtensionIVCache.contains(key)) {
+                    
+                    literalExtensionIVCache.insert(key, val);
+                }
+                
             } else {
 
                 final byte[] key = tupSer.serializeKey(iv);
@@ -452,8 +594,10 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
         }
 
+        if (cache != null)
+            cache.clear();
+        
         super.flush();
-
     }
 
     /**
@@ -474,9 +618,12 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         
         final BTree ivCache = this.ivCache.get();
 
+        final BTree literalExtensionIVCache = this.literalExtensionIVCache.get();
+
         final BTree blobsCache = this.blobsCache.get();
 
         if ((ivCache == null || ivCache.getEntryCount() == 0L)
+                && (literalExtensionIVCache == null || literalExtensionIVCache.getEntryCount() == 0L)
                 && (blobsCache == null || blobsCache.getEntryCount() == 0L)) {
 
             // Nothing materialized.
@@ -544,6 +691,24 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
                 iv.setValue(value);
 
+            } else if (iv instanceof LiteralExtensionIV) {
+                
+                final LiteralExtensionIV<?> literalExtensionIv = (LiteralExtensionIV<?>) iv;
+                
+                IVUtility.encode(keyBuilder, literalExtensionIv);
+
+                final byte[] key = keyBuilder.getKey();
+
+                if (literalExtensionIVCache.lookup(key, ivCacheTuple) == null) {
+
+                    continue;
+
+                }
+                
+                final BigdataValue value = tupSer.deserialize(ivCacheTuple);
+
+                iv.setValue(value);
+                
             } else {
 
                 IVUtility.encode(keyBuilder, iv);
@@ -565,5 +730,23 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         }
 
     }
+    
+    @Override
+    void cacheSchemaAndValue(final IVariable<?> v, final IV<?,?> iv, final boolean updateCache) {
+
+        /**
+         *  BLZG-1899: we need to materialize all IVs that require materialization;
+         *             before, this condition was !iv.isInline(), which did not consider
+         *             cases such as LiteralExtensionIVs that are inline but nevertheless
+         *             need to be materialized
+         */
+        if (iv.needsMaterialization() && iv.hasValue() && !filter) {
+            ivCacheSchema.add(v);
+            if (updateCache && cache != null)
+                cache.put(iv, iv.getValue());
+        }
+        
+    }
+    
 
 }
