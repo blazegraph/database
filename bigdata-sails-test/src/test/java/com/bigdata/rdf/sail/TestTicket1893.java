@@ -29,17 +29,14 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
-import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
@@ -62,6 +59,7 @@ public class TestTicket1893 extends
      		"<http://s> <http://p> true .\n" + 
      		"<http://s> <http://p> \"false\"^^xsd:boolean .\n" + 
      		"<http://s> <http://p> \"plain string\" .\n" + 
+     		"<http://s> <http://p> \"very long literal which length exceeds MAX_INLINE_TEXT_LENGTH\" .\n" +
      		"<http://s> <http://p> \"datatyped string\"^^xsd:string .\n" + 
      		"<http://s> <http://p> \"english string\"@en .\n" + 
      		"_:s1 <http://refers> _:s2 .\n"; 
@@ -69,16 +67,7 @@ public class TestTicket1893 extends
     private final static RDFFormat DATA_FORMAT = RDFFormat.TURTLE;
     
     private final static String INSERT_SPARQL = "INSERT DATA {" //
-    		+ "<http://s> <http://p> 1 . " //
-    		+ "<http://s> <http://p> \"2\"^^xsd:int . " //
-    		+ "<http://s> <http://p> 3.0 . " //
-    		+ "<http://s> <http://p> \"4.0\"^^xsd:double . " //
-    		+ "<http://s> <http://p> true . " //
-    		+ "<http://s> <http://p> \"false\"^^xsd:boolean . " //
-    		+ "<http://s> <http://p> \"plain string\" . " //
-    		+ "<http://s> <http://p> \"datatyped string\"^^xsd:string . " //
-    		+ "<http://s> <http://p> \"english string\"@en . " //
-    		+ "_:s1 <http://refers> _:s2 . " //
+    		+ DATA //
     		+ "}";
 
     public TestTicket1893() {
@@ -809,6 +798,7 @@ public class TestTicket1893 extends
 				vf.createLiteral("plain string"),
 				vf.createLiteral("datatyped string", XMLSchema.STRING),
 				vf.createLiteral("english string", "en"),
+				vf.createLiteral("very long literal which length exceeds MAX_INLINE_TEXT_LENGTH"),
 		};
 
 		cxn.getTripleStore().getLexiconRelation().addTerms(values, values.length, true /* readOnly */);
@@ -826,6 +816,7 @@ public class TestTicket1893 extends
         assertTrue(values[7].getIV().isInline()); //    	"plain string"
         assertTrue(values[8].getIV().isInline()); //    	"datatyped string"^^xsd:string
         assertTrue(values[9].getIV().isInline()); //    	"english string"@en
+        assertFalse(values[10].getIV().isInline()); //    	"very long literal which length exceeds max inline text length"
         
         endTest(cxn);
         
@@ -858,6 +849,7 @@ public class TestTicket1893 extends
 				vf.createLiteral("plain string"),
 				vf.createLiteral("datatyped string", XMLSchema.STRING),
 				vf.createLiteral("english string", "en"),
+				vf.createLiteral("very long literal which length exceeds MAX_INLINE_TEXT_LENGTH"),
 		};
 
 		cxn.getTripleStore().getLexiconRelation().addTerms(values, values.length, true /* readOnly */);
@@ -875,6 +867,7 @@ public class TestTicket1893 extends
         assertTrue(values[7].getIV().isInline()); //    	"plain string"
         assertTrue(values[8].getIV().isInline()); //    	"datatyped string"^^xsd:string
         assertTrue(values[9].getIV().isInline()); //    	"english string"@en
+        assertFalse(values[10].getIV().isInline()); //    	"very long literal which length exceeds max inline text length"
         
         endTest(cxn);
         
@@ -995,7 +988,7 @@ public class TestTicket1893 extends
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.INLINE_TEXT_LITERALS, Boolean.toString(inlineTextLiterals));
 
             if (inlineTextLiterals) {
-            	properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.MAX_INLINE_TEXT_LENGTH, Integer.toString(1000));
+            	properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.MAX_INLINE_TEXT_LENGTH, Integer.toString(45));
             }
 
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.INLINE_XSD_DATATYPE_LITERALS, Boolean.toString(inlineXSDDatatypeLiterals));
