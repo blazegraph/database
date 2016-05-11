@@ -1044,7 +1044,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          final IsolationLevel effectiveLevel;
          if (level == null) {
         	 if (transactionIsolationLevel == null) {
-        		 effectiveLevel = IsolationLevels.READ_UNCOMMITTED;
+        		 effectiveLevel = IsolationLevels.SERIALIZABLE;
              } else {
         		 effectiveLevel = transactionIsolationLevel;
         	 }
@@ -1053,9 +1053,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          }
          
          long timestamp;
-		 if (effectiveLevel.isCompatibleWith(IsolationLevels.SNAPSHOT_READ)) {
-        	 timestamp = RemoteTransactionManager.READ_COMMITTED;
-         } else if (effectiveLevel.isCompatibleWith(IsolationLevels.READ_UNCOMMITTED)) {
+		 if (effectiveLevel.isCompatibleWith(IsolationLevels.SERIALIZABLE)) {
+        	 timestamp = RemoteTransactionManager.UNISOLATED;
+         } else if (effectiveLevel.isCompatibleWith(IsolationLevels.SNAPSHOT)) {
         	 timestamp = RemoteTransactionManager.UNISOLATED;
          } else {
         	 throw new RepositoryException("Isolation level " + effectiveLevel + " is not supported");
@@ -1068,21 +1068,20 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          } catch (RuntimeException e) {
             throw new RepositoryException(e);
          }
-	  }
+      }
    }
-	
 
-	@Override
-	public void setIsolationLevel(IsolationLevel level)
-			throws IllegalStateException {
-		transactionIsolationLevel = level;
-	}
-	
-	@Override
-	public IsolationLevel getIsolationLevel() {
-		return transactionIsolationLevel;
-	}
-	
+   @Override
+   public void setIsolationLevel(IsolationLevel level)
+         throws IllegalStateException {
+      transactionIsolationLevel = level;
+   }
+
+   @Override
+   public IsolationLevel getIsolationLevel() {
+      return transactionIsolationLevel;
+   }
+
    @Override
    public void begin() throws RepositoryException {
 	   begin(transactionIsolationLevel);
