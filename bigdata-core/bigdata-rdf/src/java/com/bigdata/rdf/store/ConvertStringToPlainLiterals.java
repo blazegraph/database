@@ -248,7 +248,7 @@ public class ConvertStringToPlainLiterals {
 						// Insert plain literal key mapping to the same IV
 						term2Id.insert(plainLiteralKey, term2IdSer.serializeVal(value.getIV()));
 
-						System.out.println("Processed Term2ID value: " + value + " "+term);
+//						System.out.println("Processed Term2ID value: " + value + " "+term);
 					}
 					
 
