@@ -27,16 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.encoder;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.UUID;
 
 import junit.framework.TestCase2;
 
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -51,10 +52,24 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.IPv4AddrIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralArrayIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.PackedLongIV;
+import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -132,11 +147,38 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
     protected TermId<BigdataValue> mockIVCarryingBNode;
     
     /** An inline IV whose {@link IVCache} is set. */
-    protected XSDIntegerIV<BigdataLiteral> inlineIV;
+    protected XSDIntegerIV<BigdataLiteral> inlineIV1;
+    
+    /** An inline IV whose {@link IVCache} is set. */
+    protected XSDDecimalIV<BigdataLiteral> inlineIV2;
 
+    /** An inline IV whose {@link IVCache} is set. */
+    protected XSDNumericIV<BigdataLiteral> inlineIV3;
+    
     /** An inline IV whose {@link IVCache} is NOT set. */
-    protected IV<?,?> inlineIV2;
-
+    protected XSDBooleanIV<?> inlineIV4;
+    
+    /** Fully inlined literal IVs (do not require materialization) */
+    protected FullyInlineTypedLiteralIV<BigdataLiteral> fullyInlinedTypedLiteralIV;
+    protected IPv4AddrIV<BigdataLiteral> ipV4AddrIv;
+    protected LiteralArrayIV literalArrayIV;
+    protected PackedLongIV<BigdataLiteral> packedLongIV;
+    protected UUIDLiteralIV<BigdataLiteral> uuidLiteralIV;
+    protected XSDUnsignedByteIV<BigdataLiteral> unsignedByteIV;
+    protected XSDUnsignedIntIV<BigdataLiteral> unsignedIntIV;
+    protected XSDUnsignedLongIV<BigdataLiteral> unsignedLongIV;
+    protected XSDUnsignedShortIV<BigdataLiteral> unsignedShortIV;
+    
+    /** Extension IVs (require materialization) and the like */
+    protected FullyInlineURIIV<BigdataURI> fullyInlineUriIV;
+    protected LiteralExtensionIV<BigdataLiteral> literalExtensionIV;
+    protected URIExtensionIV<?> uriExtensionIV;
+    
+    /** Other IVs requiring materialization */
+    protected VocabURIByteIV<BigdataURI> vocabUriByteIV;
+    protected VocabURIShortIV<BigdataURI> vocabUriShortIV;
+    
+    
     /**
      * The encoder under test.
      */
@@ -178,12 +220,47 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         mockIVCarryingBNode = (TermId) TermId.mockIV(VTE.BNODE);
         mockIVCarryingBNode.setValue((BigdataValue) valueFactory.createBNode("_:green_as_bnode"));
 
-
-        inlineIV = new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(100));
-        inlineIV.setValue((BigdataLiteral) valueFactory.createLiteral("100",
+        inlineIV1 = new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(100));
+        inlineIV1.setValue((BigdataLiteral) valueFactory.createLiteral("100",
                 XSD.INTEGER));
+
+        inlineIV2 = new XSDDecimalIV<BigdataLiteral>(BigDecimal.valueOf(100));
+        inlineIV2.setValue((BigdataLiteral) valueFactory.createLiteral("100.0",
+                XSD.DOUBLE));
+
+        inlineIV3 = new XSDNumericIV<BigdataLiteral>(2);
+        inlineIV3.setValue((BigdataLiteral) valueFactory.createLiteral("2",
+                XSD.SHORT));
         
-        inlineIV2 = XSDBooleanIV.TRUE;
+        inlineIV4 = XSDBooleanIV.TRUE;
+        
+        
+        fullyInlinedTypedLiteralIV = 
+            new FullyInlineTypedLiteralIV<>("Test 123", null, null);
+        
+        ipV4AddrIv = new IPv4AddrIV<>("127.0.0.1");
+        literalArrayIV = new LiteralArrayIV(inlineIV1, inlineIV2, inlineIV3);
+        packedLongIV = new PackedLongIV(7736464);
+        uuidLiteralIV = new UUIDLiteralIV<>(UUID.randomUUID());
+        unsignedByteIV = new XSDUnsignedByteIV((byte)3);
+        unsignedIntIV = new XSDUnsignedIntIV<>(23);
+        unsignedLongIV = new XSDUnsignedLongIV<>(37747583929L);
+        unsignedShortIV = new XSDUnsignedShortIV((short)5);
+        
+        fullyInlineUriIV = new FullyInlineURIIV<>(new URIImpl("http://my.random.datatype"));
+        
+        literalExtensionIV = new LiteralExtensionIV(inlineIV1, fullyInlineUriIV);
+        // note: any value will be fine here, it's just about the fact that decoding must recover it
+        literalExtensionIV.setValue((BigdataLiteral) valueFactory.createLiteral("some dummy value"));
+        
+        uriExtensionIV = new URIExtensionIV(fullyInlinedTypedLiteralIV, fullyInlineUriIV);
+        
+        // vocabUriByteIV and vocabUriShortIV both require materialization
+        vocabUriByteIV = new VocabURIByteIV((byte)3);
+        vocabUriByteIV.setValue((BigdataURI) valueFactory.createURI("http://some.vocab.item1"));
+        
+        vocabUriShortIV = new VocabURIShortIV((short)4);
+        vocabUriShortIV.setValue((BigdataURI) valueFactory.createURI("http://some.vocab.item2"));
         
     }
 
@@ -202,9 +279,28 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         termId = termId2 = null;
         blobIV = null;
         mockIV1 = mockIV2 = mockIV3 = null;
-        inlineIV = null;
+        inlineIV1 = null;
         inlineIV2 = null;
+        inlineIV3 = null;
+        inlineIV4 = null;
         
+        fullyInlinedTypedLiteralIV = null;
+        ipV4AddrIv = null;
+        literalArrayIV = null;
+        packedLongIV = null;
+        uuidLiteralIV = null;
+        unsignedByteIV = null;
+        unsignedIntIV = null;
+        unsignedLongIV = null;
+        unsignedShortIV = null;
+        
+        fullyInlineUriIV = null;
+        literalExtensionIV = null;
+        uriExtensionIV = null;
+        
+        vocabUriByteIV = null;
+        vocabUriShortIV = null;
+                
     }
 
     protected void doEncodeDecodeTest(final IBindingSet expected) {
@@ -282,7 +378,7 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/532
              * (ClassCastException during hash join (can not be cast to TermId))
              */
-            if (iv.hasValue() && !iv.isInline()) {
+            if (iv.hasValue() && iv.needsMaterialization()) {
 
                 final IVariable var = e.getKey();
 
@@ -523,7 +619,8 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
         final IBindingSet expected = new ListBindingSet();
         expected.set(Var.var("x"), new Constant<IV>(termId));
-        expected.set(Var.var("y"), new Constant<IV>(inlineIV));
+        expected.set(Var.var("y"), new Constant<IV>(inlineIV1));
+        expected.set(Var.var("z"), new Constant<IV>(inlineIV2));
 
         doEncodeDecodeTest(expected);
 
@@ -757,7 +854,7 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
             final IBindingSet expected = new ListBindingSet();
 
             expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
-            expected.set(Var.var("x"), new Constant<IV<?, ?>>(inlineIV));
+            expected.set(Var.var("x"), new Constant<IV<?, ?>>(inlineIV1));
             expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
 
             doEncodeDecodeTest(expected);
@@ -783,6 +880,15 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
             doEncodeDecodeTest(expected);
         }
         
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            expected.set(Var.var("z2"), new Constant<IV<?,?>>(inlineIV2));
+            expected.set(Var.var("z3"), new Constant<IV<?,?>>(inlineIV3));
+            expected.set(Var.var("z4"), new Constant<IV<?,?>>(inlineIV4));
+
+            doEncodeDecodeTest(expected);
+        }
     }
 
     /**
@@ -799,7 +905,73 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         doEncodeDecodeTest(expected);
         
     }
+    
+    
+    public void testAbstractLiteralIVs() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x1"), new Constant<IV<?, ?>>(ipV4AddrIv));
+        expected.set(Var.var("x2"), new Constant<IV<?, ?>>(literalArrayIV));
+        expected.set(Var.var("x4"), new Constant<IV<?, ?>>(packedLongIV));
+        expected.set(Var.var("x5"), new Constant<IV<?, ?>>(uuidLiteralIV));
+        expected.set(Var.var("x6"), new Constant<IV<?, ?>>(unsignedByteIV));
+        expected.set(Var.var("x7"), new Constant<IV<?, ?>>(unsignedIntIV));
+        expected.set(Var.var("x8"), new Constant<IV<?, ?>>(unsignedLongIV));
+        expected.set(Var.var("x9"), new Constant<IV<?, ?>>(unsignedShortIV));
+        
+        doEncodeDecodeTest(expected);
 
+    }
+
+    public void testFullyInlineUriIV() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(fullyInlineUriIV));
+        
+        doEncodeDecodeTest(expected);
+
+    }
+    
+    public void testLiteralExtensionIV() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(literalExtensionIV));
+        
+        doEncodeDecodeTest(expected);
+
+    }
+
+    
+    public void testUriExtensionIV() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(uriExtensionIV));
+        
+        doEncodeDecodeTest(expected);
+    }
+    
+    public void testVocabUriByteIV() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(vocabUriByteIV));
+        
+        doEncodeDecodeTest(expected);
+    }
+    
+    public void testVocabUriShortIV() {
+        
+        final IBindingSet expected = new ListBindingSet();
+        
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(vocabUriShortIV));
+        
+        doEncodeDecodeTest(expected);
+    }
+    
     protected BlobIV<BigdataLiteral> getVeryLargeLiteral() {
         
         final int len = 1024000;
