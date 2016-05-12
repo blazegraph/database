@@ -38,7 +38,9 @@ public class FreebaseInlinedUriVocabularyDecl implements VocabularyDecl {
     
     static private final URI[] uris = new URI[] {
 
-        new URIImpl("http://rdf.freebase.com/ns/m.0775xx"), // -> 8003612
+        new URIImpl("http://rdf.freebase.com/ns/m.0"), // Freebase MID
+        new URIImpl("http://rdf.freebase.com/ns/g.1"), // Freebase GUID
+        //new URIImpl("http://rdf.freebase.com/ns/m.0775xx"), // -> 8003612
         new URIImpl("http://wp/en/"), // -> 4580887
         new URIImpl("http://en.wikipedia.org/wiki/index.html?curid="), // -> 4394125
         new URIImpl("http://fr.wikipedia.org/wiki/index.html?curid="), // -> 982239
