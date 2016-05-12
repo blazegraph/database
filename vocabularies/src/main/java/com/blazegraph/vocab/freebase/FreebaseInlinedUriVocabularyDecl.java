@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.vocab;
+package com.blazegraph.vocab.freebase;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,6 +26,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.util.VocabBuilder;
+import com.bigdata.rdf.vocab.VocabularyDecl;
 
 /**
  * Vocabulary class defining freebase properties that occur at least in 500 triples.

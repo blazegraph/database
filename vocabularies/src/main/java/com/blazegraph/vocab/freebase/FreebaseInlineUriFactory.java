@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.vocab;
+package com.blazegraph.vocab.freebase;
 
 import java.math.BigInteger;
 
@@ -38,7 +38,8 @@ import com.bigdata.rdf.model.BigdataLiteral;
  **/
 public class FreebaseInlineUriFactory extends InlineURIFactory {
 
-    public static final String URI1 = "http://rdf.freebase.com/ns/m.0775xx"; // -> 8003612
+	//This should get handled by the MID handler
+    //public static final String URI1 = "http://rdf.freebase.com/ns/m.0775xx"; // -> 8003612
     public static final String URI3 = "http://wp/en/"; // -> 4580887
     public static final String URI4 = "http://en.wikipedia.org/wiki/index.html?curid="; // -> 4394125
     public static final String URI14 = "http://fr.wikipedia.org/wiki/index.html?curid="; // -> 982239
@@ -77,8 +78,13 @@ public class FreebaseInlineUriFactory extends InlineURIFactory {
     public FreebaseInlineUriFactory() {
         
         super();
+        
+        //Handle the MIDS and GUIDs
+        addHandler(new InlineFreebaseGUIDMIDURIHandler("http://rdf.freebase.com/ns/g.1"));
+        addHandler(new InlineFreebaseGUIDMIDURIHandler("http://rdf.freebase.com/ns/m.0"));
 
-        addHandler(new URI1InlineURIHandler());
+        //Should be handled by the GUIDMID Handler
+        //addHandler(new URI1InlineURIHandler());
         addHandler(new URI3InlineURIHandler());
         addHandler(new URI4InlineURIHandler());
         addHandler(new URI14InlineURIHandler());
@@ -115,13 +121,14 @@ public class FreebaseInlineUriFactory extends InlineURIFactory {
         
     }
 
-    public static class URI1InlineURIHandler extends FreebaseInlineURIHandler {
-
-        public URI1InlineURIHandler() {
-            super(URI1);
-        }
-        
-    }
+//Should be handled by the MID handler    
+//    public static class URI1InlineURIHandler extends FreebaseInlineURIHandler {
+//
+//        public URI1InlineURIHandler() {
+//            super(URI1);
+//        }
+//        
+//    }
 
     public static class URI3InlineURIHandler extends FreebaseInlineURIHandler {
 

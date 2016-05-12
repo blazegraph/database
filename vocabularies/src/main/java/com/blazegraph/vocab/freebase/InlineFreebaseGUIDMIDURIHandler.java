@@ -21,10 +21,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package com.bigdata.rdf.internal;
+package com.blazegraph.vocab.freebase;
 
 import java.math.BigInteger;
 
+import com.bigdata.rdf.internal.InlineURIHandler;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.model.BigdataLiteral;

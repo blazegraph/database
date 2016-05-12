@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 28, 2007
  */
 
-package com.bigdata.rdf.vocab;
+package com.blazegraph.vocab.freebase;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.core.BigdataCoreVocabulary_v20160317;

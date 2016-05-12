@@ -1,4 +1,4 @@
-package com.bigdata.rdf.internal;
+package com.blazegraph.vocab.freebase;
 
 import java.math.BigInteger;
 
@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.blazegraph.vocab.freebase.InlineFreebaseGUIDMIDURIHandler;
 
 /**
  * Test suite for {@link URIExtensionIV}.
