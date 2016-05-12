@@ -176,6 +176,9 @@ public class TestAll extends TestCase {
         //namespace.
         suite.addTestSuite(TestInlineLocalNameIntegerURIHandler.class);
         
+        //Test handlers for Freebase MID and GUID inlining
+        suite.addTestSuite(TestInlineFreebaseGUIDMIDURIHandler.class);
+        
         return suite;
         
     }
