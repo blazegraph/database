@@ -130,6 +130,15 @@ public class TestTicket1889 extends QuadsTestCase {
 		}
 	}
 
+	/**
+	 * Prepares data containing blank nodes, loads it into triplestore,
+	 * then run an update, which creates additional statements with blank nodes
+	 * resulting number of statements loaded should be 2*n.
+	 * Total number of blank nodes will be n+k.
+	 * @param repo Repository to load data
+	 * @param n Number of statements to be loaded
+	 * @param k Number of subjects to be loaded
+	 */
 	private void executeQuery(final BigdataSailRepository repo, final int n, final int k)
 			throws RepositoryException, MalformedQueryException,
 			QueryEvaluationException, RDFParseException, IOException, UpdateExecutionException {
