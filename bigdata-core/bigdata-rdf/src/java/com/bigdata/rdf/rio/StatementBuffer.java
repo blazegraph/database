@@ -1359,7 +1359,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	// Buffer a batch and then incrementally flush.
 		if (queue == null) {
 
-			final BatchResult batchResult = new Batch<S>(this, false/* clone */).writeNow();
+			final BatchResult batchResult = new Batch<S>(this, true/* avoidCloningIfPossible */).writeNow();
 			bnodesResolvedCount += batchResult.getNumBNodesResolved();
 			batchWriteCount++;
 
@@ -1413,7 +1413,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			try {
 
 				// Blocking put.
-				queue.put(new Batch<S>(this, true/* clone */));
+				queue.put(new Batch<S>(this, false/* avoidCloningIfPossible */));
 				batchAddCount++;
 				
 			} catch (InterruptedException e) {
@@ -1725,14 +1725,17 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	/**
 		 * 
 		 * @param sb
-		 * @param clone
-		 *            When true, the backing arrays are cloned in order to allow
-		 *            them to be cleared by the caller. When false, the caller
-		 *            MUST invoke {@link #writeNow()} synchronously. (This is used
-		 *            to make it easier to compare the two approaches without 
-		 *            introducing any new overhead).
+		 * @param avoidCloningIfPossible
+		 *            When false, the backing arrays are cloned in order to allow
+		 *            them to be cleared by the caller. When true, values backing array
+		 *            will be used as-is if it is possible (there is enough capacity
+		 *            for the blank nodes, which has to be written to DB);
+		 *            in this case the caller MUST invoke {@link #writeNow()}
+		 *            synchronously. (This is used to make it easier to compare
+		 *            the two approaches without introducing any new overhead).
+		 *            @see https://jira.blazegraph.com/browse/BLZG-1889 (ArrayIndexOutOfBound Exception)
 		 */
-    	Batch(final StatementBuffer<S> sb, final boolean clone) {
+    	Batch(final StatementBuffer<S> sb, final boolean avoidCloningIfPossible) {
 
 			if (sb == null)
 				throw new IllegalArgumentException();
@@ -1770,8 +1773,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 		    	}
 		    	
 	    	}
+	    	
+	    	boolean cloned = false;
 	    	    
-			if (!clone && bnodes.isEmpty()) {
+			if (avoidCloningIfPossible && bnodes.isEmpty()) {
 				
 				// Direct use of StatementBuffer values array is possible, as there are no blank nodes to be written
 				
@@ -1780,7 +1785,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				
 			} else {
 				
-				if (!clone && (sb.numValues + bnodes.size() <= sb.values.length)) {
+				if (avoidCloningIfPossible && (sb.numValues + bnodes.size() <= sb.values.length)) {
 
 					// Could use StatementBuffer values array, as its capacity is sufficient for blank nodes
 					
@@ -1790,6 +1795,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				
 					// Need to recreate values array to ensure capacity for blank nodes
 					this.values = new BigdataValue[sb.numValues + bnodes.size()];
+					
+					cloned = true;
 					
 				}
 				
@@ -1806,7 +1813,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				this.numValues = this.values.length;
 			}
 
-			if (!clone) {
+			if (avoidCloningIfPossible) {
 
 				// Copy array references.
 				
@@ -1822,6 +1829,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 				System.arraycopy(sb.stmts/* src */, 0/* srcPos */, this.stmts/* dest */, 0/* destPos */,
 						sb.numStmts);
 				
+			}
+			
+			if (cloned) {
 				/*
 				 * The data was cloned, so reset the statement of the buffer in
 				 * the outer context (but not the bnodes nor deferred stmts).
