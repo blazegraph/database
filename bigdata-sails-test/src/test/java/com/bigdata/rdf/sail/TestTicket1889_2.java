@@ -68,41 +68,21 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
  * 
  * Test case covers both data load and insert update.
  */
-public class TestTicket1889 extends QuadsTestCase {
+public class TestTicket1889_2 extends TestTicket1889 {
 	
-    public TestTicket1889() {
+    public TestTicket1889_2() {
 	}
 
-	public TestTicket1889(String arg0) {
+	public TestTicket1889_2(String arg0) {
 		super(arg0);
 	}
 
-	public void testBufferCapacity() throws Exception {
-
-		final BigdataSail sail = getSail();
-		final BigdataSailRepository repo = new BigdataSailRepository(sail);
-		repo.initialize();
-		try {
-			// This configuration exceeds StatementBuffer capacity 
-			executeQuery(repo, Integer.valueOf(BigdataSail.Options.DEFAULT_BUFFER_CAPACITY) * 5, 1);
-		} finally {
-			repo.shutDown();
-			sail.__tearDownUnitTest();
-		}
-	}
-
-	public void testMergeUtility() throws Exception {
-
-		final BigdataSail sail = getSail();
-		final BigdataSailRepository repo = new BigdataSailRepository(sail);
-		repo.initialize();
-		try {
-			// This configuration uses MergeUtility, ensuring its capacity is sufficient
-			executeQuery(repo, 35000, 7000);
-		} finally {
-			repo.shutDown();
-			sail.__tearDownUnitTest();
-		}
+	@Override
+	public Properties getProperties() {
+		Properties properties = super.getProperties();
+		properties.setProperty(Options.QUEUE_CAPACITY, "0");
+		properties.setProperty(Options.TRUTH_MAINTENANCE, "true");
+		return properties;
 	}
 
 	/**
@@ -114,6 +94,7 @@ public class TestTicket1889 extends QuadsTestCase {
 	 * @param n Number of statements to be loaded
 	 * @param k Number of subjects to be loaded
 	 */
+	@Override
 	protected void executeQuery(final BigdataSailRepository repo, final int n, final int k)
 			throws RepositoryException, MalformedQueryException,
 			QueryEvaluationException, RDFParseException, IOException, UpdateExecutionException {
@@ -132,16 +113,14 @@ public class TestTicket1889 extends QuadsTestCase {
 			final String query = "prefix h: <http://>\r\n" + 
 					"\r\n" + 
 					"INSERT { \r\n" + 
-					"    GRAPH h:c { ?s h:p1 ?o }\r\n" + 
+					"    ?s h:p1 ?o .\r\n" + 
 					"}\r\n" + 
-					"WHERE\r\n" + 
-					"  { GRAPH h:c {?s h:p ?o }\r\n" + 
+					"WHERE {\r\n" + 
+					"  ?s h:p ?o .\r\n" + 
 					"}";
-			final Update q = conn.prepareUpdate(QueryLanguage.SPARQL,
-					query);
+			final Update q = conn.prepareUpdate(QueryLanguage.SPARQL, query);
 			q.execute();
-			assertEquals(n * 2, conn.getTripleStore().getStatementCount(true));
-
+			assertEquals(n * 2 + 4 /*4 inferred statements about predicates*/, conn.getTripleStore().getStatementCount(true));
 		} finally {
 			conn.close();
 		}
