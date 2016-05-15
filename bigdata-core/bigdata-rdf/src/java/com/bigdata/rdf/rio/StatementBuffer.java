@@ -1810,7 +1810,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 					
 				}
 				
-				this.numValues = this.values.length;
+				this.numValues = sb.numValues + bnodes.size();
 			}
 
 			if (avoidCloningIfPossible) {
