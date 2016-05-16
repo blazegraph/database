@@ -1,0 +1,16 @@
+SELECT ?s ?o1 ?o2 WHERE {
+
+  hint:Query hint:analytic "true" .
+  hint:Query hint:optimizer "None" .
+
+  ?s <http://p1> ?o1 .
+
+  # langMatches is the only with Requirement.ALWAYS, causing the
+  # variable ?o1 to be added to the done set
+  BIND(langMatches(?o1, "en")AS ?tmp1)
+
+  ?s <http://p2>* ?o2 .
+  
+  BIND(IF(STR(?o1)=STR(?o2), "X", "Y") as ?tmp2)
+
+} ORDER BY ?tmp2

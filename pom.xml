@@ -330,6 +330,11 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         </snapshotRepository>
       </distributionManagement>
       <repositories>
+        <!-- Add this repo first to speed builds as the S3 Wagon is slow. -->
+        <repository>
+          <id>apache.maven</id>
+          <url> http://repo.maven.apache.org/maven2/</url>
+        </repository>
         <repository>
           <id>blazegraph.releases</id>
           <url>s3://blazegraph-releases/release</url>
