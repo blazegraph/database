@@ -3709,7 +3709,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     private final void doSyncTouch(final AbstractNode<?> node) {
 
-        final long beginNanos = System.nanoTime();
+//        final long beginNanos = System.nanoTime();
         
         synchronized (this) {
 
@@ -3717,18 +3717,18 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        final long elapsedNanos = System.nanoTime() - beginNanos;
-        
-        // See BLZG-1664
+//        final long elapsedNanos = System.nanoTime() - beginNanos;
+//        
+//        // See BLZG-1664
         //btreeCounters.syncTouchNanos.add(elapsedNanos);
         
     }
     
     private final void doTouch(final AbstractNode<?> node) {
         
-        final long beginNanos = System.nanoTime();
-        
-        // See BLZG-1664
+//        final long beginNanos = System.nanoTime();
+//        
+//        // See BLZG-1664
         //btreeCounters.touchCount.increment();
         
         /*
@@ -3798,9 +3798,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         //
 //                }
 
-        final long elapsedNanos = System.nanoTime() - beginNanos;
-        
-        // See BLZG-1664
+//        final long elapsedNanos = System.nanoTime() - beginNanos;
+//        
+//        // See BLZG-1664
         //btreeCounters.touchNanos.add(elapsedNanos);
 
     }
