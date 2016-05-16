@@ -1123,11 +1123,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         lockManager = ReadWriteLockManager.getLockManager(this);
         
         // Use at most this many threads for concurrent eviction.
-        maxParallelEvictThreads = Integer.parseInt(System.getProperty("maxParallelEvictThreads","10"));
+        maxParallelEvictThreads = Integer.parseInt(
+                System.getProperty(IndexMetadata.Options.MAX_PARALLEL_EVICT_THREADS,
+                                   IndexMetadata.Options.DEFAULT_MAX_PARALLEL_EVICT_THREADS));
         
         // Do not use concurrent eviction unless we have at least this many
         // dirty nodes / leaves in a given level set.
-        minDirtyListSizeForParallelEvict = Integer.parseInt(System.getProperty("minDirtyListSizeForParallelEvict","5"));
+        minDirtyListSizeForParallelEvict = Integer.parseInt(
+                System.getProperty(IndexMetadata.Options.MIN_DIRTY_LIST_SIZE_FOR_PARALLEL_EVICT,
+                        IndexMetadata.Options.DEFAULT_MIN_DIRTY_LIST_SIZE_FOR_PARALLEL_EVICT));
         
     }
 
