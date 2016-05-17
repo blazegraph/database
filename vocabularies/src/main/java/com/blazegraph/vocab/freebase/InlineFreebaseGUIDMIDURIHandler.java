@@ -48,25 +48,40 @@ public class InlineFreebaseGUIDMIDURIHandler extends InlineURIHandler{
 	
 	
 	@Override
-	@SuppressWarnings("rawtypes")
+	@SuppressWarnings({ "rawtypes", "static-access" })
 	protected AbstractLiteralIV createInlineIV(String localName) {
-		//if (!localName.startsWith(this.MID_PREFIX) && !localName.startsWith(this.GUID_PREFIX)) {
-		//	return null;
-		//}
+		// if (!localName.startsWith(this.MID_PREFIX) &&
+		// !localName.startsWith(this.GUID_PREFIX)) {
+		// return null;
+		// }
 
 		final BigInteger midLong;
-		
-		//handle m.0 case
-		if(localName.startsWith(this.MID_PREFIX)) {
-			//Use a pad of one for the mids m.0
-			midLong = new BigInteger("1" + Long.toString(midToLong(localName)));
-		} else  if(localName.startsWith(this.GUID_PREFIX)){ //handle g.1 case
-			//Use a pad of one for the guids g.1
-			midLong = new BigInteger("2" + Long.toString(midToLong(localName)));
-		} else { //Handle just the MID without a prefix
-			midLong = new BigInteger("3" + Long.toString(midToLong(localName)));
+
+		try {
+			if (localName.startsWith(this.MID_PREFIX)) {
+				// handle m.0 case
+				// Use a pad of one for the mids m.0
+				midLong = new BigInteger("1"
+						+ Long.toString(midToLong(localName)));
+
+			} else if (localName.startsWith(this.GUID_PREFIX)) { 
+				// handle g.1  case
+				// Use a pad of one for the guids g.1
+				midLong = new BigInteger("2"
+						+ Long.toString(midToLong(localName)));
+
+			} else { // Handle just the MID without a prefix
+
+				midLong = new BigInteger("3"
+						+ Long.toString(midToLong(localName)));
+			}
+		} catch (NumberFormatException e) {
+			// if (log.isDebugEnabled()) {
+			// log.debug("Invalid integer", e);
+			// }
+			return null;
 		}
-		
+
 		return new XSDIntegerIV(midLong);
 	}
 
@@ -79,6 +94,7 @@ public class InlineFreebaseGUIDMIDURIHandler extends InlineURIHandler{
 		final String val = strVal.substring(1);
 		final BigInteger longVal = new BigInteger(val);
 		
+		//Empty string used for un-prefixed MID, type "3"
 		String prefix = "";
 		
 		if(type.equals("1")) {
@@ -113,6 +129,7 @@ public class InlineFreebaseGUIDMIDURIHandler extends InlineURIHandler{
 
         return value;
     }
+
     public static String longToGuid(long l) {
         return "#9202a8c04000641f"+Long.toHexString(l | 0x8000000000000000l);
     }

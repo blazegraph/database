@@ -2,7 +2,6 @@ package com.blazegraph.vocab.freebase;
 
 import java.util.LinkedList;
 import java.util.Properties;
-import java.util.Random;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
@@ -45,11 +44,11 @@ public class TestFreebaseVocabInlineUris extends AbstractTripleStoreTestCase {
 	protected AbstractTripleStore getInlineProps() {
 		final Properties properties = getProperties();
 
-		// Test with PubChem Vocabulary
+		// Test with Freebase Vocabulary
 		properties.setProperty(Options.VOCABULARY_CLASS,
 				FreebaseVocabularyFull.class.getName());
 
-		// Test with PubChem InlineURIHandler
+		// Test with Freebase InlineURIHandler
 		properties.setProperty(Options.INLINE_URI_FACTORY_CLASS,
 				FreebaseInlineUriFactory.class.getName());
 
