@@ -45,6 +45,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <rpm.user>blzg</rpm.user>
     <rpm.group>blzg</rpm.group>
     <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
+    <rpm.packageName>blazegraph-${project.version}</rpm.packageName>
     <rpm.release>SNAPSHOT</rpm.release>
     <app.name>blazegraph</app.name>
   </properties>
@@ -77,7 +78,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             -->
             <mappings>
               <mapping>
-                <directory>${rpm.installDir}/lib</directory>
+                <directory>/usr/share/${rpm.packageName}/lib</directory>
                 <filemode>750</filemode>
                 <username>${rpm.user}</username>
                 <groupname>${rpm.group}</groupname>
