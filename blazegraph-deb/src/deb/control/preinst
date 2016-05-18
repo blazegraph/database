@@ -1,17 +1,55 @@
-#Add the blazgraph group
-addgroup --system --quiet blzg
-#Add the blazegraph user with the home directory
-#Allow the home directory to be created later by the installer
-adduser --system --no-create-home --home /usr/local/blazegraph --quiet blzg
-usermod -g blzg blzg
-echo ""
-echo "***********************************************************"
-echo "* The following kernel tuning parameters are recommended. *"
-echo "* They are not automatically configured.                  *"
-echo "***********************************************************"
-echo ""
-#Enable TCP_TW_REUSE
-echo "echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse"
-#Set VM swappiness to 0
-echo "echo "vm.swappiness = 0" >> /etc/sysctl.d/10-vm.swappiness.conf"
-echo "sysctl -p || true >& /dev/null"
+#!/bin/sh
+set -e
+
+[ -f /etc/default/blazegraph ] && . /etc/default/blazegraph
+
+case "$1" in
+    install|upgrade)
+        [ -z "$BLZG_USER" ] && BLZG_USER="blzg"
+        [ -z "$BLZG_GROUP" ] && BLZG_GROUP="blzg"
+        [ -z "$BLZG_DATA" ] && BLZG_DATA="/var/lib/blazegraph"
+        [ -z "$BLZG_LOG" ] && BLZG_LOG="/var/log/blazegraph"
+        # Add the blazegraph group
+        if ! getent group "$BLZG_GROUP" > /dev/null 2>&1 ; then
+            addgroup --system --quiet "$BLZG_GROUP"
+        fi
+        # Add the blazegraph user with the home directory
+        # Allow the home directory to be created later by the installer
+        if ! getent passwd "$BLZG_USER" > /dev/null 2>&1 ; then
+            adduser --system --no-create-home --ingroup "$BLZG_GROUP" \
+                --disabled-password --shell /bin/false \
+                --home /usr/share/blazegraph --quiet "$BLZG_USER"
+        fi
+
+        # Make the blazegraph data and log directories here
+        # instead of as a jdeb template to allow overriding of user/group
+        # if /etc/default/blazegraph is in place before installation.
+        if [ ! -d "$BLZG_DATA" -a ! -L "$BLZG_DATA" ]; then
+            mkdir -p $BLZG_DATA
+        fi
+        if [ ! -d "$BLZG_LOG" -a ! -L "$BLZG_LOG" ]; then
+            mkdir -p $BLZG_LOG
+        fi
+        chown -R $BLZG_USER:$BLZG_GROUP $BLZG_DATA
+        chown $BLZG_USER:$BLZG_GROUP $BLZG_LOG
+
+        echo ""
+        echo "***********************************************************"
+        echo "* The following kernel tuning parameters are recommended. *"
+        echo "* They are not automatically configured.                  *"
+        echo "***********************************************************"
+        echo ""
+        #Enable TCP_TW_REUSE
+        echo "echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse"
+        #Set VM swappiness to 0
+        echo "echo 'vm.swappiness = 0' >> /etc/sysctl.d/10-vm.swappiness.conf"
+        echo "sysctl -p || true >& /dev/null"
+    ;;
+    abort-upgrade)
+    ;;
+
+    *)
+        echo "$0 called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
