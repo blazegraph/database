@@ -1,0 +1,10 @@
+# http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03
+
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+select ?x where {
+graph ?g {
+  {select ?x where {?x ?p ?g}}
+  }
+}

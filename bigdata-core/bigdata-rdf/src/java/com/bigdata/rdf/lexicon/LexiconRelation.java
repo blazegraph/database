@@ -2215,13 +2215,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // create a new index.
         textIndexer.create();
 
-    	if (indexManager instanceof IJournal) {
-
-            // make the changes restart safe (not required for federation).
-            ((IJournal) indexManager).commit();
-
-        }
-    	
         // TermIVs
         {
             // The index to scan for the RDF Literals.
@@ -2328,6 +2321,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
 
+        // We need to finally commit the changes to apply them
+        // See https://jira.blazegraph.com/browse/BLZG-1893 (Problems with Fulltext Index)
+        if (indexManager instanceof IJournal) {
+
+            // make the changes restart safe (not required for federation).
+            ((IJournal) indexManager).commit();
+
+        }
+    	
     }
 
     private void updateTextIndexConfiguration(final SparseRowStore global, final String namespace) {

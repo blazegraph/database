@@ -33,11 +33,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
@@ -58,6 +61,15 @@ import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -262,7 +274,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
                         bigdataValue.setIV(iv);
                     }
                 } else {
-                    iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(value.toString());
+                    iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(value.toString(), true);
                     bigdataValue = iv.getValue();
                 }
 
@@ -332,7 +344,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
      * Reconstructs BigdataValue out of IV, creating literals if needed
      * <p>
      * {@link IVUtility#decode(String, String)} is used by
-     * {@link ASTDeferredIVResolutionInitializer} in to convert parsed AST
+     * {@link ASTDeferredIVResolutionInitializer} to convert parsed AST
      * objects (ASTRDFLiteral and ASTNumericalLiteral) to IVs wrapped up as
      * BigdataValues, which are required on later stages of processing.
      * <p>
@@ -354,12 +366,12 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
     	// @see https://jira.blazegraph.com/browse/BLZG-1716 (SPARQL Update parser fails on invalid numeric literals)
     	if (value.isEmpty()) {
     		BigdataLiteral bigdataValue = valueFactory.createLiteral(value, dte.getDatatypeURI());
-    		IV iv = new FullyInlineTypedLiteralIV<BigdataLiteral>("", null, dte.getDatatypeURI());
+    		IV iv = new FullyInlineTypedLiteralIV<BigdataLiteral>("", null, dte.getDatatypeURI(), true);
 			bigdataValue.setIV(iv);
 			iv.setValue(bigdataValue);
 			return bigdataValue;
     	}
-        final IV iv = IVUtility.decode(value, dte.name());
+        final IV iv = decode(value, dte.name());
         BigdataValue bigdataValue;
         if (!iv.hasValue() && iv instanceof AbstractLiteralIV) {
             switch(dte) {
@@ -556,4 +568,90 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
 
     }
 
+    /**
+     * Decode an IV from its string representation and type, provided in as
+     * ASTRDFLiteral node in AST model.
+     * <p>
+     * Note: This is a very special case method. Normally logic should go
+     * through the ILexiconRelation to resolve inline IVs. This always uses
+     * inline IVs, and thus defeats the ILexiconConfiguration for the namespace.
+     * 
+     * @param val
+     *            the string representation
+     * @param type
+     *            value type
+     * @return the IV
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1176 (SPARQL QUERY/UPDATE should not use db connection)
+     * 
+     * This method was moved from IVUtility class, as it is not used anywhere except
+     * AST Deferred resolution
+     */
+    @SuppressWarnings("rawtypes")
+	public static IV decode(final String val, final String type) {
+        final DTE dte = Enum.valueOf(DTE.class, type);
+        switch (dte) {
+        case XSDBoolean: {
+            final boolean b = Boolean.valueOf(val);
+            if (b) {
+                return XSDBooleanIV.TRUE;
+            } else {
+                return XSDBooleanIV.FALSE;
+            }
+        }
+        case XSDByte: {
+            final byte x = Byte.valueOf(val);
+            return new XSDNumericIV<BigdataLiteral>(x);
+        }
+        case XSDShort: {
+            final short x = Short.valueOf(val);
+            return new XSDNumericIV<BigdataLiteral>(x);
+        }
+        case XSDInt: {
+            final int x = Integer.valueOf(val);
+            return new XSDNumericIV<BigdataLiteral>(x);
+        }
+        case XSDLong: {
+            final long x = Long.valueOf(val);
+            return new XSDNumericIV<BigdataLiteral>(x);
+        }
+        case XSDFloat: {
+            final float x = Float.valueOf(val);
+            return new XSDNumericIV<BigdataLiteral>(x);
+        }
+        case XSDDouble: {
+            final double x = Double.valueOf(val);
+            return new XSDNumericIV<BigdataLiteral>(x);
+        }
+        case UUID: {
+            final UUID x = UUID.fromString(val);
+            return new UUIDLiteralIV<BigdataLiteral>(x);
+        }
+        case XSDInteger: {
+            final BigInteger x = new BigInteger(val);
+            return new XSDIntegerIV<BigdataLiteral>(x);
+        }
+        case XSDDecimal: {
+            final BigDecimal x = new BigDecimal(val);
+            return new XSDDecimalIV<BigdataLiteral>(x);
+        }
+        case XSDString: {
+            return new FullyInlineTypedLiteralIV(val, null, XMLSchema.STRING, true);
+        }
+        case XSDUnsignedByte: {
+            return new XSDUnsignedByteIV<>((byte) (Byte.valueOf(val) + Byte.MIN_VALUE));
+        }
+        case XSDUnsignedShort: {
+            return new XSDUnsignedShortIV<>((short) (Short.valueOf(val) + Short.MIN_VALUE));
+        }
+        case XSDUnsignedInt: {
+            return new XSDUnsignedIntIV((int) (Integer.valueOf(val) + Integer.MIN_VALUE));
+        }
+        case XSDUnsignedLong: {
+            return new XSDUnsignedLongIV<>(Long.valueOf(val) + Long.MIN_VALUE);
+        }
+        default:
+            throw new UnsupportedOperationException("dte=" + dte);
+        }
+    }
 }

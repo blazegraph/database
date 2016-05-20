@@ -1,0 +1,18 @@
+# The variable ?g in GRAPH ?g is overshadowed by SELECT ?x,
+# so ?g in  VALUES ?g { ex:graph1 } is a different variable, 
+# albeit with the same name, and a singleton.
+
+
+PREFIX ex: <http://www.example.org/schema#>
+SELECT ?x
+{
+  GRAPH ?g  
+  {
+    {SELECT ?x 
+     {
+       ?x ex:p ?y
+     }
+     VALUES ?g { ex:graph1 }
+    }
+  }
+}

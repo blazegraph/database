@@ -1,0 +1,34 @@
+# This is to exercise double overshadowing of context variables
+# by sub-SELECT. It's possible to imagine a naive interpretation 
+# in which this query has no answers. 
+
+# In fact, the variable ?g from GRAPH ?g #1 is overshadowed by SELECT ?x #2, 
+# so that the variable in GRAPH ?g #2 is a different variable, although 
+# with the same name, and it is in its turn overshadowed by SELECT ?x #3, 
+# so that ?g in ?x ?p ?g is essentially a singleton.
+
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+SELECT ?x #1 
+{
+  GRAPH ?g #1 
+  {
+    ?g a ex:graph_type2 .
+
+    {SELECT ?x #2
+     {
+       GRAPH ?g #2
+       {
+         ?g a ex:graph_type1 .
+
+         {SELECT ?x #3
+          {
+            ?x ex:p ?g          
+          }
+         }
+       }
+     }
+    }
+  }
+}
