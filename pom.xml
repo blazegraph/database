@@ -369,6 +369,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         <module>bigdata-core-test/</module>
         <module>bigdata-rdf-test/</module>
         <module>bigdata-sails-test/</module>
+        <module>compatibility-test</module>
       </modules>
     </profile>
     <profile>
@@ -400,6 +401,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         <module>bigdata-core-test/</module>
         <module>bigdata-rdf-test/</module>
         <module>bigdata-sails-test/</module>
+        <module>compatibility-test</module>
         <module>blazegraph-artifacts/</module>
         <!-- Moved to blazegraph-artifacts
     <module>blazegraph-war</module>
