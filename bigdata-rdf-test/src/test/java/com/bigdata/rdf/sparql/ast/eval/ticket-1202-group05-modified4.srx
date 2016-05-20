@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- https://www.w3.org/2009/sparql/docs/tests/data-sparql11/grouping/group05.srx -->
+<sparql xmlns="http://www.w3.org/2005/sparql-results#">
+  <head>
+    <variable name="s"/>
+    <variable name="w"/>
+    <variable name="u"/>
+  </head>
+  <results>
+    <result>
+      <binding name="s">
+        <uri>http://example/s1</uri>
+      </binding>
+      <binding name="w">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">9</literal>
+      </binding>
+      <binding name="u">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">9</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/s2</uri>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/s3</uri>
+      </binding>
+    </result>
+  </results>
+</sparql>

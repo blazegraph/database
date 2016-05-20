@@ -137,7 +137,23 @@ public interface IBindingSet extends Cloneable, Serializable {
 	 *            retained.
 	 */
     public IBindingSet copy(IVariable[] variablesToKeep);
-
+    
+	/**
+	 * Return a shallow copy of the binding set, eliminating unnecessary
+	 * variables and error values (equal to Constant.errorValueConstant()).
+	 * 
+	 * @param variablesToKeep
+	 *            When non-<code>null</code>, only the listed variables are
+	 *            retained.
+	 */
+    public IBindingSet copyMinusErrors(IVariable[] variablesToKeep);
+    
+    
+    /** 
+     * @return true if this IBindingSet contains an assignment of an error value
+     */
+    public boolean containsErrorValues();
+    
     /**
      * True iff the variables and their bound values are the same
      * for the two binding sets.

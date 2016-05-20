@@ -90,6 +90,10 @@ public class TestAll extends TestCase {
 //        suite.addTest(com.bigdata.rdf.graph.TestAll.suite()); // Note: This is in its own maven project.
         suite.addTest(com.bigdata.rdf.graph.impl.bd.TestAll.suite());
 
+        
+        // BOp execution
+        suite.addTest(com.bigdata.bop.solutions.TestAll.suite());
+        
         return suite;
         
     }
