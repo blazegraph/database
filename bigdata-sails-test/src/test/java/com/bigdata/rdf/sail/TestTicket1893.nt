@@ -1,0 +1,10 @@
+<http://s> <http://p> 1 .
+<http://s> <http://p> "2"^^xsd:int .
+<http://s> <http://p> 3.0 .
+<http://s> <http://p> "4.0"^^xsd:double .
+<http://s> <http://p> true .
+<http://s> <http://p> "false"^^xsd:boolean .
+<http://s> <http://p> "plain string" .
+<http://s> <http://p> "datatyped string"^^xsd:string .
+<http://s> <http://p> "english string"@en .
+_:s1 <http://refers> _:s2 .
