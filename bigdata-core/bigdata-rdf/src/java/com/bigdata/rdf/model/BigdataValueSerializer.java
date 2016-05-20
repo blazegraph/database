@@ -37,6 +37,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
@@ -192,7 +193,7 @@ public class BigdataValueSerializer<V extends Value> {
             if (lit.getLanguage() != null)
                 return ITermIndexCodes.TERM_CODE_LCL;
 
-            if (lit.getDatatype() != null)
+            if (lit.getDatatype() != null && !XMLSchema.STRING.equals(lit.getDatatype()))
                 return ITermIndexCodes.TERM_CODE_DTL;
 
             return ITermIndexCodes.TERM_CODE_LIT;

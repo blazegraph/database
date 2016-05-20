@@ -182,7 +182,6 @@ public class ConvertStringToPlainLiterals {
             System.err.println("Journal " + journal + " does not exist");
             
         }
-
         
     }
 
@@ -229,6 +228,7 @@ public class ConvertStringToPlainLiterals {
 		    while (id2TermIterator.hasNext()) {
      	
 		        final BigdataValue value = id2TermIterator.next();
+//				final byte[] idKey = id2TermSer.id2key((TermId)value.getIV());
 				final byte[] plainLiteralKey = term2IdSer.serializeKey(value);
 		        
 		        if (value instanceof BigdataLiteral && XMLSchema.STRING.equals(((BigdataLiteral)value).getDatatype())) {
@@ -243,20 +243,28 @@ public class ConvertStringToPlainLiterals {
 					if (term != null && term2Id.lookup(plainLiteralKey) == null) {
 						
 						// Remove string-datatyped key
-						term2Id.remove(term);
+						byte[] x = term2Id.remove(key);
 						
+						term2IdSer.getKeyBuilder().reset();
+						byte[] newIdValue = term2IdSer.serializeVal(value.getIV());
 						// Insert plain literal key mapping to the same IV
-						term2Id.insert(plainLiteralKey, term2IdSer.serializeVal(value.getIV()));
+						term2Id.insert(plainLiteralKey, newIdValue);
 
-//						System.out.println("Processed Term2ID value: " + value + " "+term);
+						x = id2Term.remove(term);
+
+						byte[] newValue = id2TermSer.serializeVal(value);
+						
+						id2Term.insert(term, newValue);
+						
+					    kb.commit();
+
 					}
-					
 
 		        }
 		        
 		    }
-		    System.out.println(nm + " - completed");
 		    
+		    System.out.println(nm + " - completed");
 		
 		} else {
 		    
@@ -294,7 +302,6 @@ public class ConvertStringToPlainLiterals {
         System.err.println("usage: [-namespace namespace] propertyFile");
         
         System.exit(1);
-        
         
     }
     
