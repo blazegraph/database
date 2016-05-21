@@ -113,11 +113,6 @@ public abstract class BigdataGraph implements Graph {
         String LAX_EDGES = BigdataGraph.class.getName() + ".laxEdges";
         
         /**
-         * This is necessary to pass the test suites.
-         */
-        String READ_FROM_WRITE_CONNECTION = BigdataGraph.class.getName() + ".readFromWriteConnection";
-        
-        /**
          * Use an append model for properties (rather than replace).
          */
         String LAX_PROPERTIES = BigdataGraph.class.getName() + ".laxProperties";
@@ -171,11 +166,6 @@ public abstract class BigdataGraph implements Graph {
      */
     protected final boolean laxProperties;
     
-    /**
-     * If true, read from the write connection.  Necessary for the test suites.
-     */
-    protected final boolean readFromWriteConnection;
-    
     public BigdataGraph(final BlueprintsValueFactory factory) {
         this(factory, new Properties());
     }
@@ -187,8 +177,6 @@ public abstract class BigdataGraph implements Graph {
         
         this.laxEdges = Boolean.valueOf(props.getProperty(
                 Options.LAX_EDGES, "false"));
-        this.readFromWriteConnection = Boolean.valueOf(props.getProperty(
-                Options.READ_FROM_WRITE_CONNECTION, "false"));
         this.laxProperties = Boolean.valueOf(props.getProperty(
                 Options.LAX_PROPERTIES, "false"));
         this.maxQueryTime = Integer.parseInt(props.getProperty(

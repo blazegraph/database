@@ -60,13 +60,13 @@ public class BigdataGraphClient extends BigdataGraph {
 
     private static final Properties props = new Properties();
 
-    static {
-        /*
-         * We don't want the BigdataGraph to close our connection after every
-         * read.  The BigdataGraphClient represents a session with the server.
-         */
-        props.setProperty(BigdataGraph.Options.READ_FROM_WRITE_CONNECTION, "true");
-    }
+//    static {
+//        /*
+//         * We don't want the BigdataGraph to close our connection after every
+//         * read.  The BigdataGraphClient represents a session with the server.
+//         */
+//        props.setProperty(BigdataGraph.Options.READ_FROM_WRITE_CONNECTION, "true");
+//    }
     
 	final BigdataSailRemoteRepository repo;
 	
