@@ -76,7 +76,7 @@ import com.tinkerpop.blueprints.TransactionalGraph;
  *
  */
 public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalGraph, IChangeLog {
-	
+    
     private final transient static Logger log = Logger.getLogger(BigdataGraphEmbedded.class);
     
     public static interface Options {
@@ -87,18 +87,18 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         
     }
     
-	protected final BigdataSailRepository repo;
-	
-	protected final boolean autocommitOnShutdown;
-	
-//	transient BigdataSailRepositoryConnection cxn;
+    protected final BigdataSailRepository repo;
+    
+    protected final boolean autocommitOnShutdown;
+    
+//    transient BigdataSailRepositoryConnection cxn;
 
-	final List<BigdataGraphListener> listeners = 
-	        Collections.synchronizedList(new LinkedList<BigdataGraphListener>());
+    final List<BigdataGraphListener> listeners = 
+            Collections.synchronizedList(new LinkedList<BigdataGraphListener>());
 
-	/**
-	 * Create a Blueprints wrapper around a {@link BigdataSail} instance.
-	 */
+    /**
+     * Create a Blueprints wrapper around a {@link BigdataSail} instance.
+     */
     public BigdataGraphEmbedded(final BigdataSail sail) {
         this(sail, BigdataRDFFactory.INSTANCE);
     }
@@ -125,40 +125,40 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
      * instance.
      */
-	public BigdataGraphEmbedded(final BigdataSailRepository repo) {
-		this(repo, BigdataRDFFactory.INSTANCE, new Properties());
-	}
-	
+    public BigdataGraphEmbedded(final BigdataSailRepository repo) {
+        this(repo, BigdataRDFFactory.INSTANCE, new Properties());
+    }
+    
     /**
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
      * instance with a non-standard {@link BlueprintsValueFactory} implementation.
      */
-	public BigdataGraphEmbedded(final BigdataSailRepository repo, 
-			final BlueprintsValueFactory factory, final Properties props) {
-	    super(factory, props);
-	    
-	    this.repo = (BigdataSailRepository) repo;
-	    this.autocommitOnShutdown = Boolean.valueOf(
-	            props.getProperty(Options.AUTO_COMMIT_ON_SHUTDOWN, 
+    public BigdataGraphEmbedded(final BigdataSailRepository repo, 
+            final BlueprintsValueFactory factory, final Properties props) {
+        super(factory, props);
+        
+        this.repo = (BigdataSailRepository) repo;
+        this.autocommitOnShutdown = Boolean.valueOf(
+                props.getProperty(Options.AUTO_COMMIT_ON_SHUTDOWN, 
                     Boolean.toString(Options.DEFAULT_AUTO_COMMIT_ON_SHUTDOWN)));
-	}
-	
-	public BigdataSailRepository getRepository() {
-	    return repo;
-	}
+    }
+    
+    public BigdataSailRepository getRepository() {
+        return repo;
+    }
 
 //    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-	private final ReentrantLock lock = new ReentrantLock();
-	
+    private final ReentrantLock lock = new ReentrantLock();
+    
     private transient BigdataSailRepositoryConnection cxn = null;
     
     private transient String heldBy = null;
 
-	public BigdataSailRepositoryConnection cxn() throws Exception {
-	    /*
-	     * Asking for the connection locks the graph to the current thread
-	     * until released by commit() or rollback().
-	     */
+    public BigdataSailRepositoryConnection cxn() throws Exception {
+        /*
+         * Asking for the connection locks the graph to the current thread
+         * until released by commit() or rollback().
+         */
         if (!lock.isHeldByCurrentThread()) {
             lock.lock();
         }
@@ -167,18 +167,18 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
             cxn.addChangeLog(BigdataGraphEmbedded.this);
         }
         return cxn;
-	}
-	
-	public BigdataReadOnlyGraph getReadOnlyView() throws Exception {
+    }
+    
+    public BigdataReadOnlyGraph getReadOnlyView() throws Exception {
         if (log.isDebugEnabled()) 
             log.debug("get read-only view: " + Thread.currentThread().getName());
         
-	    return new BigdataReadOnlyGraph(
-	            repo.getReadOnlyConnection(), factory, maxQueryTime);
-	}
-	
-	@Override
-	public void commit() {
+        return new BigdataReadOnlyGraph(
+                repo.getReadOnlyConnection(), factory, maxQueryTime);
+    }
+    
+    @Override
+    public void commit() {
         /*
          * Asking for the connection locks the graph to the current thread
          * until released by commit() or rollback().
@@ -208,10 +208,10 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
              */
             lock.unlock();
         }
-	}
+    }
 
-	@Override
-	public void rollback() {
+    @Override
+    public void rollback() {
         /*
          * Asking for the connection locks the graph to the current thread
          * until released by commit() or rollback().
@@ -241,10 +241,10 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
              */
             lock.unlock();
         }
-	}
+    }
 
-	@Override
-	public void shutdown() {
+    @Override
+    public void shutdown() {
         try {
             try {
                 if (autocommitOnShutdown) {
@@ -261,20 +261,20 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-	}
-	
-//	private synchronized void lock(final String method) {
+    }
+    
+//    private synchronized void lock(final String method) {
 //        if (log.isDebugEnabled()) 
 //            log.debug("waiting for lock from: " + method + ", thread: " + Thread.currentThread().getName() + ", held by: " + heldBy);
 //        
 //        if (!lock.isHeldByCurrentThread()) {
 //            lock.lock();
 //        }
-//	    heldBy = Thread.currentThread().getName();
-//	    
+//        heldBy = Thread.currentThread().getName();
+//        
 //        if (log.isDebugEnabled()) 
 //            log.debug("lock is held: " + Thread.currentThread().getName() + ", holdCount: " + lock.getHoldCount());
-//	}
+//    }
 //
 //    private synchronized void unlock(final String method) {
 //        heldBy = null;
@@ -284,18 +284,17 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 //            log.debug("lock is released by: " + method + ", thread: " + Thread.currentThread().getName());
 //    }
 
-	@Override
-	@Deprecated
-	public void stopTransaction(Conclusion arg0) {
-	}
-	
-	public StringBuilder dumpStore() throws Exception {
-	    log.error("dump store");
-	    final BigdataSailRepositoryConnection cxn = cxn();
+    @Override
+    @Deprecated
+    public void stopTransaction(Conclusion arg0) {
+    }
+    
+    public StringBuilder dumpStore() throws Exception {
+        final BigdataSailRepositoryConnection cxn = cxn();
         cxn.flush();
         return cxn.getTripleStore().dumpStore();
-	}
-	
+    }
+    
     protected static final Features FEATURES = new Features();
 
     @Override
@@ -535,21 +534,21 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     
     protected QueryEngine getQueryEngine() {
 
-    	final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
+        final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
                 .getQueryController(getIndexManager());
-    	
-    	return queryEngine;
+        
+        return queryEngine;
     }
 
-	private IIndexManager getIndexManager() {
-	
-		final BigdataSailRepository repo = (BigdataSailRepository) this.getRepository();
-		
-		final IIndexManager indexMgr = repo.getDatabase().getIndexManager();
-		
-		return indexMgr;
-		
-	}
+    private IIndexManager getIndexManager() {
+    
+        final BigdataSailRepository repo = (BigdataSailRepository) this.getRepository();
+        
+        final IIndexManager indexMgr = repo.getDatabase().getIndexManager();
+        
+        return indexMgr;
+        
+    }
 
 
 //    @Override
@@ -696,38 +695,38 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 //    public Features getFeatures() {
 //        return super.getFeatures();
 //    }
-	
-	/**
+    
+    /**
      * 
-	 * <p>
-	 * Note: This is also responsible for noticing the time at which the
-	 * query begins to execute and storing the {@link RunningQuery} in the
-	 * {@link #m_queries} map.
-	 * 
+     * <p>
+     * Note: This is also responsible for noticing the time at which the
+     * query begins to execute and storing the {@link RunningQuery} in the
+     * {@link #m_queries} map.
+     * 
      * @param The connection.
      */
-	protected UUID setupQuery(final BigdataSailRepositoryConnection cxn,
-			ASTContainer astContainer, final QueryType queryType,
-			final String extId) {
+    protected UUID setupQuery(final BigdataSailRepositoryConnection cxn,
+            ASTContainer astContainer, final QueryType queryType,
+            final String extId) {
 
         // Note the begin time for the query.
         final long begin = System.nanoTime();
 
         // Figure out the UUID under which the query will execute.
-		final UUID queryUuid = setQueryId(astContainer, UUID.randomUUID());
-		
-		//Set to UUID of internal ID if it is null.
-		final String extQueryId = extId == null?queryUuid.toString():extId;
-		
-		if (log.isDebugEnabled() && extId == null) {
-			log.debug("Received null external query ID.  Using "
-					+ queryUuid.toString());
-		}
-		
-		final boolean isUpdateQuery = queryType != QueryType.ASK
-				&& queryType != QueryType.CONSTRUCT
-				&& queryType != QueryType.DESCRIBE
-				&& queryType != QueryType.SELECT;
+        final UUID queryUuid = setQueryId(astContainer, UUID.randomUUID());
+        
+        //Set to UUID of internal ID if it is null.
+        final String extQueryId = extId == null?queryUuid.toString():extId;
+        
+        if (log.isDebugEnabled() && extId == null) {
+            log.debug("Received null external query ID.  Using "
+                    + queryUuid.toString());
+        }
+        
+        final boolean isUpdateQuery = queryType != QueryType.ASK
+                && queryType != QueryType.CONSTRUCT
+                && queryType != QueryType.DESCRIBE
+                && queryType != QueryType.SELECT;
         
         final RunningQuery r = new RunningQuery(extQueryId, queryUuid, begin, isUpdateQuery);
 
@@ -735,213 +734,213 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         m_queries.put(extQueryId, r);
         m_queries2.put(queryUuid, r);
         
-		if (log.isDebugEnabled()) {
-			log.debug("Setup Query (External ID, UUID):  ( " + extQueryId
-					+ " , " + queryUuid + " )");
-			log.debug("External query for " + queryUuid + " is :\n"
-					+ getQueryById(queryUuid).getExtQueryId());
-			log.debug(runningQueriesToString());
-		}
+        if (log.isDebugEnabled()) {
+            log.debug("Setup Query (External ID, UUID):  ( " + extQueryId
+                    + " , " + queryUuid + " )");
+            log.debug("External query for " + queryUuid + " is :\n"
+                    + getQueryById(queryUuid).getExtQueryId());
+            log.debug(runningQueriesToString());
+        }
 
         return queryUuid;
         
     }
      
-	/**
-	 * Determines the {@link UUID} which will be associated with the
-	 * {@link IRunningQuery}. If {@link QueryHints#QUERYID} has already been
-	 * used by the application to specify the {@link UUID} then that
-	 * {@link UUID} is noted. Otherwise, a random {@link UUID} is generated and
-	 * assigned to the query by binding it on the query hints.
-	 * <p>
-	 * Note: The ability to provide metadata from the {@link ASTContainer} in
-	 * the {@link StatusServlet} or the "EXPLAIN" page depends on the ability to
-	 * cross walk the queryIds as established by this method.
-	 * 
-	 * @param query
-	 *            The query.
-	 * 
-	 * @param queryUuid
-	 * 
-	 * @return The {@link UUID} which will be associated with the
-	 *         {@link IRunningQuery} and never <code>null</code>.
-	 */
-	protected UUID setQueryId(final ASTContainer astContainer, UUID queryUuid) {
+    /**
+     * Determines the {@link UUID} which will be associated with the
+     * {@link IRunningQuery}. If {@link QueryHints#QUERYID} has already been
+     * used by the application to specify the {@link UUID} then that
+     * {@link UUID} is noted. Otherwise, a random {@link UUID} is generated and
+     * assigned to the query by binding it on the query hints.
+     * <p>
+     * Note: The ability to provide metadata from the {@link ASTContainer} in
+     * the {@link StatusServlet} or the "EXPLAIN" page depends on the ability to
+     * cross walk the queryIds as established by this method.
+     * 
+     * @param query
+     *            The query.
+     * 
+     * @param queryUuid
+     * 
+     * @return The {@link UUID} which will be associated with the
+     *         {@link IRunningQuery} and never <code>null</code>.
+     */
+    protected UUID setQueryId(final ASTContainer astContainer, UUID queryUuid) {
 
-		// Figure out the effective UUID under which the query will run.
-		final String queryIdStr = astContainer.getQueryHint(QueryHints.QUERYID);
-		if (queryIdStr == null) {
-			// Not specified, so generate and set on query hint.
-			queryUuid = UUID.randomUUID();
-		} 
+        // Figure out the effective UUID under which the query will run.
+        final String queryIdStr = astContainer.getQueryHint(QueryHints.QUERYID);
+        if (queryIdStr == null) {
+            // Not specified, so generate and set on query hint.
+            queryUuid = UUID.randomUUID();
+        } 
 
-		astContainer.setQueryHint(QueryHints.QUERYID, queryUuid.toString());
+        astContainer.setQueryHint(QueryHints.QUERYID, queryUuid.toString());
 
-		return queryUuid;
-	}
+        return queryUuid;
+    }
 
-	/**
-	 * The currently executing queries (does not include queries where a client
-	 * has established a connection but the query is not running because the
-	 * {@link #queryService} is blocking).
-	 * <p>
-	 * Note: This includes both SPARQL QUERY and SPARQL UPDATE requests.
-	 * However, the {@link AbstractQueryTask#queryUuid} might not yet be bound
-	 * since it is not set until the request begins to execute. See
-	 * {@link AbstractQueryTask#setQueryId(ASTContainer)}.
-	 */
-	private static final ConcurrentHashMap<String/* extQueryId */, RunningQuery> m_queries = new ConcurrentHashMap<String, RunningQuery>();
+    /**
+     * The currently executing queries (does not include queries where a client
+     * has established a connection but the query is not running because the
+     * {@link #queryService} is blocking).
+     * <p>
+     * Note: This includes both SPARQL QUERY and SPARQL UPDATE requests.
+     * However, the {@link AbstractQueryTask#queryUuid} might not yet be bound
+     * since it is not set until the request begins to execute. See
+     * {@link AbstractQueryTask#setQueryId(ASTContainer)}.
+     */
+    private static final ConcurrentHashMap<String/* extQueryId */, RunningQuery> m_queries = new ConcurrentHashMap<String, RunningQuery>();
 
-	/**
-	 * The currently executing QUERY and UPDATE requests.
-	 * <p>
-	 * Note: This does not include requests where a client has established a
-	 * connection to the SPARQL end point but the request is not executing
-	 * because the {@link #queryService} is blocking).
-	 * <p>
-	 * Note: This collection was introduced because the SPARQL UPDATE requests
-	 * are not executed on the {@link QueryEngine} and hence we can not use
-	 * {@link QueryEngine#getRunningQuery(UUID)} to resolve the {@link Future}
-	 */
-	private static final ConcurrentHashMap<UUID/* queryUuid */, RunningQuery> m_queries2 = new ConcurrentHashMap<UUID, RunningQuery>();
+    /**
+     * The currently executing QUERY and UPDATE requests.
+     * <p>
+     * Note: This does not include requests where a client has established a
+     * connection to the SPARQL end point but the request is not executing
+     * because the {@link #queryService} is blocking).
+     * <p>
+     * Note: This collection was introduced because the SPARQL UPDATE requests
+     * are not executed on the {@link QueryEngine} and hence we can not use
+     * {@link QueryEngine#getRunningQuery(UUID)} to resolve the {@link Future}
+     */
+    private static final ConcurrentHashMap<UUID/* queryUuid */, RunningQuery> m_queries2 = new ConcurrentHashMap<UUID, RunningQuery>();
 
-	
-	public RunningQuery getQueryById(final UUID queryUuid) {
+    
+    public RunningQuery getQueryById(final UUID queryUuid) {
 
-		return m_queries2.get(queryUuid);
+        return m_queries2.get(queryUuid);
 
-	}
+    }
 
-	@Override
-	public RunningQuery getQueryByExternalId(String extQueryId) {
-		
-		return m_queries.get(extQueryId);
-	}
+    @Override
+    public RunningQuery getQueryByExternalId(String extQueryId) {
+        
+        return m_queries.get(extQueryId);
+    }
 
-	/**
-	 * 
-	 * Remove the query from the internal queues.
-	 * 
-	 */
-	@Override
-	protected void tearDownQuery(UUID queryId) {
-		
-		if (queryId != null) {
-			
-			if(log.isDebugEnabled()) {
-				log.debug("Tearing down query: " + queryId );
-				log.debug("m_queries2 has " + m_queries2.size());
-			}
+    /**
+     * 
+     * Remove the query from the internal queues.
+     * 
+     */
+    @Override
+    protected void tearDownQuery(UUID queryId) {
+        
+        if (queryId != null) {
+            
+            if(log.isDebugEnabled()) {
+                log.debug("Tearing down query: " + queryId );
+                log.debug("m_queries2 has " + m_queries2.size());
+            }
 
-			final RunningQuery r = m_queries2.get(queryId);
+            final RunningQuery r = m_queries2.get(queryId);
 
-			if (r != null) {
-				m_queries.remove(r.getExtQueryId(), r);
-				m_queries2.remove(queryId);
+            if (r != null) {
+                m_queries.remove(r.getExtQueryId(), r);
+                m_queries2.remove(queryId);
 
-				if (log.isDebugEnabled()) {
-					log.debug("Tearing down query: " + queryId);
-					log.debug("m_queries2 has " + m_queries2.size());
-				}
-			}
+                if (log.isDebugEnabled()) {
+                    log.debug("Tearing down query: " + queryId);
+                    log.debug("m_queries2 has " + m_queries2.size());
+                }
+            }
 
-		}
+        }
 
-	}
-	
-	/**
-	 * Helper method to determine if a query was cancelled.
-	 * 
-	 * @param queryId
-	 * @return
-	 */
-	protected boolean isQueryCancelled(final UUID queryId) {
+    }
+    
+    /**
+     * Helper method to determine if a query was cancelled.
+     * 
+     * @param queryId
+     * @return
+     */
+    protected boolean isQueryCancelled(final UUID queryId) {
 
-		if (log.isDebugEnabled()) {
-			log.debug(queryId);
-		}
-		
-		RunningQuery q = getQueryById(queryId);
+        if (log.isDebugEnabled()) {
+            log.debug(queryId);
+        }
+        
+        RunningQuery q = getQueryById(queryId);
 
-		if (log.isDebugEnabled() && q != null) {
-			log.debug(queryId + " isCancelled: " + q.isCancelled());
-		}
+        if (log.isDebugEnabled() && q != null) {
+            log.debug(queryId + " isCancelled: " + q.isCancelled());
+        }
 
-		if (q != null) {
-			return q.isCancelled();
-		}
+        if (q != null) {
+            return q.isCancelled();
+        }
 
-		return false;
-	}
-	
-	public String runningQueriesToString()
-	{
-		final Collection<RunningQuery> queries = m_queries2.values();
-		
-		final Iterator<RunningQuery> iter = queries.iterator();
-		
-		final StringBuffer sb = new StringBuffer();
-	
-		while(iter.hasNext()){
-			final RunningQuery r = iter.next();
-			sb.append(r.getQueryUuid() + " : \n" + r.getExtQueryId());
-		}
-		
-		return sb.toString();
-		
-	}
-	
-	public Collection<RunningQuery> getRunningQueries() {
-		final Collection<RunningQuery> queries = m_queries2.values();
+        return false;
+    }
+    
+    public String runningQueriesToString()
+    {
+        final Collection<RunningQuery> queries = m_queries2.values();
+        
+        final Iterator<RunningQuery> iter = queries.iterator();
+        
+        final StringBuffer sb = new StringBuffer();
+    
+        while(iter.hasNext()){
+            final RunningQuery r = iter.next();
+            sb.append(r.getQueryUuid() + " : \n" + r.getExtQueryId());
+        }
+        
+        return sb.toString();
+        
+    }
+    
+    public Collection<RunningQuery> getRunningQueries() {
+        final Collection<RunningQuery> queries = m_queries2.values();
 
-		return queries;
-	}
+        return queries;
+    }
 
-	@Override
-	public void cancel(final UUID queryId) {
+    @Override
+    public void cancel(final UUID queryId) {
 
-		assert(queryId != null);
-		QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
+        assert(queryId != null);
+        QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
 
-		RunningQuery q = getQueryById(queryId);
+        RunningQuery q = getQueryById(queryId);
 
-		if(q != null) {
-			//Set the status to cancelled in the internal queue.
-			q.setCancelled(true);
-		}
-	}
+        if(q != null) {
+            //Set the status to cancelled in the internal queue.
+            q.setCancelled(true);
+        }
+    }
 
-	@Override
-	public void cancel(final String uuid) {
-		cancel(UUID.fromString(uuid));
-	}
+    @Override
+    public void cancel(final String uuid) {
+        cancel(UUID.fromString(uuid));
+    }
 
-	@Override
-	public void cancel(final RunningQuery rQuery) {
+    @Override
+    public void cancel(final RunningQuery rQuery) {
 
-		if(rQuery != null) {
-			final UUID queryId = rQuery.getQueryUuid();
-			cancel(queryId);
-		}
+        if(rQuery != null) {
+            final UUID queryId = rQuery.getQueryUuid();
+            cancel(queryId);
+        }
 
-	}
-	
+    }
+    
     private static Properties properties(final int maxQueryTime) {
         final Properties props = new Properties();
         props.setProperty(BigdataGraph.Options.MAX_QUERY_TIME, Integer.toString(maxQueryTime));
         return props;
     }
     
-	public class BigdataReadOnlyGraph extends BigdataGraph {
-	    
-	    private final BigdataSailRepositoryConnection cxn;
-	    
-	    private BigdataReadOnlyGraph(final BigdataSailRepositoryConnection cxn,
-	            final BlueprintsValueFactory factory, final int maxQueryTime) {
-	        super(factory, properties(maxQueryTime));
-	        
-	        this.cxn = cxn;
-	    }
+    public class BigdataReadOnlyGraph extends BigdataGraph {
+        
+        private final BigdataSailRepositoryConnection cxn;
+        
+        private BigdataReadOnlyGraph(final BigdataSailRepositoryConnection cxn,
+                final BlueprintsValueFactory factory, final int maxQueryTime) {
+            super(factory, properties(maxQueryTime));
+            
+            this.cxn = cxn;
+        }
 
         @Override
         public void shutdown() {
@@ -1013,8 +1012,8 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         public boolean isReadOnly() {
             return true;
         }
-	    
-	}
+        
+    }
 
     @Override
     public boolean isReadOnly() {
