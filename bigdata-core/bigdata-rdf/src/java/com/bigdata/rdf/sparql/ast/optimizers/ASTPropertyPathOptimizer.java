@@ -67,6 +67,10 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 
 //	private static final transient Logger log = Logger.getLogger(ASTPropertyPathOptimizer.class);
 	
+    public ASTPropertyPathOptimizer() {
+        super(false, true /* optimizeServiceNodes */);
+    }
+    
     /**
      * Optimize the join group.
      */
