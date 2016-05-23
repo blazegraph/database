@@ -113,11 +113,6 @@ public abstract class BigdataGraph implements Graph {
         String LAX_EDGES = BigdataGraph.class.getName() + ".laxEdges";
         
         /**
-         * This is necessary to pass the test suites.
-         */
-        String READ_FROM_WRITE_CONNECTION = BigdataGraph.class.getName() + ".readFromWriteConnection";
-        
-        /**
          * Use an append model for properties (rather than replace).
          */
         String LAX_PROPERTIES = BigdataGraph.class.getName() + ".laxProperties";
@@ -171,11 +166,6 @@ public abstract class BigdataGraph implements Graph {
      */
     protected final boolean laxProperties;
     
-    /**
-     * If true, read from the write connection.  Necessary for the test suites.
-     */
-    protected transient boolean readFromWriteConnection;
-    
     public BigdataGraph(final BlueprintsValueFactory factory) {
         this(factory, new Properties());
     }
@@ -187,8 +177,6 @@ public abstract class BigdataGraph implements Graph {
         
         this.laxEdges = Boolean.valueOf(props.getProperty(
                 Options.LAX_EDGES, "false"));
-        this.readFromWriteConnection = Boolean.valueOf(props.getProperty(
-                Options.READ_FROM_WRITE_CONNECTION, "false"));
         this.laxProperties = Boolean.valueOf(props.getProperty(
                 Options.LAX_PROPERTIES, "false"));
         this.maxQueryTime = Integer.parseInt(props.getProperty(
@@ -223,22 +211,7 @@ public abstract class BigdataGraph implements Graph {
      * Different implementations will return different types of connections
      * depending on the mode (client/server, embedded, read-only, etc.)
      */
-    public abstract RepositoryConnection getWriteConnection() throws Exception;
-    
-    /**
-     * A read-only connection can be used for read operations without blocking
-     * or being blocked by writers.
-     */
-    public abstract RepositoryConnection getReadConnection() throws Exception;
-
-    /**
-     * Clients can read from the write connection if they choose.
-     * 
-     * @param readFromWriteConnection
-     */
-    public void setReadFromWriteConnection(boolean readFromWriteConnection) {
-        this.readFromWriteConnection = readFromWriteConnection;
-    }
+    public abstract RepositoryConnection cxn() throws Exception;
     
     /**
      * Return a single-valued property for an edge or vertex.
@@ -260,13 +233,10 @@ public abstract class BigdataGraph implements Graph {
 
         try {
             
-            final RepositoryConnection cxn = readFromWriteConnection ? 
-                    getWriteConnection() : getReadConnection();
+            final RepositoryResult<Statement> result = 
+                    cxn().getStatements(uri, prop, null, false);
             
             try {
-                
-                final RepositoryResult<Statement> result = 
-                        cxn.getStatements(uri, prop, null, false);
                 
                 if (result.hasNext()) {
                     
@@ -304,9 +274,7 @@ public abstract class BigdataGraph implements Graph {
                 
             } finally {
                 
-                if (!readFromWriteConnection) {
-                    cxn.close();
-                }
+                result.close();
                 
             }
             
@@ -394,13 +362,10 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
-            final RepositoryConnection cxn = readFromWriteConnection ? 
-                    getWriteConnection() : getReadConnection();
+            final RepositoryResult<Statement> result = 
+                    cxn().getStatements(uri, null, null, false);
 
             try {
-                
-                final RepositoryResult<Statement> result = 
-                        cxn.getStatements(uri, null, null, false);
                 
                 final Set<String> properties = new LinkedHashSet<String>();
                 
@@ -427,9 +392,7 @@ public abstract class BigdataGraph implements Graph {
                 
             } finally {
                 
-                if (!readFromWriteConnection) {
-                    cxn.close();
-                }
+                result.close();
                 
             }
                 
@@ -464,7 +427,7 @@ public abstract class BigdataGraph implements Graph {
             
             final Object oldVal = getProperty(uri, prop);
             
-            getWriteConnection().remove(uri, prop, null);
+            cxn().remove(uri, prop, null);
             
             return oldVal;
             
@@ -564,7 +527,7 @@ public abstract class BigdataGraph implements Graph {
         
         try {
 
-            final RepositoryConnection cxn = getWriteConnection();
+            final RepositoryConnection cxn = cxn();
             
             if (!laxProperties) {
                 
@@ -701,7 +664,7 @@ public abstract class BigdataGraph implements Graph {
             final URI fromURI = factory.toVertexURI(from.getId().toString());
             final URI toURI = factory.toVertexURI(to.getId().toString());
             
-            final RepositoryConnection cxn = getWriteConnection();
+            final RepositoryConnection cxn = cxn();
             
             cxn.add(fromURI, edgeURI, toURI);
             
@@ -747,7 +710,7 @@ public abstract class BigdataGraph implements Graph {
 //                throw new IllegalArgumentException("vertex " + vid + " already exists");
 //            }
             
-            getWriteConnection().add(uri, TYPE, VERTEX);
+            cxn().add(uri, TYPE, VERTEX);
 
             return new BigdataVertex(uri, this);
             
@@ -775,13 +738,10 @@ public abstract class BigdataGraph implements Graph {
             
             final URI edge = factory.toEdgeURI(key.toString());
             
-            final RepositoryConnection cxn = readFromWriteConnection ? 
-                    getWriteConnection() : getReadConnection();
-                    
-            try {
+            final RepositoryResult<Statement> result = 
+                    cxn().getStatements(null, edge, null, false);
             
-                final RepositoryResult<Statement> result = 
-                    cxn.getStatements(null, edge, null, false);
+            try {
             
                 if (result.hasNext()) {
                     
@@ -800,9 +760,7 @@ public abstract class BigdataGraph implements Graph {
             
             } finally {
                 
-                if (!readFromWriteConnection) {
-                    cxn.close();
-                }
+                result.close();
                 
             }
             
@@ -853,15 +811,12 @@ public abstract class BigdataGraph implements Graph {
     Iterable<Edge> getEdges(final URI from, final URI to, 
             final String... labels) throws Exception {
 
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
-                
-        final GraphQueryResult stmts = getElements(cxn, from, to, labels);
+        final GraphQueryResult stmts = getElements(from, to, labels);
         
         /*
          * EdgeIterable will close the connection if necessary.
          */
-        return new EdgeIterable(cxn, stmts);
+        return new EdgeIterable(stmts);
         
     }
 
@@ -880,9 +835,8 @@ public abstract class BigdataGraph implements Graph {
      *   filter(?label in ("label1", "label2", ...)) .
      * }
      */
-    protected GraphQueryResult getElements(final RepositoryConnection cxn,
-            final URI from, final URI to, final String... labels) 
-                    throws Exception {
+    protected GraphQueryResult getElements(final URI from, final URI to, 
+            final String... labels) throws Exception {
         
         final StringBuilder sb = new StringBuilder();
         sb.append("construct { ?from ?edge ?to . } where {\n");
@@ -909,7 +863,7 @@ public abstract class BigdataGraph implements Graph {
                         .replace("?to", to != null ? "<"+to+">" : "?to");
      
         final org.openrdf.query.GraphQuery query = 
-                cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+                cxn().prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
         
         final GraphQueryResult stmts = query.evaluate();
 
@@ -927,18 +881,15 @@ public abstract class BigdataGraph implements Graph {
      */
     Iterable<Edge> getEdges(final String queryStr) throws Exception { 
         
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
-                
         final org.openrdf.query.GraphQuery query = 
-                cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+                cxn().prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
         
         final GraphQueryResult stmts = query.evaluate();
         
         /*
          * EdgeIterable will close the connection if necessary.
          */
-        return new EdgeIterable(cxn, stmts);
+        return new EdgeIterable(stmts);
 
     }
 
@@ -960,9 +911,6 @@ public abstract class BigdataGraph implements Graph {
     Iterable<Vertex> getVertices(final URI from, final URI to, 
             final String... labels) throws Exception {
         
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
-                
         if (from != null && to != null) {
             throw new IllegalArgumentException();
         }
@@ -971,12 +919,12 @@ public abstract class BigdataGraph implements Graph {
             throw new IllegalArgumentException();
         }
         
-        final GraphQueryResult stmts = getElements(cxn, from, to, labels);
+        final GraphQueryResult stmts = getElements(from, to, labels);
         
         /*
          * VertexIterable will close the connection if necessary.
          */
-        return new VertexIterable(cxn, stmts, from == null);
+        return new VertexIterable(stmts, from == null);
         
     }
     
@@ -991,18 +939,15 @@ public abstract class BigdataGraph implements Graph {
     Iterable<Vertex> getVertices(final String queryStr, final boolean subject) 
             throws Exception {
         
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
-                
         final org.openrdf.query.GraphQuery query = 
-                cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+                cxn().prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
         
         final GraphQueryResult stmts = query.evaluate();
         
         /*
          * VertexIterable will close the connection if necessary.
          */
-        return new VertexIterable(cxn, stmts, subject);
+        return new VertexIterable(stmts, subject);
             
     }
     
@@ -1062,25 +1007,12 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
-            final RepositoryConnection cxn = readFromWriteConnection ? 
-                    getWriteConnection() : getReadConnection();
-                    
-            try {
-                
-                if (cxn.hasStatement(uri, TYPE, VERTEX, false)) {
-                    return new BigdataVertex(uri, this);
-                }
-                
-                return null;
-                
-            } finally {
-                
-                if (!readFromWriteConnection) {
-                    cxn.close();
-                }
-                
+            if (cxn().hasStatement(uri, TYPE, VERTEX, false)) {
+                return new BigdataVertex(uri, this);
             }
             
+            return null;
+                
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -1101,16 +1033,13 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
-            final RepositoryConnection cxn = readFromWriteConnection ? 
-                    getWriteConnection() : getReadConnection();
-                    
             final RepositoryResult<Statement> result = 
-                    cxn.getStatements(null, TYPE, VERTEX, false);
+                    cxn().getStatements(null, TYPE, VERTEX, false);
             
             /*
              * VertexIterable will close the connection if necessary.
              */
-            return new VertexIterable(cxn, result, true);
+            return new VertexIterable(result, true);
             
         } catch (RuntimeException e) {
             throw e;
@@ -1134,16 +1063,13 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
-            final RepositoryConnection cxn = readFromWriteConnection ? 
-                    getWriteConnection() : getReadConnection();
-                    
             final RepositoryResult<Statement> result = 
-                    cxn.getStatements(null, p, o, false);
+                    cxn().getStatements(null, p, o, false);
             
             /*
              * VertexIterable will close the connection if necessary.
              */
-            return new VertexIterable(cxn, result, true);
+            return new VertexIterable(result, true);
             
         } catch (RuntimeException e) {
             throw e;
@@ -1175,19 +1101,21 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
+            final RepositoryConnection cxn = cxn();
+            
             final URI uri = factory.toURI(edge);
             
-            if (!getWriteConnection().hasStatement(uri, TYPE, EDGE, false)) {
+            if (!cxn.hasStatement(uri, TYPE, EDGE, false)) {
                 throw new IllegalStateException();
             }
             
             final URI wild = null;
             
             // remove the edge statement
-            getWriteConnection().remove(wild, uri, wild);
+            cxn.remove(wild, uri, wild);
             
             // remove its properties
-            getWriteConnection().remove(uri, wild, wild);
+            cxn.remove(uri, wild, wild);
             
         } catch (RuntimeException e) {
             throw e;
@@ -1207,19 +1135,21 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
+            final RepositoryConnection cxn = cxn();
+            
             final URI uri = factory.toURI(vertex);
             
-            if (!getWriteConnection().hasStatement(uri, TYPE, VERTEX, false)) {
+            if (!cxn.hasStatement(uri, TYPE, VERTEX, false)) {
                 throw new IllegalStateException();
             }
             
             final URI wild = null;
             
             // remove outgoing edges and properties
-            getWriteConnection().remove(uri, wild, wild);
+            cxn.remove(uri, wild, wild);
             
             // remove incoming edges
-            getWriteConnection().remove(wild, wild, uri);
+            cxn.remove(wild, wild, uri);
             
         } catch (RuntimeException e) {
             throw e;
@@ -1240,18 +1170,15 @@ public abstract class BigdataGraph implements Graph {
      */
     public class VertexIterable implements Iterable<Vertex>, Iterator<Vertex> {
 
-        private final RepositoryConnection cxn;
-        
         private final CloseableIteration<Statement, ? extends OpenRDFException> stmts;
         
         private final boolean subject;
         
         private final List<Vertex> cache;
         
-        public VertexIterable(final RepositoryConnection cxn,
+        public VertexIterable(
                 final CloseableIteration<Statement, ? extends OpenRDFException> stmts,
                 final boolean subject) {
-            this.cxn = cxn;
             this.stmts = stmts;
             this.subject = subject;
             this.cache = new LinkedList<Vertex>();
@@ -1284,13 +1211,6 @@ public abstract class BigdataGraph implements Graph {
                     } catch (OpenRDFException e) { 
                         log.warn("Could not close result");
                     }
-                    try {
-                        if (!readFromWriteConnection) {
-                            cxn.close();
-                        }
-                    } catch (RepositoryException e) {
-                        log.warn("Could not close connection");
-                    }
                 }
             }
         }
@@ -1318,15 +1238,12 @@ public abstract class BigdataGraph implements Graph {
      */
     public class EdgeIterable implements Iterable<Edge>, Iterator<Edge> {
 
-        private final RepositoryConnection cxn;
-        
         private final CloseableIteration<Statement, ? extends OpenRDFException> stmts;
         
         private final List<Edge> cache;
         
-        public EdgeIterable(final RepositoryConnection cxn,
+        public EdgeIterable(
                 final CloseableIteration<Statement, ? extends OpenRDFException> stmts) {
-            this.cxn = cxn;
             this.stmts = stmts;
             this.cache = new LinkedList<Edge>();
         }
@@ -1355,13 +1272,6 @@ public abstract class BigdataGraph implements Graph {
                         stmts.close();
                     } catch (OpenRDFException e) { 
                         log.warn("Could not close result");
-                    }
-                    try {
-                        if (!readFromWriteConnection) {
-                            cxn.close();
-                        }
-                    } catch (RepositoryException e) {
-                        log.warn("Could not close connection");
                     }
                 }
             }
@@ -1461,8 +1371,7 @@ public abstract class BigdataGraph implements Graph {
 	public ICloseableIterator<BigdataGraphAtom> project(final String queryStr,
 			String externalQueryId) throws Exception {
         
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
+        final RepositoryConnection cxn = cxn();
         
         if (sparqlLog.isTraceEnabled()) {
             sparqlLog.trace("query:\n"+ (queryStr.length() <= SPARQL_LOG_MAX 
@@ -1504,14 +1413,11 @@ public abstract class BigdataGraph implements Graph {
                  */
                 finalizeQuery(queryId);
             }
-            if (!readFromWriteConnection) {
-                cxn.close();
-            }
             throw ex;
         }
         
 		final IStriterator sitr = new Striterator(new WrappedResult<Statement>(
-				result, readFromWriteConnection ? null : cxn, queryId));
+				result, queryId));
         
         sitr.addFilter(new Filter() {
             private static final long serialVersionUID = 1L;
@@ -1634,8 +1540,7 @@ public abstract class BigdataGraph implements Graph {
 	public ICloseableIterator<BigdataBindingSet> select(final String queryStr,
 			String externalQueryId) throws Exception {
 
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
+        final RepositoryConnection cxn = cxn();
         
         if (sparqlLog.isTraceEnabled()) {
             sparqlLog.trace("query:\n"+ (queryStr.length() <= SPARQL_LOG_MAX 
@@ -1678,15 +1583,11 @@ public abstract class BigdataGraph implements Graph {
                  */
                 finalizeQuery(queryId);
             }
-            if (!readFromWriteConnection) {
-                cxn.close();
-            }
             throw ex;
         }
         
 		final IStriterator sitr = new Striterator(
-				new WrappedResult<BindingSet>(result,
-						readFromWriteConnection ? null : cxn, queryId));
+				new WrappedResult<BindingSet>(result, queryId));
         
         sitr.addFilter(new Resolver() {
             private static final long serialVersionUID = 1L;
@@ -1741,8 +1642,7 @@ public abstract class BigdataGraph implements Graph {
 	public boolean ask(final String queryStr, String externalQueryId)
 			throws Exception {
         
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
+        final RepositoryConnection cxn = cxn();
                 
         UUID queryId = null;
         
@@ -1775,9 +1675,6 @@ public abstract class BigdataGraph implements Graph {
                  */
                 finalizeQuery(queryId);
             }
-            if (!readFromWriteConnection) {
-                cxn.close();
-            }
         }
             
     }
@@ -1799,10 +1696,8 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
-            final RepositoryConnection cxn = getWriteConnection();
-            
             final Update update = 
-                    cxn.prepareUpdate(QueryLanguage.SPARQL, queryStr);
+                    cxn().prepareUpdate(QueryLanguage.SPARQL, queryStr);
             
             update.execute();
             
@@ -1848,8 +1743,7 @@ public abstract class BigdataGraph implements Graph {
 	public ICloseableIterator<BigdataGraphEdit> history(final List<URI> ids,
 			final String extQueryId) throws Exception {
         
-        final RepositoryConnection cxn = readFromWriteConnection ? 
-                getWriteConnection() : getReadConnection();
+        final RepositoryConnection cxn = cxn();
         
         final StringBuilder sb = new StringBuilder(HISTORY_TEMPLATE);
         
@@ -1903,14 +1797,11 @@ public abstract class BigdataGraph implements Graph {
                  */
                 finalizeQuery(queryId);
             }
-            if (!readFromWriteConnection) {
-                cxn.close();
-            }
             throw ex;
         }
             
         final IStriterator sitr = new Striterator(new WrappedResult<BindingSet>(
-                result, readFromWriteConnection ? null : cxn, queryId
+                result, queryId
                 ));
         
         sitr.addFilter(new Resolver() {
@@ -2008,14 +1899,10 @@ public abstract class BigdataGraph implements Graph {
         
         private final CloseableIteration<E,?> it;
         
-        private final RepositoryConnection cxn;
-        
         private final UUID queryId;
         
-        public WrappedResult(final CloseableIteration<E,?> it, 
-                final RepositoryConnection cxn) {
+        public WrappedResult(final CloseableIteration<E,?> it) {
             this.it = it;
-            this.cxn = cxn;
             this.queryId = null;
         }
 
@@ -2024,13 +1911,10 @@ public abstract class BigdataGraph implements Graph {
          * when it exits.
          * 
          * @param it
-         * @param cxn
          * @param queryId
          */
-        public WrappedResult(final CloseableIteration<E,?> it, 
-                final RepositoryConnection cxn, UUID queryId) {
+        public WrappedResult(final CloseableIteration<E,?> it, UUID queryId) {
             this.it = it;
-            this.cxn = cxn;
             this.queryId = queryId;
         }
 
@@ -2066,14 +1950,6 @@ public abstract class BigdataGraph implements Graph {
 				throw ex;
 			} catch (Exception ex) {
 				throw new RuntimeException(ex);
-			} finally {
-				if (cxn != null) {
-					try {
-						cxn.close();
-					} catch (RepositoryException e) {
-						log.warn("Could not close connection");
-					}
-				}
 			}   
         }
         
@@ -2202,5 +2078,10 @@ public abstract class BigdataGraph implements Graph {
 	 * @return
 	 */
 	protected abstract boolean isQueryCancelled(final UUID queryId);
+
+	/**
+	 * Is this a read-only view of the graph?
+	 */
+	public abstract boolean isReadOnly();
 	
 }

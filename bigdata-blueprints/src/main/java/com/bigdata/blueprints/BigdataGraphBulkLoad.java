@@ -69,11 +69,8 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		this.cxn.addChangeLog(this);
 	}
 
-	public RepositoryConnection getWriteConnection() throws Exception {
-		return cxn;
-	}
-
-	public RepositoryConnection getReadConnection() throws Exception {
+    @Override
+	public RepositoryConnection cxn() throws Exception {
 		return cxn;
 	}
 
@@ -224,7 +221,7 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 
 		try {
 
-			final RepositoryConnection cxn = getWriteConnection();
+			final RepositoryConnection cxn = cxn();
 
 			// // remove the old value
 			// cxn.remove(uri, prop, null);
@@ -261,7 +258,7 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 			// " already exists");
 			// }
 
-			getWriteConnection().add(uri, TYPE, VERTEX);
+			cxn().add(uri, TYPE, VERTEX);
 
 			return new BigdataVertex(uri, this);
 
@@ -313,7 +310,7 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 			final URI fromURI = factory.toVertexURI(from.getId().toString());
 			final URI toURI = factory.toVertexURI(to.getId().toString());
 
-			final RepositoryConnection cxn = getWriteConnection();
+			final RepositoryConnection cxn = cxn();
 			cxn.add(fromURI, edgeURI, toURI);
 			cxn.add(edgeURI, TYPE, EDGE);
 			cxn.add(edgeURI, LABEL, factory.toLiteral(label));
@@ -436,6 +433,11 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		// This is a NOOP for the BigdataGraphBulkLoad
 		throw new RuntimeException(
 				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+	
+	@Override
+	public boolean isReadOnly() {
+	    return false;
 	}
 
 }
