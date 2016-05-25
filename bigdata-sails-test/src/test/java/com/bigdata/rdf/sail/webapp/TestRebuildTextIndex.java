@@ -106,7 +106,7 @@ public class TestRebuildTextIndex<S extends IIndexManager> extends
 
         try {
 
-            repo.prepareTupleQuery(sparql).evaluate();
+            repo.prepareTupleQuery(sparql).evaluate().close();
 
         } catch (HttpException ex) {
             assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
@@ -128,11 +128,23 @@ public class TestRebuildTextIndex<S extends IIndexManager> extends
 
         m_mgr.rebuildTextIndex(namespace, forceBuildTextIndex);
 
-        TupleQueryResult result = repo.prepareTupleQuery(sparql).evaluate();
 
+        // Assert
         String expected = s.stringValue();
 
-        String actual = result.next().getBinding("s").getValue().stringValue();
+        TupleQueryResult result = repo.prepareTupleQuery(sparql).evaluate();
+        
+        String actual = null;
+        
+        try {
+        	
+            actual = result.next().getBinding("s").getValue().stringValue();
+            
+        } finally {
+        	
+        	result.close();
+        	
+        }
 
         assertEquals(expected, actual);
 

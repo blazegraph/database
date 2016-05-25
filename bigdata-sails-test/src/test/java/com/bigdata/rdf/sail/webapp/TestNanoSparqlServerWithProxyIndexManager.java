@@ -303,6 +303,10 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(Test_Ticket_605.class);
 
          suite.addTestSuite(TestService794.class);
+
+         // Tests for procedure of rebuild text index
+         suite.addTestSuite(TestRebuildTextIndex.class);
+         suite.addTestSuite(Test_Ticket_1893.class);
          
          if (testMode == TestMode.sids) {
             // Tests that require sids mode.

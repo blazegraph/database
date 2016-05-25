@@ -81,6 +81,20 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
      */
     private final byte termCode;
     
+    /**
+     * Indicates what literal is temporary and would need additional resolution.
+	/**
+	 * <code>true</code> iff the {@link IV} represents a <em>temporary</em>
+	 * {@link IV} reference. <code>Temporary</code> {@link IV}s are somewhat special.
+	 * They are used while preparing query/update without access to the triple store.
+	 * <code>Temporary</code> {@link IV}s have to be recreated while executing update,
+	 * as new terms may need adding to Term2ID and ID2Term indexes.
+	 * @see https://jira.blazegraph.com/browse/BLZG-1176 (SPARQL Parsers should not be db mode aware)
+	 * Introduced while fixing issue
+	 * @see https://jira.blazegraph.com/browse/BLZG-1893 (Problems with Fulltext Index)
+	 */
+    private final boolean temp;
+    
     /** The cached byte length of this {@link IV}. */
     private transient int byteLength = 0;
 
@@ -104,19 +118,37 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
     
     public FullyInlineTypedLiteralIV(final String label) {
      
-        this(label, null/* languageCode */, null/* datatype */);
+        this(label, null/* languageCode */, null/* datatype */, false/* temp */);
+        
+    }
+    
+    public FullyInlineTypedLiteralIV(final String label, final boolean temp) {
+        
+        this(label, null/* languageCode */, null/* datatype */, temp);
         
     }
     
     public FullyInlineTypedLiteralIV(final String label, final String languageCode,
             final URI datatypeURI) {
 
-        this(label, languageCode, datatypeURI, 0/* byteLength */);
+        this(label, languageCode, datatypeURI, 0/* byteLength */, false/* temp */);
+
+    }
+
+    public FullyInlineTypedLiteralIV(final String label, final String languageCode,
+            final URI datatypeURI, final boolean temp) {
+
+        this(label, languageCode, datatypeURI, 0/* byteLength */, temp);
 
     }
 
     public FullyInlineTypedLiteralIV(final String label, final String languageCode,
             final URI datatypeURI, final int byteLength) {
+    	this(label, languageCode, datatypeURI, byteLength, false/* temp */);
+    }
+
+    public FullyInlineTypedLiteralIV(final String label, final String languageCode,
+            final URI datatypeURI, final int byteLength, final boolean temp) {
 
         super(DTE.XSDString);
 
@@ -142,12 +174,19 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
 
         this.byteLength = byteLength;
         
+        this.temp = temp;
+        
     }
 
     final public String getInlineValue() {
 
         return label;
         
+    }
+    
+    @Override
+    public boolean isNullIV() {
+    	return temp || super.isNullIV();
     }
 
     /**

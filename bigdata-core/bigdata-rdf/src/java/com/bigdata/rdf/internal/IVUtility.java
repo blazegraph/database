@@ -923,91 +923,10 @@ public class IVUtility {
 //        } else {
 //            final String type = s.substring(0, s.indexOf('(')); 
 //            final String val = s.substring(s.indexOf('('), s.length()-1);
-//            return decode(val, type);
+//            return decode(val, type); // Note, that decode() is moved
+//				// into ASTDeferredIVResolutionInitializer
+//				// as it is not used anywhere else
 //        }
 //    }
 
-    /**
-     * Decode an IV from its string representation and type, provided in as
-     * ASTRDFLiteral node in AST model.
-     * <p>
-     * Note: This is a very special case method. Normally logic should go
-     * through the ILexiconRelation to resolve inline IVs. This always uses
-     * inline IVs, and thus defeats the ILexiconConfiguration for the namespace.
-     * 
-     * @param val
-     *            the string representation
-     * @param type
-     *            value type
-     * @return the IV
-     * 
-     * @see https://jira.blazegraph.com/browse/BLZG-1176 (SPARQL QUERY/UPDATE should not use db connection)
-     */
-    public static IV decode(final String val, final String type) {
-            final DTE dte = Enum.valueOf(DTE.class, type);
-            switch (dte) {
-            case XSDBoolean: {
-                final boolean b = Boolean.valueOf(val);
-                if (b) {
-                    return XSDBooleanIV.TRUE;
-                } else {
-                    return XSDBooleanIV.FALSE;
-                }
-            }
-            case XSDByte: {
-                final byte x = Byte.valueOf(val);
-                return new XSDNumericIV<BigdataLiteral>(x);
-            }
-            case XSDShort: {
-                final short x = Short.valueOf(val);
-                return new XSDNumericIV<BigdataLiteral>(x);
-            }
-            case XSDInt: {
-                final int x = Integer.valueOf(val);
-                return new XSDNumericIV<BigdataLiteral>(x);
-            }
-            case XSDLong: {
-                final long x = Long.valueOf(val);
-                return new XSDNumericIV<BigdataLiteral>(x);
-            }
-            case XSDFloat: {
-                final float x = Float.valueOf(val);
-                return new XSDNumericIV<BigdataLiteral>(x);
-            }
-            case XSDDouble: {
-                final double x = Double.valueOf(val);
-                return new XSDNumericIV<BigdataLiteral>(x);
-            }
-            case UUID: {
-                final UUID x = UUID.fromString(val);
-                return new UUIDLiteralIV<BigdataLiteral>(x);
-            }
-            case XSDInteger: {
-                final BigInteger x = new BigInteger(val);
-                return new XSDIntegerIV<BigdataLiteral>(x);
-            }
-            case XSDDecimal: {
-                final BigDecimal x = new BigDecimal(val);
-                return new XSDDecimalIV<BigdataLiteral>(x);
-            }
-            case XSDString: {
-                return new FullyInlineTypedLiteralIV(val, null, XMLSchema.STRING);
-            }
-            case XSDUnsignedByte: {
-                return new XSDUnsignedByteIV<>((byte) (Byte.valueOf(val) + Byte.MIN_VALUE));
-            }
-            case XSDUnsignedShort: {
-                return new XSDUnsignedShortIV<>((short) (Short.valueOf(val) + Short.MIN_VALUE));
-            }
-            case XSDUnsignedInt: {
-                return new XSDUnsignedIntIV((int) (Integer.valueOf(val) + Integer.MIN_VALUE));
-            }
-            case XSDUnsignedLong: {
-                return new XSDUnsignedLongIV<>(Long.valueOf(val) + Long.MIN_VALUE);
-            }
-            default:
-                throw new UnsupportedOperationException("dte=" + dte);
-            }
-    }
-    
 }

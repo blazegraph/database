@@ -37,7 +37,6 @@ import com.bigdata.btree.keys.TestKeyBuilder;
  * @see src/architecture/btree.xls for the examples used in this suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestSplitRootLeaf extends AbstractBTreeTestCase {
 
@@ -77,6 +76,8 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         
         assertKeys(new int[] { 3, 5, 7 }, a);
         assertValues(new Object[] { v3, v5, v7 }, a);
+        
+        assertEquals(0, btree.getRoot().getLevel());
 
         /*
          * split the leaf.
@@ -102,18 +103,22 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 4, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+
     }
     
     public void test_leafSplitBranchingFactor3_02() {
         
-        BTree btree = getBTree(3);
+        final BTree btree = getBTree(3);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v4 = new SimpleEntry(4);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v4 = new SimpleEntry(4);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -122,16 +127,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+
         /*
          * split the leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(4),v4);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{3,4},a);
@@ -145,18 +152,22 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 4, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+
     }
     
     public void test_leafSplitBranchingFactor3_03() {
         
-        BTree btree = getBTree(3);
+        final BTree btree = getBTree(3);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v6 = new SimpleEntry(6);
-        SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v6 = new SimpleEntry(6);
+        final SimpleEntry v7 = new SimpleEntry(7);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -165,16 +176,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+
         /*
          * split the leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(6),v6);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{6},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{3,5},a);
@@ -188,18 +201,22 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 4, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+        
     }
     
     public void test_leafSplitBranchingFactor3_04() {
         
-        BTree btree = getBTree(3);
+        final BTree btree = getBTree(3);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v7 = new SimpleEntry(7);
-        SimpleEntry v8 = new SimpleEntry(8);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v8 = new SimpleEntry(8);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -208,16 +225,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        
         /*
          * insert key that will go into the high leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(8),v8);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{7},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,2},root);
         
         assertKeys(new int[]{3,5},a);
@@ -231,19 +250,23 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 4, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+
     }
     
     public void test_leafSplitBranchingFactor4_01() {
         
-        BTree btree = getBTree(4);
+        final BTree btree = getBTree(4);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v2 = new SimpleEntry(2);
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v7 = new SimpleEntry(7);
-        SimpleEntry v9 = new SimpleEntry(9);
+        final SimpleEntry v2 = new SimpleEntry(2);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v9 = new SimpleEntry(9);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -253,16 +276,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        
         /*
          * split the leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(2),v2);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{2,3},a);
@@ -276,19 +301,23 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 5, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+        
     }
 
     public void test_leafSplitBranchingFactor4_02() {
         
-        BTree btree = getBTree(4);
+        final BTree btree = getBTree(4);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v4 = new SimpleEntry(4);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v7 = new SimpleEntry(7);
-        SimpleEntry v9 = new SimpleEntry(9);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v4 = new SimpleEntry(4);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v9 = new SimpleEntry(9);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -298,16 +327,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+
         /*
          * split the leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(4),v4);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,4},a);
@@ -321,19 +352,23 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 5, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+
     }
 
     public void test_leafSplitBranchingFactor4_03() {
         
-        BTree btree = getBTree(4);
+        final BTree btree = getBTree(4);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v6 = new SimpleEntry(6);
-        SimpleEntry v7 = new SimpleEntry(7);
-        SimpleEntry v9 = new SimpleEntry(9);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v6 = new SimpleEntry(6);
+        final SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v9 = new SimpleEntry(9);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -343,16 +378,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        
         /*
          * split the leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(6),v6);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{6},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,5},a);
@@ -366,19 +403,23 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 5, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+
     }
 
     public void test_leafSplitBranchingFactor4_04() {
         
-        BTree btree = getBTree(4);
+        final BTree btree = getBTree(4);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v7 = new SimpleEntry(7);
-        SimpleEntry v8 = new SimpleEntry(8);
-        SimpleEntry v9 = new SimpleEntry(9);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v8 = new SimpleEntry(8);
+        final SimpleEntry v9 = new SimpleEntry(9);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -388,16 +429,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+
         /*
          * split the leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(8),v8);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{7},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,5},a);
@@ -411,19 +454,23 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 5, btree.nentries);
 
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
+
     }
 
     public void test_leafSplitBranchingFactor4_05() {
         
-        BTree btree = getBTree(4);
+        final BTree btree = getBTree(4);
         
-        Leaf a = (Leaf)btree.getRoot();
+        final Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v7 = new SimpleEntry(7);
-        SimpleEntry v9 = new SimpleEntry(9);
-        SimpleEntry v10 = new SimpleEntry(10);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
+        final SimpleEntry v9 = new SimpleEntry(9);
+        final SimpleEntry v10 = new SimpleEntry(10);
 
         btree.insert(TestKeyBuilder.asSortKey(3), v3);
         btree.insert(TestKeyBuilder.asSortKey(5), v5);
@@ -433,16 +480,18 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
 
+        assertEquals(0, btree.getRoot().getLevel());
+
         /*
          * split the leaf.
          */
         btree.insert(TestKeyBuilder.asSortKey(10),v10);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
-        Node root = (Node)btree.getRoot();
+        final Node root = (Node)btree.getRoot();
         assertKeys(new int[]{7},root);
         assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
+        final Leaf b = (Leaf) root.getChild(1);
         assertEntryCounts(new int[]{2,3},root);
         
         assertKeys(new int[]{3,5},a);
@@ -455,6 +504,10 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         assertEquals("#nodes", 1, btree.nnodes);
         assertEquals("#leaves", 2, btree.nleaves);
         assertEquals("#entries", 5, btree.nentries);
+
+        assertEquals(0, btree.getRoot().getLevel());
+        assertEquals(1, a.getLevel());
+        assertEquals(1, b.getLevel());
 
     }
 

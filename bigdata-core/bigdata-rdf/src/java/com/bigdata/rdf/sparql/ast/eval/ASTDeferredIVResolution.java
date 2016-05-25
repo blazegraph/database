@@ -46,6 +46,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolutionInitializer;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
@@ -1204,7 +1205,7 @@ public class ASTDeferredIVResolution {
                         	if (label.isEmpty()) {
                         		iv = ivs[i];
                         	} else {
-                        		iv = IVUtility.decode(label, dte.name());
+                        		iv = ASTDeferredIVResolutionInitializer.decode(label, dte.name());
                         	}
                         } else {
                             iv = TermId.mockIV(VTE.valueOf(v));
