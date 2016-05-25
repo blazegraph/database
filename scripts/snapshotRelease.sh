@@ -45,9 +45,10 @@ for repo in $REMOTE_GITS; do
 
 done
 
-echo "Make sure to publish to the core Blazegraph github repo
+echo "Make sure to publish to the core Blazegraph github repo"
 echo "${GIT_CMD} push origin refs/heads/${RELEASE_BRANCH}"
 echo "${GIT_CMD} push origin refs/tags/${RELEASE_BRANCH}"
 
-echo "To reset POM versions, ./scripts/resetPomVersions.sh"
-echo "git checkout master"
+"$BASE_DIR"/resetPomVersions.sh"
+git commit -a -m "POM version resets."
+
