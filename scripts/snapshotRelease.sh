@@ -49,6 +49,5 @@ echo "Make sure to publish to the core Blazegraph github repo"
 echo "${GIT_CMD} push origin refs/heads/${RELEASE_BRANCH}"
 echo "${GIT_CMD} push origin refs/tags/${RELEASE_BRANCH}"
 
-"$BASE_DIR"/resetPomVersions.sh"
+"$BASE_DIR"/resetPomVersions.sh
 git commit -a -m "POM version resets."
-
