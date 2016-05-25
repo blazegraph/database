@@ -5,7 +5,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * 
- * Inline URI Handler to handle URI's in the form of a UUID with a suffix such as:
+ * Inline URI Handler to handle URI's in the form of a UUID with a prefix and a suffix such as:
  * 
  *  <pre>
  *   http://blazegraph.com/element/prefix_1ae004cf-0f48-469f-8a94-01339afaec41_SUFFIX
@@ -30,9 +30,8 @@ public class InlinePrefixedSuffixedUUIDURIHandler extends InlineUUIDURIHandler {
 	@SuppressWarnings("rawtypes")
     protected AbstractLiteralIV createInlineIV(final String localName) {
 
-		if (localName.startsWith(prefix) && localName.endsWith(suffix)) {
-			final String l2 = localName.substring(this.prefix.length(),
-					localName.length() - this.suffix.length());
+		if(localName.startsWith(prefix) && localName.endsWith(suffix)) {
+			final String l2 = localName.substring(this.prefix.length(), localName.length() - this.suffix.length());
 			return super.createInlineIV(l2);
 		}
 		
