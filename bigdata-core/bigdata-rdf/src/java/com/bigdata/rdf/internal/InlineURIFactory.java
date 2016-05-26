@@ -100,9 +100,11 @@ public class InlineURIFactory implements IInlineURIFactory {
        if(listHandler == null) {
     	   listHandler = new LinkedList<InlineURIHandler>();
     	   handlersByNamespace.put(namespace, listHandler);
+
        }
        
        listHandler.add(handler);
+       
     }
 
     @Override
@@ -153,7 +155,7 @@ public class InlineURIFactory implements IInlineURIFactory {
 			for (InlineURIHandler handler : floorEntry.getValue()) {
 				
 				final URIExtensionIV iv = handler.createInlineIV(uri);
-
+				
 				if (iv != null) {
 
 					return iv;
