@@ -143,22 +143,18 @@ public class InlineURIFactory implements IInlineURIFactory {
 		 */
 		if (str.startsWith(prefix)) {
 
-			//final InlineURIHandler handler = floorEntry.getValue();
-		
 			/*
 			 * Allow for multiple handlers at the same namespace.  Use the floor entry
 			 * to avoid searching all of the handlers for each request. 
 			 * 
+			 * {@link https://jira.blazegraph.com/browse/BLZG-1938}
+			 * 
 			 */
 			for (InlineURIHandler handler : floorEntry.getValue()) {
 				
-				System.err.println(str + " : considering " + handler.getClass().getCanonicalName() + " for " + prefix);
-
 				final URIExtensionIV iv = handler.createInlineIV(uri);
 
 				if (iv != null) {
-
-					System.err.println(str + " : selected " + handler.getClass().getCanonicalName() + " for " + prefix);
 
 					return iv;
 
@@ -168,20 +164,6 @@ public class InlineURIFactory implements IInlineURIFactory {
 		}
 
 		return null;
-
-		/*
-		 * Note: This code checks each handler. This is presumably being done
-		 * because the ipv4 syntax can include "/" characters (for the optional
-		 * netmask) so the URI namespace (as defined by openrdf) is not matching
-		 * the prefix under which the handler is registered.
-		 */
-//        for (InlineURIHandler handler : handlersByNamespace.values()) {
-//            final URIExtensionIV iv = handler.createInlineIV(uri);
-//            if (iv != null) {
-//                return iv;
-//            }
-//        }
-//        return null;
     }
 
     @Override
@@ -195,7 +177,18 @@ public class InlineURIFactory implements IInlineURIFactory {
 					"Can't resolve uri handler for \"" + namespace + "\".  Maybe its be deregistered?");
 		}
 		
-		//FIXME:   How does this code handle the multiple handlers for a namespace
+		/*
+		 *  It appears that this code path may not be used.   The implementation
+		 *  of {@see https://jira.blazegraph.com/browse/BLZG-1938} makes the
+		 *  handler a {@TreeMap} of {@List<InlineURIHandler>}.   
+		 *  
+		 *  However, in the reverse direction there's no way to know which 
+		 *  handler may have applied.   
+		 *  
+		 *  The implementation of {link @https://jira.blazegraph.com/browse/BLZG-1938}
+		 *  provides support for the first registered handler in this case.  This
+		 *  may be revisited in the future.
+		 */
 		return handler.get(0).getLocalNameFromDelegate(delegate);
 		
 	}
