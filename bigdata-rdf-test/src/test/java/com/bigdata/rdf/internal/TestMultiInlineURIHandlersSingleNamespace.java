@@ -103,6 +103,13 @@ public class TestMultiInlineURIHandlersSingleNamespace extends
 					vf.createURI("http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E_UnrealizedGain"),
 					vf.createURI("http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E_WashSale") };
 
+			final String[] localNames = new String[] {
+					"Position_010072F0000038090100000000D56C9E",
+					"Position_010072F0000038090100000000D56C9E_TaxCost",
+					"Position_010072F0000038090100000000D56C9E_UnrealizedGain",
+					"Position_010072F0000038090100000000D56C9E_WashSale" };
+
+
 			for (int i = 0; i < uris.length; i++) {
 				sb.add(uris[i], pred, obj);
 			}
@@ -121,9 +128,14 @@ public class TestMultiInlineURIHandlersSingleNamespace extends
 					log.debug("Checking " + uri.getNamespace() + " "
 							+ uri.getLocalName() + " inline: "
 							+ uri.getIV().isInline());
+					log.debug(localNames[i] + " : " + uri.getLocalName());
 				}
 
+				//Check it is inlined
 				assertTrue(uri.getIV().isInline());
+
+				//Check the local names are correct
+				assertTrue(localNames[i].equals(uri.getLocalName()));
 			}
 
 		} finally {
