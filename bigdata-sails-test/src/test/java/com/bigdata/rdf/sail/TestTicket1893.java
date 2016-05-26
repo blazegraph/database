@@ -35,6 +35,7 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.journal.IJournal;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
@@ -356,8 +357,8 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(0, searchEngine.count(query("english")));
         
         endTest(cxn);
         
@@ -387,8 +388,8 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(0, searchEngine.count(query("english")));
         
         endTest(cxn);
         
@@ -408,21 +409,26 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadData(cxn);
+        try {
         
-        
-        IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
-        assertEquals(0, searchEngine.count(query("1")));
-        assertEquals(0, searchEngine.count(query("2")));
-        assertEquals(0, searchEngine.count(query("3")));
-        assertEquals(0, searchEngine.count(query("4")));
-        assertEquals(0, searchEngine.count(query("true")));
-        assertEquals(0, searchEngine.count(query("false")));
-        assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
-        
-        endTest(cxn);
+	        loadData(cxn);
+	        
+	        
+	        IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
+	        assertEquals(0, searchEngine.count(query("1")));
+	        assertEquals(0, searchEngine.count(query("2")));
+	        assertEquals(0, searchEngine.count(query("3")));
+	        assertEquals(0, searchEngine.count(query("4")));
+	        assertEquals(0, searchEngine.count(query("true")));
+	        assertEquals(0, searchEngine.count(query("false")));
+	        assertEquals(1, searchEngine.count(query("plain")));
+	        assertEquals(1, searchEngine.count(query("datatyped")));
+	        assertEquals(0, searchEngine.count(query("english")));
+        } finally {
+        	
+        	endTest(cxn);
+        	
+        }
         
     }
     
@@ -450,8 +456,8 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(0, searchEngine.count(query("english")));
         
         endTest(cxn);
         
@@ -482,8 +488,8 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(0, searchEngine.count(query("english")));
         
         endTest(cxn);
         
@@ -513,8 +519,8 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(0, searchEngine.count(query("english")));
         
         endTest(cxn);
         
@@ -545,8 +551,8 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(0, searchEngine.count(query("english")));
         
         endTest(cxn);
         
@@ -576,8 +582,8 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
-        assertEquals(1, searchEngine.count(query("english")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(0, searchEngine.count(query("english")));
         
         endTest(cxn);
         
@@ -798,10 +804,14 @@ public class TestTicket1893 extends
 				vf.createLiteral("plain string"),
 				vf.createLiteral("datatyped string", XMLSchema.STRING),
 				vf.createLiteral("english string", "en"),
-				vf.createLiteral("very long literal which length exceeds MAX_INLINE_TEXT_LENGTH"),
+				vf.createLiteral("very long literal which length exceeding max inline text length for sure"),
 		};
 
-		cxn.getTripleStore().getLexiconRelation().addTerms(values, values.length, true /* readOnly */);
+		cxn.getTripleStore().getLexiconRelation().addTerms(values, values.length, false /* readOnly */);
+		
+		StringBuilder dump = cxn.getTripleStore().dumpStore();
+		
+		System.out.println(dump.toString());
         
 		// Note, that all literals got inlined according to code of:
 		// com.bigdata.rdf.internal.LexiconConfiguration.createInlineLiteralIV(Literal)
@@ -816,7 +826,7 @@ public class TestTicket1893 extends
         assertTrue(values[7].getIV().isInline()); //    	"plain string"
         assertTrue(values[8].getIV().isInline()); //    	"datatyped string"^^xsd:string
         assertTrue(values[9].getIV().isInline()); //    	"english string"@en
-        assertFalse(values[10].getIV().isInline()); //    	"very long literal which length exceeds max inline text length"
+        assertFalse(values[10].getIV().isInline()); //    	"very long literal which length exceeding max inline text length for sure"
         
         endTest(cxn);
         
@@ -849,10 +859,10 @@ public class TestTicket1893 extends
 				vf.createLiteral("plain string"),
 				vf.createLiteral("datatyped string", XMLSchema.STRING),
 				vf.createLiteral("english string", "en"),
-				vf.createLiteral("very long literal which length exceeds MAX_INLINE_TEXT_LENGTH"),
+				vf.createLiteral("very long literal which length exceeding max inline text length for sure"),
 		};
 
-		cxn.getTripleStore().getLexiconRelation().addTerms(values, values.length, true /* readOnly */);
+		cxn.getTripleStore().getLexiconRelation().addTerms(values, values.length, false /* readOnly */);
         
 		// Note, that all literals got inlined according to code of:
 		// com.bigdata.rdf.internal.LexiconConfiguration.createInlineLiteralIV(Literal)
@@ -867,7 +877,7 @@ public class TestTicket1893 extends
         assertTrue(values[7].getIV().isInline()); //    	"plain string"
         assertTrue(values[8].getIV().isInline()); //    	"datatyped string"^^xsd:string
         assertTrue(values[9].getIV().isInline()); //    	"english string"@en
-        assertFalse(values[10].getIV().isInline()); //    	"very long literal which length exceeds max inline text length"
+        assertFalse(values[10].getIV().isInline()); //    	"very long literal which length exceeding max inline text length for sure"
         
         endTest(cxn);
         
@@ -988,7 +998,7 @@ public class TestTicket1893 extends
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.INLINE_TEXT_LITERALS, Boolean.toString(inlineTextLiterals));
 
             if (inlineTextLiterals) {
-            	properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.MAX_INLINE_TEXT_LENGTH, Integer.toString(45));
+            	properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.MAX_INLINE_TEXT_LENGTH, Integer.toString(70));
             }
 
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.INLINE_XSD_DATATYPE_LITERALS, Boolean.toString(inlineXSDDatatypeLiterals));
@@ -1015,7 +1025,11 @@ public class TestTicket1893 extends
     	
     	cxn.getTripleStore().close();
     	
-    	((LocalTripleStore)cxn.getTripleStore()).getIndexManager().shutdownNow();
+    	IJournal store = ((LocalTripleStore)cxn.getTripleStore()).getIndexManager();
+    	
+    	store.shutdownNow();
+    	
+    	store.destroy();
         
     }
     

@@ -707,7 +707,7 @@ public class BigdataValueSerializer<V extends Value> {
     
             final String label = value.getLabel();
     
-            final int datatypeLength = value.getDatatype() == null ? 0 : value
+            final int datatypeLength = value.getDatatype() == null || XMLSchema.STRING.equals(value.getDatatype()) ? 0 : value
                     .getDatatype().stringValue().length();
     
             final int languageLength = value.getLanguage() == null ? 0 : value

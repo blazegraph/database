@@ -47,6 +47,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.internal.constraints.DateTimeUtility;
@@ -762,7 +763,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
                 return new FullyInlineTypedLiteralIV<BigdataLiteral>(
                         value.getLabel(), value.getLanguage(),
-                        value.getDatatype());
+                        RDF.LANGSTRING.equals(value.getDatatype()) ? null : value.getDatatype());
 
             }
 
