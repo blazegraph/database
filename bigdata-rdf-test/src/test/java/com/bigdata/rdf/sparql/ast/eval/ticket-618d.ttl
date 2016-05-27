@@ -1,0 +1,11 @@
+# This is essentialy a renaming of sparql11-subquery-04.ttl
+# to work around some lack of test reproducibility: before the BLZG-618 fix, 
+# sparql11-subquery-04 failed with some config, and 
+# this test failed with some other config.
+
+@prefix ex: <http://example.org/> .
+
+ex:4_george ex:knows ex:1_ringo, ex:3_john .
+ex:1_ringo ex:knows ex:4_george, ex:3_john.
+ex:2_paul  ex:knows ex:4_george, ex:3_john .
+

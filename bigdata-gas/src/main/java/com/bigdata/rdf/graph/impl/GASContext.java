@@ -284,7 +284,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      * we are reading on OSP and will need to do a separate read on SPO.
      */
     @Override
-    public boolean doRound(final IGASStats stats) throws InterruptedException,
+    public boolean  doRound(final IGASStats stats) throws InterruptedException,
             ExecutionException, Exception {
 
         // The fontier for this round.
@@ -449,7 +449,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * frontier is not empty, then we will do another round.
          */
 
-        final boolean nextRound = program.nextRound(this) || !gasState.frontier().isEmpty();
+        final boolean nextRound = program.nextRound(this);
 
         if(nextRound) {
 

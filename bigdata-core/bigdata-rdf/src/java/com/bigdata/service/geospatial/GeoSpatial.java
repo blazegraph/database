@@ -205,6 +205,12 @@ public interface GeoSpatial {
    final URI SPATIAL_UNIT = new URIImpl(NAMESPACE + "spatialUnit");
 
    /**
+    * Output variable, supported for "inCircle" query type only. If specified, the variable will, 
+    * for each solution, be bound to its distance towards the geospatial circle center.
+    */
+   final URI DISTANCE_VALUE = new URIImpl(NAMESPACE + "distanceValue");
+   
+   /**
     * Start time of the time interval to scan for.
     */
    final URI TIME_START = new URIImpl(NAMESPACE + "timeStart");

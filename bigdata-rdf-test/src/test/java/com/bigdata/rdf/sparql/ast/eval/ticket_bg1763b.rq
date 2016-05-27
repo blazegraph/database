@@ -1,0 +1,16 @@
+SELECT *
+WITH {
+  SELECT *
+  WHERE {
+    INCLUDE %sub
+  }
+} AS %main
+WITH {
+  SELECT *
+  WHERE {
+    ?s ?p ?o
+  }
+} AS %sub
+WHERE {
+ INCLUDE %main
+}

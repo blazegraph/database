@@ -600,16 +600,24 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final QuadsDataOrNamedSolutionSet deleteClause = op.getDeleteClause();
 
             // Just the insert clause.
-            final boolean isInsertOnly = insertClause != null
-                    && deleteClause == null;
+            /*
+             * TODO FIXME Forcing all updates through the delete+insert code path.
+             * 
+             * https://jira.blazegraph.com/browse/BLZG-1913
+             */
+            final boolean isInsertOnly = false; //insertClause != null && deleteClause == null;
 
 //            // Just the delete clause.
 //            final boolean isDeleteOnly = insertClause == null
 //                    && deleteClause != null;
 
             // Both the delete clause and the insert clause.
-            final boolean isDeleteInsert = insertClause != null
-                    && deleteClause != null;
+            /*
+             * TODO FIXME Forcing all updates through the delete+insert code path.
+             * 
+             * https://jira.blazegraph.com/browse/BLZG-1913
+             */
+            final boolean isDeleteInsert = true; //insertClause != null && deleteClause != null;
             
             /*
              * Run the WHERE clause.
@@ -676,7 +684,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 try {
 
                     // Play it once through the DELETE clause.
-                    {
+                    if (deleteClause != null) {
                     	final long beginDeleteNanos = System.nanoTime();
                     	
                         // rewind.
@@ -847,7 +855,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					} // End DELETE clause.
 
                     // Play it once through the INSERT clause.
-                    {
+                    if (insertClause != null) {
 
                     	final long beginInsertNanos = System.nanoTime();
                     	

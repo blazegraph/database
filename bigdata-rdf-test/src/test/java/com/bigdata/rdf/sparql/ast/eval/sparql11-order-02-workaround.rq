@@ -1,4 +1,0 @@
-SELECT  ?type (count(?subj) as ?cnt)
-WHERE { ?subj a ?type } 
-GROUP BY ?type 
-ORDER BY ?cnt

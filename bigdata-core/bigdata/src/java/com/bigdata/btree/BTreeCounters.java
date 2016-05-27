@@ -165,14 +165,14 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         rawRecordsRead.add(o.rawRecordsRead.get());
         rawRecordsBytesRead.add(o.rawRecordsBytesRead.get());
         // IO writes.
-        nodesWritten += o.nodesWritten;
-        leavesWritten += o.leavesWritten;
-        bytesWritten += o.bytesWritten;
-        bytesReleased += o.bytesReleased;
-        writeNanos += o.writeNanos;
-        serializeNanos += o.serializeNanos;
-        rawRecordsWritten += o.rawRecordsWritten;
-        rawRecordsBytesWritten+= o.rawRecordsBytesWritten;
+        nodesWritten.add(o.nodesWritten.get());
+        leavesWritten.add(o.leavesWritten.get());
+        bytesWritten.add(o.bytesWritten.get());
+        bytesReleased.add(o.bytesReleased.get());
+        writeNanos.add(o.writeNanos.get());
+        serializeNanos.add(o.serializeNanos.get());
+        rawRecordsWritten.add(o.rawRecordsWritten.get());
+        rawRecordsBytesWritten.add(o.rawRecordsBytesWritten.get());
 //        // touch()
 //        syncTouchNanos.add(o.syncTouchNanos.get());
 //        touchNanos.add(o.touchNanos.get());
@@ -237,14 +237,14 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
         t.rawRecordsRead.add(-o.rawRecordsRead.get());
         t.rawRecordsBytesRead.add(-o.rawRecordsBytesRead.get());
         // IO writes.
-        t.nodesWritten -= o.nodesWritten;
-        t.leavesWritten -= o.leavesWritten;
-        t.bytesWritten -= o.bytesWritten;
-        t.bytesReleased -= o.bytesReleased;
-        t.serializeNanos -= o.serializeNanos;
-        t.writeNanos -= o.writeNanos;
-        t.rawRecordsWritten -= o.rawRecordsWritten;
-        t.rawRecordsBytesWritten -= o.rawRecordsBytesWritten;
+        t.nodesWritten.add(-o.nodesWritten.get());
+        t.leavesWritten.add(-o.leavesWritten.get());
+        t.bytesWritten.add(-o.bytesWritten.get());
+        t.bytesReleased.add(-o.bytesReleased.get());
+        t.serializeNanos.add(-o.serializeNanos.get());
+        t.writeNanos.add(-o.writeNanos.get());
+        t.rawRecordsWritten.add(-o.rawRecordsWritten.get());
+        t.rawRecordsBytesWritten.add(-o.rawRecordsBytesWritten.get());
 //        // touch()
 //        syncTouchNanos.add(-o.syncTouchNanos.get());
 //        touchNanos.add(-o.touchNanos.get());
@@ -371,16 +371,16 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
     /** Total bytes read for raw records. */
     public final CAT rawRecordsBytesRead = new CAT();
 
-    // IO writes (single-threaded)
-    public int nodesWritten = 0;
-    public int leavesWritten = 0;
-    public long bytesWritten = 0L;
-	public long bytesReleased = 0L;
-    public long writeNanos = 0;
-	public long serializeNanos = 0;
-	public long rawRecordsWritten = 0;
-	public long rawRecordsBytesWritten = 0;
-	
+    // IO writes (multi-threaded since BLZG-1665)
+    public CAT nodesWritten = new CAT();
+    public CAT leavesWritten = new CAT();
+    public CAT bytesWritten = new CAT();
+    public CAT bytesReleased = new CAT();
+    public CAT writeNanos = new CAT();
+    public CAT serializeNanos = new CAT();
+    public CAT rawRecordsWritten = new CAT();
+    public CAT rawRecordsBytesWritten = new CAT();
+
 	/*
 	 * Note: The introduction of these performance counters caused a significant
 	 * performance regression for both load and query.  See BLZG-1693.
@@ -487,8 +487,8 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
     public double computeRawReadWriteScore() {
         
         return //
-            (serializeNanos + deserializeNanos.get()) + //
-            (writeNanos + readNanos.get())//
+            (serializeNanos.get() + deserializeNanos.get()) + //
+            (writeNanos.get() + readNanos.get())//
             ;
         
     }
@@ -515,7 +515,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
      */
     public double computeRawWriteScore() {
         
-        return serializeNanos + writeNanos;
+        return serializeNanos.get() + writeNanos.get();
         
     }
     
@@ -545,18 +545,18 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
     /**
      * The #of nodes written on the backing store.
      */
-    final public int getNodesWritten() {
+    final public long getNodesWritten() {
         
-        return nodesWritten;
+        return nodesWritten.get();
         
     }
     
     /**
      * The #of leaves written on the backing store.
      */
-    final public int getLeavesWritten() {
+    final public long getLeavesWritten() {
         
-        return leavesWritten;
+        return leavesWritten.get();
         
     }
     
@@ -574,7 +574,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
      */
     final public long getBytesWritten() {
         
-        return bytesWritten;
+        return bytesWritten.get();
         
     }
 
@@ -583,7 +583,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
      */
     final public long getBytesReleased() {
         
-        return bytesReleased;
+        return bytesReleased.get();
         
     }
 
@@ -903,17 +903,17 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                     }
                 });
 
-                tmp.addCounter("leafWriteCount", new Instrument<Integer>() {
+                tmp.addCounter("leafWriteCount", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(leavesWritten);
+                        setValue(leavesWritten.get());
                     }
                 });
 
-                tmp.addCounter("nodeWriteCount", new Instrument<Integer>() {
+                tmp.addCounter("nodeWriteCount", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(nodesWritten);
+                        setValue(nodesWritten.get());
                     }
                 });
 
@@ -953,14 +953,14 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                 tmp.addCounter("bytesWritten", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(bytesWritten);
+                        setValue(bytesWritten.get());
                     }
                 });
 
                 tmp.addCounter("writeSecs", new Instrument<Double>() {
                     @Override
                     public void sample() {
-                        final double writeSecs = (writeNanos / 1000000000.);
+                        final double writeSecs = (writeNanos.get() / 1000000000.);
                         setValue(writeSecs);
                     }
                 });
@@ -969,9 +969,9 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                         new Instrument<Double>() {
                     @Override
                             public void sample() {
-                                final double writeSecs = (writeNanos/ 1000000000.);
+                                final double writeSecs = (writeNanos.get() / 1000000000.);
                                 final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
-                                        : (bytesWritten / writeSecs));
+                                        : (bytesWritten.get() / writeSecs));
                                 setValue(bytesWrittenPerSec);
                             }
                         });
@@ -983,7 +983,7 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                 tmp.addCounter("serializeSecs", new Instrument<Double>() {
                     @Override
                     public void sample() {
-                        final double serializeSecs = (serializeNanos / 1000000000.);
+                        final double serializeSecs = (serializeNanos.get() / 1000000000.);
                         setValue(serializeSecs);
                     }
                 });
@@ -992,9 +992,9 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                         new Instrument<Double>() {
                     @Override
                             public void sample() {
-                                final long nwritten = nodesWritten + leavesWritten;
+                                final long nwritten = nodesWritten.get() + leavesWritten.get();
                                 final double serializeLatencyNanos = (nwritten == 0L ? 0d
-                                        : (serializeNanos / nwritten));
+                                        : (serializeNanos.get() / nwritten));
                                 setValue(serializeLatencyNanos);
                             }
                         });
@@ -1003,8 +1003,8 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                         new Instrument<Double>() {
                     @Override
                             public void sample() {
-                                final long nwritten = nodesWritten + leavesWritten;
-                                final double serializeSecs = (serializeNanos / 1000000000.);
+                                final long nwritten = nodesWritten.get() + leavesWritten.get();
+                                final double serializeSecs = (serializeNanos.get() / 1000000000.);
                                 final double serializePerSec = (serializeSecs== 0L ? 0d
                                         : (nwritten / serializeSecs));
                                 setValue(serializePerSec);
@@ -1097,20 +1097,20 @@ final public class BTreeCounters implements Cloneable, ICounterSetAccess {
                 tmp.addCounter("rawRecordsWritten", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(rawRecordsWritten);
+                        setValue(rawRecordsWritten.get());
                     }
                 });
                 tmp.addCounter("rawRecordsBytesWritten", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(rawRecordsBytesWritten);
+                        setValue(rawRecordsBytesWritten.get());
                     }
                 });
                 
                 tmp.addCounter("bytesReleased", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(bytesReleased);
+                        setValue(bytesReleased.get());
                     }
                 });
 

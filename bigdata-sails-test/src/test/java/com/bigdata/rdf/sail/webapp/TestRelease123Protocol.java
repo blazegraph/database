@@ -93,6 +93,16 @@ public class TestRelease123Protocol extends AbstractProtocolTest{
 		String result2 = serviceRequest("query", CONSTRUCT);
 		assertEquals(result1, result2);
 	}
+	
+	public void testSuppressTruthMaintenance() throws IOException {
+		resetDefaultOptions();
+		setSuppressTruthMaintenance("true");
+		setMethodisPost(BigdataRDFServlet.MIME_SPARQL_UPDATE, update);
+		String response = serviceRequest();
+		setSuppressTruthMaintenance("false");
+		assertTrue(response.contains("COMMIT"));
+		
+	}
 
 	public void testSelectPostEncodeXML() throws IOException {
 		setMethodisPostUrlEncodedData();

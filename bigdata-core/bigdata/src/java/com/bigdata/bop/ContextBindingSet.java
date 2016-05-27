@@ -115,7 +115,24 @@ public class ContextBindingSet implements IBindingSet {
         return new ContextBindingSet(context, delegate.copy(variablesToKeep));
         
     }
-
+   
+    
+    @Override
+    @SuppressWarnings("rawtypes")
+    public IBindingSet copyMinusErrors(final IVariable[] variablesToKeep) {
+        return new ContextBindingSet(context,
+                delegate.copyMinusErrors(variablesToKeep));
+    }
+    
+       
+    /** 
+     * @return true if this IBindingSet contains an assignment of an error value
+     */
+    @Override
+    public final boolean containsErrorValues() {  
+        return delegate.containsErrorValues();
+    }
+        
     public boolean equals(final Object o) {
         return delegate.equals(o);
     }

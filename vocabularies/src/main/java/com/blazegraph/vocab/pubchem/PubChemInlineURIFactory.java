@@ -176,28 +176,31 @@ public class PubChemInlineURIFactory extends InlineURIFactory {
 			int i = 0;
 			// http://purl.obolibrary.org/obo/CHEBI_13453 
 			InlineURIHandler handler = new InlinePrefixedIntegerURIHandler(
-					"http://purl.obolibrary.org/obo/", "CHEBI_", i);
+					oboNS, "CHEBI_", i);
 
 			oboMap.addHandlerForNS(i++, handler);
 
 			// http://purl.obolibrary.org/obo/PR_000005253 //fixed width 9
 			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
-					"http://purl.obolibrary.org/obo/", "PR_", 9, i);
+					oboNS, "PR_", 9, i);
 
 			oboMap.addHandlerForNS(i++, handler);
 
 			// http://purl.obolibrary.org/obo/IAO_0000136 //fixed width 7
 			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
-					"http://purl.obolibrary.org/obo/", "IAO_", 7, i);
+					oboNS, "IAO_", 7, i);
 			oboMap.addHandlerForNS(i++, handler);
 
 			// http://purl.obolibrary.org/obo/OBI_0000299 //fixed width 7
 			handler = new InlinePrefixedFixedWidthIntegerURIHandler(
-					"http://purl.obolibrary.org/obo/", "OBI_", 7, i);
+					oboNS, "OBI_", 7, i);
 			oboMap.addHandlerForNS(i++, handler);
 
-		}
+			// Add the OBO Map Handler for the base namespace
+			addHandler(oboMap);
 
+		}
+		
 		{
 
 			// Now we want to a namespace with multiple different inline

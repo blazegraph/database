@@ -77,6 +77,22 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         return this;
         
     }
+        
+    /** Returns the same object. */
+    @Override
+    public EmptyBindingSet copyMinusErrors(final IVariable[] variablesToDrop) {
+        return this;
+    }
+        
+    
+    /** 
+     * @return false, always
+     */
+    @Override
+    public final boolean containsErrorValues() {  
+        return false;
+    }
+    
     
     public void clear(IVariable var) {
         throw new UnsupportedOperationException();

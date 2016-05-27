@@ -1031,6 +1031,36 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
              "geo-realworld-cities.nt",
              "geo-realworld-circle02.srx").runTest();
     }
+    
+    /**
+     * Real world test against geo coordinates of few cities,
+     * including distance calculation.
+     * 
+     * @throws Exception
+     */
+    public void testRealWordCircleWithDistance01() throws Exception {
+       
+       new TestHelper(
+             "geo-realworld-circlewithdistance01",
+             "geo-realworld-circlewithdistance01.rq", 
+             "geo-realworld-cities.nt",
+             "geo-realworld-circlewithdistance01.srx").runTest();
+    }
+    
+    /**
+     * Real world test against geo coordinates of few cities,
+     * including distance calculation and ORDER BY over distances.
+     * 
+     * @throws Exception
+     */
+    public void testRealWordCircleWithDistance02() throws Exception {
+       
+       new TestHelper(
+             "geo-realworld-circlewithdistance02",
+             "geo-realworld-circlewithdistance02.rq", 
+             "geo-realworld-cities.nt",
+             "geo-realworld-circlewithdistance02.srx").runTest();
+    }
 
     /**
      * Real world test against geo coordinates of few cities.

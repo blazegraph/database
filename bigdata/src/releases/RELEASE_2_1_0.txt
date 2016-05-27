@@ -1,0 +1,108 @@
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a major release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
+
+Blazegraph Features (http://www.blazegraph.com/product/)
+
+2.1.0 provides major new features and upgrades as well as bug fixes for the 2.0.0 release.  It is recommended that all users upgrade to 2.1.0.   See https://blog.blazegraph.com/?p=995
+
+* Support for Lucene 5.5.0.   To migrate to Lucene 5.5.0, you should follow the procedures to rebuild your text index:  https://wiki.blazegraph.com/wiki/index.php/Rebuild_Text_Index_Procedure.   This also adds support for adding a text index to an existing journal without reloading the data.
+* Geospatial Searching.   2.0.0 brought the Beta geospatial searching, which is now a full feature in 2.1.0.    See:  https://wiki.blazegraph.com/wiki/index.php/GeoSpatial
+* Pubchem Custom Vocabulary.  Adds a custom vocabulary to use when loading the Pubchem (https://pubchem.ncbi.nlm.nih.gov/rdf/) data with Blazegraph.   See:  https://github.com/blazegraph/database/blob/master/vocabularies/README.md#pubchem
+* REST API for Online Backup of Journal files in non-HA mode.  See https://wiki.blazegraph.com/wiki/index.php/REST_API#Online_Backup
+* JSON-LD Support
+
+Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
+
+Starting points:
+
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+    Blazegraph Support:  https://www.blazegraph.com/support/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TDF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+    
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BLAZEGRAPH_RELEASE_2_1_0 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_0
+
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_0
+
+** Bug
+    * [BLZG-1200] - REGEX not working for string literals with language tags
+    * [BLZG-1708] - DataLoader fails with ArrayIndexOutOfBoundsException
+    * [BLZG-1716] - SPARQL Update parser fails on invalid numeric literals
+    * [BLZG-1755] - Date literals in complex FILTER not properly resolved 
+    * [BLZG-1773] - Extending the set of pre-defined prefixes
+    * [BLZG-1785] - Wrong result from FILTER expression with || and NOT IN
+    * [BLZG-1787] - Query Explanation Should Provide File Based Download
+    * [BLZG-1788] - Typed literals in VALUES clause not matching data
+    * [BLZG-1792] - Minor cardinality estimation bug in ASTDistinctTermScanOptimizer
+    * [BLZG-1793] - Startup Script Doesn't Set $JAVA Correctly
+    * [BLZG-1795] - badly incorrect estimated cardinalities with VALUES
+    * [BLZG-1812] - Overriding the Executable Jar Port doesn't reflect in the welcome message
+    * [BLZG-1813] - Concurrency hole in StatementBuffer can cause load to stop progress when queueCapacity != 0
+    * [BLZG-1814] - DataLoader -namespace argument is not working
+    * [BLZG-1816] - Setup Default Configuration to Avoid Queues for Concurrency Avoidence
+    * [BLZG-1835] - Failed to create debian package
+    * [BLZG-1839] - Report of out of memory error during bigdata-core compile
+    * [BLZG-1874] - The memory manager should not block when configured in a non-blocking mode
+
+
+** Improvement
+    * [BLZG-1328] - Update lucene version
+    * [BLZG-1619] - Support Sesame2 repository queries Timeout parameter
+    * [BLZG-1767] - Fix DSI Utils pom.xml as dsiutils-1.0.10 download URL is no longer active
+    * [BLZG-1817] - Reordering problem for complex subqueries
+    * [BLZG-1854] - Move to Lucene 5.5.0
+
+** New Feature
+    * [BLZG-1017] - Support JSON LD
+    * [BLZG-1727] - Allow snapshot policies with standalone installs (Online Backup REST API)
+    * [BLZG-1780] - Create Query Hint to Automatically Add the str(...) function for SPARQL REGEX
+    * [BLZG-1820] - Add MapgraphServlet API Methods to the RemoteRepositoryManager
+
+** Task
+    * [BLZG-1510] - Develop guidelines for loading pubchem.
+    * [BLZG-1565] - Document the blazegraph workbench
+    * [BLZG-1791] - AST Deferred Resolution Caching Code Review
+    * [BLZG-1824] - 2.0.2 Benchmarks
+    * [BLZG-1836] - Document changes in the REST API concerning preparation of inherited properties.
+    * [BLZG-1850] - Ease use of geospatial
+    * [BLZG-1851] - Remove non-conditional logging in AbstractTripleStore
+    * [BLZG-1853] - Benchmark 2.1.0 Release
+
+** Sub-task
+    * [BLZG-1229] - SPARQL* not parsed in SPARQL UPDATE
+    * [BLZG-1267] - Unable to bind result of EXISTS operator
+    * [BLZG-1466] - Queries in Explain mode are run twice
+    * [BLZG-1479] - Generalized version of GeoSpatial feature
+    * [BLZG-1621] - Test Cases for rebuildTextIndex
+    * [BLZG-1622] - Data migration scripts for 2.0 release
+    * [BLZG-1623] - Include data migration instructions in release notes.
+    * [BLZG-1637] - REST API method to rebuild the text index.
+    * [BLZG-1638] - Add ability to rebuild the text index to the workbench
+    * [BLZG-1714] - Document the data loader REST API capability on the wiki
+    * [BLZG-1722] - Document procedure to rebuild the text index
+    * [BLZG-1779] - Add full test coverage for RDF* and SPARQL UPDATE
+    * [BLZG-1822] - Test cases for generalized version of GeoSpatial feature
+    * [BLZG-1823] - Documentation for generalized version of GeoSpatial feature
+    * [BLZG-1830] - Code review on critical things related to geospatial issue
+    * [BLZG-1833] - geo:locationValue should use default type or specified query type
+    * [BLZG-1841] - Support extraction of complete GeoSpatial literal in geospatial SERVICE
+
+
