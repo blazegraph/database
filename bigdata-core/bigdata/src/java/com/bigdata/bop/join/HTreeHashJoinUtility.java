@@ -47,6 +47,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.Checkpoint;
@@ -67,9 +68,10 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.encoder.IBindingSetDecoder;
-import com.bigdata.rdf.internal.encoder.IVBindingSetEncoderWithIVCache;
+import com.bigdata.rdf.internal.encoder.IVBindingSetEncoder;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
@@ -111,9 +113,6 @@ import cutthecrap.utils.striterators.Visitor;
  * collisions will cause basically no increase in the work to be done. However,
  * if there are 50,000 solutions per distinct combination of the join variables
  * then we would be better off using a 64-bit hash code.
- * 
- * FIXME Vector resolution of ivCache. Various methods use
- * {@link IVBindingSetEncoderWithIVCache#resolveCachedValues(IBindingSet)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: HTreeHashJoinUtility.java 5568 2011-11-07 19:39:12Z thompsonbry
@@ -229,7 +228,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         return open;
     }
 
-    protected IVBindingSetEncoderWithIVCache getEncoder() {
+    protected IVBindingSetEncoder getEncoder() {
         return encoder;
     }
 
@@ -263,7 +262,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Utility class for compactly and efficiently encoding and decoding
      * {@link IBindingSet}s.
      */
-    private final IVBindingSetEncoderWithIVCache encoder;
+    private final IVBindingSetEncoder encoder;
     
     /**
      * The type of join to be performed.
@@ -596,7 +595,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         store = new MemStore(mmgr.createAllocationContext());
 
         // Setup the encoder.  The ivCache will be backed by the memory manager.
-        this.encoder = new IVBindingSetEncoderWithIVCache(store, filter, op);
+        this.encoder = new IVBindingSetEncoder(BigdataValueFactoryImpl.getInstance(((String[]) op
+                .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0]), filter);
 
         /*
          * Note: This is not necessary. We will encounter the join variables in
@@ -649,8 +649,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             throw new IllegalStateException();
 
         checkpointHTree(rightSolutions);
-
-        encoder.saveSolutionSet();
 
         /*
          * Note: DO NOT checkpoint the joinSet here. That index is not even

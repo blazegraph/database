@@ -27,10 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.encoder;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
-import java.util.Map;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -47,7 +45,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
@@ -98,18 +95,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
      */
     private final LinkedHashSet<IVariable<?>> schema;
     
-    /**
-     * The set of variables for which materialized {@link IV}s have been
-     * observed.
-     */
-    final protected LinkedHashSet<IVariable<?>> ivCacheSchema;
-    
-    /**
-     * A cache mapping from non-inline {@link IV}s ({@link TermId}s and
-     * {@link BlobIV}s) whose {@link IVCache} association was set to the
-     * corresponding {@link BigdataValue}.
-     */
-    final Map<IV<?, ?>, BigdataValue> cache;
+
     
     /**
      * Used to encode the {@link IV}s.
@@ -133,13 +119,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
         
         this.schema = new LinkedHashSet<IVariable<?>>();
 
-        // The set of variables for which materialized values are observed.
-        this.ivCacheSchema = filter ? null : new LinkedHashSet<IVariable<?>>();
-
         this.keyBuilder = new ASCIIKeyBuilderFactory(128).getKeyBuilder();
-
-        // Used to batch updates into the ID2TERM and BLOBS indices.
-        this.cache = filter ? null : new HashMap<IV<?, ?>, BigdataValue>();
 
     }
 
@@ -188,9 +168,6 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
 
         if(bset == null)
             throw new IllegalArgumentException();
-
-        final Map<IV<?, ?>, BigdataValue> cache = updateCache ? this.cache
-                : null;
         
         /*
          * Before we can encode the binding set, we need to update the schema
@@ -259,13 +236,13 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                     IVUtility.encode(keyBuilder, new MockedValueIV(ivToEncode));
                     
                 } else {
+                    
                     IVUtility.encode(keyBuilder, iv);
-                    if (!iv.isInline() && iv.hasValue() && !filter) {
-                        ivCacheSchema.add(v);
-                        if (cache != null)
-                            cache.put(iv, iv.getValue());
-                    }
+                    
+                    cacheSchemaAndValue(v, iv, updateCache); // caching hook
+                    
                 }
+
             }
         }
         
@@ -273,12 +250,20 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
         
     }
 
+    /**
+     * Hook method to trigger caching of variable and the value. May be
+     * re-implemented in subclasses to batch values, see {@link IVBindingSetEncoderWithIVCache}.
+     * 
+     * @param iv
+     * @param v
+     */
+    void cacheSchemaAndValue(final IVariable<?> v, final IV<?,?> iv, final boolean updateCache) {
+        // NOP
+    }
+    
     @Override
     public void flush() {
-
-        if (cache != null)
-            cache.clear();
-        
+        // NOP
     }
     
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -393,12 +378,6 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
     public void release() {
         
         schema.clear();
-
-        if (ivCacheSchema != null) {
-
-            ivCacheSchema.clear();
-            
-        }
 
     }
 

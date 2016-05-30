@@ -160,7 +160,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     private final RemoteTransactionManager transactionManager;
 
     /**
-     * <code>true</code> iff open.
+     * <code>true</code> iff already closed.
      */
     private volatile boolean m_closed = false;
 
@@ -367,10 +367,12 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
      *            trailing "/"). <code>/sparql</code> will be appended to this
      *            path to obtain the SPARQL end point for the default data set.
      * @param httpClient
-     *            If the client implements {@link AutoCloseable} then it will be
-     *            closed by {@link #close()} (optional). When not present, an
-     *            {@link HttpClient} will be allocated and scoped to this
-     *            {@link RemoteRepositoryManager} instance.
+     *            The client is managed externally and, in particular, 
+     *            may be shared, so we don't close it in {@link #close()}.
+     *            When not present (null), an {@link HttpClient} will be 
+     *            allocated and scoped to this
+     *            {@link RemoteRepositoryManager} instance, and closed
+     *            in {@link #close()}.
      * @param executor
      *            An executor used to service http client requests. (optional).
      *            When not present, an {@link Executor} will be allocated and
@@ -407,10 +409,12 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
      *            specify <code>true</code>. When <code>false</code>, the REST
      *            API methods will NOT use the load balancer aware requestURLs.
      * @param httpClient
-     *            If the client implements {@link AutoCloseable} then it will be
-     *            closed by {@link #close()} (optional). When not present, an
-     *            {@link HttpClient} will be allocated and scoped to this
-     *            {@link RemoteRepositoryManager} instance.
+     *            The client is managed externally and, in particular, 
+     *            may be shared, so we don't close it in {@link #close()}.
+     *            When not present (null), an {@link HttpClient} will be 
+     *            allocated and scoped to this
+     *            {@link RemoteRepositoryManager} instance, and closed
+     *            in {@link #close()}.
      * @param executor
      *            An executor used to service http client requests. (optional).
      *            When not present, an {@link Executor} will be allocated and
@@ -509,35 +513,42 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     @Override
     public void close() throws Exception {
 
-        if (!m_closed) {
+        if (m_closed) {
             // Already closed.
             return;
         }
 
-        if (httpClient instanceof AutoCloseable) {
-
-            /*
-             * If the caller passed in an AutoCloseable HttpClient, then we shut
-             * it down now.
-             */
-            ((AutoCloseable) httpClient).close();
-
-        }
 
         if (our_httpClient != null) {
-
+      
             /*
              * This HttpClient was allocated by our constructor. We will shut it
              * down now (unless it is already stopping or stopped).
              */
 
-            if (!our_httpClient.isStopping() && !our_httpClient.isStopped()) {
+            if (our_httpClient instanceof AutoCloseable) {
+                // The instance is managed by AutoCloseHttpClient or a similar 
+                // class, so close() instead of just stop():
+                ((AutoCloseable) our_httpClient).close();
+            } else {
+                // Not an AutoCloseable, but we should still try to stop it:
 
-                our_httpClient.stop();
+                if (!our_httpClient.isStopping() && !our_httpClient.isStopped()) {
 
+                    our_httpClient.stop();
+
+                }
             }
 
         }
+        
+        // Note that we do not close httpClient here, unless it is 
+        // our_httpClient, because it came as 
+        // a parameter to a constructor, may be shared by multiple 
+        // RemoteRepositoryManager instances and other objects, and 
+        // thus has to be closed elswhere (e.g., QueryEngine.shutdown()).
+        
+        
 
         if (our_executor != null) {
 

@@ -2,15 +2,14 @@
 
 FILE_OR_DIR=$1
 
-if [ -f "/etc/default/blazegraph" ] ; then
-    . "/etc/default/blazegraph" 
-else
-    JETTY_PORT=9999
-fi
+[ -f /etc/default/blazegraph ] && . /etc/default/blazegraph
+[ -z "$JETTY_PORT" ] && JETTY_PORT=9999
 
 LOAD_PROP_FILE=/tmp/$$.properties
 
-export NSS_DATALOAD_PROPERTIES=/usr/local/blazegraph/conf/RWStore.properties
+[ -z "${NSS_PROPERTIES}" ] && NSS_PROPERTIES=/etc/blazegraph
+
+export NSS_DATALOAD_PROPERTIES="${NSS_PROPERTIES}/RWStore.properties"
 
 #Probably some unused properties below, but copied all to be safe.
 
