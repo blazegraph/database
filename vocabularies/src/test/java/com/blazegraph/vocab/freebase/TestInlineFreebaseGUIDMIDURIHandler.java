@@ -119,4 +119,27 @@ public class TestInlineFreebaseGUIDMIDURIHandler extends TestCase2 {
 		
 	}
 	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test	
+	public void testBadNSMIDURIHandler() {
+	
+		final String nameSpace = "http://rdf.freebase.com/ns/m.0";
+		//This value should not inline
+		//http://rdf.freebase.com/ns/m.01268se
+		final String localName = "1268se";
+
+		
+		InlineFreebaseGUIDMIDURIHandler handler = new InlineFreebaseGUIDMIDURIHandler(nameSpace);
+		
+		XSDIntegerIV iv = (XSDIntegerIV) handler.createInlineIV(localName);
+
+		assertTrue (iv == null);
+
+		if(log.isDebugEnabled()) {
+			log.debug(iv.getDTE().name());
+		}
+		
+		
+	}
+	
 }

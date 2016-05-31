@@ -80,8 +80,10 @@ public class InlineFreebaseGUIDMIDURIHandler extends InlineURIHandler{
 			// log.debug("Invalid integer", e);
 			// }
 			return null;
+		} catch (IllegalArgumentException ie) {
+			return null;
 		}
-
+		
 		return new XSDIntegerIV(midLong);
 	}
 
