@@ -66,6 +66,7 @@ import com.bigdata.btree.Tuple;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.ClassPathUtil;
 
 /**
  * Class defines the log on which summary operator execution statistics are
@@ -730,11 +731,13 @@ public class QueryLog {
             final boolean clusterStats, final boolean detailedStats,
             final boolean mutationStats) throws IOException {
 
+        final boolean mapgraphStats = MapgraphPerformanceCounters.isMapGraph();
+        
         // the table start tag.
         w.write("<table border=\"1\" summary=\"" + attrib("Query Statistics")
                 + "\"\n>");
 
-        getTableHeaderXHTML(w, clusterStats, detailedStats, mutationStats);
+        getTableHeaderXHTML(w, clusterStats, detailedStats, mapgraphStats, mutationStats);
 
         // Main query.
         {
@@ -744,13 +747,13 @@ public class QueryLog {
 
             // Summary first.
             getSummaryRowXHTML(queryStr, q, w, queueStats, maxBopLength,
-                    clusterStats, detailedStats, mutationStats);
+                    clusterStats, detailedStats, mapgraphStats, mutationStats);
 
             if (!summaryOnly) {
 
                 // Then the detail rows.
                 getTableRowsXHTML(queryStr, q, w, queueStats, maxBopLength,
-                        clusterStats, detailedStats, mutationStats);
+                        clusterStats, detailedStats, mapgraphStats, mutationStats);
 
             }
 
@@ -768,7 +771,7 @@ public class QueryLog {
 
                     // Repeat the header so we can recognize what follows as a
                     // child query.
-                    getTableHeaderXHTML(w, clusterStats, detailedStats,
+                    getTableHeaderXHTML(w, clusterStats, detailedStats, mapgraphStats,
                             mutationStats);
 
                     {
@@ -779,11 +782,11 @@ public class QueryLog {
                         // Summary first.
                         getSummaryRowXHTML(null/* queryStr */, c, w,
                                 queueStats, maxBopLength, clusterStats,
-                                detailedStats, mutationStats);
+                                detailedStats, mapgraphStats, mutationStats);
 
                         // Then the detail rows.
                         getTableRowsXHTML(null/* queryStr */, c, w, queueStats,
-                                maxBopLength, clusterStats, detailedStats,
+                                maxBopLength, clusterStats, detailedStats, mapgraphStats,
                                 mutationStats);
                         
                     }
@@ -800,8 +803,9 @@ public class QueryLog {
     
     public static void getTableHeaderXHTML(final Writer w,
             final boolean clusterStats, final boolean detailedStats,
+            final boolean mapgraphStats,
             final boolean mutationStats) throws IOException {
-
+        
         // header row.
         w.write("<tr\n>");
         /*
@@ -887,6 +891,9 @@ public class QueryLog {
             w.write("<th>accessPathChunksIn</th>"); // #of chunks read from APs.
             w.write("<th>accessPathUnitsIn</th>"); // #of tuples read from APs.
         }
+        if(mapgraphStats) {
+            MapgraphPerformanceCounters.writeHeaders(w,detailedStats);
+        }
         // dynamics based on elapsed wall clock time.
         if(detailedStats) {
             w.write("<th>");w.write(cdata("solutions/ms"));w.write("</th>");
@@ -931,7 +938,7 @@ public class QueryLog {
             final IRunningQuery q, final Writer w,
             final Map<Integer/* bopId */, QueueStats> queueStats,
             final int maxBopLength, final boolean clusterStats,
-            final boolean detailedStats, final boolean mutationStats)
+            final boolean detailedStats, final boolean mapgraphStats, final boolean mutationStats)
             throws IOException {
 
         final Integer[] order = BOpUtility.getEvaluationOrder(q.getQuery());
@@ -942,7 +949,7 @@ public class QueryLog {
 
             getTableRowXHTML(queryStr, q, w, orderIndex, bopId,
                     false/* summary */, queueStats, maxBopLength, clusterStats,
-                    detailedStats, mutationStats);
+                    detailedStats, mapgraphStats, mutationStats);
 
             orderIndex++;
             
@@ -986,7 +993,7 @@ public class QueryLog {
             final Integer bopId, final boolean summary,
             final Map<Integer/* bopId */, QueueStats> queueStats,
             final int maxBopLength, final boolean clusterStats,
-            final boolean detailedStats, final boolean mutationStats)
+            final boolean detailedStats, final boolean mapgraphStats, final boolean mutationStats)
             throws IOException {
 
         final DateFormat dateFormat = DateFormat.getDateTimeInstance(
@@ -1505,6 +1512,18 @@ public class QueryLog {
             w.write(TDx);
         }
 
+        if(mapgraphStats) {
+            /**
+             * Show details about the mapgraph runtime. This is delegated iff
+             * the mapgraph runtime engine support is loaded.
+             * 
+             * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/378" >
+             *      EXPLAIN must provide useful summary of GPU task graph
+             *      evaluation </a>
+             */
+            MapgraphPerformanceCounters.write(w, q, bop, detailedStats);
+        }
+        
         /*
          * Use the total elapsed time for the query (wall time).
          */
@@ -1596,12 +1615,12 @@ public class QueryLog {
             final IRunningQuery q, final Writer w,
             final Map<Integer/* bopId */, QueueStats> queueStats,
             final int maxBopLength, final boolean clusterStats,
-            final boolean detailedStats, final boolean mutationStats)
+            final boolean detailedStats, final boolean mapgraphStats, final boolean mutationStats)
             throws IOException {
 
         getTableRowXHTML(queryStr, q, w, -1/* orderIndex */, q.getQuery()
                 .getId(), true/* summary */, queueStats, maxBopLength,
-                clusterStats, detailedStats, mutationStats);
+                clusterStats, detailedStats, mapgraphStats, mutationStats);
 
     }
 
@@ -1709,5 +1728,101 @@ public class QueryLog {
         }
 
     }
+
+    /**
+     * Interface may be used to return detailed performance counter information
+     * corresponding to the evaluation a task graph by the mapgraph runtime.
+     *
+     * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/378" > EXPLAIN must provide useful summary of GPU task graph evaluation </a>
+     * 
+     * @author bryan
+     */
+    public static interface ITaskGraphPerformanceCounterReporter {
+        
+        /**
+         * Write XHTML statistics column headers.
+         * 
+         * @param w
+         *            Where to write the headers.
+         * @param detailedStats
+         *            true iff detailed statistics were requested.
+         *            
+         * @throws IOException
+         */
+        void writeHeaders(Writer w, boolean detailedStats) throws IOException;
+
+        /**
+         * Write XHTML statistics for a task graph executed against the mapgraph
+         * runtime (iff the operator is associated with execution of a task
+         * graph).
+         * 
+         * @param w
+         *            Where to write the statistics.
+         * @param q
+         *            The query.
+         * @param bop
+         *            The operator.
+         * @param detailedStats
+         *            true iff detailed statistics were requested.
+         */
+        void write(final Writer w, final IRunningQuery q, final BOp bop, final boolean detailedStats)
+                throws IOException;
+
+    }
     
+    /**
+     * Helper class for one-time static initialization of the mapgraph
+     * performance counter extraction classes.
+     *
+     * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/378" > EXPLAIN must provide useful summary of GPU task graph evaluation </a>
+     * 
+     * @author bryan
+     */
+    private static class MapgraphPerformanceCounters {
+        
+        static private final ITaskGraphPerformanceCounterReporter reporter;
+        
+        static {
+            ITaskGraphPerformanceCounterReporter tmp = null;
+            try {
+            tmp = ClassPathUtil.classForName(//
+//                    MapgraphTaskGraphPerformanceCounterReporter.class.getName(),//
+                "com.blazegraph.rdf.gpu.MapgraphTaskGraphPerformanceCounterReporter", // preferredClassName,
+                null, // defaultClass,
+                ITaskGraphPerformanceCounterReporter.class, // sharedInterface,
+                QueryLog.class.getClassLoader() // classLoader
+                );
+            } catch(Throwable t) {
+                log.error(t,t);
+            }
+            reporter = tmp;
+        }
+
+        static boolean isMapGraph() {
+            return reporter != null;
+        }
+
+        public static void writeHeaders(Writer w, boolean detailedStats) throws IOException {
+
+            if (reporter != null) {
+
+                reporter.writeHeaders(w, detailedStats);
+                
+            }
+            
+        }
+
+        public static void write(final Writer w, final IRunningQuery q, final BOp bop, final boolean detailedStats)
+                throws IOException {
+
+            if (reporter != null) {
+
+                reporter.write(w, q, bop, detailedStats);
+
+            }
+
+        }
+
+    }
+
 }

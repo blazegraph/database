@@ -88,6 +88,8 @@ public class ClassPathUtil {
      * @throws IllegalArgumentException
      *             if the preferred class name is <code>null</code>.
      * @throws IllegalArgumentException
+     *             if the class loader is <code>null</code>.
+     * @throws IllegalArgumentException
      *             if defaultClass is given and does not implement the shared
      *             interface.
      * @throws RuntimeException
