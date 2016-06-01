@@ -134,11 +134,6 @@ public class TestInlineFreebaseGUIDMIDURIHandler extends TestCase2 {
 		XSDIntegerIV iv = (XSDIntegerIV) handler.createInlineIV(localName);
 
 		assertTrue (iv == null);
-
-		if(log.isDebugEnabled()) {
-			log.debug(iv.getDTE().name());
-		}
-		
 		
 	}
 	
