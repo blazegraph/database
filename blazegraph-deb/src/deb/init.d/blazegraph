@@ -154,8 +154,8 @@ blazegraph_sh() {
 
 	# Run the blazegraph.sh script as a daemon
 	set +e
-	touch "$BLZG_PID" "$BLZG_LOG"/blazegraph.log
-	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.log
+	touch "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
+	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
 	start-stop-daemon --start -b -u "$BLZG_USER" -g "$BLZG_GROUP" \
 		-c "$BLZG_USER" -d "$BLZG_BASE" -p "$BLZG_PID" \
 		-x /bin/bash -- -c "$AUTHBIND_COMMAND $BLZGCMD_SH"

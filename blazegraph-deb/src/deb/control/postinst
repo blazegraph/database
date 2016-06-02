@@ -11,11 +11,12 @@ case "$1" in
     configure)
         [ -z "$BLZG_DATA" ] && BLZG_DATA=/var/lib/blazegraph
         [ -z "$BLZG_CONF" ] && BLZG_CONF=/etc/blazegraph
-        # [ -z "$BLZG_USER" ] && BLZG_USER=blzg
-        # [ -z "$BLZG_GROUP" ] && BLZG_GROUP=blzg
+        [ -z "$JOURNAL" ] && JOURNAL="${BLZG_DATA}"/blazegraph.jnl
+        [ -z "$BLZG_USER" ] && BLZG_USER=blzg
+        [ -z "$BLZG_GROUP" ] && BLZG_GROUP=blzg
 
         # Update the journal file location
-        sed -i -e "s|com\\.bigdata\\.journal\\.AbstractJournal\\.file=.*|com.bigdata.journal.AbstractJournal.file=$BLZG_DATA/blazegraph.jnl|" \
+        sed -i -e "s|com\\.bigdata\\.journal\\.AbstractJournal\\.file=.*|com.bigdata.journal.AbstractJournal.file=$JOURNAL|" \
         $BLZG_CONF/RWStore.properties
 
         # if $2 is set, this is an upgrade

@@ -1,2 +1,31 @@
-service blazegraph stop
-chkconfig blazegraph off
+#!/bin/sh
+set -e
+
+[ -f /etc/blazegraph/blazegraph ] && . /etc/blazegraph/blazegraph
+
+stopBlazegraph() {
+    service blazegraph stop || true
+}
+
+case "$1" in
+    upgrade)
+        if [ "$RESTART_ON_UPGRADE" = "false" ] ; then
+            stopBlazegraph
+        fi
+    ;;
+
+    remove)
+        stopBlazegraph
+        chkconfig blazegraph off
+
+    ;;
+
+    deconfigure|failed-upgrade)
+    ;;
+
+    *)
+        echo "$0 called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+

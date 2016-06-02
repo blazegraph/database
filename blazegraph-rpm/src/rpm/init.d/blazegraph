@@ -95,7 +95,7 @@ OPENJDKS=""
 find_openjdks
 # The first existing directory is used for JAVA_HOME (if JAVA_HOME is not
 # defined in $DEFAULT)
-JDK_DIRS="/usr /usr/lib/jvm/java-7-oracle usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun"
+JDK_DIRS="/usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-7-oracle /usr/lib/jvm/java-8-oracle"
 
 # Look for the right JVM to use
 for jdir in $JDK_DIRS; do
@@ -105,15 +105,11 @@ for jdir in $JDK_DIRS; do
 done
 export JAVA_HOME
 
-# Directory where the Blazegraph distribution resides
-if [ -z "$BLZG_HOME" ] ; then
-	BLZG_HOME=/usr/local/$NAME
-fi
+# Directory where the Tomcat 6 binary distribution resides
+[ -z "$BLZG_HOME" ] && BLZG_HOME=/usr/share/$NAME
 
 # Directory for per-instance configuration files and webapps
-if [ -z "${BLZG_BASE}" ] ; then
-	BLZG_BASE=$BLZG_HOME
-fi
+[ -z "$BLZG_BASE" ] && BLZG_BASE=$BLZG_HOME
 
 # Use the Java security manager? (yes/no)
 BLZG_SECURITY=no
@@ -130,32 +126,25 @@ fi
 # End of variables that can be overwritten in $DEFAULT
 
 # overwrite settings from default file
-if [ -f "$DEFAULT" ]; then
-	. "$DEFAULT"
+[ -f "$DEFAULT" ] && . "$DEFAULT"
+
+[ -z "$BLZG_SH" ] && BLZG_SH="/usr/bin/blazegraph"
+if [ ! -f "$BLZG_SH" ]; then
+    log_failure_msg "$NAME is not installed"
+    exit 1
 fi
 
-if [ ! -f "$BLZG_HOME/bin/blazegraph.sh" ]; then
-	echo "$NAME is not installed"
-	exit 1
-fi
-
-if [ -z "$BLZG_TMPDIR" ]; then
-	BLZG_TMPDIR="$JVM_TMP"
-fi
+[ -z "$BLZG_TMPDIR" ] && BLZG_TMPDIR="$JVM_TMP"
 
 SECURITY=""
-if [ "$BLZG_SECURITY" = "yes" ]; then
-	SECURITY="-security"
-fi
+[ "$BLZG_SECURITY" = "yes" ] && SECURITY="-security"
 
 # Define other required variables
 BLZG_PID="/var/run/$NAME.pid"
-BLZG_SH="$BLZG_HOME/bin/blazegraph.sh"
 
 # Look for Java Secure Sockets Extension (JSSE) JARs
-if [ -z "${JSSE_HOME}" -a -r "${JAVA_HOME}/jre/lib/jsse.jar" ]; then
-    JSSE_HOME="${JAVA_HOME}/jre/"
-fi
+[ -z "${JSSE_HOME}" -a -r "${JAVA_HOME}/jre/lib/jsse.jar" ] && JSSE_HOME="${JAVA_HOME}/jre/"
+
 
 blazegraph_sh() {
 	# Escape any double quotes in the value of JAVA_OPTS
@@ -176,8 +165,8 @@ blazegraph_sh() {
 		\"$BLZG_SH\" $@"
 
 	set +e
-	touch "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
-	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
+	touch "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
+	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
 	$SU - $BLZG_USER -c "$BLZGCMD_SH start"
 	status="$?"
 
@@ -200,8 +189,6 @@ running_pid() {
 	PID=`cat ${BLZG_PID}`
 
 	let HAS_PID=`ps -eo pid | grep $PID | wc -l`
-
-	echo ${HAS_PID}
 
 	return ${HAS_PID} 
 	#1 if running, 0 if not
@@ -230,7 +217,7 @@ case "$1" in
 	chown $BLZG_USER "$JVM_TMP"
 	blazegraph_sh start 
 
-	sleep 5
+	sleep 1
 	;;
   stop)
 	echo "Stopping $DESC" "$NAME"

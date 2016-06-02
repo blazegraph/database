@@ -44,10 +44,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <properties>
     <rpm.user>blzg</rpm.user>
     <rpm.group>blzg</rpm.group>
-    <rpm.installDir>/usr/local/blazegraph-${project.version}</rpm.installDir>
-    <rpm.packageName>blazegraph-${project.version}</rpm.packageName>
-    <rpm.release>SNAPSHOT</rpm.release>
     <app.name>blazegraph</app.name>
+    <rpm.packageName>blazegraph-${project.version}</rpm.packageName>
+    <rpm.installDir>/usr/share/${rpm.packageName}</rpm.installDir>
+    <rpm.dataDir>/var/lib/${app.name}</rpm.dataDir>
+    <rpm.binDir>/usr/bin</rpm.binDir>
+    <rpm.release>SNAPSHOT</rpm.release>
   </properties>
   <build>
     <extensions>
@@ -78,10 +80,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             -->
             <mappings>
               <mapping>
-                <directory>/usr/share/${rpm.packageName}/lib</directory>
+                <directory>${rpm.installDir}/lib</directory>
                 <filemode>750</filemode>
-                <username>${rpm.user}</username>
-                <groupname>${rpm.group}</groupname>
+                <username>root</username>
+                <groupname>root</groupname>
                 <sources>
                   <source>
                     <location>${project.build.directory}/dependency</location>
@@ -92,8 +94,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <directory>${rpm.installDir}/war</directory>
                 <filemode>750</filemode>
                 <recurseDirectories>true</recurseDirectories>
-                <username>${rpm.user}</username>
-                <groupname>${rpm.group}</groupname>
+                <username>root</username>
+                <groupname>root</groupname>
                 <sources>
                   <source>
                     <location>${project.build.directory}/classes/war</location>
@@ -101,8 +103,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </sources>
               </mapping>
               <mapping>
-                <directory>${rpm.installDir}/bin</directory>
-                <filemode>750</filemode>
+                <directory>${rpm.binDir}/directory>
+                <filemode>755</filemode>
                 <username>${rpm.user}</username>
                 <groupname>${rpm.group}</groupname>
                 <sources>
@@ -112,11 +114,23 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </sources>
               </mapping>
               <mapping>
-                <directory>${rpm.installDir}/conf</directory>
+                <directory>/etc/logrotate.d</directory>
                 <configuration>true</configuration>
                 <filemode>750</filemode>
-                <username>${rpm.user}</username>
-                <groupname>${rpm.group}</groupname>
+                <username>root</username>
+                <groupname>root</groupname>
+                <sources>
+                  <source>
+                    <location>src/rpm/logrotate.d/blazegraph</location>
+                  </source>
+                </sources>
+              </mapping>
+              <mapping>
+                <directory>/etc/${app.name}</directory>
+                <configuration>true</configuration>
+                <filemode>750</filemode>
+                <username>root</username>
+                <groupname>root</groupname>
                 <sources>
                   <source>
                     <location>src/rpm/conf</location>
@@ -133,19 +147,19 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </sources>
               </mapping>
               <mapping>
-                <directory>${rpm.installDir}/data</directory>
-                <filemode>750</filemode>
-                <username>${rpm.user}</username>
-                <groupname>${rpm.group}</groupname>
+                <directory>/etc/init.d</directory>
+                <configuration>true</configuration>
+                <filemode>755</filemode>
+                <username>root</username>
+                <groupname>root</groupname>
+                <sources>
+                  <source>
+                    <location>src/rpm/init.d</location>
+                  </source>
+                </sources>
               </mapping>
               <mapping>
-                <directory>/var/log/${app.name}</directory>
-                <filemode>750</filemode>
-                <username>${rpm.user}</username>
-                <groupname>${rpm.group}</groupname>
-              </mapping>
-              <mapping>
-                <directory>/usr/local</directory>
+                <directory>/usr/share</directory>
                 <sources>
                   <softlinkSource>
                     <location>${rpm.installDir}</location>
