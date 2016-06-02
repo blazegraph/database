@@ -29,8 +29,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import junit.framework.Test;
+import junit.framework.TestCase2;
 
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.MockRemoteRepository;
 
 /**
@@ -41,8 +41,7 @@ import com.bigdata.rdf.sail.webapp.client.MockRemoteRepository;
  * connection with a remote server.
  * 
  */
-public class Test_REST_CANCEL<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
+public class Test_REST_CANCEL extends TestCase2 {
     
     private UUID[] uuids;
     private MockRemoteRepository remote;
