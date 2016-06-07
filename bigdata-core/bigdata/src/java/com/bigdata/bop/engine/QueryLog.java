@@ -116,7 +116,9 @@ public class QueryLog {
 
         if (!log.isInfoEnabled())
             return;
-            
+        
+        final boolean DEBUG = log.isDebugEnabled();
+        
         try {
 
             final IRunningQuery[] children = (q instanceof AbstractRunningQuery) ? ((AbstractRunningQuery) q)
@@ -150,7 +152,8 @@ public class QueryLog {
 
                     logSummaryRow(q, queueStats, sb);
 
-                    logDetailRows(q, queueStats, sb);
+                    if (DEBUG)
+                        logDetailRows(q, queueStats, sb);
                 }
 
                 if (children != null) {
@@ -163,8 +166,9 @@ public class QueryLog {
                                 .getQueueStats();
                         
                         logSummaryRow(c, queueStats, sb);
-                        
-                        logDetailRows(c, queueStats, sb);
+
+                        if (DEBUG)
+                            logDetailRows(c, queueStats, sb);
 
                     }
                     
@@ -247,6 +251,8 @@ public class QueryLog {
 
         final StringBuilder sb = new StringBuilder();
 
+        final boolean mapgraphStats = MapgraphPerformanceCounters.isMapGraph();
+        
         /*
          * Common columns for the overall query and for each pipeline operator.
          */
@@ -291,12 +297,15 @@ public class QueryLog {
         sb.append("\tunitsOutPerChunk"); // average #of solutions out per chunk.
         sb.append("\tmutationCount");
         sb.append("\ttypeErrors");
-        sb.append("\tjoinRatio"); // expansion rate multipler in the solution count.
+        sb.append("\tjoinRatio"); // expansion rate multiplier in the solution count.
         sb.append("\taccessPathDups");
         sb.append("\taccessPathCount");
         sb.append("\taccessPathRangeCount");
         sb.append("\taccessPathChunksIn");
         sb.append("\taccessPathUnitsIn");
+        if(mapgraphStats) {
+            MapgraphPerformanceCounters.writeHeaders(sb);
+        }
         // dynamics based on elapsed wall clock time.
         sb.append("\tsolutions/ms");
         sb.append("\tmutations/ms");
@@ -673,6 +682,10 @@ public class QueryLog {
         sb.append(stats.accessPathChunksIn.get());
         sb.append('\t');
         sb.append(stats.accessPathUnitsIn.get());
+
+        if (MapgraphPerformanceCounters.isMapGraph()) {
+            MapgraphPerformanceCounters.write(sb, q, evalOrder, bopId, summary, queueStats);
+        }
 
         /*
          * Use the total elapsed time for the query (wall time).
@@ -1150,7 +1163,7 @@ public class QueryLog {
         w.write(TDx);
         
         /*
-         * Pperator summary (not shown for the "total" line).
+         * Operator summary (not shown for the "total" line).
          * 
          * TODO We should have self-reporting of the summary for each operator,
          * potentially as XHTML. Also, the parser should pass along the SPARQL
@@ -1746,8 +1759,10 @@ public class QueryLog {
          *            Where to write the headers.
          * @param detailedStats
          *            true iff detailed statistics were requested.
-         *            
-         * @throws IOException
+         * 
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/378" >
+         *      EXPLAIN must provide useful summary of GPU task graph
+         *      evaluation </a>
          */
         void writeHeaders(Writer w, boolean detailedStats) throws IOException;
 
@@ -1764,9 +1779,43 @@ public class QueryLog {
          *            The operator.
          * @param detailedStats
          *            true iff detailed statistics were requested.
+         * 
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/378" >
+         *      EXPLAIN must provide useful summary of GPU task graph
+         *      evaluation </a>
          */
         void write(final Writer w, final IRunningQuery q, final BOp bop, final boolean detailedStats)
                 throws IOException;
+
+        /**
+         * Write additional column headers for the mapgraph runtime statistics.
+         * 
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/911" > Add
+         *      logger for GPU benchmarking that reports both total query time
+         *      and GPU only evaluation time </a>
+         */
+        void writeHeaders(StringBuilder sb);
+
+        /**
+         * Write additional column data for the mapgraph runtime statistics.
+         * 
+         * @param q
+         *            The {@link IRunningQuery}.
+         * @param evalOrder
+         *            The evaluation order for the operator.
+         * @param bopId
+         *            The identifier for the operator.
+         * @param summary
+         *            <code>true</code> iff the summary for the query should be
+         *            written.
+         *            
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/911" > Add
+         *      logger for GPU benchmarking that reports both total query time
+         *      and GPU only evaluation time </a>
+         */
+        void write(final StringBuilder sb, final IRunningQuery q,
+                final int evalOrder, final Integer bopId, final boolean summary,
+                final Map<Integer/*bopId*/,QueueStats> queueStats);
 
     }
     
@@ -1800,6 +1849,28 @@ public class QueryLog {
 
         static boolean isMapGraph() {
             return reporter != null;
+        }
+
+        public static void writeHeaders(StringBuilder sb) {
+
+            if (reporter != null) {
+
+                reporter.writeHeaders(sb);
+                
+            }
+            
+        }
+
+        public static void write(final StringBuilder sb, final IRunningQuery q,
+                final int evalOrder, final Integer bopId, final boolean summary,
+                final Map<Integer/*bopId*/,QueueStats> queueStats) {
+
+            if (reporter != null) {
+
+                reporter.write(sb, q, evalOrder, bopId, summary, queueStats);
+                
+            }
+            
         }
 
         public static void writeHeaders(Writer w, boolean detailedStats) throws IOException {
