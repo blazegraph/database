@@ -5,8 +5,6 @@ set -e
 [ -z "$BLZG_LOG" ] && BLZG_LOG=/var/log/blazegraph
 [ -z "$BLZG_DATA" ] && BLZG_DATA=/var/lib/blazegraph
 
-case "$1" in
-    remove)
         #TODO Review RPM remove semantics
         rm -f /etc/init.d/blazegraph
         rm -f /etc/logrotate.d/blazegraph
@@ -16,26 +14,16 @@ case "$1" in
 
         # remove **only** empty data dir
         rmdir -p --ignore-fail-on-non-empty $BLZG_DATA
-    ;;
 
-    purge)
         [ -z "$BLZG_USER" ] && BLZG_USER="blzg"
         [ -z "$BLZG_GROUP" ] && BLZG_GROUP="blzg"
 
-        # Remove logs and data
-        rm -rf $BLZG_LOG $BLZG_DATA
-
         # Remove user/group
-        deluser --system "$BLZG_USER" || true
-        delgroup --system "$BLZG_GROUP" || true
-    ;;
+        userdel -r "$BLZG_USER" || true
+        groupdel "$BLZG_GROUP" || true
 
-    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
-        # Nothing to do here
-    ;;
 
-    *)
-        echo "$0 called with unknown argument \`$1'" >&2
-        exit 1
-    ;;
-esac
+
+        # Remove logs and data
+        #rm -rf $BLZG_LOG $BLZG_DATA
+

@@ -56,7 +56,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       <extension>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>rpm-maven-plugin</artifactId>
-        <version>2.1.4</version>
+        <version>2.1.5</version>
       </extension>
     </extensions>
     <pluginManagement>
@@ -64,7 +64,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>rpm-maven-plugin</artifactId>
-          <version>2.1.4</version>
+          <version>2.1.5</version>
           <extensions>true</extensions>
           <configuration>
             <license>GPL v2</license>
@@ -81,7 +81,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             <mappings>
               <mapping>
                 <directory>${rpm.installDir}/lib</directory>
-                <filemode>750</filemode>
+                <filemode>755</filemode>
                 <username>root</username>
                 <groupname>root</groupname>
                 <sources>
@@ -92,7 +92,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               </mapping>
               <mapping>
                 <directory>${rpm.installDir}/war</directory>
-                <filemode>750</filemode>
+                <filemode>755</filemode>
                 <recurseDirectories>true</recurseDirectories>
                 <username>root</username>
                 <groupname>root</groupname>
@@ -103,8 +103,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 </sources>
               </mapping>
               <mapping>
-                <directory>${rpm.binDir}/directory>
+                <directory>${rpm.binDir}</directory>
                 <filemode>755</filemode>
+		<directoryIncluded>false</directoryIncluded>
                 <username>${rpm.user}</username>
                 <groupname>${rpm.group}</groupname>
                 <sources>
@@ -116,7 +117,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <mapping>
                 <directory>/etc/logrotate.d</directory>
                 <configuration>true</configuration>
-                <filemode>750</filemode>
+		<directoryIncluded>false</directoryIncluded>
+                <filemode>755</filemode>
                 <username>root</username>
                 <groupname>root</groupname>
                 <sources>
@@ -128,7 +130,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <mapping>
                 <directory>/etc/${app.name}</directory>
                 <configuration>true</configuration>
-                <filemode>750</filemode>
+                <filemode>755</filemode>
                 <username>root</username>
                 <groupname>root</groupname>
                 <sources>
@@ -149,6 +151,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <mapping>
                 <directory>/etc/init.d</directory>
                 <configuration>true</configuration>
+		<directoryIncluded>false</directoryIncluded>
                 <filemode>755</filemode>
                 <username>root</username>
                 <groupname>root</groupname>
@@ -176,6 +179,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <scriptFile>src/rpm/scripts/postinst</scriptFile>
               <fileEncoding>utf-8</fileEncoding>
             </postinstallScriptlet>
+            <preremoveScriptlet>
+              <scriptFile>src/rpm/scripts/preremove</scriptFile>
+              <fileEncoding>utf-8</fileEncoding>
+            </preremoveScriptlet>
             <postremoveScriptlet>
               <scriptFile>src/rpm/scripts/postremove</scriptFile>
               <fileEncoding>utf-8</fileEncoding>

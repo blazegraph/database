@@ -7,8 +7,6 @@ startBlazegraph() {
     service blazegraph start || true
 }
 
-case "$1" in
-    configure)
         [ -z "$BLZG_DATA" ] && BLZG_DATA=/var/lib/blazegraph
         [ -z "$BLZG_CONF" ] && BLZG_CONF=/etc/blazegraph
         [ -z "$JOURNAL" ] && JOURNAL="${BLZG_DATA}"/blazegraph.jnl
@@ -39,12 +37,3 @@ case "$1" in
         # Change user name in config files that cannot read /etc/default/blazegraph;
         # unfortunately we can do this only if /etc/default/blazegraph is in place before installation
         sed -i -e "s/create 640 blzg blzg/create 640 $BLZG_USER $BLZG_GROUP/" /etc/logrotate.d/blazegraph
-    ;;
-    abort-upgrade|abort-remove|abort-deconfigure)
-    ;;
-
-    *)
-        echo "$0 called with unknown argument \`$1'" >&2
-        exit 1
-    ;;
-esac
