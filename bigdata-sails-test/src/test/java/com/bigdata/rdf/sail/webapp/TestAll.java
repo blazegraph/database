@@ -103,8 +103,6 @@ public class TestAll extends TestCase {
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
         
-        suite.addTestSuite(TestBLZG1943.class);
-        
         return suite;
 
     }
