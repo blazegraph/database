@@ -14,10 +14,18 @@ case "$1" in
         [ -z "$JOURNAL" ] && JOURNAL="${BLZG_DATA}"/blazegraph.jnl
         [ -z "$BLZG_USER" ] && BLZG_USER=blzg
         [ -z "$BLZG_GROUP" ] && BLZG_GROUP=blzg
+        [ -z "$BLZG_LOG" ] && BLZG_LOG=/var/log/blazegraph
 
         # Update the journal file location
         sed -i -e "s|com\\.bigdata\\.journal\\.AbstractJournal\\.file=.*|com.bigdata.journal.AbstractJournal.file=$JOURNAL|" \
         $BLZG_CONF/RWStore.properties
+
+        # Update the rules.log location
+        sed -i -e "s|log4j.appender.ruleLog.File=.*|log4j.appender.ruleLog.File=$BLZG_LOG/rules.log|" \
+        $BLZG_CONF/log4j.properties
+
+        touch $BLZG_LOG/rules.log
+        chown $BLZG_USER:$BLZG_GROUP $BLZG_LOG/rules.log
 
         # if $2 is set, this is an upgrade
         if ( [ -n $2 ] && [ "$RESTART_ON_UPGRADE" != "false" ] ) ; then
