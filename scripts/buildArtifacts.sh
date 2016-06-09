@@ -111,7 +111,7 @@ for tarball in $FILE_EXT; do
 done
 
 #Copy the releases file as README.txt
-VERSION=`cat ${BASE_DIR}/version.properties | cut -d= -f2 | sed -e 's/\./_/g'`
+VERSION=`cat ${BASE_DIR}/version.properties | grep VERSION | cut -d= -f2 | sed -e 's/\./_/g'`
 RELEASE_NOTES="RELEASE_${VERSION}.txt"
 
 if [ -f "${BASE_DIR}/../bigdata/src/releases/${RELEASE_NOTES}" ] ; then
