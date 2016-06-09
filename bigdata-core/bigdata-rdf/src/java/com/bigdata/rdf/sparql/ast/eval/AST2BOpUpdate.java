@@ -1475,6 +1475,38 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         return null;
         
     }
+    
+    /**
+     * 
+     * Utility method to get the {@link RDFFormat} for filename.
+     * 
+     * It checks for compressed endings and is provided as a utility.
+     * 
+     * @param fileName
+     * @return
+     */
+    public static RDFFormat rdfFormatForFile(final String fileName) {
+    	/*
+         * Try to get the RDFFormat from the URL's file path.
+         */
+
+        RDFFormat fmt = RDFFormat.forFileName(fileName);
+
+        if (fmt == null && fileName.endsWith(".zip")) {
+            fmt = RDFFormat.forFileName(fileName.substring(0, fileName.length() - 4));
+        }
+
+        if (fmt == null && fileName.endsWith(".gz")) {
+            fmt = RDFFormat.forFileName(fileName.substring(0, fileName.length() - 3));
+        }
+
+        if (fmt == null) {
+            // Default format.
+            fmt = RDFFormat.RDFXML;
+        }
+        
+        return fmt;
+    }
 
     /**
      * Parse and load a document.
@@ -1525,7 +1557,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final String baseURL = sourceURL.toExternalForm();
             
             // The file path.
-            final String n = sourceURL.getFile();
+            //BLZG-1929
+            final String n = sourceURL.getPath();
 
             /**
              * Attempt to obtain the format from the Content-Type.
@@ -1538,26 +1571,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             if (format == null) {
 
-                /*
-                 * Try to get the RDFFormat from the URL's file path.
-                 */
-
-                RDFFormat fmt = RDFFormat.forFileName(n);
-
-                if (fmt == null && n.endsWith(".zip")) {
-                    fmt = RDFFormat.forFileName(n.substring(0, n.length() - 4));
-                }
-
-                if (fmt == null && n.endsWith(".gz")) {
-                    fmt = RDFFormat.forFileName(n.substring(0, n.length() - 3));
-                }
-
-                if (fmt == null) {
-                    // Default format.
-                    fmt = RDFFormat.RDFXML;
-                }
-
-                format = fmt;
+                format = rdfFormatForFile(n);
 
             }
 
