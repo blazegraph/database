@@ -78,16 +78,18 @@ public class TestMultiInlineURIHandlersSingleNamespace extends
 	public void test_TwoNamespaceCreation() {
 		
 		final InlineNamespaceMultiURIHandler mHandler = new InlineNamespaceMultiURIHandler("http://blazegraph.com/data/");
-		boolean hasException = false;
+		boolean noException = true;
 		
 		try {
 			InlineSignedIntegerURIHandler i = new InlineSignedIntegerURIHandler("http://www.bigdata.com/");
 			mHandler.addHandler(i);
 		} catch (RuntimeException e) {
-			hasException = true;
+			noException = false;
 		}
 		
-		assert(!hasException);
+		if(noException)
+			fail();
+
 	}
 
 	public void test_TestVocabularyInlineValues() {
