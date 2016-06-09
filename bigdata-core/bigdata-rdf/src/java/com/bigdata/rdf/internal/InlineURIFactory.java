@@ -173,7 +173,7 @@ public class InlineURIFactory implements IInlineURIFactory {
 		
 	}
 
-	public TreeMap<String, InlineURIHandler> getHandlersByNamespace() {
+	private TreeMap<String, InlineURIHandler> getHandlersByNamespace() {
 		return handlersByNamespace;
 	}
 
