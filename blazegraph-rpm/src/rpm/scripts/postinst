@@ -1,6 +1,39 @@
-ln -s /usr/local/blazegraph/bin/blazegraph.init.d /etc/init.d/blazegraph
-ln -s /usr/local/blazegraph/conf/blazegraph.logrotate.d /etc/logrotate.d/blazegraph
-ln -s /usr/local/blazegraph/conf/ /etc/blazegraph
-#Update the journal file location
-sed -i -e 's/com\.bigdata\.journal\.AbstractJournal\.file=.*/com.bigdata.journal.AbstractJournal.file=\/usr\/local\/blazegraph\/data\/blazegraph\.jnl/' /usr/local/blazegraph/conf/RWStore.properties
-chkconfig blazegraph on
+#!/bin/sh
+set -e
+
+[ -f /etc/default/blazegraph ] && . /etc/default/blazegraph
+
+startBlazegraph() {
+    service blazegraph start || true
+}
+
+        [ -z "$BLZG_DATA" ] && BLZG_DATA=/var/lib/blazegraph
+        [ -z "$BLZG_CONF" ] && BLZG_CONF=/etc/blazegraph
+        [ -z "$JOURNAL" ] && JOURNAL="${BLZG_DATA}"/blazegraph.jnl
+        [ -z "$BLZG_USER" ] && BLZG_USER=blzg
+        [ -z "$BLZG_GROUP" ] && BLZG_GROUP=blzg
+        [ -z "$BLZG_LOG" ] && BLZG_LOG=/var/log/blazegraph
+
+        # Update the journal file location
+        sed -i -e "s|com\\.bigdata\\.journal\\.AbstractJournal\\.file=.*|com.bigdata.journal.AbstractJournal.file=$JOURNAL|" \
+        $BLZG_CONF/RWStore.properties
+
+        # Update the rules.log location
+        sed -i -e "s|log4j.appender.ruleLog.File=.*|log4j.appender.ruleLog.File=$BLZG_LOG/rules.log|" \
+        $BLZG_CONF/log4j.properties
+
+        touch $BLZG_LOG/rules.log
+        chown $BLZG_USER:$BLZG_GROUP $BLZG_LOG/rules.log
+
+        # if $2 is set, this is an upgrade
+        if ( [ -n $2 ] && [ "$RESTART_ON_UPGRADE" != "false" ] ) ; then
+            chkconfig blazegraph on
+            startBlazegraph
+            # this is a fresh installation
+        elif [ -z $2 ] ; then
+            echo "### NOT starting blazegraph after install, please execute"
+            echo " sudo service blazegraph start"
+        fi
+        # Change user name in config files that cannot read /etc/default/blazegraph;
+        # unfortunately we can do this only if /etc/default/blazegraph is in place before installation
+        sed -i -e "s/create 640 blzg blzg/create 640 $BLZG_USER $BLZG_GROUP/" /etc/logrotate.d/blazegraph

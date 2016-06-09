@@ -66,6 +66,11 @@ cmd="java ${JAVA_OPTS} \
 case "$1" in
   start)
 
+      if [ -f "$BLZG_PID" ]; then
+            echo "$BLZG_PID exists...trying to stop."
+            $0 stop
+      fi
+
       # Note: This redirects console logger output to dev/null!
       # This is only valid if all logger output is explicitly
       # directed into a file, which it is not when using the
@@ -79,7 +84,7 @@ case "$1" in
          $cmd >> $BLZG_LOG 2>&1 &
       fi
       pid=$!
-      retval=$$
+      retval=$?
       # echo "PID=$pid"
       echo "$pid">$BLZG_PID
       exit $retval
