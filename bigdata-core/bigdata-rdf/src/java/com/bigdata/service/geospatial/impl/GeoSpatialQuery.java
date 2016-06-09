@@ -88,6 +88,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     private final IVariable<?> coordSystemVar;
     private final IVariable<?> customFieldsVar;
     private final IVariable<?> literalVar;
+    private final IVariable<?> distanceVar;
     private final IBindingSet incomingBindings;
 
     // derived parameters
@@ -115,7 +116,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final IVariable<?> locationAndTimeVar, final IVariable<?> latVar, 
             final IVariable<?> lonVar, final IVariable<?> coordSystemVar, 
             final IVariable<?> customFieldsVar, final IVariable<?> literalVar,
-            final IBindingSet incomingBindings) {
+            final IVariable<?> distanceVar, final IBindingSet incomingBindings) {
 
         this.geoSpatialConfig = geoSpatialConfig;
         this.searchFunction = searchFunction;
@@ -141,6 +142,7 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         this.customFieldsVar = customFieldsVar;
         this.incomingBindings = incomingBindings;
         this.literalVar = literalVar;
+        this.distanceVar = distanceVar;
         
         this.datatypeConfig = 
             geoSpatialConfig.getConfigurationForDatatype(searchDatatype);
@@ -183,14 +185,15 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             final IVariable<?> coordSystemVar, 
             final IVariable<?> customFieldsVar,
             final IVariable<?> literalVar,
+            final IVariable<?> distanceVar,
             final IBindingSet incomingBindings,
             final CoordinateDD lowerBoundingBox,
             final CoordinateDD upperBoundingBox) {
 
         this(geoSpatialConfig, searchFunction, searchDatatype, subject, predicate, context, spatialCircleCenter,
              spatialCircleRadius, spatialRectangleSouthWest, spatialRectangleNorthEast,  spatialUnit,
-             timeStart, timeEnd, coordSystem, customFieldsConstraints, locationVar, timeVar, 
-             locationAndTimeVar, latVar, lonVar, coordSystemVar, customFieldsVar, literalVar, incomingBindings);
+             timeStart, timeEnd, coordSystem, customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, 
+             latVar, lonVar, coordSystemVar, customFieldsVar, literalVar, distanceVar, incomingBindings);
         
         this.lowerBoundingBox = lowerBoundingBox;
         this.upperBoundingBox = upperBoundingBox;
@@ -343,6 +346,11 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
     public IVariable<?> getLiteralVar() {
         return literalVar;
     }
+    
+    @Override
+    public IVariable<?> getDistanceVar() {
+        return distanceVar;
+    }
 
 
     @Override
@@ -483,8 +491,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                    geoSpatialConfig, searchFunction, searchDatatype, subject, predicate, context, 
                    spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                    spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
-                   customFieldsConstraints, locationVar, timeVar, locationAndTimeVar,
-                   latVar, lonVar, coordSystemVar, customFieldsVar, literalVar, incomingBindings,
+                   customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, latVar, 
+                   lonVar, coordSystemVar, customFieldsVar, literalVar, distanceVar, incomingBindings,
                    new CoordinateDD(lowerBoundingBox.northSouth, Math.nextAfter(-180.0,0) /** -179.999... */), 
                    new CoordinateDD(upperBoundingBox.northSouth, upperBoundingBox.eastWest));
             normalizedQueries.add(query1);
@@ -494,8 +502,8 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                     geoSpatialConfig, searchFunction, searchDatatype, subject, predicate, context, 
                     spatialCircleCenter, spatialCircleRadius, spatialRectangleSouthWest, 
                     spatialRectangleNorthEast, spatialUnit, timeStart, timeEnd, coordSystem,
-                    customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, 
-                    latVar, lonVar, coordSystemVar, customFieldsVar, literalVar,incomingBindings, 
+                    customFieldsConstraints, locationVar, timeVar, locationAndTimeVar, latVar, 
+                    lonVar, coordSystemVar, customFieldsVar, literalVar, distanceVar, incomingBindings, 
                     new CoordinateDD(lowerBoundingBox.northSouth, lowerBoundingBox.eastWest), 
                     new CoordinateDD(upperBoundingBox.northSouth, 180.0));
             normalizedQueries.add(query2);
@@ -574,12 +582,13 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
         }
 
         // lookup of geospatial component in non-geospatial (custom) z-order index
-        if (locationVar!=null || locationAndTimeVar!=null || latVar!=null || lonVar!=null) {
+        if (locationVar!=null || locationAndTimeVar!=null || latVar!=null || lonVar!=null || distanceVar!=null) {
             if (!(datatypeConfig.hasLat() && datatypeConfig.hasLon())) {
                 throw new GeoSpatialSearchException(
                     "Requested extraction of geospatial coordinates (via " + GeoSpatial.LOCATION_AND_TIME_VALUE + ", "
-                    + GeoSpatial.LOCATION_AND_TIME_VALUE + ", " + GeoSpatial.LAT_VALUE + ", or " + GeoSpatial.LON_VALUE + ")"
-                    + " but the index contains no geospatial coordinates. Please remove the respective predicated from your query.");
+                    + GeoSpatial.LOCATION_AND_TIME_VALUE + ", " + GeoSpatial.LAT_VALUE + ", " + GeoSpatial.LON_VALUE + 
+                    " or " + GeoSpatial.DISTANCE_VALUE + ")" + " but the index contains no geospatial coordinates. " + 
+                    "Please remove the respective predicated from your query.");
             }
         }
         
@@ -637,22 +646,22 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
                 
             if (spatialCircleCenter==null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_CENTER + " must be provided for search function inCircle.");
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_CENTER + " not supported for search function inCircle.");
             }
             
             if (spatialCircleRadius==null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_RADIUS + " must be provided for search function inCircle.");                
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_RADIUS + " not supported for search function inCircle.");                
             }
             
             if (spatialRectangleSouthWest!=null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST + " must not be provided for search function inCircle.");                                
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST + " not supported for search function inCircle.");                                
             }
             
             if (spatialRectangleNorthEast!=null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST + " must not be provided for search function inCircle.");                                                
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST + " not supported for search function inCircle.");                                                
             }
                 
             break;
@@ -666,23 +675,27 @@ public class GeoSpatialQuery implements IGeoSpatialQuery {
             
             if (spatialRectangleSouthWest==null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST + " must be provided for search function inRectangle.");                                
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_SOUTH_WEST + " not supported for search function inRectangle.");                                
             }
             
             if (spatialRectangleNorthEast==null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST + " must be provided for search function inRectangle.");                                                
+                    "Predicate " + GeoSpatial.SPATIAL_RECTANGLE_NORTH_EAST + " not supported for search function inRectangle.");                                                
             }
-
             
             if (spatialCircleCenter!=null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_CENTER + " must not be provided for search function inRectangle.");
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_CENTER + " not supported for search function inRectangle.");
             }
             
             if (spatialCircleRadius!=null) {
                 throw new GeoSpatialSearchException(
-                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_RADIUS + " must not be provided for search function inRectangle.");                
+                    "Predicate " + GeoSpatial.SPATIAL_CIRCLE_RADIUS + " not supported for search function inRectangle.");                
+            }
+            
+            if (distanceVar!=null) {
+                throw new GeoSpatialSearchException(
+                        "Predicate " + GeoSpatial.DISTANCE_VALUE + " not supported for search function inRectangle.");                                
             }
             
             break;

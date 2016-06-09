@@ -1,0 +1,50 @@
+@prefix geoliteral: <http://www.bigdata.com/rdf/geospatial/literals/v1#> .
+@prefix example: <http://www.example.com/> .
+
+example:Oktoberfest-2013
+    rdf:type example:Fair ;
+    rdfs:label "Oktoberfest 2013" ;
+    example:happened "48.13188#11.54965#1379714400"^^geoliteral:lat-lon-time ;
+                example:city example:Munich .
+
+example:RAR-2013
+    rdf:type example:Festival ;
+    rdfs:label "Rock am Ring 2013" ;
+    example:happened "50.33406#6.94259#1370556000"^^geoliteral:lat-lon-time ;
+                example:city example:Nuerburg .
+
+example:Oktoberfest-2014
+    rdf:type example:Fair ;
+    rdfs:label "Oktoberfest 2014" ;
+    example:happened "48.13188#11.54965#1411164000"^^geoliteral:lat-lon-time ;
+                example:city example:Munich .
+
+example:RAR-2014
+    rdf:type example:Festival ;
+    rdfs:label "Rock am Ring 2014" ;
+    example:happened "50.33406#6.94259#1401919200"^^geoliteral:lat-lon-time ;
+                example:city example:Nuerburg .
+
+example:Oktoberfest-2015
+    rdf:type example:Fair ;
+    rdfs:label "Oktoberfest 2015" ;
+    example:happened "48.13188#11.54965#1442613600"^^geoliteral:lat-lon-time ;
+                example:city example:Munich .
+
+example:RAR-2015
+    rdf:type example:Festival ;
+    rdfs:label "Rock am Ring 2015" ;
+    example:happened "50.36780#7.31170#1464904800"^^geoliteral:lat-lon-time ;
+                example:city example:Mendig .
+
+example:Munich
+    rdf:type example:City ;
+    example:location "48.13743#11.57549"^^geoliteral:lat-lon .
+
+example:Nuerburg
+    rdf:type example:City ;
+    example:location "50.34188#6.95203"^^geoliteral:lat-lon .
+
+example:Mendig
+    rdf:type example:City ;
+    example:location "50.36667#7.28333"^^geoliteral:lat-lon .

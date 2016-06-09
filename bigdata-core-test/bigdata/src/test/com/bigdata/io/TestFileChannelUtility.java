@@ -34,12 +34,20 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Random;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.io.FileChannelUtility.AsyncTransfer;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.BytesUtil;
 
@@ -578,5 +586,254 @@ public class TestFileChannelUtility extends TestCase {
 			sourceFile.delete();
 		}
 	}
+	
+	/*
+	 * The idea is to write a large file and then read asynchronously across a large number of small buffers.
+	 * 
+	 */
+	public void no_testAsyncReadersCancelled() throws IOException, InterruptedException {
+		final Random r = new Random();
+
+		final File sourceFile = new File("/Volumes/NonSSD/bigdata/interrupted.jnl"); // External non-SSD drive
+		
+
+		final RandomAccessFile raf = new RandomAccessFile(sourceFile, "rw");
+		
+		// Now let's read 50M randomly from the file
+		final byte[] buf = new byte[50*1024*1024];
+		long addr = 0;
+		final ArrayList<AsyncTransfer> transfers = new ArrayList<AsyncTransfer>();
+		while (addr < buf.length) { // cursor is within buffer
+			// final int rdlen = r.nextInt(4096);
+			final int rdlen = 4096;
+			
+			final ByteBuffer bb = ByteBuffer.wrap(buf, (int) addr, rdlen);
+			// Thread.sleep(2);
+			transfers.add(new AsyncTransfer(addr, bb));
+			addr += rdlen;			
+		}
+		
+		// Create a new Thread which will race backwards attempting to cancel the AsyncTransfer
+		// this will be a NOP until it hits one with a Future, ie one that has been scheduled.
+		
+		final Thread canceller = new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(20);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+				for (int i = transfers.size()-1; i >= 0; i--) {
+					transfers.get(i).cancel();
+				}
+			}
+			
+		});
+		canceller.start();
+		
+		try {		
+	        final ReopenFileChannel reopener = new ReopenFileChannel(sourceFile, raf, "rw");
+			FileChannelUtility.readAllAsync(reopener, transfers);
+			fail("Unexpected Success");
+		} catch (final CancellationException ce) {
+			// Expected
+		} catch (final Exception e) {
+			fail("Unexpected exception");
+		}
+	}
     
+	/*
+	 * The idea is to write a large file and then read asynchronously across a large number of small buffers.
+	 * 
+	 */
+	public void no_testAsyncReadersCloseChannel() throws IOException, InterruptedException {
+		final Random r = new Random();
+
+		final File sourceFile = new File("/Volumes/NonSSD/bigdata/interrupted.jnl"); // External non-SSD drive
+		
+		final int rdlen = 1 * 4096;
+
+		final long faddr = sourceFile.length() - rdlen;
+
+		final RandomAccessFile raf = new RandomAccessFile(sourceFile, "rw");
+		
+		// Now let's read 50M randomly from the file
+		final byte[] buf = new byte[5*1024*1024];
+		long addr = 0;
+		long readAddr = 0;
+		final ArrayList<AsyncTransfer> transfers = new ArrayList<AsyncTransfer>();
+		while (addr < buf.length) { // cursor is within buffer
+			// final int rdlen = r.nextInt(4096);
+			
+			final ByteBuffer bb = ByteBuffer.wrap(buf, (int) addr, rdlen);
+			// Thread.sleep(2);
+			transfers.add(new AsyncTransfer(readAddr, bb));
+			readAddr = r.nextLong() % faddr;	
+			if (readAddr < 0) {
+				readAddr = -readAddr;
+			}
+			addr += rdlen;
+		}
+		
+		// Create a new Thread which will race backwards attempting to cancel the AsyncTransfer
+		// this will be a NOP until it hits one with a Future, ie one that has been scheduled.
+		
+        final ReopenFileChannel reopener = new ReopenFileChannel(sourceFile, raf, "rw");
+        
+        final AtomicInteger closes = new AtomicInteger(0);
+ 
+        final Thread closer = new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				while (true) {
+				    try {
+						reopener.getAsyncChannel().close();
+						System.out.println("File Close: " + closes.get());
+						closes.incrementAndGet();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					try {
+						Thread.sleep(50);
+					} catch (InterruptedException e) {
+						// expected
+						return;
+					}
+				}
+			}
+			
+		});
+        closer.start();
+		
+		try {		
+			FileChannelUtility.readAllAsync(reopener, transfers);
+			// expected success
+			closer.interrupt();
+			
+			if (closes.get() == 0) {
+				fail("No closes");
+			}
+			
+			log.info("File Closes: " + closes.get());
+			System.out.println("File Closes: " + closes.get());
+		} catch (final Exception e) {
+			e.printStackTrace();
+			fail("Unexpected exception");
+		}
+	}
+	/*
+	 * ReopenFileChannel similar to RWStore class
+	 */
+	private class ReopenFileChannel implements IReopenChannel<FileChannel>,
+			FileChannelUtility.IAsyncOpener {
+
+		final private File file;
+
+		private final String mode;
+
+		private volatile RandomAccessFile raf;
+
+		private final Path path;
+
+		private volatile AsynchronousFileChannel asyncChannel;
+
+		private int asyncChannelOpenCount = 0;;
+
+		public ReopenFileChannel(final File file, final RandomAccessFile raf,
+				final String mode) throws IOException {
+
+			this.file = file;
+
+			this.mode = mode;
+
+			this.raf = raf;
+
+			this.path = Paths.get(file.getAbsolutePath());
+
+			reopenChannel();
+
+		}
+
+		public AsynchronousFileChannel getAsyncChannel() {
+			if (asyncChannel != null) {
+				if (asyncChannel.isOpen())
+					return asyncChannel;
+			}
+
+			synchronized (this) {
+				if (asyncChannel != null) { // check again while synchronized
+					if (asyncChannel.isOpen())
+						return asyncChannel;
+				}
+
+				try {
+					asyncChannel = AsynchronousFileChannel.open(path,
+							StandardOpenOption.READ);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+
+				asyncChannelOpenCount++;
+
+				return asyncChannel;
+			}
+		}
+
+		public int getAsyncChannelOpenCount() {
+			return asyncChannelOpenCount;
+		}
+
+		public String toString() {
+
+			return file.toString();
+
+		}
+
+		public FileChannel reopenChannel() throws IOException {
+
+			/*
+			 * Note: This is basically a double-checked locking pattern. It is
+			 * used to avoid synchronizing when the backing channel is already
+			 * open.
+			 */
+			{
+				final RandomAccessFile tmp = raf;
+				if (tmp != null) {
+					final FileChannel channel = tmp.getChannel();
+					if (channel.isOpen()) {
+						// The channel is still open.
+						return channel;
+					}
+				}
+			}
+
+			synchronized (this) {
+
+				if (raf != null) {
+					final FileChannel channel = raf.getChannel();
+					if (channel.isOpen()) {
+						/*
+						 * The channel is still open. If you are allowing
+						 * concurrent reads on the channel, then this could
+						 * indicate that two readers each found the channel
+						 * closed and that one was able to re-open the channel
+						 * before the other such that the channel was open again
+						 * by the time the 2nd reader got here.
+						 */
+						return channel;
+					}
+				}
+
+				// open the file.
+				this.raf = new RandomAccessFile(file, mode);
+				return raf.getChannel();
+
+			}
+
+		}
+
+	}
 }

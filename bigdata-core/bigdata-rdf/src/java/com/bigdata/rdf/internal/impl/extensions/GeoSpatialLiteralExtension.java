@@ -30,13 +30,15 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Properties;
 import java.util.Set;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
@@ -69,8 +71,6 @@ import com.bigdata.service.geospatial.IGeoSpatialLiteralSerializer;
  * Interpreted as BigInteger, this is the value 24, which is stored as integer
  * literal in the database. The asValue method reverts this (lossless) encoding.
  * 
- * Note: this class is *not* thread-safe (reusable key builder).
- * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
@@ -84,8 +84,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    private final GeoSpatialDatatypeConfiguration datatypeConfig;
    
-   // re-usable key builder, initialized once in the beginning
-   final IKeyBuilder kb;
+   // Factory for thread local key builder
+   private final IKeyBuilderFactory kbfactory;
    
    /**
     * Constructor setting up an instance with a default schema description.
@@ -98,9 +98,12 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
        this.datatype = resolver.resolve(config.getUri());
        this.datatypeConfig = config; 
        this.litSerializer = config.getLiteralSerializer();
-       this.kb = KeyBuilder.newInstance();
+       this.kbfactory = new DefaultKeyBuilderFactory(new Properties());
    }
 
+   private IKeyBuilder getKeyBuilder() {
+       return kbfactory.getKeyBuilder();
+   }
    
    @Override
    public Set<BigdataURI> getDatatypes() {
@@ -307,6 +310,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public byte[] toZOrderByteArray(
          final long[] componentsAsLongArr, final GeoSpatialDatatypeConfiguration datatypeConfig) {
       
+      final IKeyBuilder kb = getKeyBuilder();
+       
       kb.reset();
       
       for (int i=0; i<componentsAsLongArr.length; i++) {
@@ -493,6 +498,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     */
    public long[] fromZOrderByteArray(final byte[] byteArr) {
       
+      final IKeyBuilder kb = getKeyBuilder();
+
       kb.reset();
       
       for (int i=0; i<byteArr.length; i++) {

@@ -96,7 +96,7 @@ public class AutoCloseHttpClient extends HttpClient implements AutoCloseable {
 	@Override
 	public void close() throws Exception {
 
-		if (isStopped())
+		if (isStopping() || isStopped())
 			return;
 
 		stop();

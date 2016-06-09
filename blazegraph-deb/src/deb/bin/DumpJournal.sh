@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Dumps the data in the specified Journal file. The journal MUST NOT
 # be in use by another process.
@@ -14,8 +14,9 @@
 # -tuples    : Dump the records in the indices.
 
 # Setup the source environment.
-source /etc/default/blazegraph
+[ -f /etc/default/blazegraph ] && . /etc/default/blazegraph
 
+[ -z "$BLZG_HOME" ] && BLZG_HOME=/usr/share/blazegraph
 LIB_DIR="$BLZG_HOME"/lib
 
 CLASSPATH=`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`:${CLASSPATH}

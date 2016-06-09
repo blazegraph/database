@@ -9,8 +9,8 @@ apt-get update #Update to the latest
 apt-get install python-software-properties
 add-apt-repository ppa:webupd8team/java
 apt-get update
-apt-get install oracle-java7-installer
-dpkg --install blazegraph-deb.deb #The path to the Debian package
+apt-get install oracle-java8-installer
+dpkg --install blazegraph.deb #The path to the Debian package
 apt-get install -f -y #force install of dependencies without prompting for updates
 ```
 
@@ -23,5 +23,4 @@ http://localhost:9999/
 Changing the configuration
 -----------------
 
-The blazegraph configuration is stored in `/usr/local/blazegraph/conf`.  The system configuration is in `/etc/default/blazegraph`.
-
+The blazegraph configuration is stored in `/etc/blazegraph`.  The system configuration is in `/etc/default/blazegraph`.

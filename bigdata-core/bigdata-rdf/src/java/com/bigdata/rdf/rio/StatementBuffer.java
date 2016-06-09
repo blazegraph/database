@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -164,7 +165,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * to values array while running {@link #incrementalWrite()} 
 	 * @see https://jira.blazegraph.com/browse/BLZG-1708 (DataLoader fails with ArrayIndexOutOfBoundsException)
      */
-    private int bnodesUnresolvedCount;
+    private int bnodesTotalCount;
 
     /**
      * The #of blank nodes, which were resolved and thus will not require adding
@@ -405,10 +406,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			}
 		});
 		
-		counters.addCounter("bnodesUnresolvedCount", new Instrument<Integer>() {
+		counters.addCounter("bnodesTotalCount", new Instrument<Integer>() {
 			@Override
 			public void sample() {
-				setValue(bnodesUnresolvedCount);
+				setValue(bnodesTotalCount);
 			}
 		});
 
@@ -1248,7 +1249,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
         bnodes = null;
         
-        bnodesUnresolvedCount = 0;
+        bnodesTotalCount = 0;
         
         bnodesResolvedCount = 0;
         
@@ -1290,13 +1291,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         this.bnodes = bnodes;
         
-        bnodesUnresolvedCount = 0;
+        bnodesTotalCount = 0;
         
         bnodesResolvedCount = 0;
         
         for (BigdataBNode bnode: bnodes.values()) {
         	if (bnode.getIV() == null) {
-        		bnodesUnresolvedCount++;
+        		bnodesTotalCount++;
         	}
         }
         
@@ -1355,34 +1356,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected void incrementalWrite() {
 
-    	/*
-    	 * Look for non-sid bnodes and add them to the values to be written
-    	 * to the database (if they haven't already been written).
-    	 */
-    	if (bnodes != null) {
-    		
-	    	for (BigdataBNode bnode : bnodes.values()) {
-	    		
-	    		// sid, skip
-	    		if (bnode.isStatementIdentifier())
-	    			continue;
-	    		
-	    		// already written, skip
-	    		if (bnode.getIV() != null)
-	    			continue;
-	    		
-	    		values[numValues++] = bnode;
-	    		
-	    		numBNodes++;
-	    		
-	    	}
-	    	
-    	}
-    	    
     	// Buffer a batch and then incrementally flush.
 		if (queue == null) {
 
-			final BatchResult batchResult = new Batch<S>(this, false/* clone */).writeNow();
+			final BatchResult batchResult = new Batch<S>(this, true/* avoidCloningIfPossible */).writeNow();
 			bnodesResolvedCount += batchResult.getNumBNodesResolved();
 			batchWriteCount++;
 
@@ -1436,7 +1413,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			try {
 
 				// Blocking put.
-				queue.put(new Batch<S>(this, true/* clone */));
+				queue.put(new Batch<S>(this, false/* avoidCloningIfPossible */));
 				batchAddCount++;
 				
 			} catch (InterruptedException e) {
@@ -1520,6 +1497,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 					maxValues += sb.numValues;
 					maxStmts += sb.numStmts;
 				}
+				
+				if(DEBUG) {
+					log.debug("maxValues=" + maxValues);
+				}
 
 				// we will de-dup the values below.
 				values = new BigdataValue[maxValues];
@@ -1585,6 +1566,12 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
 			if (term == null)
 				throw new IllegalArgumentException();
+			
+			if (term instanceof BigdataBNode && term.getIV() != null) {
+				// Skip already resolved blank nodes
+				// @see https://jira.blazegraph.com/browse/BLZG-1889 (ArrayIndexOutOfBound Exception)
+				return term;
+			}
 
 			// TODO BLZG-1532 (JAVA8) replace with putIfAbsent()
 			final BigdataValue existingTerm = distinctTermMap.get(term);
@@ -1603,6 +1590,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
 				throw new AssertionError();
 
+			}
+			
+			if(log.isDebugEnabled()) {
+				log.debug("numValues="+numValues + ": " + term);
 			}
 
 			values[numValues++] = term;
@@ -1734,14 +1725,17 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     	/**
 		 * 
 		 * @param sb
-		 * @param clone
-		 *            When true, the backing arrays are cloned in order to allow
-		 *            them to be cleared by the caller. When false, the caller
-		 *            MUST invoke {@link #writeNow()} synchronously. (This is used
-		 *            to make it easier to compare the two approaches without 
-		 *            introducing any new overhead).
+		 * @param avoidCloningIfPossible
+		 *            When false, the backing arrays are cloned in order to allow
+		 *            them to be cleared by the caller. When true, values backing array
+		 *            will be used as-is if it is possible (there is enough capacity
+		 *            for the blank nodes, which has to be written to DB);
+		 *            in this case the caller MUST invoke {@link #writeNow()}
+		 *            synchronously. (This is used to make it easier to compare
+		 *            the two approaches without introducing any new overhead).
+		 *            @see https://jira.blazegraph.com/browse/BLZG-1889 (ArrayIndexOutOfBound Exception)
 		 */
-    	Batch(final StatementBuffer<S> sb, final boolean clone) {
+    	Batch(final StatementBuffer<S> sb, final boolean avoidCloningIfPossible) {
 
 			if (sb == null)
 				throw new IllegalArgumentException();
@@ -1756,13 +1750,73 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			this.changeLog = sb.changeLog;
 			this.didWriteCallback = sb.didWriteCallback;
 
-			if (!clone) {
+	    	/*
+	    	 * Look for non-sid bnodes and add them to the values to be written
+	    	 * to the database (if they haven't already been written).
+	    	 */
+    		List<BigdataValue> bnodes = new ArrayList<>();
+    		
+	    	if (sb.bnodes != null) {
+
+		    	for (BigdataBNode bnode : sb.bnodes.values()) {
+		    		
+		    		// sid, skip
+		    		if (bnode.isStatementIdentifier())
+		    			continue;
+		    		
+		    		// already written, skip
+		    		if (bnode.getIV() != null)
+		    			continue;
+		    		
+		    		bnodes.add(bnode);
+		    		
+		    	}
+		    	
+	    	}
+	    	
+	    	boolean cloned = false;
+	    	    
+			if (avoidCloningIfPossible && bnodes.isEmpty()) {
+				
+				// Direct use of StatementBuffer values array is possible, as there are no blank nodes to be written
+				
+				this.values = sb.values;
+				this.numValues = sb.numValues;
+				
+			} else {
+				
+				if (avoidCloningIfPossible && (sb.numValues + bnodes.size() <= sb.values.length)) {
+
+					// Could use StatementBuffer values array, as its capacity is sufficient for blank nodes
+					
+					this.values = sb.values;
+
+			    } else {
+				
+					// Need to recreate values array to ensure capacity for blank nodes
+					this.values = new BigdataValue[sb.numValues + bnodes.size()];
+					
+					cloned = true;
+					
+				}
+				
+				System.arraycopy(sb.values/* src */, 0/* srcPos */, this.values/* dest */, 0/* destPos */,
+						sb.numValues/* length */);
+	
+				// append bnodes
+				for (int i = 0; i < bnodes.size(); i++) {
+					
+					this.values[sb.numValues + i] = bnodes.get(i);
+					
+				}
+				
+				this.numValues = sb.numValues + bnodes.size();
+			}
+
+			if (avoidCloningIfPossible) {
 
 				// Copy array references.
 				
-				this.numValues = sb.numValues;
-				this.values = sb.values;
-
 				this.numStmts = sb.numStmts;
 				this.stmts = sb.stmts;
 
@@ -1770,16 +1824,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
 				// Clone array data.
 				
-				this.numValues = sb.numValues;
-				this.values = new BigdataValue[sb.numValues];
-				System.arraycopy(sb.values/* src */, 0/* srcPos */, this.values/* dest */, 0/* destPos */,
-						sb.numValues/* length */);
-
 				this.numStmts = sb.numStmts;
 				this.stmts = new BigdataStatement[sb.numStmts];
 				System.arraycopy(sb.stmts/* src */, 0/* srcPos */, this.stmts/* dest */, 0/* destPos */,
 						sb.numStmts);
 				
+			}
+			
+			if (cloned) {
 				/*
 				 * The data was cloned, so reset the statement of the buffer in
 				 * the outer context (but not the bnodes nor deferred stmts).
@@ -2230,7 +2282,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         // This check takes into account dynamically calculated #of unresolved bnodes,
         // which will get added to values array while running incrementalWrite
         // @see https://jira.blazegraph.com/browse/BLZG-1708
-        if (numValues + bnodesUnresolvedCount - bnodesResolvedCount + arity > values.length)
+        if (numValues + bnodesTotalCount - bnodesResolvedCount + arity > values.length)
             return true;
 
         return false;
@@ -2302,7 +2354,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                      */
 	                bnodes = new LinkedHashMap<String, BigdataBNode>(bufferCapacity);
 	                
-	                bnodesUnresolvedCount = 0;
+	                bnodesTotalCount = 0;
 	                
 	                bnodesResolvedCount = 0;
 	
@@ -2335,7 +2387,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 	            // (DataLoader fails with ArrayIndexOutOfBoundsException)
 	            if (bnode.getIV() == null) {
 	            	
-	            	bnodesUnresolvedCount++;
+	            	bnodesTotalCount++;
 	            	
 	            }
 	            

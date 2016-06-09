@@ -1992,6 +1992,15 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     
     /**
      * Static helper used to determine materialization requirements.
+     */
+    public static INeedsMaterialization.Requirement gatherVarsToMaterialize(
+        final BOp c, final Set<IVariable<IV>> terms) {
+        
+        return gatherVarsToMaterialize(c, terms, false /* includeVarsInAnnotations */);
+    }
+    
+    /**
+     * Static helper used to determine materialization requirements.
      * 
      * TODO This should also reason about datatype constraints on variables. If
      * we know that a variable is constrained in a given scope to only take on a
@@ -2002,12 +2011,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
     @SuppressWarnings("rawtypes")
     public static INeedsMaterialization.Requirement gatherVarsToMaterialize(
-            final BOp c, final Set<IVariable<IV>> terms) {
+            final BOp c, final Set<IVariable<IV>> terms, final boolean includeVarsInAnnotations) {
     
         boolean materialize = false;
         boolean always = false;
         
-        final Iterator<BOp> it = BOpUtility.preOrderIterator(c);
+        final Iterator<BOp> it = 
+                includeVarsInAnnotations ? 
+                BOpUtility.preOrderIteratorWithAnnotations(c) : BOpUtility.preOrderIterator(c);
         
         while (it.hasNext()) {
             

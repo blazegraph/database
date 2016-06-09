@@ -724,18 +724,17 @@ abstract public class AbstractTransactionService extends AbstractService
              * exclusive operations.
              */
 
-            lock.lock();
-            
-            switch (getRunState()) {
-            case Running:
-                break;
-            default:
-                throw new IllegalStateException(ERR_SERVICE_NOT_AVAIL);
-            }
-
+            lock.lock();           
             try {
+            	
+                switch (getRunState()) {
+                case Running:
+                    break;
+                default:
+                    throw new IllegalStateException(ERR_SERVICE_NOT_AVAIL);
+                }
 
-                final TxState txState = assignTransactionIdentifier(timestamp);
+               final TxState txState = assignTransactionIdentifier(timestamp);
 
                 activateTx(txState);
 

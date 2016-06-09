@@ -1,11 +1,29 @@
-rm -f /etc/init.d/blazegraph
-rm -f /etc/logrotate.d/blazegraph
-rm -f /etc/blazegraph
+#!/bin/sh
+set -e
 
-rm -rf /usr/local/blazegraph/conf
-rm -rf /usr/local/blazegraph/bin
-rm -rf /usr/local/blazegraph/war
-rm -rf /usr/local/blazegraph/lib
+[ -f /etc/blazeraph/blazegraph ] && . /etc/blazegraph/blazegraph
+[ -z "$BLZG_LOG" ] && BLZG_LOG=/var/log/blazegraph
+[ -z "$BLZG_DATA" ] && BLZG_DATA=/var/lib/blazegraph
 
-#Leave the data dir
-rm -f /usr/local/blazegraph
+        #TODO Review RPM remove semantics
+        rm -f /etc/init.d/blazegraph
+        rm -f /etc/logrotate.d/blazegraph
+        rm -rf /etc/blazegraph
+        # Remove logs and pids
+        rm -rf $BLZG_LOG
+
+        # remove **only** empty data dir
+        rmdir -p --ignore-fail-on-non-empty $BLZG_DATA
+
+        [ -z "$BLZG_USER" ] && BLZG_USER="blzg"
+        [ -z "$BLZG_GROUP" ] && BLZG_GROUP="blzg"
+
+        # Remove user/group
+        userdel -r "$BLZG_USER" || true
+        groupdel "$BLZG_GROUP" || true
+
+
+
+        # Remove logs and data
+        #rm -rf $BLZG_LOG $BLZG_DATA
+

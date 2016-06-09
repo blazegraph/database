@@ -23,12 +23,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Arrays;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.GZIPInputStream;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -49,6 +51,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdate;
 
 /**
  * Handler for INSERT operations.
@@ -497,6 +500,8 @@ public class InsertServlet extends BigdataRDFServlet {
 
                         RDFFormat format = RDFFormat.forMIMEType(new MiniMime(
                                 contentType).getMimeType());
+                        
+                        final String fileName = url.getPath();
 
                         if (format == null) {
 
@@ -504,8 +509,8 @@ public class InsertServlet extends BigdataRDFServlet {
                              * Try to get the RDFFormat from the URL's file
                              * path.
                              */
-
-                            format = RDFFormat.forFileName(url.getFile());
+                        	//BLZG-1929
+                            format = AST2BOpUpdate.rdfFormatForFile (fileName);
 
                         }
 
@@ -552,8 +557,16 @@ public class InsertServlet extends BigdataRDFServlet {
                          * Run the parser, which will cause statements to be
                          * inserted.
                          */
+                        
+                        InputStream is = hconn.getInputStream();
+                        
+                       if(fileName.endsWith(".gz")) {
+                    	   
+                    	   is = new GZIPInputStream(hconn.getInputStream());
+                    	   
+                       } 
 
-                        rdfParser.parse(hconn.getInputStream(),
+                        rdfParser.parse(is,
                                 url.toExternalForm()/* baseURL */);
 
                     } finally {

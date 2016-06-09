@@ -161,11 +161,26 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-datatype-2",
 
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-cycles-04",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-04",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-06",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-02",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-03",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sum-02",
+        //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-04", // BLZG-618
+        
+        
+        /* This query currently works: */ 
+        //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-subquery-06",
+        
+        
+        //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-02", // BLZG-618
+        //"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-order-03", // BLZG-618
+        
+        /* This test actually produces correct result (see TestTCK.test_sparql11_sum_02()) 
+         * which is deemed incorrect because sparql11-sum-02.srx in 
+         * the Sesame Test Suite v2.7.12 is wrong: it specifies {totalPrice=0} 
+         * as the correct result (see TestTCK.test_sparql11_sum_02()). Note that 
+         * the latest release sesame-sparql-testsuite 4.1.1 still contains 
+         * the wrong result file.
+         * See https://openrdf.atlassian.net/browse/SES-884
+         */ 
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sum-02", 
+        
         
         /*
          * This test produces no result instead of an empty result.
@@ -191,7 +206,7 @@ Data:
 
 =========================================
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-empty-group2",
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-empty-group2", 
         
         /*
          * This test produces some extra results.
@@ -301,8 +316,11 @@ Data:
 :s :p :o, :o1, :o2.
 :t :p :o1, :o2.
 =========================================
+ 
+            This query currently works correctly.
+ 
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/exists/manifest#exists04",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/exists/manifest#exists04",
         
         /*
          * These two are the same problem.  We drop solutions that do not have
@@ -393,18 +411,25 @@ graph ?g {
 }
 }
 =========================================
+* 
+*         Currently (Apr 13, 2016) only subquery03 fails.
+* 
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery01",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery02",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery01",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery02",
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
 
         /*
 The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
+               
+               They are no longer in the black list because they work now, 
+               after the completion of https://jira.blazegraph.com/browse/BLZG-618
+ 
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg03",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg07",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg03",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg07",
     });
 
 	/**

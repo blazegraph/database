@@ -64,6 +64,282 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         super(name);
     }
 
+    
+    public void test_ticket_1202a() throws Exception {
+
+        new TestHelper("ticket-1202-group03",// testURI,
+                "ticket-1202-group03.rq",// queryFileURL
+                "ticket-1202-group03.ttl",// dataFileURL
+                "ticket-1202-group03.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202b() throws Exception {
+
+        new TestHelper("ticket-1202-group05",// testURI,
+                "ticket-1202-group05.rq",// queryFileURL
+                "ticket-1202-group05.ttl",// dataFileURL
+                "ticket-1202-group05.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202c() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified1",// testURI,
+                "ticket-1202-group03-modified1.rq",// queryFileURL
+                "ticket-1202-group03-modified1.ttl",// dataFileURL
+                "ticket-1202-group03-modified1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202d() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified1",// testURI,
+                "ticket-1202-group05-modified1.rq",// queryFileURL
+                "ticket-1202-group05-modified1.ttl",// dataFileURL
+                "ticket-1202-group05-modified1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    
+    public void test_ticket_1202e() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified2",// testURI,
+                "ticket-1202-group03-modified2.rq",// queryFileURL
+                "ticket-1202-group03-modified2.ttl",// dataFileURL
+                "ticket-1202-group03-modified2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202f() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified3",// testURI,
+                "ticket-1202-group03-modified3.rq",// queryFileURL
+                "ticket-1202-group03-modified3.ttl",// dataFileURL
+                "ticket-1202-group03-modified3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202g() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified2",// testURI,
+                "ticket-1202-group05-modified2.rq",// queryFileURL
+                "ticket-1202-group05-modified2.ttl",// dataFileURL
+                "ticket-1202-group05-modified2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202h() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified3",// testURI,
+                "ticket-1202-group05-modified3.rq",// queryFileURL
+                "ticket-1202-group05-modified3.ttl",// dataFileURL
+                "ticket-1202-group05-modified3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+     
+    public void test_ticket_1202i() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified4",// testURI,
+                "ticket-1202-group03-modified4.rq",// queryFileURL
+                "ticket-1202-group03-modified4.ttl",// dataFileURL
+                "ticket-1202-group03-modified4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202j() throws Exception {
+
+        new TestHelper("ticket-1202-group03-modified5",// testURI,
+                "ticket-1202-group03-modified5.rq",// queryFileURL
+                "ticket-1202-group03-modified5.ttl",// dataFileURL
+                "ticket-1202-group03-modified5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202k() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified4",// testURI,
+                "ticket-1202-group05-modified4.rq",// queryFileURL
+                "ticket-1202-group05-modified4.ttl",// dataFileURL
+                "ticket-1202-group05-modified4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202l() throws Exception {
+
+        new TestHelper("ticket-1202-group05-modified5",// testURI,
+                "ticket-1202-group05-modified5.rq",// queryFileURL
+                "ticket-1202-group05-modified5.ttl",// dataFileURL
+                "ticket-1202-group05-modified5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202m() throws Exception {
+
+        new TestHelper("ticket-1202-additional1",// testURI,
+                "ticket-1202-additional1.rq",// queryFileURL
+                "ticket-1202-additional1.ttl",// dataFileURL
+                "ticket-1202-additional1.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202n() throws Exception {
+
+        new TestHelper("ticket-1202-additional2",// testURI,
+                "ticket-1202-additional2.rq",// queryFileURL
+                "ticket-1202-additional2.ttl",// dataFileURL
+                "ticket-1202-additional2.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    public void test_ticket_1202o() throws Exception {
+
+        new TestHelper("ticket-1202-additional3",// testURI,
+                "ticket-1202-additional3.rq",// queryFileURL
+                "ticket-1202-additional3.ttl",// dataFileURL
+                "ticket-1202-additional3.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202p() throws Exception {
+
+        new TestHelper("ticket-1202-additional4",// testURI,
+                "ticket-1202-additional4.rq",// queryFileURL
+                "ticket-1202-additional4.ttl",// dataFileURL
+                "ticket-1202-additional4.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    public void test_ticket_1202q() throws Exception {
+
+        new TestHelper("ticket-1202-additional5",// testURI,
+                "ticket-1202-additional5.rq",// queryFileURL
+                "ticket-1202-additional5.ttl",// dataFileURL
+                "ticket-1202-additional5.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    public void test_ticket_1202r() throws Exception {
+
+        new TestHelper("ticket-1202-additional6",// testURI,
+                "ticket-1202-additional6.rq",// queryFileURL
+                "ticket-1202-additional6.ttl",// dataFileURL
+                "ticket-1202-additional6.srx"// resultFileURL
+                ).runTest();
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    public void test_ticket_618a() throws Exception {
+
+        new TestHelper("sparql11-order-02",// testURI,
+                "sparql11-order-02.rq",// queryFileURL
+                "sparql11-order-02.ttl",// dataFileURL
+                "sparql11-order-02.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618b() throws Exception {
+
+        new TestHelper("sparql11-order-03",// testURI,
+                "sparql11-order-03.rq",// queryFileURL
+                "sparql11-order-03.ttl",// dataFileURL
+                "sparql11-order-03.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618c() throws Exception {
+
+        new TestHelper("sparql11-subquery-04",// testURI,
+                "sparql11-subquery-04.rq",// queryFileURL
+                "sparql11-subquery-04.ttl",// dataFileURL
+                "sparql11-subquery-04.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618d() throws Exception {
+
+        new TestHelper("ticket-618d",// testURI,
+                "ticket-618d.rq",// queryFileURL
+                "ticket-618d.ttl",// dataFileURL
+                "ticket-618d.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    public void test_ticket_618e() throws Exception {
+
+        new TestHelper("ticket-618e",// testURI,
+                "ticket-618e.rq",// queryFileURL
+                "ticket-618e.ttl",// dataFileURL
+                "ticket-618e.srx",// resultFileURL
+                true /* checkOrder */).runTest();
+
+    }
+    
+    /* Currently disabled due to parsing problems. 
+    
+    //CONSTRUCT { ?x ex:p ?y }
+    //WHERE 
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+    public void test_ticket_618f() throws Exception {
+
+        new TestHelper("ticket-618f",// testURI,
+                "ticket-618f.rq",// queryFileURL
+                "ticket-618f.ttl",// dataFileURL
+                "ticket-618f.srx").runTest();
+
+    }
+    */
+    
+    /* Currently disabled due to parsing problems. 
+    
+    //ASK
+    //{
+    //  ?x ex:r ?y .
+    //  ?y ex:q ?z 
+    //}
+    //GROUP BY ?x ?y
+    //ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+
+    
+    public void test_ticket_618g() throws Exception {
+
+        new TestHelper("ticket-618g",// testURI,
+                "ticket-618g.rq",// queryFileURL
+                "ticket-618g.ttl",// dataFileURL
+                "ticket-618g.srx").runTest();
+
+    }
+    */
+    
+    
+    
+    
     /**
      * <pre>
      * SELECT * WHERE {{}}
@@ -2025,6 +2301,49 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
    }
    
    /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395a",   // testURI,
+           "ticket_bg1395a.rq",// queryFileURL
+           "ticket_bg1395a.ttl",// dataFileURL
+           "ticket_bg1395a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395b",   // testURI,
+           "ticket_bg1395b.rq",// queryFileURL
+           "ticket_bg1395bc.ttl",// dataFileURL
+           "ticket_bg1395bc.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1395: Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * -> https://jira.blazegraph.com/browse/BLZG-1395
+    */
+   public void test_ticket_1395c() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1395c",   // testURI,
+           "ticket_bg1395c.rq",// queryFileURL
+           "ticket_bg1395bc.ttl",// dataFileURL
+           "ticket_bg1395bc.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   
+   /**
     * BLZG-1817: reordering inside complex subqueries that will
     * be translated into NSIs.
     */
@@ -2062,6 +2381,99 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        
        assertTrue(idxOfB<idxOfA);
    }
-   
 
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1760a",   // testURI,
+           "ticket_bg1760a.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1760b",   // testURI,
+           "ticket_bg1760b.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   
+   /**
+    * BLZG-1760: HAVING incorrectly says "Non-aggregate variable in select expression"
+    */
+   public void test_ticket_1760c() throws Exception {
+
+
+       new TestHelper(
+           "ticket_bg1760c",   // testURI,
+           "ticket_bg1760c.rq",// queryFileURL
+           "ticket_bg1760.ttl",// dataFileURL
+           "ticket_bg1760c.srx"// resultFileURL
+           ).runTest();    
+   }
+
+   /**
+    * BLZG-1763: Wildcard projection was not rewritten
+    * -> original example without data, producing the empty result
+    */
+   public void test_ticket_1763a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1763a",   // testURI,
+           "ticket_bg1763a.rq",// queryFileURL
+           "empty.trig",// dataFileURL
+           "ticket_bg1763a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1763: Wildcard projection was not rewritten
+    * -> modified example with data
+    */
+   public void test_ticket_1763b() throws Exception {
+
+       new TestHelper(
+           "ticket_bg1763b",   // testURI,
+           "ticket_bg1763b.rq",// queryFileURL
+           "ticket_bg1763b.ttl",// dataFileURL
+           "ticket_bg1763b.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911a() throws Exception {
+
+       new TestHelper(
+           "ticket_bg911a",   // testURI,
+           "ticket_bg911a.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
+
+   /**
+    * BLZG-911: FROM NAMED clause doesn't work properly
+    */
+   public void test_ticket_911b() throws Exception {
+       
+       new TestHelper(
+           "ticket_bg911b",   // testURI,
+           "ticket_bg911b.rq",// queryFileURL
+           "ticket_bg911.trig",// dataFileURL
+           "ticket_bg911.srx"// resultFileURL
+           ).runTest();    
+   }
 }
