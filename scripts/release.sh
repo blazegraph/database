@@ -39,31 +39,31 @@ NEW_VERSION=$1
 
 echo "Setting pom version to $CURRENT_VERSION.  New version will be ${NEW_VERSION}."
 
-${BASE_DIR}/updateVersions.sh $CURRENT_VERSION
+#${BASE_DIR}/updateVersions.sh $CURRENT_VERSION
 
 RELEASE_BRANCH=BLAZEGRAPH_RELEASE_`echo ${CURRENT_VERSION} | sed -e 's/\./_/g'`
 
 echo "Creating new release branch:  $RELEASE_BRANCH"
 
-${GIT_CMD} checkout -b $RELEASE_BRANCH
+#${GIT_CMD} checkout -b $RELEASE_BRANCH
 
 echo "Commiting the POMs with updated versions."
 
-${GIT_CMD} commit -a -m "POM version updates for $RELEASE_BRANCH"
+#${GIT_CMD} commit -a -m "POM version updates for $RELEASE_BRANCH"
 
 echo "Creating Release Tag"
 
-${GIT_CMD} tag -a $RELEASE_BRANCH  -m "Blazegraph Release ${CURRENT_VERSION}"
+#${GIT_CMD} tag -a $RELEASE_BRANCH  -m "Blazegraph Release ${CURRENT_VERSION}"
 
 #Actually build and publish the release to maven central
 
 echo "Building core artifacts..."
 
-"${BASE_DIR}"/buildArtifacts.sh
+#"${BASE_DIR}"/buildArtifacts.sh
 
 echo "Deploying to Maven Central..."
 
-"${BASE_DIR}"/mavenCentral.sh
+#"${BASE_DIR}"/mavenCentral.sh
 
 echo "Publishing javadoc to https://blazegraph.github.io/database/apidocs/index.html..."
 

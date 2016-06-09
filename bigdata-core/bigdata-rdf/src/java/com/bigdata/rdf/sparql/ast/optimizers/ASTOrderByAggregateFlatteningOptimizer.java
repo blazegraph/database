@@ -18,7 +18,6 @@
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.List;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
