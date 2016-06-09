@@ -23,11 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
+import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.lexicon.TestTermIVComparator;
+import com.bigdata.rdf.store.TestLocalTripleStore;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -176,6 +178,16 @@ public class TestAll extends TestCase {
         //namespace.
         suite.addTestSuite(TestInlineLocalNameIntegerURIHandler.class);
         
+        //Test Handler for single namespace multiple inline URI Handlers
+        //BLZG-1938
+       
+        final ProxyTestSuite proxySuite = new ProxyTestSuite(new TestLocalTripleStore(),
+                "Local Triple Store With Provenance Test Suite"); 
+        
+        proxySuite.addTest(TestMultiInlineURIHandlersSingleNamespace.suite());
+        
+        suite.addTest( proxySuite);
+       
         return suite;
         
     }
