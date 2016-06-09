@@ -15,8 +15,8 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.vocab.TestMultiInlineURIFactory;
 import com.bigdata.rdf.vocab.TestMultiVocabulary;
+import com.bigdata.rdf.vocab.TestNamespaceMultiURIHandler;
 
 /**
  *
@@ -63,7 +63,7 @@ public class TestMultiInlineURIHandlersSingleNamespace extends
 
 		// Test with TestVocabulary InlineURIHandler
 		props.setProperty(Options.INLINE_URI_FACTORY_CLASS,
-				TestMultiInlineURIFactory.class.getName());
+				TestNamespaceMultiURIHandler.class.getName());
 
 		// test w/o axioms - they imply a predefined vocab.
 		props.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
@@ -73,6 +73,21 @@ public class TestMultiInlineURIHandlersSingleNamespace extends
 
 		return props;
 
+	}
+	
+	public void test_TwoNamespaceCreation() {
+		
+		final InlineNamespaceMultiURIHandler mHandler = new InlineNamespaceMultiURIHandler("http://blazegraph.com/data/");
+		boolean hasException = false;
+		
+		try {
+			InlineSignedIntegerURIHandler i = new InlineSignedIntegerURIHandler("http://www.bigdata.com/");
+			mHandler.addHandler(i);
+		} catch (RuntimeException e) {
+			hasException = true;
+		}
+		
+		assert(!hasException);
 	}
 
 	public void test_TestVocabularyInlineValues() {
@@ -98,15 +113,15 @@ public class TestMultiInlineURIHandlersSingleNamespace extends
 			// http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E_WashSale
 
 			final BigdataURI[] uris = new BigdataURI[] {
-					vf.createURI("http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E"),
 					vf.createURI("http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E_TaxCost"),
 					vf.createURI("http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E_UnrealizedGain"),
+					vf.createURI("http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E"),
 					vf.createURI("http://blazegraph.com/Data#Position_010072F0000038090100000000D56C9E_WashSale") };
 
 			final String[] localNames = new String[] {
-					"Position_010072F0000038090100000000D56C9E",
 					"Position_010072F0000038090100000000D56C9E_TaxCost",
 					"Position_010072F0000038090100000000D56C9E_UnrealizedGain",
+					"Position_010072F0000038090100000000D56C9E",
 					"Position_010072F0000038090100000000D56C9E_WashSale" };
 
 

@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -64,10 +62,8 @@ public class InlineURIFactory implements IInlineURIFactory {
 	 * This map should be populated in the constructor for this class and
 	 * the subclasses in order to guarantee that the changes are visible
 	 * once we leave the scope of the constructor.
-	 * <p>
-	 * The map is now a map of Lists to support multiple handlers per namespace.
 	 */
-	private final TreeMap<String, List<InlineURIHandler>> handlersByNamespace = new TreeMap<String, List<InlineURIHandler>>();
+	private final TreeMap<String, InlineURIHandler> handlersByNamespace = new TreeMap<String, InlineURIHandler>();
     
     /**
      * By default, handle IPv4 and UUID.
@@ -92,32 +88,20 @@ public class InlineURIFactory implements IInlineURIFactory {
     protected void addHandler(final InlineURIHandler handler) {
 
     	//        this.handlers.add(handler);
-       //getHandlersByNamespace().put(handler.getNamespace(), handler);
-    
-       final String namespace = handler.getNamespace();
-       List<InlineURIHandler> listHandler = handlersByNamespace.get(handler.getNamespace());
-       
-       if(listHandler == null) {
-    	   listHandler = new LinkedList<InlineURIHandler>();
-    	   handlersByNamespace.put(namespace, listHandler);
-
-       }
-       
-       listHandler.add(handler);
-       
+        getHandlersByNamespace().put(handler.getNamespace(), handler);
+        
     }
 
     @Override
-	public void init(final Vocabulary vocab) {
+    public void init(final Vocabulary vocab) {
 
-		for (List<InlineURIHandler> handlerList : getHandlersByNamespace()
-				.values()) {
-
-			for (InlineURIHandler handler : handlerList) {
-				handler.init(vocab);
-			}
-		}
-	}
+    	for (InlineURIHandler handler : getHandlersByNamespace().values()) {
+        
+    		handler.init(vocab);
+    		
+        }
+    	
+    }
 
     @Override
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -126,7 +110,7 @@ public class InlineURIFactory implements IInlineURIFactory {
 		final String str = uri.stringValue();
 
 		// Find handler with longest prefix match LTE the given URI.
-		final Map.Entry<String, List<InlineURIHandler>> floorEntry = getHandlersByNamespace().floorEntry(str);
+		final Map.Entry<String, InlineURIHandler> floorEntry = getHandlersByNamespace().floorEntry(str);
 
 		if (floorEntry == null) {
 
@@ -145,58 +129,52 @@ public class InlineURIFactory implements IInlineURIFactory {
 		 */
 		if (str.startsWith(prefix)) {
 
-			/*
-			 * Allow for multiple handlers at the same namespace.  Use the floor entry
-			 * to avoid searching all of the handlers for each request. 
-			 * 
-			 * {@link https://jira.blazegraph.com/browse/BLZG-1938}
-			 * 
-			 */
-			for (InlineURIHandler handler : floorEntry.getValue()) {
-				
-				final URIExtensionIV iv = handler.createInlineIV(uri);
-				
-				if (iv != null) {
+			final InlineURIHandler handler = floorEntry.getValue();
 
-					return iv;
+			final URIExtensionIV iv = handler.createInlineIV(uri);
 
-				}
+			if (iv != null) {
+
+				return iv;
+
 			}
 
 		}
 
 		return null;
+
+		/*
+		 * Note: This code checks each handler. This is presumably being done
+		 * because the ipv4 syntax can include "/" characters (for the optional
+		 * netmask) so the URI namespace (as defined by openrdf) is not matching
+		 * the prefix under which the handler is registered.
+		 */
+//        for (InlineURIHandler handler : handlersByNamespace.values()) {
+//            final URIExtensionIV iv = handler.createInlineIV(uri);
+//            if (iv != null) {
+//                return iv;
+//            }
+//        }
+//        return null;
     }
 
     @Override
     public String getLocalNameFromDelegate(final URI namespace,
             final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
 
-		final List<InlineURIHandler> handler = getHandlersByNamespace().get(namespace.stringValue());
+		final InlineURIHandler handler = getHandlersByNamespace().get(namespace.stringValue());
 		
 		if (handler == null) {
 			throw new IllegalArgumentException(
 					"Can't resolve uri handler for \"" + namespace + "\".  Maybe its be deregistered?");
 		}
 		
-		/*
-		 *  It appears that this code path may not be used.   The implementation
-		 *  of {@see https://jira.blazegraph.com/browse/BLZG-1938} makes the
-		 *  handler a {@TreeMap} of {@List<InlineURIHandler>}.   
-		 *  
-		 *  However, in the reverse direction there's no way to know which 
-		 *  handler may have applied.   
-		 *  
-		 *  The implementation of {link @https://jira.blazegraph.com/browse/BLZG-1938}
-		 *  provides support for the first registered handler in this case.  This
-		 *  may be revisited in the future.
-		 */
-		return handler.get(0).getLocalNameFromDelegate(delegate);
+		return handler.getLocalNameFromDelegate(delegate);
 		
 	}
 
-	public TreeMap<String, List<InlineURIHandler>> getHandlersByNamespace() {
+	private TreeMap<String, InlineURIHandler> getHandlersByNamespace() {
 		return handlersByNamespace;
 	}
-	
+
 }
