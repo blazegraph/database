@@ -60,13 +60,13 @@ public class BigdataGraphClient extends BigdataGraph {
 
     private static final Properties props = new Properties();
 
-    static {
-        /*
-         * We don't want the BigdataGraph to close our connection after every
-         * read.  The BigdataGraphClient represents a session with the server.
-         */
-        props.setProperty(BigdataGraph.Options.READ_FROM_WRITE_CONNECTION, "true");
-    }
+//    static {
+//        /*
+//         * We don't want the BigdataGraph to close our connection after every
+//         * read.  The BigdataGraphClient represents a session with the server.
+//         */
+//        props.setProperty(BigdataGraph.Options.READ_FROM_WRITE_CONNECTION, "true");
+//    }
     
 	final BigdataSailRemoteRepository repo;
 	
@@ -148,26 +148,13 @@ public class BigdataGraphClient extends BigdataGraph {
     * ISOLATABLE_INDICES).
     */
 	@Override
-	public BigdataSailRemoteRepositoryConnection getWriteConnection() throws Exception {
+	public BigdataSailRemoteRepositoryConnection cxn() throws Exception {
 	    if (cxn == null) {
 	        cxn = repo.getConnection();
 	    }
 	    return cxn;
 	}
 	
-    /**
-    * Get a {@link BigdataSailRemoteRepositoryConnection}. No difference in
-    * connection for remote clients.
-    * 
-    * TODO Review this now that we support read/write tx for
-    * BigdataSailRemoteRepositoryConnection (if namespace uses
-    * ISOLATABLE_INDICES).
-    */
-	@Override
-    public BigdataSailRemoteRepositoryConnection getReadConnection() throws Exception {
-        return getWriteConnection();
-    }
-    
 	/**
 	 * Shutdown the connection and repository (client-side, not server-side).
 	 */
@@ -300,5 +287,11 @@ public class BigdataGraphClient extends BigdataGraph {
 		// TODO Auto-generated method stub
 		return false;
 	}
+	
+   @Override
+    public boolean isReadOnly() {
+        return false;
+    }
+
 
 }

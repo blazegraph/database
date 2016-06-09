@@ -59,8 +59,8 @@ public class TestTicket1875 extends QuadsTestCase {
 				repo.initialize();
 				String update1 =
 						"insert data {  \r\n" + 
-						"  <x:s>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.ft.com/ontology/thing/Thing> .\r\n" + 
-						"  <<<x:s>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.ft.com/ontology/thing/Thing>  >> <http://www.ft.com/ontology/event/prov> <http://x>  \r\n" + 
+						"  <x:s>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.blazegraph.com/ontology/thing/Thing> .\r\n" + 
+						"  <<<x:s>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.blazegraph.com/ontology/thing/Thing>  >> <http://www.blazegraph.com/ontology/event/prov> <http://x>  \r\n" + 
 						"}";
 				executeUpdate(repo, update1);
 	

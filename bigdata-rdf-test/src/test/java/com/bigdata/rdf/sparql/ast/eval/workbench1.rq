@@ -1,0 +1,10 @@
+select ?col1 ?col2 ?incoming {
+  {
+    rdf:type ?col1 ?col2
+    bind (false as ?incoming) .
+  } union {
+    ?col1 ?col2 rdf:type
+    bind (true as ?incoming) .
+  }
+}
+group by ?col1 ?col2 ?incoming

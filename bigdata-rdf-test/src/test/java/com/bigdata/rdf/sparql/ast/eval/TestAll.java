@@ -213,6 +213,11 @@ public class TestAll extends TestCase {
         // @see #1059 (combination of fast-range-count and distinct-term-scan)
         suite.addTest(TestSimpleGroupByAndCountOptimizer.suite());
         
+        // Ticket: https://github.com/SYSTAP/bigdata-gpu/issues/368
+        // ClassCast Exception when Loading LUBM: com.bigdata.rdf.internal.impl.literal.XSDBooleanIV
+        // cannot be cast to com.bigdata.rdf.internal.impl.literal.NumericIV
+        suite.addTestSuite(TestTicketBigdataGPU368.class);
+        
         /*
          * Runtime Query Optimizer (RTO).
          */

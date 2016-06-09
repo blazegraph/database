@@ -140,6 +140,8 @@ public class InsertServlet extends BigdataRDFServlet {
         final String baseURI = req.getRequestURL().toString();
         
         final String contentType = req.getContentType();
+        
+        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
 
         if (contentType == null)
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -205,7 +207,7 @@ public class InsertServlet extends BigdataRDFServlet {
             
             submitApiTask(
                     new InsertWithBodyTask(req, resp, getNamespace(req),
-                            ITx.UNISOLATED, baseURI, defaultContext,
+                            ITx.UNISOLATED, suppressTruthMaintenance, baseURI, defaultContext,
                             rdfParserFactory)).get();
             
         } catch (Throwable t) {
@@ -229,6 +231,7 @@ public class InsertServlet extends BigdataRDFServlet {
     private static class InsertWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
+        private final boolean suppressTruthMaintenance;
         private final Resource[] defaultContext;
         private final RDFParserFactory rdfParserFactory;
 
@@ -251,10 +254,12 @@ public class InsertServlet extends BigdataRDFServlet {
         public InsertWithBodyTask(final HttpServletRequest req,
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
+                final boolean suppressTruthMaintenance,
                 final String baseURI, final Resource[] defaultContext,
                 final RDFParserFactory rdfParserFactory) {
             super(req, resp, namespace, timestamp);
             this.baseURI = baseURI;
+            this.suppressTruthMaintenance = suppressTruthMaintenance;
             this.defaultContext = defaultContext;
             this.rdfParserFactory = rdfParserFactory;
         }
@@ -271,11 +276,22 @@ public class InsertServlet extends BigdataRDFServlet {
 
             final AtomicLong nmodified = new AtomicLong(0L);
 
-            BigdataSailRepositoryConnection conn = null;
+            BigdataSailRepositoryConnection repoConn = null;
+            BigdataSailConnection conn = null;
             boolean success = false;
             try {
 
-                conn = getConnection();
+                repoConn = getConnection();
+            	
+            	conn = repoConn.getSailConnection();
+                
+                boolean truthMaintenance = conn.getTruthMaintenance();
+                
+                if (truthMaintenance && suppressTruthMaintenance) {
+                	
+                	conn.setTruthMaintenance(false);
+                	
+                }
 
                 /**
                  * There is a request body, so let's try and parse it.
@@ -299,13 +315,18 @@ public class InsertServlet extends BigdataRDFServlet {
                 rdfParser
                         .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-                rdfParser.setRDFHandler(new AddStatementHandler(conn
-                        .getSailConnection(), nmodified, defaultContext));
+                rdfParser.setRDFHandler(new AddStatementHandler(conn, nmodified, defaultContext));
 
                 /*
                  * Run the parser, which will cause statements to be inserted.
                  */
                 rdfParser.parse(req.getInputStream(), baseURI);
+                
+                if (truthMaintenance && suppressTruthMaintenance) {
+                	
+                	conn.setTruthMaintenance(true);
+                	
+                }
 
                 // Commit the mutation.
                 conn.commit();
@@ -326,6 +347,12 @@ public class InsertServlet extends BigdataRDFServlet {
                         conn.rollback();
 
                     conn.close();
+
+                }
+                
+                if (repoConn != null) {
+
+                	repoConn.close();
 
                 }
 
@@ -350,6 +377,8 @@ public class InsertServlet extends BigdataRDFServlet {
 			final HttpServletResponse resp) throws IOException {
 	    
 		final String namespace = getNamespace(req);
+		
+		final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
 
 		final String[] uris = req.getParameterValues(BigdataRDFContext.URI);
 
@@ -399,7 +428,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
             submitApiTask(
                     new InsertWithURLsTask(req, resp, namespace,
-                            ITx.UNISOLATED, defaultContext, urls)).get();
+                            suppressTruthMaintenance, ITx.UNISOLATED, defaultContext, urls)).get();
 
         } catch (Throwable t) {
 
@@ -418,6 +447,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
         private final Vector<URL> urls;
         private final Resource[] defaultContext;
+        private final boolean suppressTruthMaintenance;
 
         /**
          * 
@@ -436,11 +466,13 @@ public class InsertServlet extends BigdataRDFServlet {
          */
         public InsertWithURLsTask(final HttpServletRequest req,
                 final HttpServletResponse resp, final String namespace,
+                final boolean suppressTruthMaintenance,
                 final long timestamp, final Resource[] defaultContext,
                 final Vector<URL> urls) {
             super(req, resp, namespace, timestamp);
             this.urls = urls;
             this.defaultContext = defaultContext;
+            this.suppressTruthMaintenance = suppressTruthMaintenance;
         }
         
         @Override
@@ -453,11 +485,22 @@ public class InsertServlet extends BigdataRDFServlet {
 
             final long begin = System.currentTimeMillis();
             
-            BigdataSailRepositoryConnection conn = null;
+            BigdataSailRepositoryConnection repoConn = null;
+            BigdataSailConnection conn = null;
             boolean success = false;
             try {
 
-                conn = getConnection();
+                repoConn = getConnection();
+                
+                conn = repoConn.getSailConnection();
+                
+                boolean truthMaintenance = conn.getTruthMaintenance();
+                
+                if (truthMaintenance && suppressTruthMaintenance) {
+                	
+                	conn.setTruthMaintenance(false);
+                	
+                }
 
                 final AtomicLong nmodified = new AtomicLong(0L);
 
@@ -549,9 +592,8 @@ public class InsertServlet extends BigdataRDFServlet {
                                 .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
                         rdfParser
-                                .setRDFHandler(new AddStatementHandler(conn
-                                        .getSailConnection(), nmodified,
-                                        defactoContext));
+                                .setRDFHandler(new AddStatementHandler(conn,
+                                		nmodified, defactoContext));
 
                         /*
                          * Run the parser, which will cause statements to be
@@ -589,6 +631,13 @@ public class InsertServlet extends BigdataRDFServlet {
                 } // next URI.
 
                 // Commit the mutation.
+                
+                if (truthMaintenance && suppressTruthMaintenance) {
+                	
+                	conn.setTruthMaintenance(true);
+                	
+                }
+                
                 conn.commit();
                 
                 success = true;
@@ -607,6 +656,12 @@ public class InsertServlet extends BigdataRDFServlet {
                         conn.rollback();
 
                     conn.close();
+
+                }
+                
+                if (repoConn != null) {
+
+                	repoConn.close();
 
                 }
 
