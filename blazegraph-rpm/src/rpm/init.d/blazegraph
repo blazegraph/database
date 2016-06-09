@@ -182,7 +182,8 @@ blazegraph_sh() {
 running_pid() {
 
 	if [ ! -f "${BLZG_PID}" ] ; then
-		echo 0;
+		echo 0
+		return
 	fi
 
 	PID=`cat ${BLZG_PID}`
