@@ -1,0 +1,129 @@
+#!/bin/bash
+set -e
+
+[ -z "${JAVA_HOME}" ] && JAVA_HOME=/usr
+[ -z "${BLZG_HOME}" ] && BLZG_HOME=/usr/share/blazegraph
+[ -z "${BLZG_LOG}" ] && BLZG_LOG=/var/log/blazegraph/blazgraph.log
+[ -z "${BLZG_DATA}" ] && BLZG_DATA=/var/lib/blazegraph
+[ -z "${BLZG_CONF}" ] && BLZG_CONF=/etc/blazegraph
+[ -z "${LOGGING_CONFIG}" ] && LOGGING_CONFIG=${BLZG_CONF}/logging.properties
+[ -z "${LOG4J_CONFIG}" ] && LOG4J_CONFIG=${BLZG_CONF}/log4j.properties
+[ -z "${NSS}" ] && NSS="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
+[ -z "${NSS_NAMESPACE}" ] && NSS_NAMESPACE="kb"
+[ -z "${NSS_PROPERTIES}" ] && NSS_PROPERTIES="${BLZG_CONF}"/RWStore.properties
+
+export INSTALL_DIR=${BLZG_HOME}
+if [ "${INSTALL_TYPE}" == "BREW" ]; then
+   export LIB_DIR=${INSTALL_DIR}/libexec
+else
+   export LIB_DIR=${INSTALL_DIR}/lib
+fi
+
+JETTY_CLASSPATH=`find ${LIB_DIR} -name 'blazegraph-*.jar' -print0 | tr '\0' ':'`:`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
+
+[ -d "${BLZG_DATA}" ] || mkdir -p "${BLZG_DATA}"
+
+[ -z "${JETTY_PORT}" ] && JETTY_PORT="9999"
+[ -z "${JETTY_XML}" ] && JETTY_XML="${BLZG_CONF}/jetty.xml"
+[ -z "${JETTY_RESOURCE_BASE}" ] && JETTY_RESOURCE_BASE="${BLZG_HOME}/war"
+
+JETTY_OPTS="\
+ -Djetty.port=${JETTY_PORT}\
+ -Djetty.resourceBase=${JETTY_RESOURCE_BASE}\
+ -Djetty.home=${JETTY_RESOURCE_BASE}\
+ -Djetty.overrideWebXml=${JETTY_RESOURCE_BASE}/WEB-INF/override-web.xml\
+ -DJETTY_XML=${JETTY_XML}\
+ -Djava.util.logging.config.file=${LOGGING_CONFIG}\
+ -Dlog4j.configuration=${LOG4J_CONFIG}\
+"
+
+JAVA_OPTS="\
+ ${JVM_OPTS}\
+ ${JETTY_OPTS}\
+"
+
+cmd="${JAVA_HOME}/bin/java ${JAVA_OPTS} \
+    -cp ${JETTY_CLASSPATH} \
+    $NSS \
+    -jettyXml ${JETTY_XML} \
+    $JETTY_PORT \
+    $NSS_NAMESPACE \
+    $NSS_PROPERTIES\
+"
+
+case "$1" in
+  start)
+
+      # Note: This redirects console logger output to dev/null!
+      # This is only valid if all logger output is explicitly
+      # directed into a file, which it is not when using the
+      # default log4j and java.util.logging configuration. I am
+      # leaving the brew installer behavior as its historical
+      # value to avoid breaking it, but it is very likely to be
+      # incorrect.
+      if [ "${INSTALL_TYPE}" == "BREW" ]; then
+         $cmd >> $BLZG_LOG 2>&1 &
+      else
+         $cmd >> $BLZG_LOG 2>&1 &
+      fi
+      pid=$!
+      retval=$?
+      # echo "PID=$pid"
+      if [ -n "$BLZG_PID" ]; then
+          echo "$pid" > $BLZG_PID
+      fi
+      exit $retval
+      ;;
+    stop)
+#
+# Stop the ServiceStarter and all child services.
+#
+        if [ -f "$BLZG_PID" ]; then
+            read pid < "$BLZG_PID"
+            pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+            if [ -z "$pidno" ]; then
+# The process has died so remove the old pid file.
+                echo $"`date` : `hostname` : $pid died?"
+                rm -f "$BLZG_PID"
+		exit 0
+            else
+                echo -ne $"`date` : `hostname` : bringing blazegraph service down ... "
+                kill $pid
+                rm -f "$BLZG_PID"
+		exit 0
+            fi
+        fi
+        ;;
+    status)
+#
+# Report status for the ServicesManager (up or down).
+#
+        if [ -f "$BLZG_PID" ]; then
+            read pid < "$BLZG_PID"
+            pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+            if [ -z "$pidno" ]; then
+                echo $"`date` : `hostname` : process died? pid=$pid."
+                exit 1
+            else
+                echo $"`date` : `hostname` : running as $pid."
+                exit 0
+            fi
+        else
+            echo $"`date` : `hostname` : not running."
+            exit 3
+        fi
+        ;;
+#
+# Simply stop then start.
+#
+    restart)
+        $0 stop
+        $0 start
+        ;;
+    *)
+ me=`basename $0`
+        echo $"Usage: $0 {start|stop|status|restart}"
+        exit 1
+esac
+
+exit 0
