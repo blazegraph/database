@@ -30,11 +30,11 @@ DESC="Blazegraph High Performance Database"
 DEFAULT=/etc/default/$NAME
 JVM_TMP=/tmp/blazegraph-$NAME-tmp
 
-if [ `id -u` -ne 0 ]; then
+if [ `id -u` -ne 0 -a "$1" != "status" ]; then
 	echo "You need root privileges to run this script"
 	exit 1
 fi
- 
+
 # Make sure blazegraph is started with system locale
 if [ -r /etc/default/locale ]; then
 	. /etc/default/locale
@@ -43,14 +43,12 @@ fi
 
 . /lib/lsb/init-functions
 
-if [ -r /etc/default/rcS ]; then
-	. /etc/default/rcS
-fi
+[ -r /etc/default/rcS ] && . /etc/default/rcS
 
 
 # The following variables can be overwritten in $DEFAULT
 
-# this is a work-around until there is a suitable runtime replacement 
+# this is a work-around until there is a suitable runtime replacement
 # for dpkg-architecture for arch:all packages
 # this function sets the variable OPENJDKS
 find_openjdks()
@@ -75,25 +73,19 @@ OPENJDKS=""
 find_openjdks
 # The first existing directory is used for JAVA_HOME (if JAVA_HOME is not
 # defined in $DEFAULT)
-JDK_DIRS="/usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-7-oracle"
+JDK_DIRS="/usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-7-oracle /usr/lib/jvm/java-8-oracle"
 
 # Look for the right JVM to use
 for jdir in $JDK_DIRS; do
-    if [ -r "$jdir/bin/java" -a -z "${JAVA_HOME}" ]; then
-	JAVA_HOME="$jdir"
-    fi
+    [ -r "$jdir/bin/java" -a -z "${JAVA_HOME}" ] && JAVA_HOME="$jdir"
 done
 export JAVA_HOME
 
 # Directory where the Tomcat 6 binary distribution resides
-if [ -z "$BLZG_HOME" ] ; then
-	BLZG_HOME=/usr/local/$NAME
-fi
+[ -z "$BLZG_HOME" ] && BLZG_HOME=/usr/share/$NAME
 
 # Directory for per-instance configuration files and webapps
-if [ -z "${BLZG_BASE}" ] ; then
-	BLZG_BASE=$BLZG_HOME
-fi
+[ -z "$BLZG_BASE" ] && BLZG_BASE=$BLZG_HOME
 
 # Use the Java security manager? (yes/no)
 BLZG_SECURITY=no
@@ -103,79 +95,69 @@ BLZG_SECURITY=no
 # Xalan XSL transformer can work without X11 display on JDK 1.4+
 # It also looks like the default heap size of 64M is not enough for most cases
 # so the maximum heap size is set to 128M
-if [ -z "$JAVA_OPTS" ]; then
-	JAVA_OPTS="-Djava.awt.headless=true -Xmx128M"
-fi
+[ -z "$JAVA_OPTS" ] && JAVA_OPTS="-Djava.awt.headless=true -Xmx128M"
 
 # End of variables that can be overwritten in $DEFAULT
 
 # overwrite settings from default file
-if [ -f "$DEFAULT" ]; then
-	. "$DEFAULT"
-fi
+[ -f "$DEFAULT" ] && . "$DEFAULT"
 
-if [ ! -f "$BLZG_HOME/bin/blazegraph.sh" ]; then
+[ -z "$BLZG_SH" ] && BLZG_SH="/usr/bin/blazegraph"
+if [ ! -f "$BLZG_SH" ]; then
 	log_failure_msg "$NAME is not installed"
 	exit 1
 fi
 
 #POLICY_CACHE="$BLZG_BASE/work/catalina.policy"
 
-if [ -z "$BLZG_TMPDIR" ]; then
-	BLZG_TMPDIR="$JVM_TMP"
-fi
+[ -z "$BLZG_TMPDIR" ] && BLZG_TMPDIR="$JVM_TMP"
 
 # Set the JSP compiler if set in the blazegraph.default file
-if [ -n "$JSP_COMPILER" ]; then
-	JAVA_OPTS="$JAVA_OPTS -Dbuild.compiler=\"$JSP_COMPILER\""
-fi
+[ -n "$JSP_COMPILER" ] && JAVA_OPTS="$JAVA_OPTS -Dbuild.compiler=\"$JSP_COMPILER\""
 
 SECURITY=""
-if [ "$BLZG_SECURITY" = "yes" ]; then
-	SECURITY="-security"
-fi
+[ "$BLZG_SECURITY" = "yes" ] && SECURITY="-security"
 
 # Define other required variables
 BLZG_PID="/var/run/$NAME.pid"
-BLZG_SH="$BLZG_HOME/bin/blazegraph.sh"
 
 # Look for Java Secure Sockets Extension (JSSE) JARs
-if [ -z "${JSSE_HOME}" -a -r "${JAVA_HOME}/jre/lib/jsse.jar" ]; then
-    JSSE_HOME="${JAVA_HOME}/jre/"
-fi
+[ -z "${JSSE_HOME}" -a -r "${JAVA_HOME}/jre/lib/jsse.jar" ] && JSSE_HOME="${JAVA_HOME}/jre/"
 
 blazegraph_sh() {
 	# Escape any double quotes in the value of JAVA_OPTS
 	JAVA_OPTS="$(echo $JAVA_OPTS | sed 's/\"/\\\"/g')"
 
+	# Define the command to run Tomcat's blazegraph.sh as a daemon
+	# set -a tells sh to export assigned variables to spawned shells.
+	# TODO: BLZG_TMPDIR is unused in downstream script
+	# TODO: JAVA_OPTS is overwritten in downstream script
+	# TODO: LOGGING_CONFIG is used in downstream script, but never defined even in $DEFAULT
+	#       nor is there a logging.properties file packaged.
+	BLZGCMD_SH="set -a;
+		JAVA_HOME=\"$JAVA_HOME\"; \
+		source \"$DEFAULT\"; \
+		BLZG_HOME=\"$BLZG_HOME\"; \
+		JAVA_OPTS=\"$JAVA_OPTS\"; \
+		BLZG_PID=\"$BLZG_PID\"; \
+		BLZG_LOG=\"$BLZG_LOG\"/blazegraph.log; \
+		BLZG_TMPDIR=\"$BLZG_TMPDIR\"; \
+		LANG=\"$LANG\"; \
+		JSSE_HOME=\"$JSSE_HOME\"; \
+		\"$BLZG_SH\" $@"
+
 	AUTHBIND_COMMAND=""
 	if [ "$AUTHBIND" = "yes" -a "$1" = "start" ]; then
 		AUTHBIND_COMMAND="/usr/bin/authbind --deep /bin/bash -c "
-	fi
-
-	# Define the command to run Tomcat's blazegraph.sh as a daemon
-	# set -a tells sh to export assigned variables to spawned shells.
-	BLZGCMD_SH="set -a; JAVA_HOME=\"$JAVA_HOME\"; source \"$DEFAULT\"; \
-		BLZG_HOME=\"$BLZG_HOME\"; \
-		BLZG_BASE=\"$BLZG_BASE\"; \
-		JAVA_OPTS=\"$JAVA_OPTS\"; \
-		BLZG_PID=\"$BLZG_PID\"; \
-		BLZG_LOG=\"$BLZG_LOG\"/blazegraph.out; \
-		BLZG_TMPDIR=\"$BLZG_TMPDIR\"; \
-		LANG=\"$LANG\"; JSSE_HOME=\"$JSSE_HOME\"; \
-		cd \"$BLZG_BASE\"; \
-		\"$BLZG_SH\" $@"
-
-	if [ "$AUTHBIND" = "yes" -a "$1" = "start" ]; then
 		BLZGCMD_SH="'$BLZGCMD_SH'"
 	fi
 
 	# Run the blazegraph.sh script as a daemon
 	set +e
-	touch "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
-	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
+	touch "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
+	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
 	start-stop-daemon --start -b -u "$BLZG_USER" -g "$BLZG_GROUP" \
-		-c "$BLZG_USER" -d "$BLZG_TMPDIR" -p "$BLZG_PID" \
+		-c "$BLZG_USER" -d "$BLZG_BASE" -p "$BLZG_PID" \
 		-x /bin/bash -- -c "$AUTHBIND_COMMAND $BLZGCMD_SH"
 	status="$?"
 	set +a -e
@@ -189,8 +171,8 @@ case "$1" in
 		exit 1
 	fi
 
-	if [ ! -d "$BLZG_BASE/conf" ]; then
-		log_failure_msg "invalid BLZG_BASE: $BLZG_BASE"
+	if [ ! -d "$BLZG_CONF" ]; then
+		log_failure_msg "invalid BLZG_CONF: $BLZG_CONF"
 		exit 1
 	fi
 
@@ -200,12 +182,12 @@ case "$1" in
 		>/dev/null; then
 
 		# Regenerate POLICY_CACHE file
-	#	umask 022
-	#	echo "// AUTO-GENERATED FILE from /etc/blazegraph/policy.d/" \
-	#		> "$POLICY_CACHE"
-	#	echo ""  >> "$POLICY_CACHE"
-	#	cat $BLZG_BASE/conf/policy.d/*.policy \
-	#		>> "$POLICY_CACHE"
+		#	umask 022
+		#	echo "// AUTO-GENERATED FILE from /etc/blazegraph/policy.d/" \
+		#		> "$POLICY_CACHE"
+		#	echo ""  >> "$POLICY_CACHE"
+		#	cat $BLZG_CONF/policy.d/*.policy \
+		#		>> "$POLICY_CACHE"
 
 		# Remove / recreate JVM_TMP directory
 		rm -rf "$JVM_TMP"
@@ -217,7 +199,7 @@ case "$1" in
 
 		blazegraph_sh start $SECURITY
 		sleep 5
-        	if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
+		if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
 			--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
 			>/dev/null; then
 			if [ -f "$BLZG_PID" ]; then
@@ -228,7 +210,7 @@ case "$1" in
 			log_end_msg 0
 		fi
 	else
-	        log_progress_msg "(already running)"
+        log_progress_msg "(already running)"
 		log_end_msg 0
 	fi
 	;;
@@ -236,7 +218,7 @@ case "$1" in
 	log_daemon_msg "Stopping $DESC" "$NAME"
 
 	set +e
-	if [ -f "$BLZG_PID" ]; then 
+	if [ -f "$BLZG_PID" ]; then
 		start-stop-daemon --stop --pidfile "$BLZG_PID" \
 			--user "$BLZG_USER" \
 			--retry=TERM/20/KILL/5 >/dev/null
@@ -255,25 +237,9 @@ case "$1" in
 	log_end_msg 0
 	set -e
 	;;
-   status)
-	set +e
-	start-stop-daemon --test --start --pidfile "$BLZG_PID" \
-		--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
-		>/dev/null 2>&1
-	if [ "$?" = "0" ]; then
-
-		if [ -f "$BLZG_PID" ]; then
-		    log_success_msg "$DESC is not running, but pid file exists."
-			exit 1
-		else
-		    log_success_msg "$DESC is not running."
-			exit 3
-		fi
-	else
-		log_success_msg "$DESC is running with pid `cat $BLZG_PID`"
-	fi
-	set -e
-        ;;
+  status)
+	status_of_proc -p $BLZG_PID "$JAVA_HOME/bin/java" "$NAME" && exit 0 || exit $?
+    ;;
   restart|force-reload)
 	if [ -f "$BLZG_PID" ]; then
 		$0 stop
@@ -283,11 +249,11 @@ case "$1" in
 	;;
   try-restart)
         if start-stop-daemon --test --start --pidfile "$BLZG_PID" \
-		--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
-		>/dev/null; then
+			--user $BLZG_USER --exec "$JAVA_HOME/bin/java" \
+			>/dev/null; then
 		$0 start
 	fi
-        ;;
+    ;;
   *)
 	log_success_msg "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
 	exit 1

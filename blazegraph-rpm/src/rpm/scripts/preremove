@@ -1,2 +1,10 @@
-service blazegraph stop
-chkconfig blazegraph off
+#!/bin/sh
+set -e
+
+[ -f /etc/blazegraph/blazegraph ] && . /etc/blazegraph/blazegraph
+
+stopBlazegraph() {
+    service blazegraph stop || true
+}
+
+        stopBlazegraph

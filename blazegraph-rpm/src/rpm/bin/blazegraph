@@ -1,11 +1,16 @@
 #!/bin/bash
 set -e
 
-if [ -z "${BLZG_HOME}" ]; then
-   # set BLZG_HOME to the top-level of the installation.
-   pushd `dirname $0` > /dev/null;cd ..;BLZG_HOME=`pwd`;popd > /dev/null
-   echo "BLZG_HOME Not specified: using ${BLZG_HOME}";
-fi
+[ -z "${JAVA_HOME}" ] && JAVA_HOME=/usr
+[ -z "${BLZG_HOME}" ] && BLZG_HOME=/usr/share/blazegraph
+[ -z "${BLZG_LOG}" ] && BLZG_LOG=/var/log/blazegraph/blazgraph.log
+[ -z "${BLZG_DATA}" ] && BLZG_DATA=/var/lib/blazegraph
+[ -z "${BLZG_CONF}" ] && BLZG_CONF=/etc/blazegraph
+[ -z "${LOGGING_CONFIG}" ] && LOGGING_CONFIG=${BLZG_CONF}/logging.properties
+[ -z "${LOG4J_CONFIG}" ] && LOG4J_CONFIG=${BLZG_CONF}/log4j.properties
+[ -z "${NSS}" ] && NSS="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
+[ -z "${NSS_NAMESPACE}" ] && NSS_NAMESPACE="kb"
+[ -z "${NSS_PROPERTIES}" ] && NSS_PROPERTIES="${BLZG_CONF}"/RWStore.properties
 
 export INSTALL_DIR=${BLZG_HOME}
 if [ "${INSTALL_TYPE}" == "BREW" ]; then
@@ -14,26 +19,15 @@ else
    export LIB_DIR=${INSTALL_DIR}/lib
 fi
 
-export JETTY_CLASSPATH=`find ${LIB_DIR} -name 'blazegraph-*.jar' -print0 | tr '\0' ':'`:`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
+JETTY_CLASSPATH=`find ${LIB_DIR} -name 'blazegraph-*.jar' -print0 | tr '\0' ':'`:`find ${LIB_DIR} -name '*.jar' -print0 | tr '\0' ':'`
 
-export DATA_DIR=${BLZG_HOME}/data
+[ -d "${BLZG_DATA}" ] || mkdir -p "${BLZG_DATA}"
 
-if [ ! -d "${DATA_DIR}" ]; then
-   mkdir -p "${DATA_DIR}"
-fi
+[ -z "${JETTY_PORT}" ] && JETTY_PORT="9999"
+[ -z "${JETTY_XML}" ] && JETTY_XML="${BLZG_CONF}/jetty.xml"
+[ -z "${JETTY_RESOURCE_BASE}" ] && JETTY_RESOURCE_BASE="${BLZG_HOME}/war"
 
-if [ -z "${JETTY_PORT}" ]; then
-   export JETTY_PORT="9999"
-fi
-if [ -z "${JETTY_XML}" ]; then
-   export JETTY_XML="${BLZG_CONF}/jetty.xml"
-fi
-if [ -z "${JETTY_RESOURCE_BASE}" ]; then
-   export JETTY_RESOURCE_BASE="${BLZG_HOME}/war"
-fi
-
-
-export JETTY_OPTS="\
+JETTY_OPTS="\
  -Djetty.port=${JETTY_PORT}\
  -Djetty.resourceBase=${JETTY_RESOURCE_BASE}\
  -Djetty.home=${JETTY_RESOURCE_BASE}\
@@ -43,7 +37,7 @@ export JETTY_OPTS="\
  -Dlog4j.configuration=${LOG4J_CONFIG}\
 "
 
-export JAVA_OPTS="\
+JAVA_OPTS="\
  ${JVM_OPTS}\
  ${JETTY_OPTS}\
 "
@@ -60,7 +54,6 @@ cmd="${JAVA_HOME}/bin/java ${JAVA_OPTS} \
 case "$1" in
   start)
 
-      echo "Running: $cmd"
       # Note: This redirects console logger output to dev/null!
       # This is only valid if all logger output is explicitly
       # directed into a file, which it is not when using the
@@ -74,9 +67,11 @@ case "$1" in
          $cmd >> $BLZG_LOG 2>&1 &
       fi
       pid=$!
-      retval=$$
+      retval=$?
       # echo "PID=$pid"
-      echo "$pid">$BLZG_PID
+      if [ -n "$BLZG_PID" ]; then
+          echo "$pid" > $BLZG_PID
+      fi
       exit $retval
       ;;
     stop)
@@ -90,11 +85,12 @@ case "$1" in
 # The process has died so remove the old pid file.
                 echo $"`date` : `hostname` : $pid died?"
                 rm -f "$BLZG_PID"
+		exit 0
             else
                 echo -ne $"`date` : `hostname` : bringing blazegraph service down ... "
                 kill $pid
                 rm -f "$BLZG_PID"
-                echo "done!"
+		exit 0
             fi
         fi
         ;;
@@ -107,11 +103,14 @@ case "$1" in
             pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
             if [ -z "$pidno" ]; then
                 echo $"`date` : `hostname` : process died? pid=$pid."
+                exit 1
             else
                 echo $"`date` : `hostname` : running as $pid."
+                exit 0
             fi
         else
             echo $"`date` : `hostname` : not running."
+            exit 3
         fi
         ;;
 #
