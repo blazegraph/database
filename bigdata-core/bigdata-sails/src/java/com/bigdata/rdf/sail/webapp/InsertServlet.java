@@ -547,8 +547,8 @@ public class InsertServlet extends BigdataRDFServlet {
                              * Try to get the RDFFormat from the URL's file
                              * path.
                              */
-
-                            format = RDFFormat.forFileName(url.getFile());
+                        	//BLZG-1929
+                            format = RDFFormat.forFileName(url.getPath());
 
                         }
 
