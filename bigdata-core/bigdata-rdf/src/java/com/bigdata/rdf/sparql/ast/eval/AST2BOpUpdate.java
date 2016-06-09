@@ -1525,7 +1525,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final String baseURL = sourceURL.toExternalForm();
             
             // The file path.
-            final String n = sourceURL.getFile();
+            //BLZG-1929
+            final String n = sourceURL.getPath();
 
             /**
              * Attempt to obtain the format from the Content-Type.
