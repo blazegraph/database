@@ -1,0 +1,30 @@
+# This is just a modification of ticket-618e.rq for testing aggregates 
+# in GROUP BY in combination with ASK instead of SELECT.
+
+PREFIX ex: <http://example.org/>
+ASK
+{
+  ?x ex:r ?y .
+  ?y ex:q ?z 
+}
+GROUP BY ?x ?y
+ORDER BY DESC(max(?z)) ?x (count(?z)) DESC(?y) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

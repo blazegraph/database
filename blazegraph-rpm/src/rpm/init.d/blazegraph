@@ -95,7 +95,7 @@ OPENJDKS=""
 find_openjdks
 # The first existing directory is used for JAVA_HOME (if JAVA_HOME is not
 # defined in $DEFAULT)
-JDK_DIRS="/usr /usr/lib/jvm/java-7-oracle usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun"
+JDK_DIRS="/usr/lib/jvm/default-java ${OPENJDKS} /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-7-oracle /usr/lib/jvm/java-8-oracle /usr/java/current /usr/bin"
 
 # Look for the right JVM to use
 for jdir in $JDK_DIRS; do
@@ -105,15 +105,11 @@ for jdir in $JDK_DIRS; do
 done
 export JAVA_HOME
 
-# Directory where the Blazegraph distribution resides
-if [ -z "$BLZG_HOME" ] ; then
-	BLZG_HOME=/usr/local/$NAME
-fi
+# Directory where the Tomcat 6 binary distribution resides
+[ -z "$BLZG_HOME" ] && BLZG_HOME=/usr/share/$NAME
 
 # Directory for per-instance configuration files and webapps
-if [ -z "${BLZG_BASE}" ] ; then
-	BLZG_BASE=$BLZG_HOME
-fi
+[ -z "$BLZG_BASE" ] && BLZG_BASE=$BLZG_HOME
 
 # Use the Java security manager? (yes/no)
 BLZG_SECURITY=no
@@ -130,32 +126,25 @@ fi
 # End of variables that can be overwritten in $DEFAULT
 
 # overwrite settings from default file
-if [ -f "$DEFAULT" ]; then
-	. "$DEFAULT"
+[ -f "$DEFAULT" ] && . "$DEFAULT"
+
+[ -z "$BLZG_SH" ] && BLZG_SH="/usr/bin/blazegraph"
+if [ ! -f "$BLZG_SH" ]; then
+    log_failure_msg "$NAME is not installed"
+    exit 1
 fi
 
-if [ ! -f "$BLZG_HOME/bin/blazegraph.sh" ]; then
-	echo "$NAME is not installed"
-	exit 1
-fi
-
-if [ -z "$BLZG_TMPDIR" ]; then
-	BLZG_TMPDIR="$JVM_TMP"
-fi
+[ -z "$BLZG_TMPDIR" ] && BLZG_TMPDIR="$JVM_TMP"
 
 SECURITY=""
-if [ "$BLZG_SECURITY" = "yes" ]; then
-	SECURITY="-security"
-fi
+[ "$BLZG_SECURITY" = "yes" ] && SECURITY="-security"
 
 # Define other required variables
 BLZG_PID="/var/run/$NAME.pid"
-BLZG_SH="$BLZG_HOME/bin/blazegraph.sh"
 
 # Look for Java Secure Sockets Extension (JSSE) JARs
-if [ -z "${JSSE_HOME}" -a -r "${JAVA_HOME}/jre/lib/jsse.jar" ]; then
-    JSSE_HOME="${JAVA_HOME}/jre/"
-fi
+[ -z "${JSSE_HOME}" -a -r "${JAVA_HOME}/jre/lib/jsse.jar" ] && JSSE_HOME="${JAVA_HOME}/jre/"
+
 
 blazegraph_sh() {
 	# Escape any double quotes in the value of JAVA_OPTS
@@ -169,21 +158,21 @@ blazegraph_sh() {
 		BLZG_BASE=\"$BLZG_BASE\"; \
 		JAVA_OPTS=\"$JAVA_OPTS\"; \
 		BLZG_PID=\"$BLZG_PID\"; \
-		BLZG_LOG=\"$BLZG_LOG\"/blazegraph.out; \
+		BLZG_LOG=\"$BLZG_LOG\"/blazegraph.log; \
 		BLZG_TMPDIR=\"$BLZG_TMPDIR\"; \
 		LANG=\"$LANG\"; JSSE_HOME=\"$JSSE_HOME\"; \
 		cd \"$BLZG_BASE\"; \
 		\"$BLZG_SH\" $@"
 
 	set +e
-	touch "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
-	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/blazegraph.out
+	touch "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
+	chown $BLZG_USER "$BLZG_PID" "$BLZG_LOG"/${NAME}.log
 	$SU - $BLZG_USER -c "$BLZGCMD_SH start"
 	status="$?"
 
-	if [ $status -gt 0 ] ; then
+	if [ $status -eq 0 ] ; then
 		PID=`cat $BLZG_PID`
-		echo "Started $NAME (pid: $PID)"
+		echo "Started $DESC $NAME (pid ${PID})"
 	fi
 
 	set +a -e
@@ -193,17 +182,15 @@ blazegraph_sh() {
 running_pid() {
 
 	if [ ! -f "${BLZG_PID}" ] ; then
-		return 0;
-                exit 0
+		echo 0
+		return
 	fi
 
 	PID=`cat ${BLZG_PID}`
 
 	let HAS_PID=`ps -eo pid | grep $PID | wc -l`
 
-	echo ${HAS_PID}
-
-	return ${HAS_PID} 
+	echo ${HAS_PID} 
 	#1 if running, 0 if not
 
 }
@@ -215,9 +202,15 @@ case "$1" in
 		exit 1
 	fi
 
-	if [ ! -d "$BLZG_BASE/conf" ]; then
-		echo "invalid BLZG_BASE: $BLZG_BASE"
+	if [ ! -d "$BLZG_CONF" ]; then
+		echo "invalid BLZG_CONF: $BLZG_CONF"
 		exit 1
+	fi
+
+	if [ "`running_pid`" -eq 1 ] ; then
+		PID=`cat "${BLZG_PID}"`	
+		echo "$DESC $NAME is already running (pid:  $PID)."
+		exit 0
 	fi
 
 	echo "Starting $DESC" "$NAME"
@@ -229,8 +222,9 @@ case "$1" in
 	}
 	chown $BLZG_USER "$JVM_TMP"
 	blazegraph_sh start 
-
-	sleep 5
+	status=$?
+	sleep 1
+	exit $status
 	;;
   stop)
 	echo "Stopping $DESC" "$NAME"
@@ -240,16 +234,16 @@ case "$1" in
 
 		PID=`cat "${BLZG_PID}"`	
 	
-		if [ `running_pid` -eq 1 ] ; then
+		if [ "`running_pid`" -eq 1 ] ; then
 
 			kill -9 $PID
 			if [ `running_pid` -eq 0 ] ; then
 				rm -f "${BLZG_PID}"
 				rm -rf "$JVM_TMP"
-				echo "Stopped $NAME (pid ${PID})"
+				echo "Stopped $DESC $NAME (pid ${PID})"
 				exit 0
 			else
-				echo "Failed to stop $NAME (pid ${PID})"
+				echo "Failed to stop $DESC $NAME (pid ${PID})"
 				exit 1
 			fi
 		fi
@@ -263,7 +257,7 @@ case "$1" in
    status)
 	set +e
 
-	if [ -f "${BLZG_PID}" ] &&  [ `running_pid` -eq 0 ]; then
+	if [ -f "${BLZG_PID}" ] &&  [ "`running_pid`" -eq 0 ]; then
 	    echo "$DESC is not running, but pid file exists."
 	    exit 3
 	elif [ ! -f "$BLZG_PID" ]; then

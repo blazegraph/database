@@ -107,6 +107,9 @@ public class TestAll extends TestCase {
         // Unit tests for assigning join variables for named subquery includes.
         suite.addTestSuite(TestASTNamedSubqueryOptimizer.class);
         
+        // Unit tests for assigning join variables for named solution sets includes.
+        suite.addTestSuite(TestASTNamedSubqueryOptimizer2.class);
+        
         // Unit tests for lifting of simple optionals into the parent group.
         suite.addTestSuite(TestASTSimpleOptionalOptimizer.class);
 
@@ -182,6 +185,10 @@ public class TestAll extends TestCase {
 		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
 			suite.addTest(TestASTDistinctTermScanOptimizer.suite());
 
+                      
+        suite.addTestSuite(TestASTOrderByAggregateFlatteningOptimizer.class);
+               
+                
         return suite;
 
     }

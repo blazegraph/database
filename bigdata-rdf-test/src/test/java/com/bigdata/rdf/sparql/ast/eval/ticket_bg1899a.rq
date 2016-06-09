@@ -1,0 +1,26 @@
+PREFIX geoliteral: <http://www.bigdata.com/rdf/geospatial/literals/v1#>
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+PREFIX example: <http://www.example.com/>
+
+SELECT ?event WHERE {
+
+  hint:Query hint:analytic "true" .
+ 
+  example:Munich example:location ?locationOfMunich .
+
+  SERVICE geo:search {
+    ?event geo:search "inCircle" .
+    ?event geo:predicate example:happened .
+    ?event geo:searchDatatype geoliteral:lat-lon-time .
+    ?event geo:spatialCircleCenter ?locationOfMunich .
+    ?event geo:spatialCircleRadius "500" . # default unit: Kilometers
+    ?event geo:timeStart "0" . 
+    ?event geo:timeEnd "1483225199" .   # 31.12.2016, 23:59:59
+    ?event geo:locationValue ?location .
+  }
+
+  ?event rdf:type* example:Festival .
+  
+  BIND(IF(?locationOfMunich=?location, "X", "Y") as ?X)
+
+} ORDER BY ?X 

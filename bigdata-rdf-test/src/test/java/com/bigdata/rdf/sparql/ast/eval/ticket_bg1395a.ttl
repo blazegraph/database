@@ -1,0 +1,17 @@
+@prefix namespace2 : <tag:example.com:namespace2#> .
+@prefix namespace1 : <tag:example.com:namespace1#> .
+
+<http://my.item1> namespace1:isRelationshipFor <tag:example.com:myitem> .
+<http://my.item1> rdfs:label "Item 1" .
+<http://my.item1> rdfs:comment "This is item 1" .
+
+
+<http://my.item2> namespace1:isRelationshipFor <tag:example.com:myitem> .
+<http://my.item2> rdfs:label "Item 2" .
+
+
+<http://my.item3> namespace1:isRelationshipFor <tag:example.com:myitem> .
+<http://my.item3> rdfs:comment "This is item 3" .
+
+<http://my.item4> namespace1:isRelationshipFor <tag:example.com:myitem> .
+<http://my.item4> rdfs:propX "Some property value" .

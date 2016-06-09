@@ -840,6 +840,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
                 n++;
 
             }
+            
+            tokenStream.end();
+            
+            tokenStream.close();
 
         } catch (IOException ioe) {
             

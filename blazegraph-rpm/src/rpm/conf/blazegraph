@@ -1,24 +1,22 @@
 NAME=blazegraph
-BLZG_HOME=/usr/local/${NAME}
-BLZG_CONF=$BLZG_HOME/conf
+BLZG_HOME=/usr/share/${NAME}
+BLZG_CONF=/etc/${NAME}
 BLZG_LOG=/var/log/${NAME}
+BLZG_DATA=/var/lib/${NAME}
+JOURNAL_FILE=blazegraph.jnl
+JOURNAL="${BLZG_DATA}"/"${JOURNAL_FILE}"
 # Run Blazegraph as this user ID and group ID
 BLZG_USER=blzg
 BLZG_GROUP=blzg
 JETTY_XML="${BLZG_CONF}"/jetty.xml
 JETTY_RESOURCE_BASE="${BLZG_HOME}"/war/
-JETTY_OPTS="-Djetty.resourceBase=$JETTY_RESOURCE_BASE -DjettyXml=$JETTY_XML"
-BLZG_NSS=com.bigdata.rdf.sail.webapp.NanoSparqlServer
-PORT=9999
+JETTY_PORT=9999
 LOGGING_CONFIG="${BLZG_CONF}"/logging.properties
 LOG4J_CONFIG="${BLZG_CONF}"/log4j.properties
 NSS="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
 NSS_NAMESPACE="kb"
 NSS_PROPERTIES="${BLZG_CONF}"/RWStore.properties
-NSS="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
-NSS_NAMESPACE="kb"
-NSS_PROPERTIES="${BLZG_CONF}"/RWStore.properties
-JVM_OPTS="-Djava.awt.headless=true -server -Xmx4g -XX:MaxDirectMemorySize=3000m -XX:+UseG1GC"
+JVM_OPTS="-Djava.awt.headless=true -server -Xmx8g -XX:MaxDirectMemorySize=3000m -XX:+UseG1GC"
 #Used for testing on EC2 micro instances
 #JVM_OPTS="-Djava.awt.headless=true -server -Xmx256m -XX:MaxDirectMemorySize=100m -XX:+UseG1GC"
 

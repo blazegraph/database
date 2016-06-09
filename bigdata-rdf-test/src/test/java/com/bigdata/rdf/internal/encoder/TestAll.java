@@ -60,8 +60,8 @@ public class TestAll extends TestCase {
         // Encoding/decoding of IV binding sets
         suite.addTestSuite(TestIVBindingSetEncoder.class);
 
-        // Encoding/decoding of IV binding sets with scalable IV => Value cache.
-        suite.addTestSuite(TestIVBindingSetEncoderWithCache.class);
+//        // Encoding/decoding of IV binding sets with scalable IV => Value cache.
+//        suite.addTestSuite(TestIVBindingSetEncoderWithCache.class);
 
         // Encoding/decoding for the wire of IV solution sets.
         suite.addTestSuite(TestIVSolutionSetEncoder.class);

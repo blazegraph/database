@@ -1,0 +1,7 @@
+<http://www.example.com/Product1> rdf:type <http://www.example.com/Product> .
+<http://www.example.com/Product1> rdfs:label "Product 1" .
+<http://www.example.com/Product2> rdf:type <http://www.example.com/Product> .
+<http://www.example.com/Product2> rdfs:comment "This is product 2" .
+<http://www.example.com/Product3> rdf:type <http://www.example.com/Product> .
+<http://www.example.com/Product3> rdfs:label "Product 3" .
+<http://www.example.com/Product3> rdfs:comment "This is product 3" .

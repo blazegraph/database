@@ -644,6 +644,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			properties.setProperty(Options.READ_CACHE_BUFFER_COUNT, "20");
 
+			properties.setProperty(RWStore.Options.READ_BLOBS_ASYNC, "true");
+			
 			// Size of META_BITS_BLOCKS
 			properties.setProperty(RWStore.Options.META_BITS_SIZE, "9");
 

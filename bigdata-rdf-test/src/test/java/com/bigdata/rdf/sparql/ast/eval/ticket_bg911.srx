@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="ps"/>
+    <variable name="p"/>
+    <variable name="o"/>
+  </head>
+  <results>
+    <result>
+      <binding name="ps"><uri>http://example.com/data/person3</uri></binding>
+      <binding name="p"><uri>http://example.com/data/age</uri></binding>
+      <binding name="o"><literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal></binding>
+    </result>
+    <result>
+      <binding name="ps"><uri>http://example.com/data/person3</uri></binding>
+      <binding name="p"><uri>http://example.com/data/name</uri></binding>
+      <binding name="o"><literal>Person 3 - graph1</literal></binding>
+    </result>
+    <result>
+      <binding name="ps"><uri>http://example.com/data/person3</uri></binding>
+      <binding name="p"><uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri></binding>
+      <binding name="o"><uri>http://example.com/data/Person</uri></binding>
+    </result>        
+  </results>
+</sparql>

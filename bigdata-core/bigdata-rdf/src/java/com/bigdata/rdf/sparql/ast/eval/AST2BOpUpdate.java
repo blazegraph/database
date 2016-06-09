@@ -600,16 +600,24 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final QuadsDataOrNamedSolutionSet deleteClause = op.getDeleteClause();
 
             // Just the insert clause.
-            final boolean isInsertOnly = insertClause != null
-                    && deleteClause == null;
+            /*
+             * TODO FIXME Forcing all updates through the delete+insert code path.
+             * 
+             * https://jira.blazegraph.com/browse/BLZG-1913
+             */
+            final boolean isInsertOnly = false; //insertClause != null && deleteClause == null;
 
 //            // Just the delete clause.
 //            final boolean isDeleteOnly = insertClause == null
 //                    && deleteClause != null;
 
             // Both the delete clause and the insert clause.
-            final boolean isDeleteInsert = insertClause != null
-                    && deleteClause != null;
+            /*
+             * TODO FIXME Forcing all updates through the delete+insert code path.
+             * 
+             * https://jira.blazegraph.com/browse/BLZG-1913
+             */
+            final boolean isDeleteInsert = true; //insertClause != null && deleteClause != null;
             
             /*
              * Run the WHERE clause.
@@ -676,7 +684,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 try {
 
                     // Play it once through the DELETE clause.
-                    {
+                    if (deleteClause != null) {
                     	final long beginDeleteNanos = System.nanoTime();
                     	
                         // rewind.
@@ -847,7 +855,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					} // End DELETE clause.
 
                     // Play it once through the INSERT clause.
-                    {
+                    if (insertClause != null) {
 
                     	final long beginInsertNanos = System.nanoTime();
                     	
@@ -1467,6 +1475,38 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         return null;
         
     }
+    
+    /**
+     * 
+     * Utility method to get the {@link RDFFormat} for filename.
+     * 
+     * It checks for compressed endings and is provided as a utility.
+     * 
+     * @param fileName
+     * @return
+     */
+    public static RDFFormat rdfFormatForFile(final String fileName) {
+    	/*
+         * Try to get the RDFFormat from the URL's file path.
+         */
+
+        RDFFormat fmt = RDFFormat.forFileName(fileName);
+
+        if (fmt == null && fileName.endsWith(".zip")) {
+            fmt = RDFFormat.forFileName(fileName.substring(0, fileName.length() - 4));
+        }
+
+        if (fmt == null && fileName.endsWith(".gz")) {
+            fmt = RDFFormat.forFileName(fileName.substring(0, fileName.length() - 3));
+        }
+
+        if (fmt == null) {
+            // Default format.
+            fmt = RDFFormat.RDFXML;
+        }
+        
+        return fmt;
+    }
 
     /**
      * Parse and load a document.
@@ -1517,7 +1557,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final String baseURL = sourceURL.toExternalForm();
             
             // The file path.
-            final String n = sourceURL.getFile();
+            //BLZG-1929
+            final String n = sourceURL.getPath();
 
             /**
              * Attempt to obtain the format from the Content-Type.
@@ -1530,26 +1571,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             if (format == null) {
 
-                /*
-                 * Try to get the RDFFormat from the URL's file path.
-                 */
-
-                RDFFormat fmt = RDFFormat.forFileName(n);
-
-                if (fmt == null && n.endsWith(".zip")) {
-                    fmt = RDFFormat.forFileName(n.substring(0, n.length() - 4));
-                }
-
-                if (fmt == null && n.endsWith(".gz")) {
-                    fmt = RDFFormat.forFileName(n.substring(0, n.length() - 3));
-                }
-
-                if (fmt == null) {
-                    // Default format.
-                    fmt = RDFFormat.RDFXML;
-                }
-
-                format = fmt;
+                format = rdfFormatForFile(n);
 
             }
 
