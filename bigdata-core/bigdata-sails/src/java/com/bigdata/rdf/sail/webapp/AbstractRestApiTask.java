@@ -40,6 +40,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CAT;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.task.AbstractApiTask;
