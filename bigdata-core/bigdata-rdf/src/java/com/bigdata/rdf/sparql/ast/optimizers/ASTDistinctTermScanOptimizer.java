@@ -27,22 +27,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -59,6 +65,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -400,17 +407,41 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 
       boolean isQuads = context.getAbstractTripleStore().isQuads();
 
-      // first, construct a predicate for index probing
-      IVariableOrConstant[] args = new IVariableOrConstant[isQuads ? 4 : 3];
-      args[0] = sp.s().getValueExpression();
-      args[1] = sp.p().getValueExpression();
-      args[2] = sp.o().getValueExpression();
-      if (isQuads) {
-         args[3] = sp.c() == null ? Var.var("--anon-" + context.nextId()) : sp
-               .c().getValueExpression();
+      
+      /**
+       * For the purpose of computing the right index for the distinct term scan, we need
+       * to substitute in the variables that will be bound at execution time; for a single
+       * triple pattern query, these are exactly the statically injected variables
+       * 
+       * See https://jira.blazegraph.com/browse/BLZG-1947.
+       */
+      final StatementPatternNode spAsBound = new StatementPatternNode(sp);
+      final Set<IVariable<?>> alwaysBoundVars = context.getSolutionSetStats().getAlwaysBound();
+      final ConstantNode dummyConstant = new ConstantNode(new Constant<IV>(TermId.mockIV(VTE.URI)));
+      for (IVariable<?> var : alwaysBoundVars) {
+          
+          final TermNode s = spAsBound.s();
+          if (s instanceof VarNode && ((VarNode)s).getValueExpression().equals(var)) {
+              spAsBound.setArg(0, dummyConstant);
+          }
+          
+          final TermNode p = spAsBound.p();
+          if (p instanceof VarNode && ((VarNode)p).getValueExpression().equals(var)) {
+              spAsBound.setArg(1, dummyConstant);
+          }
+          
+          final TermNode o = spAsBound.o();
+          if (o instanceof VarNode && ((VarNode)o).getValueExpression().equals(var)) {
+              spAsBound.setArg(2, dummyConstant);
+          }
+          
+          final TermNode c = spAsBound.c();
+          if (c!=null && c instanceof VarNode && ((VarNode)c).getValueExpression().equals(var)) {
+              spAsBound.setArg(3, dummyConstant);
+          }
       }
 
-      Set<SPOKeyOrder> candidateKeyOrder = getCandidateKeyOrders(sp,
+      Set<SPOKeyOrder> candidateKeyOrder = getCandidateKeyOrders(spAsBound,
             termScanVar, context, isQuads);
       if (candidateKeyOrder.isEmpty()) {
          return null;

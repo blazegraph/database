@@ -14,7 +14,7 @@
     </result>
     <result>
       <binding name="p">
-         <uri>http://p2</uri>
+         <uri>http://p3</uri>
       </binding>
     </result>    
   </results>
