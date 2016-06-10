@@ -281,7 +281,7 @@ public class QueryLog {
         sb.append("\tnvars"); // #of variables in the predicate for a join.
         sb.append("\tfastRangeCount"); // fast range count used by the static optimizer.
         // dynamics (aggregated for totals as well).
-        sb.append("\trunState"); // true iff the operator will not be evaluated again.
+        sb.append("\trunState"); // Operator run state (NA, Running, StartLastPass, RunningLastPass, Done)
         sb.append("\tsumMillis"); // cumulative milliseconds for eval of this operator.
         sb.append("\topCount"); // cumulative #of invocations of tasks for this operator.
         sb.append("\tnumRunning");// #of concurrent invocations of the operator (current value)
@@ -399,7 +399,13 @@ public class QueryLog {
             sb.append("total");
         } else {
             // Otherwise show just this bop.
-            sb.append(bopIndex.get(bopId).toString());
+            String bopStr = bopIndex.get(bopId).toString();
+            final int maxBopLength = 256;
+            if (bopStr.length() > maxBopLength) {
+                bopStr = bopStr.substring(0, maxBopLength - 1);
+            }
+            bopStr = bopStr.replace('\n', ' ').replace('\t', ' ');
+            sb.append(bopStr);
             sb.append('\t');
             sb.append(evalOrder); // eval order for this bop.
             sb.append('\t');
