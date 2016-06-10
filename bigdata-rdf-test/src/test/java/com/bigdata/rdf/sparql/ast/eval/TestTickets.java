@@ -2633,4 +2633,17 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "workbench1.srx"   // result file
            ).runTest();
    }
+   
+   /**
+    * BLZG-1947: DISTINCT over predicates and VALUES clause do not go along very well
+    */
+   public void test_ticket_1947() throws Exception {
+       
+       new TestHelper(
+           "ticket_bg1947",   // testURI,
+           "ticket_bg1947.rq",// queryFileURL
+           "ticket_bg1947.nt",// dataFileURL
+           "ticket_bg1947.srx"// resultFileURL
+           ).runTest();    
+   }
 }
