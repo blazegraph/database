@@ -2637,13 +2637,26 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
    /**
     * BLZG-1947: DISTINCT over predicates and VALUES clause do not go along very well
     */
-   public void test_ticket_1947() throws Exception {
+   public void test_ticket_1947a() throws Exception {
        
        new TestHelper(
            "ticket_bg1947",   // testURI,
-           "ticket_bg1947.rq",// queryFileURL
+           "ticket_bg1947a.rq",// queryFileURL
            "ticket_bg1947.nt",// dataFileURL
-           "ticket_bg1947.srx"// resultFileURL
+           "ticket_bg1947a.srx"// resultFileURL
+           ).runTest();    
+   }
+   
+   /**
+    * BLZG-1947: DISTINCT over predicates and VALUES clause do not go along very well
+    */
+   public void test_ticket_1947b() throws Exception {
+       
+       new TestHelper(
+           "ticket_bg1947",   // testURI,
+           "ticket_bg1947b.rq",// queryFileURL
+           "ticket_bg1947.nt",// dataFileURL
+           "ticket_bg1947b.srx"// resultFileURL
            ).runTest();    
    }
 }
