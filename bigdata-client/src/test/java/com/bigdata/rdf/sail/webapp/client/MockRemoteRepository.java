@@ -103,7 +103,6 @@ public class MockRemoteRepository extends RemoteRepository {
 			public JettyResponseListener doConnect(ConnectOptions opts) throws Exception {
 				// Store connection options
 				data.opts = opts;
-				System.out.println("Setting opts = "+opts);
 				return super.doConnect(opts);
 			}
 		};
