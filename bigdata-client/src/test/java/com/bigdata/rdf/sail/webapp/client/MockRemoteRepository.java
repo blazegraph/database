@@ -33,6 +33,14 @@ public class MockRemoteRepository extends RemoteRepository {
 		protected volatile List<ResponseListener> listeners;
 	}
 	public volatile Data data;
+	
+	/**
+	 * This monitor is used to block an execution until
+	 * it will be notified in httpClient.send(). 
+	 * It ensures, that after exit from runQuery() method, 
+	 * test could rely on availability of request parameters, 
+	 * captured in httpClient.send().
+	 */
     public final static Object SEND_MONITOR = new Object();
 
 	private MockRemoteRepository(RemoteRepositoryManager mgr, String sparqlEndpointURL, IRemoteTx tx, Data data) {

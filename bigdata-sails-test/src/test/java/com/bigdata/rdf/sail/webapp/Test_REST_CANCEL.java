@@ -82,6 +82,10 @@ public class Test_REST_CANCEL extends TestCase2 {
         remote = MockRemoteRepository.create(null, "");
     }
     
+    /*
+     * The test verifies that the close() method cancels all the running queries 
+     */
+    
     public void test_Cancel_Queries() throws Exception {
         
         final String query = "select * {?s ?p ?o}";
@@ -121,18 +125,29 @@ public class Test_REST_CANCEL extends TestCase2 {
    }
 
     private void runQuery(final String query, final ExecutorService executor, final int i) throws InterruptedException {
-        executor.submit(new Runnable(){@Override public void run() { try {
-            remote.prepareTupleQuery(query, uuids[i]).evaluate();
-        } catch (IOException | InterruptedException e) {
-            // expected
-            log.debug(e);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        } }});
+    	
+        executor.submit(new Runnable(){@Override public void run() { 
+        	
+        	try {        		
+        		remote.prepareTupleQuery(query, uuids[i]).evaluate();
+        	} catch (IOException | InterruptedException e) {
+        		// expected
+        		log.debug(e);
+        	} catch (Exception e) {
+        		throw new RuntimeException(e);
+        	} 
+        	
+        }});
+        
+        // SEND_MONITOR from MockRemoteRepository is used to block execution
+        // until this monitor will be notified in httpClient.send().
+        // It ensures, that after exit from runQuery() method, test could rely
+        // on availability of request parameters, captured in httpClient.send(). 
+        // @see MockRemoteRepository.create().
         synchronized(MockRemoteRepository.SEND_MONITOR) {
             MockRemoteRepository.SEND_MONITOR.wait();
         }
+        
     }
-
 
 }

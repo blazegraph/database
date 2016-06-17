@@ -1690,11 +1690,18 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             }
 
             final JettyResponseListener listener = new JettyResponseListener(request, queryTimeoutMillis) {
-                @Override
+               
+            	/*
+            	 * The method is called after the response has been processed,
+            	 * so we are removing current queryId from the runningQueries map.
+            	 */
+            	@Override
                 public void onComplete(Result result) {
                     
                     super.onComplete(result);
                     
+                    // In case we are processing a cancel query request, it does not have 
+                    // its own queryId, so we do not need to remove it from runningQueries map. 
                     if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
                         if (opts.getRequestParam(QUERYID) != null) {
                             runningQueries.remove(opts.getRequestParam(QUERYID));
@@ -1703,6 +1710,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                 }
             };
 
+            // In case we are processing a cancel query request, it does not have 
+            // its own queryId, so we are not tracking it in runningQueries map. 
             if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
                 if (opts.getRequestParam(QUERYID) != null) {
                     runningQueries.add(opts.getRequestParam(QUERYID));
