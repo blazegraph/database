@@ -138,25 +138,6 @@ public class LatchedExecutor implements Executor {
      * <p>
      * Pre-condition: The caller has a permit.
      */
-    private void scheduleNextBad() {
-         while (true) {
-            Runnable next = null;
-            if ((next = queue.poll()) != null) {
-                try {
-                    executor.execute(next);
-                    return;
-                } catch (RejectedExecutionException ex) {
-                    // log error and poll the queue again.
-                    log.error(ex, ex);
-                    continue;
-                }
-            } else {
-                semaphore.release();
-                return;
-            }
-        }
-    }
-
 	private void scheduleNext() {
 		while (true) {
 			Runnable next = null;
