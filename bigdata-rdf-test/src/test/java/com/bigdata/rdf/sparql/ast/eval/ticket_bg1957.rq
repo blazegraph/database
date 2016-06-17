@@ -1,0 +1,11 @@
+SELECT (count(DISTINCT ?personA) as ?count)
+WHERE {
+  ?personA a <http://Person> .
+  ?personA <http://knows> ?personB . 
+  ?personB <http://met> ?personC . 
+  ?personB <http://likes> ?personD . 
+  ?personD <http://age> ?age . 
+  FILTER ( ?age = 30 ) 
+  VALUES (?personC) { (<http://Michael>) }
+}
+LIMIT 10000

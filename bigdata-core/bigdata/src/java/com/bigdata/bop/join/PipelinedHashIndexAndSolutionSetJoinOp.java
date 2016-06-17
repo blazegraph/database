@@ -37,7 +37,6 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.PipelineOp.Annotations;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.SubqueryAnnotations;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -392,37 +391,13 @@ public class PipelinedHashIndexAndSolutionSetJoinOp extends HashIndexOp {
 
             try {
 
-                if (sourceIsPipeline) {
+                // Buffer all source solutions.
+                acceptAndOutputSolutions();
 
-                    // Buffer all source solutions.
-                    acceptAndOutputSolutions();
+                if (context.isLastInvocation()) {
 
-                    if (context.isLastInvocation()) {
-
-                        // Done. Release the allocation context.
-                        state.release();
-
-                    }
-
-                } else {
-                    
-                    if(first) {
-                    
-                        // Accept ALL solutions.
-                        acceptAndOutputSolutions();
-                        
-                        // Done. Release the allocation context.
-                        state.release();
-                        
-                    }
-
-                    // Copy all solutions from the pipeline to the sink.
-                    BOpUtility.copy(context.getSource(), context.getSink(),
-                            null/* sink2 */, null/* mergeSolution */,
-                            null/* selectVars */, null/* constraints */, stats);
-
-                    // Flush solutions to the sink.
-                    context.getSink().flush();
+                    // Done. Release the allocation context.
+                    state.release();
 
                 }
 
