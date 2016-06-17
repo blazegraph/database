@@ -1,0 +1,39 @@
+#!/bin/sh
+set -e
+
+[ -f /etc/default/blazegraph ] && . /etc/default/blazegraph
+[ -z "$BLZG_LOG" ] && BLZG_LOG=/var/log/blazegraph
+[ -z "$BLZG_DATA" ] && BLZG_DATA=/var/lib/blazegraph
+
+case "$1" in
+    remove)
+        # Remove logs and pids
+        rm -rf $BLZG_LOG
+
+        # remove **only** empty data dir
+        rmdir -p --ignore-fail-on-non-empty $BLZG_DATA
+    ;;
+
+    purge)
+        [ -z "$BLZG_USER" ] && BLZG_USER="blzg"
+        [ -z "$BLZG_GROUP" ] && BLZG_GROUP="blzg"
+        # Remove service
+        update-rc.d blazegraph remove >/dev/null || true
+
+        # Remove logs and data
+        rm -rf $BLZG_LOG $BLZG_DATA
+
+        # Remove user/group
+        deluser --system "$BLZG_USER" || true
+        delgroup --system "$BLZG_GROUP" || true
+    ;;
+
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        # Nothing to do here
+    ;;
+
+    *)
+        echo "$0 called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac

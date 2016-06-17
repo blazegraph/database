@@ -21,5 +21,5 @@ You may then navigate http://localhost:9999/bigdata/ to access Blazegraph.
 Changing the configuration
 -----------------
 
-The blazegraph configuration is stored in `/usr/local/blazegraph/conf`, which is soft-linked to  `/etc/blazegraph`.
+The blazegraph configuration is stored in `/etc/blazegraph/`
 

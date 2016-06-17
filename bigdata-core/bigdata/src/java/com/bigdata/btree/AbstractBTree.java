@@ -2209,7 +2209,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //                    filter.disable();
                     recycle(filter.disable());
                     
-                    log.warn("Bloom filter disabled - maximum error rate would be exceeded"
+                    if(INFO) log.info("Bloom filter disabled - maximum error rate would be exceeded"
                                     + ": entryCount="
                                     + getEntryCount()
                                     + ", factory="

@@ -116,7 +116,9 @@ public class QueryLog {
 
         if (!log.isInfoEnabled())
             return;
-            
+        
+        final boolean DEBUG = log.isDebugEnabled();
+        
         try {
 
             final IRunningQuery[] children = (q instanceof AbstractRunningQuery) ? ((AbstractRunningQuery) q)
@@ -150,7 +152,8 @@ public class QueryLog {
 
                     logSummaryRow(q, queueStats, sb);
 
-                    logDetailRows(q, queueStats, sb);
+                    if (DEBUG)
+                        logDetailRows(q, queueStats, sb);
                 }
 
                 if (children != null) {
@@ -163,8 +166,9 @@ public class QueryLog {
                                 .getQueueStats();
                         
                         logSummaryRow(c, queueStats, sb);
-                        
-                        logDetailRows(c, queueStats, sb);
+
+                        if (DEBUG)
+                            logDetailRows(c, queueStats, sb);
 
                     }
                     
@@ -247,6 +251,8 @@ public class QueryLog {
 
         final StringBuilder sb = new StringBuilder();
 
+        final boolean mapgraphStats = MapgraphPerformanceCounters.isMapGraph();
+        
         /*
          * Common columns for the overall query and for each pipeline operator.
          */
@@ -275,7 +281,7 @@ public class QueryLog {
         sb.append("\tnvars"); // #of variables in the predicate for a join.
         sb.append("\tfastRangeCount"); // fast range count used by the static optimizer.
         // dynamics (aggregated for totals as well).
-        sb.append("\trunState"); // true iff the operator will not be evaluated again.
+        sb.append("\trunState"); // Operator run state (NA, Running, StartLastPass, RunningLastPass, Done)
         sb.append("\tsumMillis"); // cumulative milliseconds for eval of this operator.
         sb.append("\topCount"); // cumulative #of invocations of tasks for this operator.
         sb.append("\tnumRunning");// #of concurrent invocations of the operator (current value)
@@ -291,12 +297,15 @@ public class QueryLog {
         sb.append("\tunitsOutPerChunk"); // average #of solutions out per chunk.
         sb.append("\tmutationCount");
         sb.append("\ttypeErrors");
-        sb.append("\tjoinRatio"); // expansion rate multipler in the solution count.
+        sb.append("\tjoinRatio"); // expansion rate multiplier in the solution count.
         sb.append("\taccessPathDups");
         sb.append("\taccessPathCount");
         sb.append("\taccessPathRangeCount");
         sb.append("\taccessPathChunksIn");
         sb.append("\taccessPathUnitsIn");
+        if(mapgraphStats) {
+            MapgraphPerformanceCounters.writeHeaders(sb);
+        }
         // dynamics based on elapsed wall clock time.
         sb.append("\tsolutions/ms");
         sb.append("\tmutations/ms");
@@ -369,10 +378,19 @@ public class QueryLog {
         sb.append('\t');
         if (summary) {
             /*
-             * The entire query (recursively). New lines are translated out to
-             * keep this from breaking the table format.
+             * The entire query (recursively). New lines and tabs are translated
+             * out to keep this from breaking the table format.
+             * 
+             * Note: I have truncated the query plan since the full query causes
+             * problems when attempting to inspect the query log.
              */
-            sb.append(BOpUtility.toString(q.getQuery()).replace('\n', ' '));
+            String bopStr = BOpUtility.toString(q.getQuery());
+            final int maxBopLength = 256;
+            if (bopStr.length() > maxBopLength) {
+                bopStr = bopStr.substring(0, maxBopLength - 1);
+            }
+            bopStr = bopStr.replace('\n', ' ').replace('\t', ' ');
+            sb.append(bopStr);
             sb.append('\t'); // evalOrder
             sb.append("total");
             sb.append('\t'); // evaluation context
@@ -381,7 +399,13 @@ public class QueryLog {
             sb.append("total");
         } else {
             // Otherwise show just this bop.
-            sb.append(bopIndex.get(bopId).toString());
+            String bopStr = bopIndex.get(bopId).toString();
+            final int maxBopLength = 256;
+            if (bopStr.length() > maxBopLength) {
+                bopStr = bopStr.substring(0, maxBopLength - 1);
+            }
+            bopStr = bopStr.replace('\n', ' ').replace('\t', ' ');
+            sb.append(bopStr);
             sb.append('\t');
             sb.append(evalOrder); // eval order for this bop.
             sb.append('\t');
@@ -426,6 +450,7 @@ public class QueryLog {
             }
         }
         sb.append('\t');
+        // predSummary
         if (pred != null) {
             sb.append(pred.getClass().getSimpleName());
             sb.append("[" + predId + "](");
@@ -538,7 +563,7 @@ public class QueryLog {
         /*
          * Static optimizer metadata.
          * 
-         * FIXME Should report [nvars] be the expected asBound #of variables
+         * TODO Should report [nvars] be the expected asBound #of variables
          * given the assigned evaluation order and the expectation of propagated
          * bindings (optionals may leave some unbound).
          */
@@ -595,6 +620,16 @@ public class QueryLog {
             // Aggregate the statistics for all pipeline operators.
             for (BOpStats t : statsMap.values()) {
                 stats.add(t);
+            }
+            final IRunningQuery[] children = (q instanceof AbstractRunningQuery)
+                    ? ((AbstractRunningQuery) q).getChildren() : null;
+            if (children != null) {
+                // Aggregate child subqueries as well.
+                for (IRunningQuery child : children) {
+                    for (BOpStats t : child.getStats().values()) {
+                        stats.add(t);
+                    }
+                }
             }
         } else {
             // Just this operator.
@@ -673,6 +708,10 @@ public class QueryLog {
         sb.append(stats.accessPathChunksIn.get());
         sb.append('\t');
         sb.append(stats.accessPathUnitsIn.get());
+
+        if (MapgraphPerformanceCounters.isMapGraph()) {
+            MapgraphPerformanceCounters.write(sb, q, evalOrder, bopId, summary, queueStats);
+        }
 
         /*
          * Use the total elapsed time for the query (wall time).
@@ -892,7 +931,7 @@ public class QueryLog {
             w.write("<th>accessPathUnitsIn</th>"); // #of tuples read from APs.
         }
         if(mapgraphStats) {
-            MapgraphPerformanceCounters.writeHeaders(w,detailedStats);
+            MapgraphPerformanceCounters.writeXHTMLHeaders(w,detailedStats);
         }
         // dynamics based on elapsed wall clock time.
         if(detailedStats) {
@@ -1150,7 +1189,7 @@ public class QueryLog {
         w.write(TDx);
         
         /*
-         * Pperator summary (not shown for the "total" line).
+         * Operator summary (not shown for the "total" line).
          * 
          * TODO We should have self-reporting of the summary for each operator,
          * potentially as XHTML. Also, the parser should pass along the SPARQL
@@ -1303,7 +1342,7 @@ public class QueryLog {
         /*
          * Static optimizer metadata.
          * 
-         * FIXME Should report [nvars] be the expected asBound #of variables
+         * TODO Should report [nvars] be the expected asBound #of variables
          * given the assigned evaluation order and the expectation of propagated
          * bindings (optionals may leave some unbound).
          */
@@ -1375,9 +1414,19 @@ public class QueryLog {
 
         final PipelineJoinStats stats = new PipelineJoinStats();
         if(summary) {
-            // Aggregate the statistics for all pipeline operators.
+            // Aggregate the statistics for all pipeline operators. 
             for (BOpStats t : statsMap.values()) {
                 stats.add(t);
+            }
+            final IRunningQuery[] children = (q instanceof AbstractRunningQuery)
+                    ? ((AbstractRunningQuery) q).getChildren() : null;
+            if (children != null) {
+                // Aggregate child subqueries as well.
+                for (IRunningQuery child : children) {
+                    for (BOpStats t : child.getStats().values()) {
+                        stats.add(t);
+                    }
+                }
             }
         } else {
             // Just this operator.
@@ -1521,7 +1570,7 @@ public class QueryLog {
              *      EXPLAIN must provide useful summary of GPU task graph
              *      evaluation </a>
              */
-            MapgraphPerformanceCounters.write(w, q, bop, detailedStats);
+            MapgraphPerformanceCounters.writeXHTML(w, q, evalOrder, bopId, summary, detailedStats, queueStats);
         }
         
         /*
@@ -1746,10 +1795,12 @@ public class QueryLog {
          *            Where to write the headers.
          * @param detailedStats
          *            true iff detailed statistics were requested.
-         *            
-         * @throws IOException
+         * 
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/378" >
+         *      EXPLAIN must provide useful summary of GPU task graph
+         *      evaluation </a>
          */
-        void writeHeaders(Writer w, boolean detailedStats) throws IOException;
+        void writeXHTMLHeaders(Writer w, boolean detailedStats) throws IOException;
 
         /**
          * Write XHTML statistics for a task graph executed against the mapgraph
@@ -1762,11 +1813,48 @@ public class QueryLog {
          *            The query.
          * @param bop
          *            The operator.
+         * @param summary
+         *            true iff this is a summary row.
          * @param detailedStats
          *            true iff detailed statistics were requested.
+         * 
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/378" >
+         *      EXPLAIN must provide useful summary of GPU task graph
+         *      evaluation </a>
          */
-        void write(final Writer w, final IRunningQuery q, final BOp bop, final boolean detailedStats)
-                throws IOException;
+        void writeXHTML(final Writer w, final IRunningQuery q, final int evalOrder, final Integer bopId,
+                final boolean summary, final boolean detailedStats,
+                final Map<Integer/* bopId */, QueueStats> queueStats) throws IOException;
+
+        /**
+         * Write additional column headers for the mapgraph runtime statistics.
+         * 
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/911" > Add
+         *      logger for GPU benchmarking that reports both total query time
+         *      and GPU only evaluation time </a>
+         */
+        void writeHeaders(StringBuilder sb);
+
+        /**
+         * Write additional column data for the mapgraph runtime statistics.
+         * 
+         * @param q
+         *            The {@link IRunningQuery}.
+         * @param evalOrder
+         *            The evaluation order for the operator.
+         * @param bopId
+         *            The identifier for the operator.
+         * @param summary
+         *            <code>true</code> iff the summary for the query should be
+         *            written.
+         *            
+         * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/911" > Add
+         *      logger for GPU benchmarking that reports both total query time
+         *      and GPU only evaluation time </a>
+         */
+        void write(final StringBuilder sb, final IRunningQuery q,
+                final int evalOrder, final Integer bopId, final boolean summary,
+                final Map<Integer/*bopId*/,QueueStats> queueStats);
 
     }
     
@@ -1802,22 +1890,45 @@ public class QueryLog {
             return reporter != null;
         }
 
-        public static void writeHeaders(Writer w, boolean detailedStats) throws IOException {
+        public static void writeHeaders(StringBuilder sb) {
 
             if (reporter != null) {
 
-                reporter.writeHeaders(w, detailedStats);
+                reporter.writeHeaders(sb);
                 
             }
             
         }
 
-        public static void write(final Writer w, final IRunningQuery q, final BOp bop, final boolean detailedStats)
-                throws IOException {
+        public static void write(final StringBuilder sb, final IRunningQuery q,
+                final int evalOrder, final Integer bopId, final boolean summary,
+                final Map<Integer/*bopId*/,QueueStats> queueStats) {
 
             if (reporter != null) {
 
-                reporter.write(w, q, bop, detailedStats);
+                reporter.write(sb, q, evalOrder, bopId, summary, queueStats);
+                
+            }
+            
+        }
+
+        public static void writeXHTMLHeaders(Writer w, boolean detailedStats) throws IOException {
+
+            if (reporter != null) {
+
+                reporter.writeXHTMLHeaders(w, detailedStats);
+                
+            }
+            
+        }
+
+        public static void writeXHTML(final Writer w, final IRunningQuery q, final int evalOrder, final Integer bopId,
+                final boolean summary, final boolean detailedStats,
+                final Map<Integer/* bopId */, QueueStats> queueStats) throws IOException {
+
+            if (reporter != null) {
+
+                reporter.writeXHTML(w, q, evalOrder, bopId, summary, detailedStats, queueStats);
 
             }
 

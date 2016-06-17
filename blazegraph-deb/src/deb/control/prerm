@@ -1,1 +1,28 @@
-service blazegraph stop || true
+#!/bin/sh
+set -e
+
+[ -f /etc/default/blazegraph ] && . /etc/default/blazegraph
+
+stopBlazegraph() {
+    service blazegraph stop || true
+}
+
+case "$1" in
+    upgrade)
+        if [ "$RESTART_ON_UPGRADE" = "false" ] ; then
+            stopBlazegraph
+        fi
+    ;;
+
+    remove)
+        stopBlazegraph
+    ;;
+
+    deconfigure|failed-upgrade)
+    ;;
+
+    *)
+        echo "$0 called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac

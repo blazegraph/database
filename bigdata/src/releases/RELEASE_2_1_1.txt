@@ -1,0 +1,86 @@
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture and, now, GPU Acceleration. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a major release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
+
+Blazegraph Features (http://www.blazegraph.com/product/)
+
+2.1.1 is a maintenance release for 2.1.0 release.  It is recommended that all users upgrade to 2.1.1.   See https://blog.blazegraph.com/?p=1011
+
+* Bug fixes for Lucene Text Indexing
+* Geospatial bug fixes
+* Support for inlining Hex-based UUIDs
+* Support for multiple inline URI handlers at a single namespace
+
+Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
+
+Starting points:
+
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+    Blazegraph Support:  https://www.blazegraph.com/support/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TDF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+    
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BLAZEGRAPH_RELEASE_2_1_1 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_1
+
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_1
+
+** Bug
+    * [BLZG-1202] - Groups with unbound values ignored by aggregate queries
+    * [BLZG-1395] - Multiple OPTIONAL statements in a UNION fail to retrieve results
+    * [BLZG-1563] - RemoteRepositoryManager.close() issue
+    * [BLZG-1760] - having incorrectly says: Non-aggregate variable in select expression:
+    * [BLZG-1763] - Wildcard projection was not rewritten
+    * [BLZG-1827] - RemoteRepositoryManager#close() doesn't release resources
+    * [BLZG-1856] - Create a SampledVertices enum which calls the existing call.
+    * [BLZG-1857] - Create a new method which returns All for the AllVertices enum.
+    * [BLZG-1862] - infinite loop with named solution set
+    * [BLZG-1875] - RDR UPDATE Problems
+    * [BLZG-1876] - Lucene TokenStream contract violation: close() call missing
+    * [BLZG-1877] - GASProgram should be able to vote to halt via nextRound() regardless of whether there are vertices in the frontier
+    * [BLZG-1883] - Blazegraph RPM and Debian Deployers do not follow Unix Standards
+    * [BLZG-1884] - RWStore ASYNC IO fails to make progress (apparent deadlock)
+    * [BLZG-1888] - Custom Prefix Declarations does not properly handle end of file
+    * [BLZG-1889] - ArrayIndexOutOfBound Exception
+    * [BLZG-1892] - Suspected wrong visibility scoping for named graph-valued variables.
+    * [BLZG-1893] - Problems with Fulltext Index
+    * [BLZG-1897] - Distance between point and itself is not zero
+    * [BLZG-1899] - NotMaterializedException caused by HTree hash index
+    * [BLZG-1913] - DELETE + WHERE or INSERT + WHERE cause NPE in BTree while DELETE + INSERT + WHERE does not
+    * [BLZG-1929] - presigned s3 url of *.gz will not get load
+    * [BLZG-1943] - Custom geo serializer
+
+
+** Improvement
+    * [BLZG-1848] - inCircle geosearch returning also distance from center
+    * [BLZG-1944] - Support GZIP Compression for INSERT REST API
+
+** New Feature
+    * [BLZG-1936] - UUID Suffix Inline URI Handler
+    * [BLZG-1937] - Hex-based UUID URI Handler
+    * [BLZG-1938] - Support Multiple Inline URI Handlers for a given namespace
+    * [BLZG-1945] - Freebase Custom Vocabulary
+
+** Task
+    * [BLZG-1922] - Code review and merge of concurrent checkpoint by level set of the index
+    * [BLZG-1924] - Benchmark 2.1.1 Release
+
+** Sub-task
+    * [BLZG-618] - Allow aggregates in ORDER BY and HAVING clauses
+    * [BLZG-1946] - Inline URI Handler for Freebase MID and GUID formats
