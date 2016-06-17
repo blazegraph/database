@@ -5,6 +5,10 @@
  */
 package com.bigdata.rdf.sail.sparql.ast;
 
+/**
+ * @openrdf
+ */
+
 public class VisitorException extends Exception {
 
 	private static final long serialVersionUID = 6682567015759392643L;

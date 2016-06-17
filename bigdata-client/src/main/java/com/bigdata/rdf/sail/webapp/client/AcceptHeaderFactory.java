@@ -53,6 +53,7 @@ import org.openrdf.rio.RDFParserRegistry;
  * to handle {@link TupleQueryResultFormat} using the same base quality value.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  * @version $Id$
  * 
  *          TODO Add a parameter for SID support or just specify as the

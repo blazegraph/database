@@ -25,6 +25,8 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.math.BigInteger;
 
+import org.openrdf.model.URI;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOpContext;
@@ -261,8 +263,8 @@ public class TestMIN extends TestCase2 {
         final IConstant<String> org1 = new Constant<String>("org1");
         final IConstant<String> org2 = new Constant<String>("org2");
         final IConstant<String> auth1 = new Constant<String>("auth1");
-        final TermId tid1 = new TermId<BigdataValue>(VTE.LITERAL, 1);
-        tid1.setValue(f.createLiteral("auth2"));
+        final TermId tid1 = new TermId<BigdataValue>(VTE.URI, 1);
+		tid1.setValue(f.createURI(":auth2"));
         final IConstant<IV> auth2 = new Constant<IV>(tid1);
         final IConstant<String> auth3 = new Constant<String>("auth3");
         final IConstant<String> book1 = new Constant<String>("book1");

@@ -81,6 +81,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *      SPARQL Update Extensions (Wiki) </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  * @version $Id: BigdataSPARQLUpdateTest.java 6204 2012-03-28 20:17:06Z
  *          thompsonbry $
  */

@@ -56,6 +56,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
+
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.IOException;
@@ -80,6 +81,10 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
+
+/**
+ * @openrdf
+ */
 
 public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluationTestCase {
 

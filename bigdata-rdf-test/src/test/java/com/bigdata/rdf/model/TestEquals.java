@@ -9,6 +9,7 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.internal.IV;
@@ -100,7 +101,7 @@ public class TestEquals extends TestCase {
 
 		doLiteralTest("bigdata", XMLSchema.STRING/* datatype */, null/* languageCode */);
 
-		doLiteralTest("bigdata", null/* datatype */, "en"/* languageCode */);
+		doLiteralTest("bigdata", RDF.LANGSTRING/* datatype */, "en"/* languageCode */);
 
 	}
 
@@ -110,10 +111,10 @@ public class TestEquals extends TestCase {
 		if (datatype == null && languageCode == null)
 			return f.createLiteral(label);
 
-		if (datatype == null)
-			return f.createLiteral(label, languageCode);
+		if (languageCode == null)
+			return f.createLiteral(label, datatype);
 		
-		return f.createLiteral(label, datatype);
+		return f.createLiteral(label, languageCode);
 
 	}
 

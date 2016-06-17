@@ -8,5 +8,5 @@ prefix xsd: <http://www.w3.org/2001/XMLSchema#>
 select ?s
 where {
   ?s :hasAddress ?address .
-  FILTER(REGEX(?address, '^12.*', 'i'))
+  FILTER(REGEX(?address, '^11.*', 'i'))
 }

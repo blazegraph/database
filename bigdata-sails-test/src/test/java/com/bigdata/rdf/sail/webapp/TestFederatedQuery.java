@@ -128,6 +128,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * are W3C tests and have the pattern <code>serviceXX</code>. There are also
  * tests developed for openrdf.
  * 
+ * @openrdf
+ * 
  * @see <a href="http://www.w3.org/2009/sparql/docs/tests/"> W3C Tests </a>
  * 
  * @see <a

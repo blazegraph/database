@@ -3,6 +3,9 @@
  *
  * Licensed under the Aduna BSD-style license.
  */
+/**
+ * @openrdf
+ */
 package com.bigdata.rdf.sail.sparql.ast;
 
 public abstract class ASTQuery extends ASTOperation {

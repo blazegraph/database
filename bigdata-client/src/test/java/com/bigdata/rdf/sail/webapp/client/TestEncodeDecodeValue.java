@@ -38,6 +38,7 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 /**
  * Test suite for utility class to encode and decode RDF Values for interchange
@@ -120,7 +121,7 @@ public class TestEncodeDecodeValue extends TestCase2 {
         assertEquals(new LiteralImpl("ab'c"),
                 EncodeDecodeValue.decodeValue("'ab'c'"));
 
-        doTest("\"'ab'c'\"", new LiteralImpl("'ab'c'"));
+        doTest("\"'ab'c'\"", new LiteralImpl("'ab'c'", XMLSchema.STRING));
     }
 
     public void test_encodeDecode_Literal_languageCode() {

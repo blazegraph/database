@@ -28,6 +28,7 @@ import java.util.Map;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -193,10 +194,10 @@ public class StrBeforeBOp extends IVValueExpression<IV> implements INeedsMateria
 
 		final URI dt2 = arg2.getDatatype();
 
-		if (dt1 != null && !dt1.stringValue().equals(XSD.STRING.stringValue()))
+		if (dt1 != null && !(dt1.stringValue().equals(XSD.STRING.stringValue()) || dt1.stringValue().equals(RDF.LANGSTRING.stringValue())))
 			throw new SparqlTypeErrorException();
 
-		if (dt2 != null && !dt2.stringValue().equals(XSD.STRING.stringValue()))
+		if (dt2 != null && !(dt2.stringValue().equals(XSD.STRING.stringValue()) || dt2.stringValue().equals(RDF.LANGSTRING.stringValue())))
 			throw new SparqlTypeErrorException();
 
 

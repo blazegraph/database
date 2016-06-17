@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
@@ -311,7 +312,7 @@ public class BigdataSubjectCentricFullTextIndex extends FullTextIndex implements
 
             final Literal lit = (Literal) val;
 
-            if (!indexDatatypeLiterals && lit.getDatatype() != null) {
+            if (!indexDatatypeLiterals && lit.getDatatype() != null && !XMLSchema.STRING.equals(lit.getDatatype())) {
 
                 // do not index datatype literals in this manner.
                 continue;

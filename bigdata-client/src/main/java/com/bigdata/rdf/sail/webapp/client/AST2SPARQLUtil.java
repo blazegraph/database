@@ -34,6 +34,7 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 /**
  * Utility class for externalizing SPARQL prefix declaration management.
@@ -160,9 +161,7 @@ public class AST2SPARQLUtil {
         if (languageCode != null) {
             sb.append('@');
             sb.append(languageCode);
-        }
-
-        if (datatypeURI != null) {
+        } else if (datatypeURI != null && !XMLSchema.STRING.equals(datatypeURI)) {
             sb.append("^^");
             sb.append(datatypeStr);
         }

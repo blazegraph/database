@@ -71,6 +71,7 @@ import com.bigdata.rdf.properties.PropertiesParser;
  * An {@link PropertiesParser} for {@link Properties} objects in XML.
  * 
  * @author Bryan THompson
+ * @openrdf
  */
 public class PropertiesXMLParser implements PropertiesParser {
 
