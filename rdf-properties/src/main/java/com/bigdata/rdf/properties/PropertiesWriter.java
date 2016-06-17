@@ -62,6 +62,8 @@ import java.util.Properties;
 
 /**
  * An interface for properties document writers.
+ * 
+ * @openrdf
  */
 public interface PropertiesWriter { 
     

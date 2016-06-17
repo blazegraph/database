@@ -17,6 +17,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
@@ -1197,7 +1198,7 @@ public class ASTDeferredIVResolution {
                             resolved = vf.createLiteral(label, dataType);
                         }
                         final DTE dte = DTE.valueOf(dataType);
-                        if (dte != null) {
+                        if (dte != null && !dataType.equals(XMLSchema.STRING)) {
                         	// Check if lexical form is empty, and keep FullyInlineTypedLiteralIV
                         	// holding corresponding data type as iv for the new value
                         	// @see https://jira.blazegraph.com/browse/BLZG-1716 (SPARQL Update parser fails on invalid numeric literals)

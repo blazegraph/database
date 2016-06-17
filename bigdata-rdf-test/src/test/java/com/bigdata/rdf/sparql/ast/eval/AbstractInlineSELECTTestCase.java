@@ -119,6 +119,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
  * See {@link AbstractDataDrivenSPARQLTestCase} for the out-of-line files based approach,
  * which may be more suitable for larger queries, test data or results.
  * @author jeremycarroll
+ * @openrdf
  */
 public abstract class AbstractInlineSELECTTestCase extends AbstractDataAndSPARQLTestCase
         {

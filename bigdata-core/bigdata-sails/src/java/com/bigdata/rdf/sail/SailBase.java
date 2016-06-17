@@ -26,6 +26,7 @@ import org.openrdf.sail.SailException;
  * @author Herko ter Horst
  * @author jeen
  * @author Arjohn Kampman
+ * @openrdf
  */
 public abstract class SailBase implements Sail {
 

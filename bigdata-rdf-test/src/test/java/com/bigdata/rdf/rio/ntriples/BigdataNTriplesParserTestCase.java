@@ -20,6 +20,7 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
  * JUnit test for the N-Triples parser.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public abstract class BigdataNTriplesParserTestCase extends TestCase2 {
 

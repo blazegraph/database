@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import org.openrdf.model.Literal;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -78,7 +79,7 @@ public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterializa
 
         final Literal lit = asLiteral(iv);
         
-        if (lit.getDatatype() != null || lit.getLanguage() != null) {
+        if (!XMLSchema.STRING.equals(lit.getDatatype()) || lit.getLanguage() != null) {
             throw new SparqlTypeErrorException();
         }
         

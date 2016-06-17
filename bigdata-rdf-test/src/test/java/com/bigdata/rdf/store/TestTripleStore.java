@@ -211,7 +211,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         try {
 
             doAddTermTest(store, new LiteralImpl("abc"));
-            doAddTermTest(store, new LiteralImpl("abc", XMLSchema.STRING));
+            //Check if STRING datatyped literal corresponds to plain literal in the store 
+            assertNotNull(store.getIV(new LiteralImpl("abc", XMLSchema.STRING)));
             doAddTermTest(store, new LiteralImpl("abc", "en"));
     
             doAddTermTest(store, new URIImpl("http://www.bigdata.com"));

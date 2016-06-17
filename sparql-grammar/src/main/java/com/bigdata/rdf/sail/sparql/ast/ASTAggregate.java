@@ -12,6 +12,7 @@ import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilder;
 /**
  *
  * @author Jeen
+ * @openrdf
  */
 public abstract class ASTAggregate extends SimpleNode {
 

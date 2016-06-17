@@ -69,6 +69,7 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
  * 
  * @author mrpersonick
  * @author thompsonbry
+ * @openrdf
  */
 public class BigdataConnectionTest extends RepositoryConnectionTest {
 

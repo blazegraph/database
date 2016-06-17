@@ -215,7 +215,7 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
                  */
                 return languageCodeLiteral2key(languageCode, text);
 
-            } else if (datatypeUri != null) {
+            } else if (datatypeUri != null && !datatypeUri.equals(XMLSchema.STRING)) {
 
                 /*
                  * datatype literal.

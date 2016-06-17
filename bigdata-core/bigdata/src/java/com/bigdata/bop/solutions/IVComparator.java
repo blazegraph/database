@@ -63,6 +63,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * @author Arjohn Kampman
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @openrdf
  * @version $Id$
  */
 public class IVComparator implements Comparator<IV>, Serializable {
@@ -208,8 +209,7 @@ public class IVComparator implements Comparator<IV>, Serializable {
 		// Additional constraint for ORDER BY: "A plain literal is lower
 		// than an RDF literal with type xsd:string of the same lexical
 		// form."
-
-		if (!QueryEvaluationUtil.isStringLiteral(leftLit) || !QueryEvaluationUtil.isStringLiteral(rightLit)) {
+		if (!(QueryEvaluationUtil.isPlainLiteral(leftLit) || QueryEvaluationUtil.isPlainLiteral(rightLit))) {
 			try {
 				boolean isSmaller = QueryEvaluationUtil.compareLiterals(leftLit, rightLit, CompareOp.LT);
 
@@ -217,6 +217,10 @@ public class IVComparator implements Comparator<IV>, Serializable {
 					return -1;
 				}
 				else {
+					boolean isEquivalent = QueryEvaluationUtil.compareLiterals(leftLit, rightLit, CompareOp.EQ);
+					if (isEquivalent) {
+						return 0;
+					}
 					return 1;
 				}
 			}
@@ -228,6 +232,7 @@ public class IVComparator implements Comparator<IV>, Serializable {
 
 		int result = 0;
 
+		// FIXME: Confirm these rules work with RDF-1.1
 		// Sort by datatype first, plain literals come before datatyped literals
 		URI leftDatatype = leftLit.getDatatype();
 		URI rightDatatype = rightLit.getDatatype();
@@ -275,8 +280,14 @@ public class IVComparator implements Comparator<IV>, Serializable {
 
 	/**
 	 * Taken directly from Sesame's ValueComparator, no modification.
+	 * 
+	 * Compares two literal datatypes and indicates if one should be ordered
+	 * after the other. This algorithm ensures that compatible ordered datatypes
+	 * (numeric and date/time) are grouped together so that
+	 * {@link QueryEvaluationUtil#compareLiterals(Literal, Literal, CompareOp)}
+	 * is used in consecutive ordering steps.
 	 */
-    private int compareDatatypes(final URI leftDatatype, final URI rightDatatype) {
+	private int compareDatatypes(final URI leftDatatype, final URI rightDatatype) {
 		if (XMLDatatypeUtil.isNumericDatatype(leftDatatype)) {
 			if (XMLDatatypeUtil.isNumericDatatype(rightDatatype)) {
 				// both are numeric datatypes

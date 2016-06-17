@@ -38,6 +38,7 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
@@ -267,7 +268,7 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
 
             final Literal lit = (Literal) val;
 
-            if (!indexDatatypeLiterals && lit.getDatatype() != null) {
+            if (!indexDatatypeLiterals && lit.getDatatype() != null && !XMLSchema.STRING.equals(lit.getDatatype())) {
 
                 // do not index datatype literals in this manner.
                 continue;
