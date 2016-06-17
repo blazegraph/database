@@ -153,11 +153,12 @@ public class LatchedExecutor implements Executor {
 			} else {
 				semaphore.release();
 
-				if (queue.peek() == null) {
-					return;
-				} else if (semaphore.tryAcquire()) {
-					continue;
-				}
+				// check for a missed enqueue
+                if (!queue.isEmpty() && semaphore.tryAcquire()) {
+                    continue;
+                }
+
+                return;
 			}
 		}
 	}
