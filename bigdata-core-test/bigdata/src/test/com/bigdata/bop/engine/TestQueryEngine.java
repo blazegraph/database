@@ -36,7 +36,9 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -1982,4 +1984,39 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         return runningQuery;
     }
 
+    /**
+     * Test the LatchExecutor to verify reliable progression with multiple threads contending
+     * to add tasks.
+     * 
+     * @throws InterruptedException
+     */
+	public void testLatchExecutorProgression() throws InterruptedException {
+		LatchedExecutor latched = new LatchedExecutor(
+				Executors.newCachedThreadPool(), 1);
+
+		final Semaphore sem = new Semaphore(1);
+
+		Runnable task = new Runnable() {
+
+			@Override
+			public void run() {
+
+				sem.release();
+
+			}
+
+		};
+
+		// Without the fix to the LatchedExecutor.scheduleNext this deadlocks in less than
+		//	10,000 iterations
+		for (int n = 0; n < (1 * 1024 * 1024); n++) { // try 1 million iterations
+			// System.err.println("Iteration: " + n);
+			
+			sem.acquire();
+
+			latched.execute(task);
+
+		}
+
+	}
 }
