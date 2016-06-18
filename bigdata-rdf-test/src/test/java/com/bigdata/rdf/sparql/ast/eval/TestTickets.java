@@ -2476,4 +2476,18 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_bg911.srx"// resultFileURL
            ).runTest();    
    }
+
+   /**
+    * BLZG-1957: PipelinedHashJoin defect in combination with VALUES clause
+    */
+   public void test_ticket_1957() throws Exception {
+       
+       new TestHelper(
+           "ticket_bg1957",   // testURI,
+           "ticket_bg1957.rq",// queryFileURL
+           "ticket_bg1957.n3",// dataFileURL
+           "ticket_bg1957.srx"// resultFileURL
+           ).runTest();    
+   }
+
 }
