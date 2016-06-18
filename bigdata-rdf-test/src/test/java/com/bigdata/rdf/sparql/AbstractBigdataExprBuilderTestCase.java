@@ -37,6 +37,7 @@ import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.CoreBaseBOp;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -65,6 +66,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 import junit.framework.TestCase;
+import static junit.framework.TestCase.fail;
 
 /**
  * Abstract base class for tests of the {@link BigdataExprBuilder} and friends.
@@ -356,5 +358,60 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         }
         
     }
+    
+    
+    /** Checks that the two ASTs are different, as required by some 
+     *  unit tests.
+     */
+        protected static void assertDifferentAST(final String queryStr,
+            final IQueryNode expected, final IQueryNode actual) {
 
+        if (expected instanceof QueryRoot) {
+
+            if (((QueryRoot) expected).getQueryHints() == null) {
+                /*
+                 * Note: Discard the query hints since the unit tests are not
+                 * building those up from the AST at this time.
+                 */
+                ((QueryRoot) actual).setQueryHints(null);
+            }
+            
+            if (((QueryRoot) expected).getDataset() == null) {
+                /*
+                 * Note: Discard the data set since the unit tests are not
+                 * building those up from the AST at this time.
+                 */
+                ((QueryRoot) actual).setDataset(null);
+            }
+            
+        }
+        if (actual instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)actual).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
+        if (expected instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)expected).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
+        if (expected.equals(actual)) {
+            
+            log.error("\nIndistringuishable ASTs:\n");
+            log.error("\nqueryStr:\n" + queryStr);
+            log.error("\nexpected:\n" + expected);
+            log.error("\nactual:\n" + actual);
+            
+            fail("Could not find any difference between two ASTs: " + //
+                 "\n  expected: " + expected + //
+                 "\n  actual: " + actual);
+        }
+
+        
+    } // assertDifferentAST(final String queryStr,
+    
 }

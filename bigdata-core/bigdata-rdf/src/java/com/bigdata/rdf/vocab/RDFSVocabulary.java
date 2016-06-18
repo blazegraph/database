@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.vocab;
 
-import org.openrdf.Sesame;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
@@ -42,7 +41,6 @@ import com.bigdata.rdf.vocab.decls.RDFSVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.RDFVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.SKOSVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.SesameVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.XMLSchemaVocabularyDecl;
 
 /**

@@ -60,6 +60,8 @@ package com.bigdata.rdf.properties;
 /**
  * A {@link PropertiesParserFactory} returns {@link PropertiesParser}s for a
  * specific {@link PropertiesFormat}.
+ * 
+ * @openrdf
  */
 public interface PropertiesParserFactory {
 

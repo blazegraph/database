@@ -70,6 +70,7 @@ import com.bigdata.rdf.properties.PropertiesParser;
  * listing format.
  * 
  * @author Bryan THompson
+ * @openrdf
  */
 public class PropertiesTextParser implements PropertiesParser {
 

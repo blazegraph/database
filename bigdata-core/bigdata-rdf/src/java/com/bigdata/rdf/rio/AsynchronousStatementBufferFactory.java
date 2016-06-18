@@ -73,6 +73,7 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
 
@@ -2999,7 +3000,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                         final BigdataLiteral lit = (BigdataLiteral) obj;
 
-                        if (!indexDatatypeLiterals && lit.getDatatype() != null) {
+                        if (!indexDatatypeLiterals && lit.getDatatype() != null && !XMLSchema.STRING.equals(lit.getDatatype())) {
                             // Ignore datatype literals.
                             return false;
                         }

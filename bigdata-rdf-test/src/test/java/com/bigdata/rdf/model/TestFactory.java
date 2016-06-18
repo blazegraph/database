@@ -36,6 +36,7 @@ import junit.framework.TestCase2;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -119,7 +120,7 @@ public class TestFactory extends TestCase2 {
         
         final BigdataLiteral l1 = vf.createLiteral("12", (URI) null);
         
-        assertEquals(null, l1.getDatatype());
+        assertEquals(XMLSchema.STRING, l1.getDatatype());
 
         assertEquals(12, l1.intValue());
         

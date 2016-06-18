@@ -27,6 +27,7 @@ import org.openrdf.repository.sparql.query.QueueCursor;
  * Provides concurrent access to tuple results as they are being parsed.
  * 
  * @author James Leigh
+ * @openrdf
  */
 public class BackgroundTupleResult extends TupleQueryResultImpl implements
 		TupleQueryResult, Runnable, TupleQueryResultHandler {

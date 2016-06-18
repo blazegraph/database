@@ -71,6 +71,7 @@ import com.bigdata.counters.ICounterSet;
  * Formats for {@link ICounterSet}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  */
 public class CounterSetFormat extends FileFormat implements Iterable<CounterSetFormat> {
 

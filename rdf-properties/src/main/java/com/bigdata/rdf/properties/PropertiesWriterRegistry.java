@@ -65,6 +65,7 @@ import info.aduna.lang.service.FileFormatServiceRegistry;
  * 
  * @author Arjohn Kampman
  * @author Bryan Thompson
+ * @openrdf
  */
 public class PropertiesWriterRegistry extends
         FileFormatServiceRegistry<PropertiesFormat, PropertiesWriterFactory> {

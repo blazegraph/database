@@ -1,0 +1,25 @@
+# ?g from the outer graph ?g is overshadowed by the inner select ?x.
+# The inner graph ?g is actually non-redundant because ?g there is a different variable,
+# although it has the same name as the variable in the outer graph ?g.
+ 
+prefix ex: <http://www.example.org/schema#>
+prefix in: <http://www.example.org/instance#>
+
+select ?x where {
+
+  ?g a ex:graph_type2 .
+
+  graph ?g {
+
+    ?x ex:q ?z .
+
+    {select ?x where {
+
+      graph ?g {
+        ?x ex:p ?y
+      } .
+
+      ?g a ex:graph_type1 .  
+    }}
+  }
+}

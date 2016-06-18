@@ -70,6 +70,7 @@ import com.bigdata.rdf.sparql.ast.UpdateRoot;
  * Harness for running the SPARQL 1.1 UPDATE compliance tests (DAWG).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  */
 public class BigdataSPARQLUpdateConformanceTest extends
         SPARQLUpdateConformanceTest {

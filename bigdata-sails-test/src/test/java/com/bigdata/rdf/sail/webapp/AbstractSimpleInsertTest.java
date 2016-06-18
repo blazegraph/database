@@ -68,6 +68,10 @@ import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.journal.IIndexManager;
 
+/**
+ * @openrdf
+ */
+
 public class AbstractSimpleInsertTest<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
 

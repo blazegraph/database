@@ -113,15 +113,13 @@ public class TestBigdataGraphEmbeddedTransactional extends AbstractTestBigdataGr
                 }
 
                 if(log.isInfoEnabled())
-                	log.info("\n"+((BigdataSailRepositoryConnection)
-                        graph.getWriteConnection()).getTripleStore().dumpStore());
+                	log.info("\n"+graph.dumpStore());
                 
                 if (graph.getFeatures().supportsStringProperty) {
                     v1.setProperty("key1", "value1");
                     graph.commit();
                     if(log.isInfoEnabled())
-                       log.info("\n"+((BigdataSailRepositoryConnection)
-                            graph.getWriteConnection()).getTripleStore().dumpStore());
+                       log.info("\n"+graph.dumpStore());
                     assertEquals("value1", v1.getProperty("key1"));
                 }
 

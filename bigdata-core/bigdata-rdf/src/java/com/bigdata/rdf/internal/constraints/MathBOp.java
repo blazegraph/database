@@ -52,6 +52,8 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
  * A math expression involving a left and right IValueExpression operand. The
  * operation to be applied to the operands is specified by the
  * {@link Annotations#OP} annotation.
+ * 
+ * @openrdf
  */
 final public class MathBOp extends IVValueExpression
 		implements INeedsMaterialization {

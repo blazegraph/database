@@ -944,8 +944,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			} catch (InterruptedException e) {
 				
 				// Cancel task and propagate interrupt.
-				
-				ft.cancel(true/* mayInterruptIfRunning */);
+                final Future<Void> ft = this.ft;
+                if (ft != null) ft.cancel(true/* mayInterruptIfRunning */);
 				
 				Thread.currentThread().interrupt();
 				
@@ -1373,7 +1373,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			
 				/*
 				 * If the future is done, get the future, and
-				 * propogate any exceptions. 
+				 * propagate any exceptions. 
 				 * 
 				 * @see BLZG-1813
 				 */

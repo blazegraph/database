@@ -17,10 +17,7 @@
  */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
@@ -28,6 +25,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -48,11 +46,13 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * This compulsory AST transformation (not an optional optimizer!) enforces the
  * correct treatment of aggregates in ORDER BY clauses, according to the SPARQL
- * semantic, under the asumption that {@link com.bigdata.bop.solutions.MemorySortOp} does not have to deal
+ * semantic, under the asumption that {@link MemorySortOp} does not have to deal
  * with aggregates. In a nutshell, this is done by introducing aliases for the
  * aggregate expressions and thus pushing the computation of the aggregates to
  * where they can already be processed.

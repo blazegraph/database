@@ -1,0 +1,4 @@
+<http://s1> <http://p1> <http://o1> .
+<http://s2> <http://p2> "Plain literal" .
+<http://s3> <http://p3> "Language literal"@en .
+<http://s4> <http://p4> "Typed literal" .

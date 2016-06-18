@@ -9,7 +9,7 @@
   <results>
     <result>
         <binding name="m">
-      	   <literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal>
+      	   <literal xml:lang="en">bigdata</literal>
       	   </binding>
     </result>
   </results>

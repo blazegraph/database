@@ -1,0 +1,6 @@
+select distinct ?p
+where
+{
+  ?s ?p ?o.
+  values ?s { <http://s1> <http://s3> }
+}

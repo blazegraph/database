@@ -86,19 +86,12 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
             if (allSame) {
                 final Literal lit = asLiteral(v);
                 label = lit.getLabel();
-                if (lit.getDatatype() != null) {
-                    if (lang != null) {
-                        allSame = false;
-                    } else if (datatype == null) {
-                        if (i == 0) {
-                            datatype = lit.getDatatype();
-                        } else {
-                            allSame = false;
-                        }
-                    } else if (!datatype.equals(lit.getDatatype())) {
-                        allSame = false;
-                    }
-                } else if (lit.getLanguage() != null) {
+                // Since RDF 1.1, all code written to handle Literal objects must check
+                // for the existence of a language tag before checking the datatype.
+                // In previous versions, the Literal datatype could be checked before
+                // checking for a language tag, as they were previously mutually incompatible.
+                // @See http://rdf4j.org/sesame/2.8/docs/articles/upgrade-notes.docbook?view
+                if (lit.getLanguage() != null) {
                     if (datatype != null) {
                         allSame = false;
                     } else if (lang == null) {
@@ -110,6 +103,18 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
                     } else if (!lang.equals(lit.getLanguage())) {
                         allSame = false;
                     }
+                } else if (lit.getDatatype() != null) {
+                    if (lang != null) {
+                        allSame = false;
+                    } else if (datatype == null) {
+                        if (i == 0) {
+                            datatype = lit.getDatatype();
+                        } else {
+                            allSame = false;
+                        }
+                    } else if (!datatype.equals(lit.getDatatype())) {
+                        allSame = false;
+                    }
                 } else {
                     allSame = false;
                 }
@@ -119,10 +124,10 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
             sb.append(label);
         }
         if (allSame) {
-            if (datatype != null) {
-                return super.asIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
-            } else if (lang != null) {
+            if (lang != null) {
                 return super.asIV(getValueFactory().createLiteral(sb.toString(),lang), bs);
+            } else if (datatype != null) {
+                return super.asIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
             }
         }
         return super.asIV(getValueFactory().createLiteral(sb.toString()), bs);

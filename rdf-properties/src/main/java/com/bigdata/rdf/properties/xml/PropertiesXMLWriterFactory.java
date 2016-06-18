@@ -66,6 +66,8 @@ import com.bigdata.rdf.properties.PropertiesWriterFactory;
 
 /**
  * An {@link PropertiesWriterFactory} for text writers.
+ * 
+ * @openrdf
  */
 public class PropertiesXMLWriterFactory implements PropertiesWriterFactory {
 
