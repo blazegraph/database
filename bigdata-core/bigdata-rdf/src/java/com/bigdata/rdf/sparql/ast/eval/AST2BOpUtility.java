@@ -634,7 +634,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
 				    varNamesMaybeBound.add(maybeBoundVar.getName());
 				}
 
-				if (!varNamesProjected.equals(varNamesMaybeBound)) {
+				// if the set of projected vars is a superset of those possibly bound
+				// (e.g. projected: ?s ?p ?o, possibly bound ?s ?p) we can safely skip
+				// the final projection, as it won't change the query result
+				if (!varNamesProjected.containsAll(varNamesMaybeBound)) {
 				
     				final List<NV> anns = new LinkedList<NV>();
     				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
