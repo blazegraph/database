@@ -4,7 +4,7 @@ This is a major release of Blazegraph™.  The official release is now made into
 
 Blazegraph Features (http://www.blazegraph.com/product/)
 
-2.1.2 is a maintenance release for 2.1.1 release.  It is recommended that all users upgrade to 2.1.2.   See https://blog.blazegraph.com/?p=1011
+2.1.2 is a maintenance release for 2.1.1 release.  It is recommended that all users upgrade to 2.1.2.   See https://blog.blazegraph.com/?p=1019
 
 Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
 
