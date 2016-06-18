@@ -615,26 +615,46 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
 			{
 				// The variables projected by the subquery.
-				final IVariable<?>[] projectedVars = projection
-						.getProjectionVars();
+				final IVariable<?>[] projectedVars = projection.getProjectionVars();
 
-				final List<NV> anns = new LinkedList<NV>();
-				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
-				anns.add(new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER));
-				anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, true));// live stats
-				anns.add(new NV(ProjectionOp.Annotations.SELECT, projectedVars));
-				if (preserveOrder) {
-					/**
-					 * @see #563 (ORDER BY + DISTINCT)
-					 * @see #1044 (PROJECTION after ORDER BY does not preserve
-					 *      order)
-					 */
-					anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
-					anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
+				/**
+				 * BLZG-1958: we only need a projection op if the set of projected vars
+				 * differs from the variables bound inside the query
+				 */
+				final Set<IVariable<?>> maybeBoundVars = 
+				    ctx.sa.getSpannedVariables(root, new HashSet<IVariable<?>>());
+				
+				final Set<String> varNamesProjected = new LinkedHashSet<String>();
+				for (final IVariable<?> projectedVar : projectedVars) {
+				    varNamesProjected.add(projectedVar.getName());
 				}
-				left = applyQueryHints(new ProjectionOp(leftOrEmpty(left),//
-						anns.toArray(new NV[anns.size()])//
-						), queryBase, ctx);
+				
+				final Set<String> varNamesMaybeBound = new LinkedHashSet<String>();
+				for (final IVariable<?> maybeBoundVar : maybeBoundVars) {
+				    varNamesMaybeBound.add(maybeBoundVar.getName());
+				}
+
+				if (!varNamesProjected.equals(varNamesMaybeBound)) {
+				
+    				final List<NV> anns = new LinkedList<NV>();
+    				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
+    				anns.add(new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER));
+    				anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, true));// live stats
+    				anns.add(new NV(ProjectionOp.Annotations.SELECT, projectedVars));
+    				if (preserveOrder) {
+    					/**
+    					 * @see #563 (ORDER BY + DISTINCT)
+    					 * @see #1044 (PROJECTION after ORDER BY does not preserve
+    					 *      order)
+    					 */
+    					anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+    					anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
+    				}
+    				left = applyQueryHints(new ProjectionOp(leftOrEmpty(left),//
+    						anns.toArray(new NV[anns.size()])//
+    						), queryBase, ctx);
+    				
+				}
 			}
             
             if (materializeProjection) {
