@@ -62,6 +62,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.btree.IIndex;
@@ -365,8 +366,18 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          */
         String READ_BLOBS_ASYNC = RWStore.class.getName() + ".readBlobsAsync";
 
-        String DEFAULT_READ_BLOBS_ASYNC = "true";
-        
+        /**
+         * Note: Windows does not handle async IO channel reopens in the same
+         * fashion as Linux, leading to "overlapping file exceptions" and other
+         * weirdness. Therefore this option is explicitly disabled by default 
+         * on Windows.
+         * 
+         * @see https://jira.blazegraph.com/browse/BLZG-1911 (Blazegraph 2.1
+         *      version does not work on Windows (async IO causes file lock
+         *      errors))
+         */
+        String DEFAULT_READ_BLOBS_ASYNC = SystemUtil.isWindows() ? "false" : "true";
+
         /**
          * Defines the number of bits that must be free in a FixedAllocator for
          * it to be added to the free list.  This is used to ensure a level
