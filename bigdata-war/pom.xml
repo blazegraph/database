@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-artifacts</artifactId>
-    <version>2.1.2</version>
+    <version>2.1.2-master-SNAPSHOT</version>
     <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-war</artifactId>
-  <version>2.1.2</version>
+  <version>2.1.2-master-SNAPSHOT</version>
   <name>Blazegraph WAR (bigdata legacy context path)</name>
   <description>Blazegraph Web Application Archive with legacy /bigdata deployment path</description>
   <packaging>war</packaging>
