@@ -1,0 +1,42 @@
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture and, now, GPU Acceleration. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a major release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
+
+Blazegraph Features (http://www.blazegraph.com/product/)
+
+2.1.2 is a maintenance release for 2.1.1 release.  It is recommended that all users upgrade to 2.1.2.   See https://blog.blazegraph.com/?p=1019
+
+Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
+
+Starting points:
+
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+    Blazegraph Support:  https://www.blazegraph.com/support/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TDF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+    
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BLAZEGRAPH_RELEASE_2_1_2 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_2
+
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_2
+
+** Bug
+    * [BLZG-1911] - Blazegraph 2.1 version does not work on Windows (async IO causes file lock errors)
+    * [BLZG-1954] - Potential Race Condition in Latched Executor
+    * [BLZG-1957] - PipelinedHashJoin defect in combination with VALUES clause
