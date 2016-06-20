@@ -617,47 +617,52 @@ public class AST2BOpUtility extends AST2BOpRTO {
 				// The variables projected by the subquery.
 				final IVariable<?>[] projectedVars = projection.getProjectionVars();
 
-				/**
-				 * BLZG-1958: we only need a projection op if the set of projected vars
-				 * differs from the variables bound inside the query
-				 */
-				final Set<IVariable<?>> maybeBoundVars = 
-				    ctx.sa.getSpannedVariables(root, new HashSet<IVariable<?>>());
+//				/**
+//				 * BLZG-1958: we only need a projection op if the set of projected vars
+//				 * differs from the variables bound inside the query.
+//               *				
+//               * NOTE: The following code sets the top-level projection conditionally, only if it
+//               * is needed. However, there are some problems related to temporary and anonymous
+//               * variables being included where they should not. See BLZG-1958. This is something
+//               * we may need to re-enable once the optimization proposed in BLZG-1901 is in place;
+//               * the code is currently commented out.				 
+//				 */
+//				final Set<IVariable<?>> maybeBoundVars = 
+//				    ctx.sa.getSpannedVariables(root, new HashSet<IVariable<?>>());
+//				
+//				final Set<String> varNamesProjected = new LinkedHashSet<String>();
+//				for (final IVariable<?> projectedVar : projectedVars) {
+//				    varNamesProjected.add(projectedVar.getName());
+//				}
+//				
+//				final Set<String> varNamesMaybeBound = new LinkedHashSet<String>();
+//				for (final IVariable<?> maybeBoundVar : maybeBoundVars) {
+//				    varNamesMaybeBound.add(maybeBoundVar.getName());
+//				}
+//
+//				// if the set of projected vars is a superset of those possibly bound
+//				// (e.g. projected: ?s ?p ?o, possibly bound ?s ?p) we can safely skip
+//				// the final projection, as it won't change the query result
+//				if (!varNamesProjected.containsAll(varNamesMaybeBound)) {
 				
-				final Set<String> varNamesProjected = new LinkedHashSet<String>();
-				for (final IVariable<?> projectedVar : projectedVars) {
-				    varNamesProjected.add(projectedVar.getName());
-				}
-				
-				final Set<String> varNamesMaybeBound = new LinkedHashSet<String>();
-				for (final IVariable<?> maybeBoundVar : maybeBoundVars) {
-				    varNamesMaybeBound.add(maybeBoundVar.getName());
-				}
-
-				// if the set of projected vars is a superset of those possibly bound
-				// (e.g. projected: ?s ?p ?o, possibly bound ?s ?p) we can safely skip
-				// the final projection, as it won't change the query result
-				if (!varNamesProjected.containsAll(varNamesMaybeBound)) {
-				
-    				final List<NV> anns = new LinkedList<NV>();
-    				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
-    				anns.add(new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER));
-    				anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, true));// live stats
-    				anns.add(new NV(ProjectionOp.Annotations.SELECT, projectedVars));
-    				if (preserveOrder) {
-    					/**
-    					 * @see #563 (ORDER BY + DISTINCT)
-    					 * @see #1044 (PROJECTION after ORDER BY does not preserve
-    					 *      order)
-    					 */
-    					anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
-    					anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
-    				}
-    				left = applyQueryHints(new ProjectionOp(leftOrEmpty(left),//
-    						anns.toArray(new NV[anns.size()])//
-    						), queryBase, ctx);
-    				
-				}
+				final List<NV> anns = new LinkedList<NV>();
+    			anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
+    			anns.add(new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER));
+    			anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, true));// live stats
+    			anns.add(new NV(ProjectionOp.Annotations.SELECT, projectedVars));
+    			if (preserveOrder) {
+    			    /**
+    			     * @see #563 (ORDER BY + DISTINCT)
+    				 * @see #1044 (PROJECTION after ORDER BY does not preserve
+    				 *      order)
+    				 */
+    			    anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+    				anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
+    			}
+    			left = applyQueryHints(new ProjectionOp(leftOrEmpty(left),//
+    			    anns.toArray(new NV[anns.size()])//
+    			        ), queryBase, ctx);
+//				}
 			}
             
             if (materializeProjection) {
