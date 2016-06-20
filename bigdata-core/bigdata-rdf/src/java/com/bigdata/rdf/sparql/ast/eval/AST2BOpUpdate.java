@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import info.aduna.iteration.CloseableIteration;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -52,6 +54,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 //import org.openrdf.query.impl.MutableTupleQueryResult;
@@ -68,6 +71,8 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -82,6 +87,10 @@ import com.bigdata.bop.rdf.update.CommitOp;
 import com.bigdata.bop.rdf.update.InsertStatementsOp;
 import com.bigdata.bop.rdf.update.ParseOp;
 import com.bigdata.bop.rdf.update.RemoveStatementsOp;
+import com.bigdata.bop.solutions.SolutionSetStream;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.GraphEmptyException;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.GraphExistsException;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.SolutionSetDoesNotExistException;
@@ -129,12 +138,15 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
+import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.stream.Stream.StreamIndexMetadata;
 import com.bigdata.striterator.Chunkerator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
-import info.aduna.iteration.CloseableIteration;
 
 /**
  * Class handles SPARQL update query plan generation.
@@ -665,6 +677,48 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * associated with the SailConnection in case the view is
 				 * isolated by a transaction.
 				 */
+////				final BOpContextBase bopContextBase = context.getBOpContext();
+////				final BOpContext bopContext = (BOpContext)context.getBOpContext();
+////				final IMemoryManager mmgr = bopContext.getMemoryManager(null);
+//				final MemoryManager mmgr = new MemoryManager(DirectBufferPool.INSTANCE);
+//                final AbstractRawStore store = new MemStore(mmgr.createAllocationContext());
+//
+//                final StreamIndexMetadata metadata = new StreamIndexMetadata(UUID.randomUUID());
+//                final Checkpoint checkpoint = new Checkpoint(metadata);
+//                
+//                final SolutionSetStream ssstr = new SolutionSetStream(store, checkpoint, metadata, false);
+//                
+//                
+//                final  ICloseableIterator<IBindingSet[]> resItr= 
+//                    ASTEvalHelper.evaluateTupleQuery2(
+//                       context.conn.getTripleStore(), astContainer,
+//                         context.getQueryBindingSet()/* bindingSets */, true);
+//
+////                while (resItr.hasNext()) {
+////                    IBindingSet[] intl = resItr.next();
+////                    System.out.println(intl);
+////                }
+////				
+//                ssstr.put(resItr);
+//
+//              
+//                ICloseableIterator<IBindingSet[]> res2Itr = ssstr.get();
+//                while (res2Itr.hasNext()) {
+//                    System.out.println("NEXT 1: " + res2Itr.next());
+//                }
+//                
+//                ICloseableIterator<IBindingSet[]> res3Itr = ssstr.get();
+//                while (res3Itr.hasNext()) {
+//                    System.out.println("NEXT 2: " + res3Itr.next());
+//                }
+//
+//                /////////////////
+//                
+//                final TupleQueryResult res = 
+//                    ASTEvalHelper.evaluateTupleQuery(
+//                        context.conn.getTripleStore(), astContainer,
+//                        context.getQueryBindingSet()/* bindingSets */, null /* dataset */);
+
 
 				// Note: Blocks until the result set is materialized.
 				final long beginWhereClauseNanos = System.nanoTime();
