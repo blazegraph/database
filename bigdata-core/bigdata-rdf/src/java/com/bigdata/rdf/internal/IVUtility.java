@@ -87,6 +87,8 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
  * Helper class for {@link IV}s.
+ * 
+ * @openrdf
  */
 /*
  * Note: There are a huge number of warnings in this class, all of which are

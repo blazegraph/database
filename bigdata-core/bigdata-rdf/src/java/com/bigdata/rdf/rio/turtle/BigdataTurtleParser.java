@@ -56,9 +56,9 @@ public class BigdataTurtleParser extends TurtleParser {
      * literal, integer, double and boolean.
      */
     protected Value parseValue()
-        throws IOException, RDFParseException
+        throws IOException, RDFParseException, RDFHandlerException
     {
-        int c = peek();
+        int c = peekCodePoint();
 
         if (c == '<') {
             // uriref, e.g. <foo://bar>
@@ -92,15 +92,15 @@ public class BigdataTurtleParser extends TurtleParser {
 
 
     protected Value parseURIOrSid()
-        throws IOException, RDFParseException
+        throws IOException, RDFParseException, RDFHandlerException
     {
         // First character should be '<'
-        int c = read();
+        int c = readCodePoint();
         verifyCharacterOrFail(c, "<");
         
-        int n = peek();
+        int n = peekCodePoint();
         if (n == '<') {
-            read();
+            readCodePoint();
             if (this.valueFactory == null) {
                 reportFatalError("must use a BigdataValueFactory to use the RDR syntax");
             }
@@ -112,7 +112,7 @@ public class BigdataTurtleParser extends TurtleParser {
     }
     
     protected Value parseSid()
-            throws IOException, RDFParseException
+            throws IOException, RDFParseException, RDFHandlerException
     {
         Resource s = (Resource) parseValue();
         
@@ -122,12 +122,12 @@ public class BigdataTurtleParser extends TurtleParser {
         skipWS();
         Value o = parseValue();
 
-        int i = read();
+        int i = readCodePoint();
         while (TurtleUtil.isWhitespace(i)) {
-            i = read();
+            i = readCodePoint();
         }
         
-        if (i == '>' && read() == '>') {
+        if (i == '>' && readCodePoint() == '>') {
             if (valueFactory == null || 
                     valueFactory instanceof BigdataValueFactory == false) {
                 /*
@@ -170,9 +170,9 @@ public class BigdataTurtleParser extends TurtleParser {
     protected int skipWS()
         throws IOException
     {
-        int c = read();
+        int c = readCodePoint();
         while (TurtleUtil.isWhitespace(c)) {
-            c = read();
+            c = readCodePoint();
         }
 
         unread(c);
@@ -187,11 +187,11 @@ public class BigdataTurtleParser extends TurtleParser {
         throws IOException, RDFParseException
     {
         // Node ID should start with "_:"
-        verifyCharacterOrFail(read(), "_");
-        verifyCharacterOrFail(read(), ":");
+        verifyCharacterOrFail(readCodePoint(), "_");
+        verifyCharacterOrFail(readCodePoint(), ":");
 
         // Read the node ID
-        int c = read();
+        int c = readCodePoint();
         if (c == -1) {
             throwEOFException();
         }
@@ -204,7 +204,7 @@ public class BigdataTurtleParser extends TurtleParser {
         name.append((char)c);
 
         // Read all following letter and numbers, they are part of the name
-        c = read();
+        c = readCodePoint();
 
         // If we would never go into the loop we must unread now
         if (!TurtleUtil.isNameChar(c)) {
@@ -213,7 +213,7 @@ public class BigdataTurtleParser extends TurtleParser {
 
         while (TurtleUtil.isNameChar(c)) {
             int previous = c;
-            c = read();
+            c = readCodePoint();
             
             if (previous == '.' && (c == -1 || TurtleUtil.isWhitespace(c) || c == '<' || c == '_')) {
                 unread(c);

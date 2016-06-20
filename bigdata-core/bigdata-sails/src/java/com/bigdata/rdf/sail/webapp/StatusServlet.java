@@ -142,17 +142,28 @@ public class StatusServlet extends BigdataRDFServlet {
     /**
      * The name of a request parameter used to request a display of the
      * currently running queries. Legal values for this request parameter are
-     * either {@value #DETAILS} or no value.
+     * either {@value #DETAILS}, {@value #ALL_DETAILS}, or no value.
      * 
      * @see #DETAILS
+     * @see #ALL_DETAILS
      * @see #QUERY_ID
      */
     private static final String SHOW_QUERIES = "showQueries";
 
     /**
+     * Used to request the live "explain" of each query.
+     * 
      * @see #SHOW_QUERIES
      */
     private static final String DETAILS = "details";
+
+    /**
+     * Used to request the live "explain" of each query with the details for
+     * each such query.
+     * 
+     * @see #SHOW_QUERIES
+     */
+    private static final String ALL_DETAILS = "allDetails";
 
     /**
      * The name of a request parameter whose value is the {@link UUID} of a
@@ -608,10 +619,16 @@ public class StatusServlet extends BigdataRDFServlet {
         final boolean showQueries = req.getParameter(SHOW_QUERIES) != null;
 
         boolean showQueryDetails = false;
+        boolean showQueryAllDetails = false;
         if (showQueries) {
             for (String tmp : req.getParameterValues(SHOW_QUERIES)) {
-                if (tmp.equals(DETAILS))
+                if (tmp.equals(DETAILS)) {
                     showQueryDetails = true;
+                } else if (tmp.equals(ALL_DETAILS)) {
+                    showQueryDetails = true;
+                    showQueryAllDetails = true;
+                }
+
             }
         }
 
@@ -906,7 +923,7 @@ public class StatusServlet extends BigdataRDFServlet {
 							w,
 							current,
 							queryEngine.getRunningQuery(acceptedQuery.queryId2),
-							acceptedQuery, showQueryDetails, maxBopLength);
+							acceptedQuery, showQueryDetails, showQueryAllDetails, maxBopLength);
     			}
 
             } // end of block in which we handle the running queries.
@@ -1217,7 +1234,7 @@ public class StatusServlet extends BigdataRDFServlet {
     private XMLBuilder.Node showQuery(final HttpServletRequest req,
             final HttpServletResponse resp, final Writer w,
             XMLBuilder.Node current, final IRunningQuery q,
-            final RunningQuery acceptedQuery, final boolean showQueryDetails,
+            final RunningQuery acceptedQuery, final boolean showQueryDetails, final boolean showQueryAllDetails,
             final int maxBopLength) throws IOException {
 
         // The UUID assigned to the IRunningQuery.
@@ -1381,13 +1398,13 @@ public class StatusServlet extends BigdataRDFServlet {
             // iff scale-out.
             final boolean clusterStats = q.getFederation() != null;
             // detailed explain not enabled on this code path.
-            final boolean detailedStats = false;
+            final boolean detailedStats = showQueryAllDetails;
             // no mutation for query.
             final boolean mutationStats = false;
             
             // Format as a table, writing onto the response.
             QueryLog.getTableXHTML(queryString, q, children, w,
-                    !showQueryDetails, maxBopLength, clusterStats,
+                    false/*summaryOnly*/, maxBopLength, clusterStats,
                     detailedStats, mutationStats);
 
         }

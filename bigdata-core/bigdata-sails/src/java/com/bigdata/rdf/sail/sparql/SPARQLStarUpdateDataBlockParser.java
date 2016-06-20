@@ -96,7 +96,7 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 	 *---------*/
 
 	@Override
-	protected Value parseValue() throws IOException, RDFParseException {
+	protected Value parseValue() throws IOException, RDFParseException, RDFHandlerException {
 		if (checkSparqlStarSyntax()) {
 			return parseStmtValue();
 		}
@@ -104,10 +104,10 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 	}
 	
 	private boolean checkSparqlStarSyntax() throws IOException {
-		int c1 = read();
+		int c1 = readCodePoint();
 		int c2;
 		try {
-			c2 = read();
+			c2 = readCodePoint();
 			unread(c2);
 		} finally {
 			unread(c1);
@@ -120,22 +120,22 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 		StringBuilder stmtBuf = new StringBuilder(100);
 
 		// First 2 characters should be '<'
-		int c = read();
+		int c = readCodePoint();
 		verifyCharacterOrFail(c, "<");
-		c = read();
+		c = readCodePoint();
 		verifyCharacterOrFail(c, "<");
 		int recursiveCounter = 1;
 
 		// Read up to the next ">>" characters combination
 		while (true) {
-			c = read();
-			int c2 = peek();
+			c = readCodePoint();
+			int c2 = peekCodePoint();
 
 			if (c == '<' && c2 =='<' ) {
 				recursiveCounter++;
 			} else  if (c == '>' && c2 == '>') {
 				if (--recursiveCounter == 0) {
-					c = read();
+					c = readCodePoint();
 					break;
 				}
 			} else if (c == -1) {
@@ -146,7 +146,7 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 
 			if (c == '\\') {
 				// This escapes the next character, which might be a '>'
-				c = read();
+				c = readCodePoint();
 				if (c == -1) {
 					throwEOFException();
 				}

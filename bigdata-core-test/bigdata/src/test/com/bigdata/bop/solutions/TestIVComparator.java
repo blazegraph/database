@@ -296,11 +296,11 @@ public class TestIVComparator extends TestCase2 {
 
         final IVComparator c = new IVComparator();
 
-        // plain LT languageCode
-        assertLT(c.compare(v.noninline_plain_lit1, v.noninline_languageCode_de_lit1));
+        // plain GT languageCode
+        assertGT(c.compare(v.noninline_plain_lit1, v.noninline_languageCode_de_lit1));
 
-        // languageCode LT datatype
-        assertLT(c.compare(v.noninline_plain_lit1, v.noninline_xsd_string_lit1));
+        // languageCode EQ string
+        assertEQ(c.compare(v.noninline_plain_lit1, v.noninline_xsd_string_lit1));
 
     }
     
@@ -358,8 +358,8 @@ public class TestIVComparator extends TestCase2 {
 
         final IVComparator c = new IVComparator();
 
-        // plain literal LT numeric
-        assertLT(c.compare(v.noninline_plain_lit1, v.inline_xsd_int1));
+        // plain literal is actually string and GT numeric
+        assertGT(c.compare(v.noninline_plain_lit1, v.inline_xsd_int1));
 
         // numeric LT boolean
         assertLT(c.compare(v.inline_xsd_int1, v.inline_xsd_boolean_true));

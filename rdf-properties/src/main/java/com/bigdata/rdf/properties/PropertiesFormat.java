@@ -69,6 +69,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * Formats for a properties file.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  */
 public class PropertiesFormat extends FileFormat implements Iterable<PropertiesFormat> {
 

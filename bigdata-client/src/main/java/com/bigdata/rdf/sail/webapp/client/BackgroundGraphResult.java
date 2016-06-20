@@ -29,7 +29,7 @@ import org.openrdf.rio.RDFParser;
  * Provides concurrent access to statements as they are being parsed.
  * 
  * @author James Leigh
- * 
+ * @openrdf
  */
 public class BackgroundGraphResult implements GraphQueryResult, Runnable,
         RDFHandler {

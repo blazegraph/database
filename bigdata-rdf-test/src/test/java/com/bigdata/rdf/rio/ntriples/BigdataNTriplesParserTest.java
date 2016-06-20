@@ -14,6 +14,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
  * JUnit test for the N-Triples parser.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class BigdataNTriplesParserTest extends BigdataNTriplesParserTestCase {
 

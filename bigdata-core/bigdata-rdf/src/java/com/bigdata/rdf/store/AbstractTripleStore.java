@@ -978,9 +978,13 @@ abstract public class AbstractTripleStore extends
 		 * Boolean option enables support for a full text index that may be used
 		 * to lookup datatype literals by tokens found in the text of those
 		 * literals (default {@value #DEFAULT_TEXT_INDEX_DATATYPE_LITERALS}).
-		 * This option will cause ALL datatype literals to be presented to the
-		 * full text indexer, including <code>xsd:string</code>,
-		 * <code>xsd:int</code>, etc.
+		 * Enabling of this option will cause ALL datatype literals to be presented
+		 * to the full text indexer, including <code>xsd:string</code>,
+		 * <code>xsd:int</code>, etc. If disabled, only <code>xsd:string</code>
+		 * will be indexed.<br>
+		 * Note: only literals placed into Term2ID index may be indexed in a
+		 * full text index, so you might need to disable {@link #INLINE_TEXT_LITERALS}
+		 * and {@link #INLINE_XSD_DATATYPE_LITERALS}.
 		 */
         String TEXT_INDEX_DATATYPE_LITERALS = AbstractTripleStore.class
                 .getName() + ".textIndex.datatypeLiterals";

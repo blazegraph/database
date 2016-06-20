@@ -63,6 +63,8 @@ import com.bigdata.journal.IIndexManager;
  * Proxied test suite.
  * We test the behavior reported in trac 731 - the bug resport uses the repo properties to set up the describe mode,
  * the behavior reproduced just using a query hint.
+ * 
+ * @openrdf
  */
 public class TestCBD731<S extends IIndexManager> extends AbstractSimpleInsertTest<S> {
 

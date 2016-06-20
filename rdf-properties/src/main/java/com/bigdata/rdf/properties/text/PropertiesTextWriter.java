@@ -71,6 +71,7 @@ import com.bigdata.rdf.properties.PropertiesWriter;
  * {@link PropertiesFormat#TEXT} writer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  */
 public class PropertiesTextWriter implements PropertiesWriter {
 

@@ -65,6 +65,7 @@ import org.openrdf.rio.RDFParserFactory;
  * A registry that keeps track of the available {@link RDFParserFactory}s.
  * 
  * @author Bryan Thompson
+ * @openrdf
  */
 public class PropertiesParserRegistry extends
         FileFormatServiceRegistry<PropertiesFormat, PropertiesParserFactory> {
