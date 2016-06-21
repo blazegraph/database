@@ -788,33 +788,33 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                                 minusOp.setMinus(true);
 
                                 // Set the projection node.
-    							queryRoot.setProjection(deleteClause.getProjection());
+                                queryRoot.setProjection(deleteClause.getProjection());
 
-    							/*
-    							 * Run as a SELECT query : Do NOT materialize
-    							 * IVs.
-    							 * 
-    							 * Note: This *MUST* use the view of the
-    							 * tripleStore which is associated with the
-    							 * SailConnection in case the view is isolated
-    							 * by a transaction.
-    							 */
-    							final ICloseableIterator<IBindingSet[]> titr = 
-    							    ASTEvalHelper.evaluateTupleQuery2(
-    							        context.conn.getTripleStore(),
-    							        astContainer,
-    							        context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
+                                /*
+                                 * Run as a SELECT query : Do NOT materialize
+                                 * IVs.
+                                 * 
+                                 * Note: This *MUST* use the view of the
+                                 * tripleStore which is associated with the
+                                 * SailConnection in case the view is isolated
+                                 * by a transaction.
+                                 */
+                                final ICloseableIterator<IBindingSet[]> titr = 
+                                    ASTEvalHelper.evaluateTupleQuery2(
+                                        context.conn.getTripleStore(),
+                                        astContainer,
+                                        context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
 
-    							try {
+                                try {
 
-    							    // Write onto named solution set.
-    							    context.solutionSetManager.putSolutions(solutionSet, titr);
+                                    // Write onto named solution set.
+                                    context.solutionSetManager.putSolutions(solutionSet, titr);
 
-    							} finally {
+                                } finally {
 
-    							    titr.close();
+                                    titr.close();
 
-    							}
+                                }
     
                             } finally {
     
@@ -854,10 +854,10 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     
                                 final BigdataStatement stmt = itr.next();
     
-    							addOrRemoveStatement(
-    							    context.conn.getSailConnection(), stmt,
-    							    false/* insert */);
-    
+                                addOrRemoveStatement(
+                                    context.conn.getSailConnection(), stmt,
+                                    false/* insert */);
+
                             }
 
                         }
