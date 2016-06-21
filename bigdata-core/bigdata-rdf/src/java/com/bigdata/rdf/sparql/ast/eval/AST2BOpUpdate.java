@@ -652,14 +652,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * the WHERE clause results when both the DELETE clause and the
 				 * INSERT clause are present.
 				 * 
-				 * FIXME For large intermediate results, we would be much better
-				 * off putting the data onto an HTree (or, better yet, a chain
-				 * of blocks) and processing the bindings as IVs rather than
-				 * materializing them as RDF Values (and even for small data
-				 * sets, we would be better off avoiding materialization of the
-				 * RDF Values and using an ASTConstructIterator which builds
-				 * ISPOs using IVs rather than Values).
-				 * 
 				 * Note: Unlike operations against a graph, we do NOT perform
 				 * truth maintenance for updates against solution sets,
 				 * therefore we could get by nicely with operations on
@@ -668,13 +660,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
 				 * (SPARQL Cache)
 				 */
-
-				final LexiconRelation lexicon = context
-						.getAbstractTripleStore().getLexiconRelation();
-
-				final int chunkSize = 100; // TODO configure.
-
-				
+                // TODO: put fields onto struct and call method containing the inner logics
+                // TODO: wipe out unused code paths -> we believe we can't use updates while running query
                 MemoryManager mmgr = null;
                 AbstractRawStore store = null;
                 SolutionSetStream ssstr = null;
@@ -689,22 +676,41 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                      */
                     final long beginWhereClauseNanos = System.nanoTime();
 
-                    final StreamIndexMetadata metadata = new StreamIndexMetadata(UUID.randomUUID());
+                    // TODO: solution set stream stats contains information about which variables are
+                    //       materialized and which are not
+                    final StreamIndexMetadata metadata = new StreamIndexMetadata(UUID.randomUUID()); 
+                    
                     final Checkpoint checkpoint = new Checkpoint(metadata);
                     mmgr = QueryEngineUtils.newBoundedNativeMemoryManager();
                     store = new MemStore(mmgr.createAllocationContext());
-                    ssstr = new SolutionSetStream(store, checkpoint, metadata, false);    				    
+                    ssstr = new SolutionSetStream(store, checkpoint, metadata, false /* readOnly */);    				    
 
                     // get the result
                     final  ICloseableIterator<IBindingSet[]> resItr = 
                         ASTEvalHelper.evaluateTupleQuery2(
                             context.conn.getTripleStore(), astContainer,
-                            context.getQueryBindingSet()/* bindingSets */, false);
+                            context.getQueryBindingSet()/* bindingSets */, true /* materialize */);
 
                     // play the result into a solution set stream
                     // Note: Blocks until the result set is materialized.
                     ssstr.put(resItr);
                     deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
+
+
+//                    // TODO: remove again, this is debug code
+//                    {
+//                        ICloseableIterator<IBindingSet[]> bsItr = ssstr.get();
+//                        System.out.println("==========> bsItr after initialization");
+//                        while (bsItr.hasNext()) {
+//                            final IBindingSet[] bs = bsItr.next();
+//                            for (int i=0; i<bs.length; i++) {
+//                                final IBindingSet bSet = bs[i]; 
+//                                System.out.println("> " + bSet);                                
+//                            }
+//                        }
+//                        System.out.println("<==========");
+//                    }
+//                    // END TODO
 
                     // If the query contains a nativeDistinctSPO query hint then
                     // the line below unfortunately isolates the query so that the hint does
@@ -760,6 +766,23 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                             // solutions to be deleted.
                             final String tempSolutionSet = "-" + solutionSet + "-" + UUID.randomUUID();
 
+                            
+//                            // TODO: remove again, this is debug code
+//                            {
+//                                ICloseableIterator<IBindingSet[]> bsItr = ssstr.get();
+//                                System.out.println("======2====> bsItr after initialization");
+//                                while (bsItr.hasNext()) {
+//                                    final IBindingSet[] bs = bsItr.next();
+//                                    for (int i=0; i<bs.length; i++) {
+//                                        final IBindingSet bSet = bs[i]; 
+//                                        System.out.println("> " + bSet);                                
+//                                    }
+//                                }
+//                                System.out.println("<=====2=====");
+//                            }
+//                            // END TODO
+                            
+                            
                             // Write solutions to be deleted onto temp set.
                             context.solutionSetManager.putSolutions(
                                 tempSolutionSet,

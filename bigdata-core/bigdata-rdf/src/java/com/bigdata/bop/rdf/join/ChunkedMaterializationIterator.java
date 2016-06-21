@@ -93,6 +93,8 @@ public class ChunkedMaterializationIterator implements
         this.materializeInlineIVs = materializeInlineIVs;
         
         this.src = src;
+        
+        this.open = true; // unless closed
 
     }
 

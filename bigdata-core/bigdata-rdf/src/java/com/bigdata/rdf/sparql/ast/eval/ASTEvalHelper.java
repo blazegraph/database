@@ -59,6 +59,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -328,7 +329,7 @@ public class ASTEvalHelper {
         try {
 
             // Submit query for evaluation.
-            runningQuery = context.queryEngine.eval(queryPlan, globallyScopedBSAsList);
+            runningQuery = context.queryEngine.eval(queryPlan, astContainer.getOptimizedASTBindingSets());
 
             // The iterator draining the query solutions.
             final ICloseableIterator<IBindingSet[]> it1 = runningQuery
@@ -354,9 +355,11 @@ public class ASTEvalHelper {
                  */
                 
                 // The variables to be materialized.
-                final IVariable<?>[] vars = projectedSet
-                        .toArray(new IVariable[projectedSet.size()]);
-
+                final IVariable<?>[] vars = new IVariable[projectedSet.size()];
+                for (int i=0; i<vars.length; i++) {
+                    vars[i] = Var.var(projectedSet.get(i));
+                }
+                
                 // Wrap with chunked materialization logic.
                 it2 = new ChunkedMaterializationIterator(vars,
                         context.db.getLexiconRelation(),
