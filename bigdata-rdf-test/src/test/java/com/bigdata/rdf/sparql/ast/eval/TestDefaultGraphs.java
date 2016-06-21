@@ -248,7 +248,7 @@ public class TestDefaultGraphs extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
         
         final PipelineOp queryPlan = astContainer.getQueryPlan();
-        final BOp pipelineJoin = queryPlan.get(0);
+        final BOp pipelineJoin = queryPlan.get(0).get(0); // first is chunked materialization op
         final SPOPredicate spoPred = (SPOPredicate)pipelineJoin.annotations().get(AccessPathJoinAnnotations.PREDICATE);
         final Object filter = spoPred.annotations().get(IPredicate.Annotations.ACCESS_PATH_FILTER);
 
@@ -279,7 +279,7 @@ public class TestDefaultGraphs extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
-        final BOp pipelineJoin = queryPlan.get(0);
+        final BOp pipelineJoin = queryPlan.get(0).get(0); // first is chunked materialization op
         final SPOPredicate spoPred = (SPOPredicate)pipelineJoin.annotations().get(AccessPathJoinAnnotations.PREDICATE);
         final Object filter = spoPred.annotations().get(IPredicate.Annotations.ACCESS_PATH_FILTER);
 
@@ -309,7 +309,7 @@ public class TestDefaultGraphs extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
         
         final PipelineOp queryPlan = astContainer.getQueryPlan();
-        final BOp pipelineJoin = queryPlan.get(0);
+        final BOp pipelineJoin = queryPlan.get(0).get(0); // first is chunked materialization op
         final SPOPredicate spoPred = (SPOPredicate)pipelineJoin.annotations().get(AccessPathJoinAnnotations.PREDICATE);
         final Object filter = spoPred.annotations().get(IPredicate.Annotations.ACCESS_PATH_FILTER);
 
