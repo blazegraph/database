@@ -1,0 +1,5 @@
+SELECT ?s ?o
+WHERE {
+  hint:Query hint:maxParallel 10 .
+  ?s ?p ?o
+}
