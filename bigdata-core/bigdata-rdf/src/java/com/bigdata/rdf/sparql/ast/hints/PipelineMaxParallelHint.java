@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -60,29 +59,16 @@ final class PipelineMaxParallelHint extends AbstractIntQueryHint {
             final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op, final Integer value) {
 
-        if (op instanceof IJoinNode) {
-
-            /*
-             * Note: This is set on the queryHint Properties object and then
-             * transferred to the pipeline operator when it is generated.
-             */
-
+        /*
+         * Note: This is set on the queryHint Properties object and then
+         * transferred to the pipeline operator when it is generated.
+         * 
+         * Since BLZG-1960, we propagate the query hint to all operators. It is up
+         * to AST2BOpUtility to carry over this query hint only to those operators
+         * that do *not* implement the ISingleThreadedOp interface.
+         */
             _setQueryHint(context, scope, op,
                     PipelineOp.Annotations.MAX_PARALLEL, value);
-
-        }
-
-//        if (QueryHintScope.Query.equals(scope)) {
-//
-//            /*
-//             * Also stuff the query hint on the global context for things which
-//             * look there.
-//             */
-//
-//            conditionalSetGlobalProperty(context,
-//                    PipelineOp.Annotations.MAX_PARALLEL, value);
-//
-//        }
 
     }
 

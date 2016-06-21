@@ -37,6 +37,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.rdf.sparql.ast.ASTBase;
@@ -341,7 +342,19 @@ public class AST2BOpBase {
                 log.debug("Query hint: op=" + (op.getClass().getSimpleName())
                         + " [" + name + "=" + value + "]");
 
-            op = (PipelineOp) op.setProperty(name, value);
+            
+            // will be set to true if the query hint must not be propagated to the operator
+            boolean skipPropagate = false;
+            
+            /**
+             * BLZG-1960: propagate maxParallel only to operators that are not single-threaded
+             */
+            skipPropagate |= 
+                PipelineOp.Annotations.MAX_PARALLEL.equals(name) && op instanceof ISingleThreadedOp;
+                
+            if (!skipPropagate) {
+                op = (PipelineOp) op.setProperty(name, value);                
+            }
 
         }
 
