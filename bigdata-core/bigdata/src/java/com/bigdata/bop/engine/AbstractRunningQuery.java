@@ -1631,7 +1631,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      */
     private MemoryManager newMemoryManager() {
         
-        return MemoryManager.newBoundedNativeMemoryManager();
+        return QueryEngineUtils.newBoundedNativeMemoryManager();
     }
 
     @Override
