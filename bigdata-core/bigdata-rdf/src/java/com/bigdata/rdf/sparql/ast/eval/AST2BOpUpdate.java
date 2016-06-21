@@ -101,6 +101,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.RDFParserOptions;
+import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
@@ -136,11 +137,15 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.stream.Stream.StreamIndexMetadata;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Chunkerator;
+import com.bigdata.striterator.Dechunkerator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
@@ -674,48 +679,13 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 SolutionSetStream ssstr = null;
 				try {
 				    
-				/*
-				 * Run as a SELECT query.
-				 * 
-				 * Note: This *MUST* use the view of the tripleStore which is
-				 * associated with the SailConnection in case the view is
-				 * isolated by a transaction.
-				 */
-				
-////				final BOpContextBase bopContextBase = context.getBOpContext();
-////				final BOpContext bopContext = (BOpContext)context.getBOpContext();
-////				final IMemoryManager mmgr = bopContext.getMemoryManager(null);
-//				final MemoryManager mmgr = new MemoryManager(DirectBufferPool.INSTANCE);
-//                
-//                
-//                
-
-//
-////                while (resItr.hasNext()) {
-////                    IBindingSet[] intl = resItr.next();
-////                    System.out.println(intl);
-////                }
-////				
-//                ssstr.put(resItr);
-//
-//              
-//                ICloseableIterator<IBindingSet[]> res2Itr = ssstr.get();
-//                while (res2Itr.hasNext()) {
-//                    System.out.println("NEXT 1: " + res2Itr.next());
-//                }
-//                
-//                ICloseableIterator<IBindingSet[]> res3Itr = ssstr.get();
-//                while (res3Itr.hasNext()) {
-//                    System.out.println("NEXT 2: " + res3Itr.next());
-//                }
-//
-//                /////////////////
-//                
-//                final TupleQueryResult res = 
-//                    ASTEvalHelper.evaluateTupleQuery(
-//                        context.conn.getTripleStore(), astContainer,
-//                        context.getQueryBindingSet()/* bindingSets */, null /* dataset */);
-
+    				/*
+    				 * Run as a SELECT query.
+    				 * 
+    				 * Note: This *MUST* use the view of the tripleStore which is
+    				 * associated with the SailConnection in case the view is
+    				 * isolated by a transaction.
+    				 */
                     final long beginWhereClauseNanos = System.nanoTime();
                     
                     final StreamIndexMetadata metadata = new StreamIndexMetadata(UUID.randomUUID());
@@ -729,7 +699,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     				final  ICloseableIterator<IBindingSet[]> resItr = 
     				    ASTEvalHelper.evaluateTupleQuery2(
     				        context.conn.getTripleStore(), astContainer,
-    				        context.getQueryBindingSet()/* bindingSets */, true);
+    				        context.getQueryBindingSet()/* bindingSets */, false);
 
     				// play the result into a solution set stream
                     // Note: Blocks until the result set is materialized.
@@ -893,8 +863,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     								template.setNativeDistinct(true);
     							}
 
-    							final TupleQueryResult tqr = 
-    							    new TupleQueryResultImpl(new LinkedList<String>(), ssstr.get());
+                                final TupleQueryResult tqr = 
+                                        wrapIterator(ssstr.get(), context.conn.getTripleStore());
+                                
                                 final ASTConstructIterator itr = new ASTConstructIterator(
                                         context,//
                                         context.conn.getTripleStore(), template,
@@ -972,7 +943,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     							}
     
                                 final TupleQueryResult tqr = 
-                                        new TupleQueryResultImpl(new LinkedList<String>(), ssstr.get());
+                                    wrapIterator(ssstr.get(), context.conn.getTripleStore());
+                                
                                 final ASTConstructIterator itr = new ASTConstructIterator(
                                         context,//
                                         context.conn.getTripleStore(), template,
@@ -1164,6 +1136,43 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         return null;
         
+    }
+    
+    
+    /**
+     * Wraps an internal iterator into a Sesame TupleQueryResult iterator.
+     * 
+     * @param it the internal iterator to wrap
+     * @return
+     */
+    // TODO: get defaults right, look at queryId & required
+    private static TupleQueryResult wrapIterator(
+        final ICloseableIterator<IBindingSet[]> it, final AbstractTripleStore db) {
+        
+        final int chunkCapacity = PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY; 
+        
+        final ICloseableIterator<IBindingSet> it1 = new Dechunkerator<IBindingSet>(it);
+        
+        final IChunkedOrderedIterator<IBindingSet> it2 = 
+                new ChunkedWrappedIterator<IBindingSet>(it1, chunkCapacity, IBindingSet.class);
+            
+            final int chunkOfChunksCapacity = 
+                PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY;
+            final long chunkTimeout = 
+                (long)PipelineOp.Annotations.DEFAULT_CHUNK_TIMEOUT;
+            final int termsChunkSize = chunkCapacity;
+            final int blobsChunkSize = chunkCapacity;
+            
+            final CloseableIteration<BindingSet, QueryEvaluationException> it3 = 
+                new Bigdata2Sesame2BindingSetIterator(
+                    // Materialize IVs as RDF Values.
+                    new BigdataBindingSetResolverator(db, it2,
+                            null /* TODO: queryId */, null /* required */, chunkCapacity,
+                            chunkOfChunksCapacity, chunkTimeout,
+                            termsChunkSize, blobsChunkSize).start(db
+                            .getExecutorService()));
+            
+            return new TupleQueryResultImpl(new LinkedList<String>(), it3);
     }
 
 	/**
