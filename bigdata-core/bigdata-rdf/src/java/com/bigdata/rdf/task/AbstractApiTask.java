@@ -317,7 +317,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
         conn.addChangeLog(new IChangeLog(){
         
             @Override
-            public void changeEvent(final IChangeRecord record) {
+            public final void changeEvent(final IChangeRecord record) {
                 mutationCount.increment();
             }
             
