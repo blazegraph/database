@@ -61,6 +61,7 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
       final String endpoint;
       final Integer searchTimeout;
       final String searchField;
+      final String fieldToSearch;
       final String scoreField;
       final String snippetField;      
       final IBindingSet incomingBindings;
@@ -71,7 +72,7 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
        */
       public FulltextSearchQuery(final String query, final String params,
             final String endpoint, final Integer searchTimeout,
-            final String searchField, final String scoreField, 
+            final String searchField, final String fieldToSearch, final String scoreField, 
             final String snippetField, final IBindingSet incomingBindings,
             final SearchResultType searchResultType) {
 
@@ -80,6 +81,7 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
          this.endpoint = endpoint;
          this.searchTimeout = searchTimeout;
          this.searchField = searchField;
+         this.fieldToSearch = fieldToSearch;
          this.scoreField = scoreField;
          this.snippetField = snippetField;
          this.incomingBindings = incomingBindings;
@@ -122,6 +124,12 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
          return searchField;
       }
 
+      /**
+       * @return the field that is to be searched
+       */
+      public String getFieldToSearch() {
+         return fieldToSearch;
+      }
       
       /**
        * @return the field that is mapped to the snippet variable
