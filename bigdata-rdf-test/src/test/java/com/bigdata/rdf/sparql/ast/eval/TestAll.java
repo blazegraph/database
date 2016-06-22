@@ -172,6 +172,9 @@ public class TestAll extends TestCase {
         
         // Test suite for embedded bigdata query hints.
         suite.addTestSuite(TestQueryHints.class);
+        
+        // Test suite for max parallel query hint propagation
+        suite.addTestSuite(TestMaxParallelQueryHint.class);
 
         // Test suite with explicitly enabled hash joins.
         suite.addTestSuite(TestHashJoin.class);
