@@ -28,16 +28,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.lexicon;
 
 import java.io.StringReader;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -51,6 +56,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.FullTextIndex;
@@ -91,7 +97,15 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
         return indexDatatypeLiterals;
         
     }
+
     
+    /**
+     * The set of datatypes that should be included in the text index 
+     * even though {@link AbstractTripleStore.Options#TEXT_INDEX_DATATYPE_LITERALS} is not enabled. 
+     */
+    private final Set<URI> datatypesToTextIndex;
+    
+
     /**
      * @param indexManager
      * @param namespace
@@ -111,6 +125,14 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
                 .parseBoolean(getProperty(
                         AbstractTripleStore.Options.TEXT_INDEX_DATATYPE_LITERALS,
                         AbstractTripleStore.Options.DEFAULT_TEXT_INDEX_DATATYPE_LITERALS));
+        /*
+         * TODO Make this configurable.
+         */
+        this.datatypesToTextIndex =
+                new LinkedHashSet<URI>(Arrays.asList(new URI[] {
+                        XSD.IPV4
+                }));
+
 
     }
 
@@ -268,7 +290,13 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
 
             final Literal lit = (Literal) val;
 
-            if (!indexDatatypeLiterals && lit.getDatatype() != null && !XMLSchema.STRING.equals(lit.getDatatype())) {
+            if (!(
+                    indexDatatypeLiterals ||
+                    (lit.getDatatype() == null) ||
+                    datatypesToTextIndex.contains(lit.getDatatype()) ||
+                    XMLSchema.STRING.equals(lit.getDatatype()) ||
+                    RDF.LANGSTRING.equals(lit.getDatatype())
+               )) {
 
                 // do not index datatype literals in this manner.
                 continue;

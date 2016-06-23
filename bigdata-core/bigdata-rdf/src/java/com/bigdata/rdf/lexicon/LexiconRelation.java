@@ -1833,19 +1833,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 nunknown++;
                 
-            } else if (!readOnly && this.textIndex && v instanceof BigdataLiteral) {
+            } 
+            
+            if (!readOnly && this.textIndex && v instanceof BigdataLiteral) {
                 
-                /*
-                 * Some inline IVs will be text indexed per the 
-                 * LexiconConfiguration.
-                 */
-                final URI dt = ((BigdataLiteral) v).getDatatype();
-                if (dt == null || dt.equals(XSD.STRING) || dt.equals(RDF.LANGSTRING)) {
-                    // always text index strings, even inline ones
-                    textIndex.add(v);
-                } else if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
-                    textIndex.add(v);
-                }
+                // Decision if FTS would index particular literal is delegated
+                // to specific FTS implementation.
+                // See https://jira.blazegraph.com/browse/BLZG-1928 (Problems with Full Text Index (continued))
+                textIndex.add(v);
                 
             }
             
