@@ -35,9 +35,23 @@ public class WatdivVocabularyDecl implements VocabularyDecl {
 	static private final URI[] uris = new URI[] {
 
 			// Inline URIs
-			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Role"),
-			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/ProductCategory"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/AgeGroup"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/City"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Country"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Gender"),
 			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Genre"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Language"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Offer"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Product"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/ProductCategory"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Purchase"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Retailer"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Review"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Role"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/SubGenre"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Topic"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/User"),
+			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/Website"),
 
 			// frequencies of predicates in dataset
 			new URIImpl("http://db.uwaterloo.ca/~galuc/wsdbm/friendOf"), // rank=0,

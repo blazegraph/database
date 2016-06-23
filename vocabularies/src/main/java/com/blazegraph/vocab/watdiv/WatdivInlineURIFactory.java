@@ -30,9 +30,54 @@ import com.bigdata.rdf.internal.InlineUnsignedIntegerURIHandler;
 public class WatdivInlineURIFactory extends InlineURIFactory {
 	
 	public static final String[] INLINE_INT_URIS = {
-			"http://db.uwaterloo.ca/~galuc/wsdbm/Role",
-			"http://db.uwaterloo.ca/~galuc/wsdbm/ProductCategory",
-			"http://db.uwaterloo.ca/~galuc/wsdbm/Genre" };
+		"http://db.uwaterloo.ca/~galuc/wsdbm/AgeGroup",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/City",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Country",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Gender",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Genre",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Language",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Offer",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Product",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/ProductCategory",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Purchase",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Retailer",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Review",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Role",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/SubGenre",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Topic",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/User",
+		"http://db.uwaterloo.ca/~galuc/wsdbm/Website"
+	};
+	
+	/*
+	 * 
+ http://db.uwaterloo.ca/~galuc/wsdbm/City
+http://db.uwaterloo.ca/~galuc/wsdbm/Offer
+http://db.uwaterloo.ca/~galuc/wsdbm/Product
+http://db.uwaterloo.ca/~galuc/wsdbm/Purchase
+http://db.uwaterloo.ca/~galuc/wsdbm/Retailer
+http://db.uwaterloo.ca/~galuc/wsdbm/Review
+http://db.uwaterloo.ca/~galuc/wsdbm/SubGenre
+http://db.uwaterloo.ca/~galuc/wsdbm/User
+http://db.uwaterloo.ca/~galuc/wsdbm/Website
+http://db.uwaterloo.ca/~galuc/wsdbm/AgeGroup
+http://db.uwaterloo.ca/~galuc/wsdbm/City
+http://db.uwaterloo.ca/~galuc/wsdbm/Country
+http://db.uwaterloo.ca/~galuc/wsdbm/Gender
+http://db.uwaterloo.ca/~galuc/wsdbm/Genre
+http://db.uwaterloo.ca/~galuc/wsdbm/Language
+http://db.uwaterloo.ca/~galuc/wsdbm/Offer
+http://db.uwaterloo.ca/~galuc/wsdbm/Product
+http://db.uwaterloo.ca/~galuc/wsdbm/ProductCategory
+http://db.uwaterloo.ca/~galuc/wsdbm/Purchase
+http://db.uwaterloo.ca/~galuc/wsdbm/Retailer
+http://db.uwaterloo.ca/~galuc/wsdbm/Review
+http://db.uwaterloo.ca/~galuc/wsdbm/Role
+http://db.uwaterloo.ca/~galuc/wsdbm/SubGenre
+http://db.uwaterloo.ca/~galuc/wsdbm/Topic
+http://db.uwaterloo.ca/~galuc/wsdbm/User
+http://db.uwaterloo.ca/~galuc/wsdbm/Website
+	 */
 
 	public WatdivInlineURIFactory() {
 		super();
