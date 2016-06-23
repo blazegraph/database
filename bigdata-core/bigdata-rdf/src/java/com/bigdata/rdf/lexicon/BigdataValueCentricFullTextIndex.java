@@ -42,6 +42,7 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
@@ -126,13 +127,23 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
                         AbstractTripleStore.Options.TEXT_INDEX_DATATYPE_LITERALS,
                         AbstractTripleStore.Options.DEFAULT_TEXT_INDEX_DATATYPE_LITERALS));
         /*
-         * TODO Make this configurable.
+         * Also index specific datatypes even if indexDatatypeLiterals is not enabled?
          */
-        this.datatypesToTextIndex =
-                new LinkedHashSet<URI>(Arrays.asList(new URI[] {
-                        XSD.IPV4
-                }));
-
+        String[] datatypes = getProperty(
+		        AbstractTripleStore.Options.DATATYPES_TO_TEXT_INDEX,
+		        AbstractTripleStore.Options.DEFAULT_DATATYPES_TO_TEXT_INDEX).split("\\w*,\\w*");
+        
+		this.datatypesToTextIndex = new LinkedHashSet<URI>(datatypes.length);
+		
+		for (String datatype: datatypes) {
+			
+			if (datatype.length()>0) {
+				
+				this.datatypesToTextIndex.add(new URIImpl(datatype));
+				
+			}
+			
+		}
 
     }
 

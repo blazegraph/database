@@ -1034,6 +1034,8 @@ public class TestTicket1893 extends
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.INLINE_XSD_DATATYPE_LITERALS, Boolean.toString(inlineXSDDatatypeLiterals));
 
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.TEXT_INDEX_DATATYPE_LITERALS, Boolean.toString(textIndexDatatypeLiterals));
+            
+            properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.DATATYPES_TO_TEXT_INDEX, XSD.IPV4.stringValue());
 
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.STORE_BLANK_NODES, Boolean.toString(true));
 
