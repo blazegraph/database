@@ -96,7 +96,7 @@ public class SolrFulltextSearchImpl implements
       FutureResponseListener listener =
          new FutureResponseListener(request, 10 * 1024 * 1024); // 100 MB size
       
-      request.param("q", query.getQuery());
+      request.param("q", query.getFieldToSearch() + ":" + query.getQuery());
       request.param("wt", "json");
 
       final String searchParams = query.getParams();

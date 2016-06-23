@@ -2,6 +2,7 @@
 
 Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
 
+
 Contact:
      SYSTAP, LLC DBA Blazegraph
      2501 Calvert ST NW #106
@@ -272,6 +273,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          if (uri.equals(FTS.SEARCH) || uri.equals(FTS.ENDPOINT)
                || uri.equals(FTS.ENDPOINT_TYPE) || uri.equals(FTS.PARAMS)
                || uri.equals(FTS.SEARCH_RESULT_TYPE) || uri.equals(FTS.SEARCH_FIELD)
+               || uri.equals(FTS.FIELD_TO_SEARCH)
                || uri.equals(FTS.SCORE_FIELD) || uri.equals(FTS.SNIPPET_FIELD)
                || uri.equals(FTS.TIMEOUT)) {
 
@@ -343,6 +345,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
       private final TermNode searchResultType;
       private final TermNode searchTimeout;
       private final TermNode searchField;
+      private final TermNode fieldToSearch;
       private final TermNode scoreField;
       private final TermNode snippetField;
       private final FulltextSearchDefaults defaults;
@@ -395,6 +398,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          TermNode searchResultType = null;
          TermNode searchTimeout = null;
          TermNode searchField = null;
+         TermNode fieldToSearch = null;
          TermNode scoreField = null;
          TermNode snippetField = null;
 
@@ -420,6 +424,8 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
                searchTimeout = meta.o();
             } else if (FTS.SEARCH_FIELD.equals(p)) {
                searchField = meta.o();
+            } else if (FTS.FIELD_TO_SEARCH.equals(p)) {
+               fieldToSearch = meta.o();
             } else if (FTS.SNIPPET_FIELD.equals(p)) {
                snippetField = meta.o();
             } else if (FTS.SCORE_FIELD.equals(p)) {
@@ -449,6 +455,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          this.searchResultType = searchResultType;
          this.searchTimeout = searchTimeout;
          this.searchField = searchField;
+         this.fieldToSearch = fieldToSearch;
          this.scoreField = scoreField;
          this.snippetField = snippetField;
 
@@ -459,7 +466,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
             IBindingSet[] bsList) {
 
          return new FulltextSearchMultiHiterator(bsList, query, endpoint,
-               endpointType, params, searchField, scoreField, snippetField, 
+               endpointType, params, searchField, fieldToSearch, scoreField, snippetField, 
                searchResultType, searchTimeout, defaults, serviceCallParams);
 
       }
@@ -653,6 +660,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
       final TermNode searchResultType;
       final TermNode searchTimeout;
       final TermNode searchField;
+      final TermNode fieldToSearch;
       final TermNode scoreField;
       final TermNode snippetField;
       final ServiceCallCreateParams serviceCallParams;
@@ -666,7 +674,8 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
       public FulltextSearchMultiHiterator(final IBindingSet[] bindingSet,
             final TermNode query, final TermNode endpoint,
             final TermNode endpointType, final TermNode params,
-            final TermNode searchField, final TermNode scoreField, 
+            final TermNode searchField, final TermNode fieldToSearch,
+            final TermNode scoreField, 
             final TermNode snippetField, final TermNode searchResultType, 
             final TermNode searchTimeout, final FulltextSearchDefaults defaults,
             final ServiceCallCreateParams serviceCallParams) {
@@ -679,6 +688,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          this.searchResultType = searchResultType;
          this.searchTimeout = searchTimeout;
          this.searchField = searchField;
+         this.fieldToSearch = fieldToSearch;
          this.scoreField = scoreField;
          this.snippetField = snippetField;
          
@@ -769,6 +779,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          final SearchResultType searchResultType = resolveSearchResultType(bs);
          final Integer searchTimeout = resolveSearchTimeout(bs);
          final String searchField = resolveSearchField(bs);
+         final String fieldToSearch = resolveFieldToSearch(bs);
          final String scoreField = resolveScoreField(bs);
          final String snippetField = resolveSnippetField(bs);
 
@@ -787,7 +798,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
 
          FulltextSearchQuery sq = new FulltextSearchQuery(
                query, params, endpoint, searchTimeout, searchField,
-               scoreField, snippetField, bs, searchResultType);
+               fieldToSearch, scoreField, snippetField, bs, searchResultType);
          curDelegate = (FulltextSearchHiterator) 
                ftSearch.search(sq, serviceCallParams.getClientConnectionManager());
 
@@ -967,6 +978,24 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
             FTS.Options.DEFAULT_SEARCH_FIELD : searchFieldStr;
 
       }
+
+      /**
+       * Resolves the field to search, which is either a constant or a variable
+       * to be looked up in the binding set.
+       */
+      private String resolveFieldToSearch(IBindingSet bs) {
+
+         String fieldToSearchStr = resolveAsString(fieldToSearch, bs);
+         
+         // try override with system default, if not set
+         if (fieldToSearchStr==null || fieldToSearchStr.isEmpty()) {
+            fieldToSearchStr = defaults.getDefaultFieldToSearch();
+         }
+         
+         return fieldToSearchStr==null || fieldToSearchStr.isEmpty() ?
+            FTS.Options.DEFAULT_SEARCH_FIELD : fieldToSearchStr;
+
+      }
       
       /**
        * Resolves the search field, which is either a constant or a variable
@@ -1055,6 +1084,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
       final String defaultTimeout;
       final String defaultParams;
       final String defaultSearchField;
+      final String defaultFieldToSearch;
       final String defaultScoreField;
       final String defaultSnippetField;
 
@@ -1077,6 +1107,9 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
 
          this.defaultSearchField =
                p.getProperty(FTS.Options.FTS_SEARCH_FIELD);
+         
+         this.defaultFieldToSearch =
+               p.getProperty(FTS.Options.FTS_FIELD_TO_SEARCH);
          
          this.defaultScoreField =
                p.getProperty(FTS.Options.FTS_SCORE_FIELD);
@@ -1110,6 +1143,10 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          return defaultSearchField;
       }
 
+      public String getDefaultFieldToSearch() {
+         return defaultFieldToSearch;
+      }
+
       public String getDefaultScoreField() {
          return defaultScoreField;
       }
@@ -1137,6 +1174,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
             if (predicate.equals(FTS.SEARCH) || predicate.equals(FTS.ENDPOINT)
                || predicate.equals(FTS.ENDPOINT_TYPE) || predicate.equals(FTS.PARAMS)
                || predicate.equals(FTS.SEARCH_RESULT_TYPE) || predicate.equals(FTS.SEARCH_FIELD)
+               || predicate.equals(FTS.FIELD_TO_SEARCH) 
                || predicate.equals(FTS.SCORE_FIELD) || predicate.equals(FTS.SNIPPET_FIELD)
                || predicate.equals(FTS.TIMEOUT)) {
                

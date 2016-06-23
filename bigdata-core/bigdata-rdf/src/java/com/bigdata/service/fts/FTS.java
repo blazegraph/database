@@ -165,7 +165,16 @@ public interface FTS {
       
       final String DEFAULT_SEARCH_FIELD = "id"; // this is the Solr default
 
+      /**
+       * Option that may be set to specify a default for {@link FTS#FIELD_TO_SEARCH},
+       * to be used in fulltext search whenever the {@link FTS#FIELD_TO_SEARCH} is
+       * left unspecified. When set, the magic vocabulary
+       * {@link FTS#FIELD_TO_SEARCH} may be used to override the default.
+       */
+      String FTS_FIELD_TO_SEARCH = FTS.class.getName() + ".defaultFieldToSearch";
       
+      final String DEFAULT_FIELD_TO_SEARCH = "text"; // this is the Solr default
+
       /**
        * Option that may be set to specify a default for {@link FTS#SCORE_FIELD},
        * to be used in fulltext search whenever the {@link FTS#SCORE_FIELD} is
@@ -407,6 +416,22 @@ public interface FTS {
     * </pre>
     */
    final URI SEARCH_FIELD = new URIImpl(NAMESPACE + "searchField");
+   
+   /**
+    * Magic predicate to indicate the external search service field
+    * should be searched.  The default is &quot;text&quot;
+    * 
+    * <pre>
+    * 
+    * select ?s
+    * where {
+    *   ?s fts:search &quot;scale-out RDF triplestore&quot; .
+    *   ?s fts:searchField "id" .
+    * }
+    * 
+    * </pre>
+    */
+   final URI FIELD_TO_SEARCH = new URIImpl(NAMESPACE + "fieldToSearch");
    
    /**
     * Magic predicate to indicate the external search service field whose
