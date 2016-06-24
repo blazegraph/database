@@ -380,6 +380,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
  			
  			return modelQuery;
  		}
+ 		
+ 		public long getMutationCount() {
+ 			return task.getMutationCount();
+ 		}	
 
     }
 

@@ -1143,6 +1143,8 @@ public class StatusServlet extends BigdataRDFServlet {
         // The time since the task began executing (until it stops).
         final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(task
                 .getElapsedNanos());
+        
+        final long mutationCount = task.getMutationCount();
 
         current.node("h1", "Task");
         {
@@ -1164,6 +1166,9 @@ public class StatusServlet extends BigdataRDFServlet {
                .attr("class", "elapsed").text("" + elapsedMillis).close()
             .text("ms")
             //
+            // See BLZG-1661
+            .text(", ").text("mutationCount=").node("span")
+            .attr("class", "mutationCount").text("" + mutationCount).close()
             .text(", ").node("a").attr("href", detailsURL)
             .attr("class", "details-url")
             .text("details").close()//
