@@ -514,19 +514,19 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 	 */
     public void test_text_index_inline_unicode_literals() {
 
-    	if(true) {
-    		/*
-    		 * TODO The full text index does not currently have a code path for
-    		 * inline Unicode Values.  We are considering a refactor which would
-    		 * use a [token S P O : relevance] key for the full text index and
-    		 * do maintenance on the index when statements are added or retracted.
-    		 * It would make sense to support full text indexing for inline 
-    		 * Unicode Values at that time since we will be seeing them when we
-    		 * write on the statement indices.
-    		 */
-    		log.warn("Full text index is not supported for inline Unicode at this time.");
-    		return;
-    	}
+//    	if(true) {
+//    		/*
+//    		 * The full text index supports indexing of inlined literals
+//    		 * since https://jira.blazegraph.com/browse/BLZG-1928.
+//    		 * Although, note that FTS index does not get records retracted
+//    		 * if original literals are removed from triplestore.
+//    		 * TODO We are considering a refactor which would
+//    		 * use a [token S P O : relevance] key for the full text index and
+//    		 * do maintenance on the index when statements are added or retracted.
+//    		 */
+//    		log.warn("Full text index is not supported for inline Unicode at this time.");
+//    		return;
+//    	}
     	
         final Properties properties = getProperties();
 
@@ -543,6 +543,10 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         properties.setProperty(
                 AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
                 "256");
+
+        properties.setProperty(
+                AbstractTripleStore.Options.INLINE_TEXT_LITERALS,
+                "true");
 
         // We do not need any vocabulary to test this.
         properties.setProperty(
@@ -564,11 +568,17 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                     f.createLiteral("slow brown dog", f
                             .asValue(XMLSchema.STRING)),//
                     
-                    f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
-                            f.asValue(XMLSchema.ANYURI)),//
+                    // Used language tagged literal instead or "http://www.bigdata.com/mangy/yellow/cat"^^xsd:anyUri
+                    // because unknown datatypes could not be inlined.
+                    f.createLiteral("http://www.bigdata.com/mangy/yellow/cat", "en"),//
             };
 
             store.addTerms(terms);
+            
+            // Ensure that literals are inlined
+            assertTrue(terms[0].getIV().isInline());
+            assertTrue(terms[1].getIV().isInline());
+            assertTrue(terms[2].getIV().isInline());
 
             assertExpectedHits(store, "brown", "en", //
                     0f, // minCosine,
@@ -578,10 +588,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                     });
             
             assertExpectedHits(store, "cat", "en", //
-//                    0f, // minCosine,
+                    0f, // minCosine,
                     new BigdataValue[] {//
-                    f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
-                            f.asValue(XMLSchema.ANYURI))//
+                    f.createLiteral("http://www.bigdata.com/mangy/yellow/cat", "en")//
                     });
             
             if(store.isStable()) {
@@ -600,10 +609,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                         });
                 
                 assertExpectedHits(store, "cat", "en", //
-//                        0f, // minCosine,
+                        0f, // minCosine,
                         new BigdataValue[] {//
-                        f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
-                                f.asValue(XMLSchema.ANYURI))//
+                        f.createLiteral("http://www.bigdata.com/mangy/yellow/cat", "en")//
                         });
                 
             }
