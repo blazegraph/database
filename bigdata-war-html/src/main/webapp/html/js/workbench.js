@@ -244,7 +244,7 @@ function getNamespaces(synchronous) {
                   use = '<a href="#" class="use-namespace">Use</a>';
                }
                
-               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="namespace-rebuild-text-index">Rebuild Full Text Index</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
+               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="namespace-rebuild-text-index">Rebuild Full Text Index</a></td><td><a href="#" class="namespace-drop-entailments">Drop Entailments</a></td><td><a href="#" class="namespace-create-entailments">Create Entailments</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
                
                initMapgraphNamespaceMgmtExtensions(title);
 
@@ -270,16 +270,24 @@ function getNamespaces(synchronous) {
                e.preventDefault();
                rebuildTextIndex($(this).parents('tr').data('name'), true);
             });
-           $('.clone-namespace').click(function(e) {
+            $('.namespace-drop-entailments').click(function(e) {
+               e.preventDefault();
+               dropEntailments($(this).parents('tr').data('name'), true);
+            });
+            $('.namespace-create-entailments').click(function(e) {
+               e.preventDefault();
+               createEntailments($(this).parents('tr').data('name'), true);
+            });
+           	$('.clone-namespace').click(function(e) {
               e.preventDefault();
               cloneNamespace($(this).parents('tr').data('name'));
               $('#namespace-create-errors').html('');
-           });
-           $('.namespace-service-description').click(function() {
+           	});
+           	$('.namespace-service-description').click(function() {
               return confirm('This can be an expensive operation. Proceed anyway?');
-           });
+           	});
      }
-      }
+    }
    };
    $.ajax(settings);
 }
@@ -326,6 +334,8 @@ function getNamespaceProperties(namespace, download) {
          $('#namespace-properties table').empty();
          $('#namespace-properties').show();
          $('#namespace-rebuild-text-index').hide();
+         $('#namespace-drop-entailments').hide();
+         $('#namespace-create-entailments').hide();
       }
    $.get(url, function(data) {
       var java = '';
@@ -349,6 +359,8 @@ function rebuildTextIndex(namespace) {
     $('#namespace-rebuild-text-index p').empty();
     $('#namespace-properties table').empty();
     $('#namespace-properties').hide();
+    $('#namespace-drop-entailments').hide();
+    $('#namespace-create-entailments').hide();
     $('#namespace-rebuild-text-index').show();
 
     var settings = {
@@ -378,6 +390,70 @@ function rebuildTextIndex(namespace) {
     $.ajax(url, settings);
 }
 
+function dropEntailments(namespace) {
+
+	if(confirm('Are you sure you want to drop all the entailments from the namespace ' + namespace + '?')) {
+	
+		$('#namespace-drop-entailments h1').html(namespace);
+	    $('#namespace-drop-entailments p').empty();
+	    $('#namespace-drop-entailments p').html("Operation 'Drop entailments' is running, you could check its status on <a href=\"#status\">status page</a>"); 
+	    $('#namespace-properties table').empty();
+	    $('#namespace-properties').hide();
+	    $('#namespace-rebuild-text-index').hide();
+	    $('#namespace-create-entailments').hide();
+	    $('#namespace-drop-entailments').show();
+	
+	    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+	
+	    var settings = {
+	              type: 'POST',
+	              data: {'update' : 'DROP ENTAILMENTS'},
+	              error: function(jqXHR, textStatus, errorThrown) { 
+	              				$('#namespace-drop-entailments p').empty();
+	           					$('#namespace-drop-entailments').hide(); 
+	              				alert(jqXHR.responseText);              				
+	              				},
+	              success: function(data) { 
+	                            $('#namespace-drop-entailments h1').html(namespace); 
+	                            $('#namespace-drop-entailments p').html(data); 
+	                            }
+	              
+	           };
+    } else {
+           $('#namespace-drop-entailments p').empty();
+           $('#namespace-drop-entailments').hide();
+    }
+    $.ajax(url, settings);
+}
+
+function createEntailments(namespace) {
+
+    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+    
+    $('#namespace-create-entailments h1').html(namespace);
+    $('#namespace-create-entailments p').empty();
+    $('#namespace-create-entailments p').html("Operation 'Create entailments' is running, you could check its status on <a href=\"#status\">status page</a>"); 
+    $('#namespace-properties table').empty();
+    $('#namespace-properties').hide();
+    $('#namespace-rebuild-text-index').hide();
+    $('#namespace-drop-entailments').hide();
+    $('#namespace-create-entailments').show();
+
+    var settings = {
+              type: 'POST',
+              data: {'update' : 'CREATE ENTAILMENTS'},
+              error: function(jqXHR, textStatus, errorThrown) { 
+	              				$('#namespace-create-entailments p').empty();
+	           					$('#namespace-create-entailments').hide(); 
+	              				alert(jqXHR.responseText);              				
+	              				},
+              success: function(data) { 
+                            $('#namespace-create-entailments h1').html(namespace); 
+                            $('#namespace-create-entailments p').html(data); 
+                            }
+            };
+    $.ajax(url, settings);
+}
 
 function getPreparedProperties(elem) {
 
@@ -424,7 +500,7 @@ function getPreparedProperties(elem) {
                  type: 'POST',
                  data: data,
                  contentType: 'text/plain',
-//                 contentType: 'application/xml',
+//               contentType: 'application/xml',
                  async: false,
                  success: function(data) { 
                          elem.html('');
