@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import info.aduna.iteration.CloseableIteration;
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -93,7 +95,6 @@ import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
-import info.aduna.iteration.CloseableIteration;
 
 /**
  * Helper class for evaluating SPARQL queries.
@@ -1063,11 +1064,6 @@ public class ASTEvalHelper {
             ctx.setQueryBindingSet(bs);
             ctx.setBindings(bindingSets);
             ctx.setDataset(dataset);
-
-            /*
-             * Convert the query (generates an optimized AST as a side-effect).
-             */
-            AST2BOpUpdate.optimizeUpdateRoot(ctx);
 
             /*
              * Generate and execute physical plans for the update operations.

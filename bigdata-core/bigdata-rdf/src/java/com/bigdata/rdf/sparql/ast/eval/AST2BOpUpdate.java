@@ -187,37 +187,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             .var("o"), c = Var.var("c");
 
     /**
-     * Convert the query
-     * <p>
-     * Note: This is currently a NOP.
-     */
-    protected static void optimizeUpdateRoot(final AST2BOpUpdateContext context) {
-
-//        final ASTContainer astContainer = context.astContainer;
-//
-//        // Clear the optimized AST.
-//        // astContainer.clearOptimizedUpdateAST();
-//
-//        /*
-//         * Build up the optimized AST for the UpdateRoot for each Update to
-//         * be executed. Maybe do this all up front before we run anything since
-//         * we might reorder or regroup some operations (e.g., parallelized LOAD
-//         * operations, parallelized INSERT data operations, etc).
-//         */
-//        final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
-//
-//        /*
-//         * Evaluate each update operation in the optimized UPDATE AST in turn.
-//         */
-//        for (Update op : updateRoot) {
-//  
-//            ...
-//        
-//        }
-
-    }
-
-    /**
      * Convert and/or execute the update request.
      * 
      * @throws Exception
@@ -653,7 +622,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         context.conn.getTripleStore(), astContainer,
                         context.getQueryBindingSet()/* bindingSets */, true /* materialize */);
 
-                // play the result into a solution set stream
+                // play the result into a native memory backed solution set stream
+                // TODO: for now, we materialize this result -> this may not always be needed
                 // Note: Blocks until the result set is materialized.
                 ssstr.put(resItr);
                 deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
@@ -1052,6 +1022,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             addOrRemoveStatement(context.conn.getSailConnection(), stmt, true/* insert */);
    
         }
+        
     }
 
     /**
@@ -1119,21 +1090,21 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         final IChunkedOrderedIterator<IBindingSet> it2 = 
                 new ChunkedWrappedIterator<IBindingSet>(it1, chunkCapacity, IBindingSet.class);
             
-            final int chunkOfChunksCapacity = 
-                PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY;
-            final long chunkTimeout = 
-                (long)PipelineOp.Annotations.DEFAULT_CHUNK_TIMEOUT;
-            final int termsChunkSize = chunkCapacity;
-            final int blobsChunkSize = chunkCapacity;
+        final int chunkOfChunksCapacity = 
+            PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY;
             
-            final CloseableIteration<BindingSet, QueryEvaluationException> it3 = 
-                new Bigdata2Sesame2BindingSetIterator(
-                    // Materialize IVs as RDF Values.
-                    new BigdataBindingSetResolverator(db, it2,
-                            null /* TODO: queryId */, null /* required */, chunkCapacity,
-                            chunkOfChunksCapacity, chunkTimeout,
-                            termsChunkSize, blobsChunkSize).start(db
-                            .getExecutorService()));
+        final long chunkTimeout = 
+            (long)PipelineOp.Annotations.DEFAULT_CHUNK_TIMEOUT;
+        final int termsChunkSize = chunkCapacity;
+        final int blobsChunkSize = chunkCapacity;
+            
+        final CloseableIteration<BindingSet, QueryEvaluationException> it3 = 
+            new Bigdata2Sesame2BindingSetIterator(
+                // Materialize IVs as RDF Values.
+                new BigdataBindingSetResolverator(
+                    db, it2, null /* TODO: queryId */, null /* required */, 
+                    chunkCapacity, chunkOfChunksCapacity, 
+                    chunkTimeout,termsChunkSize, blobsChunkSize).start(db.getExecutorService()));
             
             return new TupleQueryResultImpl(new LinkedList<String>(), it3);
     }
