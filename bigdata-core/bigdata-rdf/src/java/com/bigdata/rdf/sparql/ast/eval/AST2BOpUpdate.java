@@ -616,18 +616,16 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  */
                 final long beginWhereClauseNanos = System.nanoTime();
 
-                // get the result
+                // get the result iterator; the solutions not materialized are not materialized,
+                // i.e. materialization must be done on demand where needed
                 final  ICloseableIterator<IBindingSet[]> resItr = 
                     ASTEvalHelper.evaluateTupleQuery2(
                         context.conn.getTripleStore(), astContainer,
-                        context.getQueryBindingSet()/* bindingSets */, true /* materialize */);
+                        context.getQueryBindingSet()/* bindingSets */);
 
                 // play the result into a native memory backed solution set stream
-                // TODO: for now, we materialize this result -> this may not always be needed
-                // Note: Blocks until the result set is materialized.
                 ssstr.put(resItr);
                 deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
-                
                 
                 // If the query contains a nativeDistinctSPO query hint then
                 // the line below unfortunately isolates the query so that the hint does
@@ -913,7 +911,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  ASTEvalHelper.evaluateTupleQuery2(
                      context.conn.getTripleStore(),
                      astContainer,
-                     context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
+                     context.getQueryBindingSet()/* bindingSets */);
 
              try {
 

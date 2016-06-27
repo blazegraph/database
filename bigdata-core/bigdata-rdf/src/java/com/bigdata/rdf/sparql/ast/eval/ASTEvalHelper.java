@@ -61,11 +61,9 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.rdf.join.ChunkedMaterializationIterator;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
@@ -251,7 +249,7 @@ public class ASTEvalHelper {
 
     /**
      * Evaluate a SELECT query without converting the results into openrdf
-     * solutions.
+     * solutions. Does not materialize the results.
      * 
      * @param store
      *            The {@link AbstractTripleStore} having the data.
@@ -274,7 +272,7 @@ public class ASTEvalHelper {
      */
     static public ICloseableIterator<IBindingSet[]> evaluateTupleQuery2(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet globallyScopedBS, final boolean materialize)
+            final QueryBindingSet globallyScopedBS)
             throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -288,40 +286,6 @@ public class ASTEvalHelper {
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
-        // The optimized AST.
-        final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
-        
-        // true iff we can materialize the projection inside of the query plan.
-        final boolean materializeProjectionInQuery = materialize && context.materializeProjectionInQuery
-                && !optimizedQuery.hasSlice();
-
-        final List<String> projectedSet;
-
-        if (materialize) {
-
-            /*
-             * Add a materialization step.
-             */
-            
-            // Get the projection for the query.
-            final IVariable<?>[] projected = astContainer.getOptimizedAST()
-                    .getProjection().getProjectionVars();
-
-            projectedSet = new LinkedList<String>();
-
-            for (IVariable<?> var : projected)
-                projectedSet.add(var.getName());
-
-        } else {
-        
-            /*
-             * Do not add a materialization step.
-             */
-
-            projectedSet = null;
-            
-        }
-
         doSparqlLogging(context);
         
         final PipelineOp queryPlan = astContainer.getQueryPlan();
@@ -333,46 +297,7 @@ public class ASTEvalHelper {
             runningQuery = context.queryEngine.eval(queryPlan, astContainer.getOptimizedASTBindingSets());
 
             // The iterator draining the query solutions.
-            final ICloseableIterator<IBindingSet[]> it1 = runningQuery
-                    .iterator();
-
-            final ICloseableIterator<IBindingSet[]> it2;
-
-            if (materialize && !materializeProjectionInQuery
-                    && !projectedSet.isEmpty()) {
-
-                /*
-                 * Materialize IVs as RDF Values.
-                 * 
-                 * Note: This is the code path when we want to materialize the
-                 * IVs and we can not do so within the query plan because the
-                 * query uses a SLICE. If we want to materialize IVs and there
-                 * is no slice, then the materialization step is done inside of
-                 * the query plan.
-                 * 
-                 * Note: This does not materialize the IVCache for inline IVs.
-                 * The assumption is that the consumer is bigdata aware and can
-                 * use inline IVs directly.
-                 */
-                
-                // The variables to be materialized.
-                final IVariable<?>[] vars = new IVariable[projectedSet.size()];
-                for (int i=0; i<vars.length; i++) {
-                    vars[i] = Var.var(projectedSet.get(i));
-                }
-                
-                // Wrap with chunked materialization logic.
-                it2 = new ChunkedMaterializationIterator(vars,
-                        context.db.getLexiconRelation(),
-                        false/* materializeInlineIVs */, it1);
-
-            } else {
-                
-                it2 = it1;
-                
-            }
-            
-            return it2;
+            return runningQuery.iterator();
 
         } catch (Throwable t) {
             if (runningQuery != null) {
