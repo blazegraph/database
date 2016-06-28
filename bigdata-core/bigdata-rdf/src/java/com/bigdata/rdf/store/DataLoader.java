@@ -1903,7 +1903,7 @@ public class DataLoader {
 	 * support multiple data files within a single archive.
 	 * 
 	 * @param args
-	 *            <code>[-quiet][-closure][-verbose][-durableQueues][-namespace <i>namespace</i>] propertyFile (fileOrDir)*</code>
+	 *            <code>[-quiet][-closure][-verbose][-format][-baseURI][-defaultGraph][-durableQueues][-namespace <i>namespace</i>] propertyFile (fileOrDir)*</code>
 	 *            where
 	 *            <dl>
 	 *            <dt>-quiet</dt>
@@ -1915,6 +1915,17 @@ public class DataLoader {
 	 *            {@link Options#VERBOSE}.</dd>
 	 *            <dt>-closure</dt>
 	 *            <dd>Compute the RDF(S)+ closure.</dd>
+	 *            <dt>-format</dt>
+	 *            <dd>The format of the file (optional, when not specified the
+     *            format is deduced for each file in turn using the
+     *            {@link RDFFormat} static methods).</dd>
+	 *            <dt>-baseURI</dt>
+	 *            <dd>The baseURI (optional, when not specified the name of the each
+     *            file load is converted to a URL and used as the baseURI for
+     *            that file).</dd>
+	 *            <dt>-defaultGraph</dt>
+	 *            <dd>The value that will be used for the graph/context co-ordinate when
+     *            loading data represented in a triple format into a quad store.</dd>
 	 *            <dt>-durableQueues</dt>
 	 *            <dd>Files will be renamed to either <code>.good</code> or
 	 *            <code>.fail</code> as they are processed. The files will
@@ -2246,7 +2257,7 @@ public class DataLoader {
 
     private static void usage() {
         
-        System.err.println("usage: [-closure][-verbose][-durableQueues][-namespace namespace] propertyFile (fileOrDir)+");
+        System.err.println("usage: [-closure][-verbose][-format][-baseURI][-defaultGraph][-durableQueues][-namespace namespace] propertyFile (fileOrDir)+");
 
         System.exit(1);
         
