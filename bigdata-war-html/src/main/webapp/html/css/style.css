@@ -271,7 +271,7 @@ hr {
    border: none;
 }
 
-.advanced-features, #query-response, #query-pagination, #query-explanation, #query-history, #query-export-container, #update-response, #update-clear-container, #explore-results, #namespace-properties {
+.advanced-features, #query-response, #query-pagination, #query-explanation, #query-history, #query-export-container, #update-response, #update-clear-container, #explore-results, #namespace-properties, #namespace-rebuild-text-index, #namespace-drop-entailments, #namespace-create-entailments {
    display: none;
 }
 
