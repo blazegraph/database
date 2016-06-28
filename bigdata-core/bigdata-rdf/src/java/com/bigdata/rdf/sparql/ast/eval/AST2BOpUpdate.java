@@ -537,7 +537,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final ASTContainer astContainer = new ASTContainer(queryRoot);
             /*
              * Inherit 'RESOLVED' flag, so resolution will not be run
-             * for ASTContainer, constracted from parts of already resolved update.
+             * for ASTContainer, constructed from parts of already resolved update.
              */
             astContainer.setProperty(ASTContainer.Annotations.RESOLVED, context.astContainer.getProperty(ASTContainer.Annotations.RESOLVED));
 
@@ -599,13 +599,13 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             try {
 
                 // TODO: solution set stream stats contains information about which variables are
-                //       materialized and which are not
+                //       materialized and which are not. This could be exploited by query plans.
                 final StreamIndexMetadata metadata = new StreamIndexMetadata(UUID.randomUUID()); 
                     
                 final Checkpoint checkpoint = new Checkpoint(metadata);
-                mmgr = QueryEngineUtils.newBoundedNativeMemoryManager();
+                mmgr = QueryEngineUtils.newBoundedNativeMemoryManager(); // Note: Memory restriction (if any) for solutions is independent of the memory restriction for the query (real restriction is 2x the specified one).
                 store = new MemStore(mmgr.createAllocationContext());
-                ssstr = new SolutionSetStream(store, checkpoint, metadata, false /* readOnly */);    				    
+                ssstr = new SolutionSetStream(store, checkpoint, metadata, false /* readOnly */);
 
                 /*
                  * Evaluate the WHERE part of the query
@@ -616,15 +616,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  */
                 final long beginWhereClauseNanos = System.nanoTime();
 
-                // get the result iterator; the solutions not materialized are not materialized,
-                // i.e. materialization must be done on demand where needed
+                // Run the WHERE clause; get the result iterator; the solutions
+                // by the query. i.e. materialization must be done on demand
+                // where needed by the consumer of the itr or the solution set
+                // stream on which the itr is written.
                 final  ICloseableIterator<IBindingSet[]> resItr = 
                     ASTEvalHelper.evaluateTupleQuery2(
                         context.conn.getTripleStore(), astContainer,
                         context.getQueryBindingSet()/* bindingSets */);
 
                 // play the result into a native memory backed solution set stream
-                ssstr.put(resItr);
+                try {ssstr.put(resItr);} finally {resItr.close();}
                 deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
                 
                 // If the query contains a nativeDistinctSPO query hint then
@@ -637,7 +639,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 
                 applyUpdate(op, context, deleteInsertWhereStats, queryRoot, ssstr, astContainer, nativeDistinct);
 
-                
             } finally {
 
                 try {
@@ -699,7 +700,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         final GraphPatternGroup<?> whereClause = op.getWhereClause();
         
         // play through DELETE clause
-        if (deleteClause!=null) {
+        if (deleteClause != null) {
 
             final long beginDeleteNanos = System.nanoTime();
             
@@ -711,7 +712,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         }
    
         // play through INSERT clause (if requested)
-        if (insertClause!=null) {
+        if (insertClause != null) {
             
             final long beginInsertNanos = System.nanoTime();
 
@@ -747,10 +748,10 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final GraphPatternGroup<?> whereClause,
             final AST2BOpUpdateContext context,
             final QueryRoot queryRoot, final ASTContainer astContainer,
-            SolutionSetStream ssstr, final boolean nativeDistinct)
+            final SolutionSetStream ssstr, final boolean nativeDistinct)
             throws QueryEvaluationException, SailException {
 
-        assert(deleteClause!=null);
+        assert (deleteClause != null);
         
         if (deleteClause.isSolutions()) {
    
@@ -783,7 +784,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     private static void applyDeleteToBackingStore(
             final QuadsDataOrNamedSolutionSet deleteClause,
             final GraphPatternGroup<?> whereClause,
-            final AST2BOpUpdateContext context, SolutionSetStream ssstr,
+            final AST2BOpUpdateContext context, final SolutionSetStream ssstr,
             final boolean nativeDistinct) throws QueryEvaluationException,
             SailException {
         		
@@ -792,28 +793,39 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         		
         template.setDistinctQuads(true);
         		
-        if (nativeDistinct) {
+        if (nativeDistinct) { // FIXME Jeremy: this flag needs to be controlled by a query hint so it can be disabled. 
             template.setNativeDistinct(true);
         }
 
-        final TupleQueryResult tqr = 
-            wrapIterator(ssstr.get(), context.conn.getTripleStore());
-                
-        final ASTConstructIterator itr = new ASTConstructIterator(
-            context,//
-            context.conn.getTripleStore(), template,
-            whereClause, null/* bnodesMap */,
-            tqr);
+        final TupleQueryResult tqr = wrapIterator(ssstr.get(), context.conn.getTripleStore());
 
-        while (itr.hasNext()) {
-   
-            final BigdataStatement stmt = itr.next();
-   
-            addOrRemoveStatement(
-                context.conn.getSailConnection(), stmt,
-                false/* insert */);
+        try {
+
+            final ASTConstructIterator itr = new ASTConstructIterator(context, //
+                    context.conn.getTripleStore(), template, whereClause, null/* bnodesMap */, tqr);
+
+            try {
+
+                while (itr.hasNext()) {
+
+                    final BigdataStatement stmt = itr.next();
+
+                    addOrRemoveStatement(context.conn.getSailConnection(), stmt, false/* insert */);
+
+                }
+
+            } finally {
+
+                itr.close();
+
+            }
+
+        } finally {
+
+            tqr.close();
 
         }
+        
     }
 
     /**
@@ -959,7 +971,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final boolean nativeDistinct) throws QueryEvaluationException,
             SailException {
 
-        assert(insertClause!=null);
+        assert (insertClause != null);
 
         if (insertClause.isSolutions()) {
 
@@ -1001,26 +1013,38 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         template.setDistinctQuads(true);
                 
         if (nativeDistinct) {
-            template.setNativeDistinct(true);
+            template.setNativeDistinct(true); // FIXME Jeremy: must be able to disable with a query hint.
         }
 
-        final TupleQueryResult tqr = 
-            wrapIterator(ssstr.get(), context.conn.getTripleStore());
+        final TupleQueryResult tqr = wrapIterator(ssstr.get(), context.conn.getTripleStore());
 
-        final ASTConstructIterator itr = new ASTConstructIterator(
-            context,//
-            context.conn.getTripleStore(), template,
-            whereClause, null/* bnodesMap */,
-            tqr);
-   
-        while (itr.hasNext()) {
+        try {
 
-            final BigdataStatement stmt = itr.next();
-   
-            addOrRemoveStatement(context.conn.getSailConnection(), stmt, true/* insert */);
-   
+            final ASTConstructIterator itr = new ASTConstructIterator(context, //
+                    context.conn.getTripleStore(), template, whereClause, null/* bnodesMap */, tqr);
+
+            try {
+
+                while (itr.hasNext()) {
+
+                    final BigdataStatement stmt = itr.next();
+
+                    addOrRemoveStatement(context.conn.getSailConnection(), stmt, true/* insert */);
+
+                }
+
+            } finally {
+
+                itr.close();
+
+            }
+
+        } finally {
+
+            tqr.close();
+
         }
-        
+
     }
 
     /**
@@ -1077,7 +1101,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @param it the internal iterator to wrap
      * @return
      */
-    // TODO: get defaults right, look at queryId & required
+    // TODO: get defaults right (query hint overrides), look at queryId & required vars. FIXME Refactor so this remains in ASTEvalHelper.
     private static TupleQueryResult wrapIterator(
         final ICloseableIterator<IBindingSet[]> it, final AbstractTripleStore db) {
         
@@ -1100,11 +1124,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             new Bigdata2Sesame2BindingSetIterator(
                 // Materialize IVs as RDF Values.
                 new BigdataBindingSetResolverator(
-                    db, it2, null /* TODO: queryId */, null /* required */, 
+                    db, it2, null /* TODO: queryId */, null /* required vars */, 
                     chunkCapacity, chunkOfChunksCapacity, 
                     chunkTimeout,termsChunkSize, blobsChunkSize).start(db.getExecutorService()));
             
-            return new TupleQueryResultImpl(new LinkedList<String>(), it3);
+        return new TupleQueryResultImpl(new LinkedList<String>(), it3);
     }
     
     /**
