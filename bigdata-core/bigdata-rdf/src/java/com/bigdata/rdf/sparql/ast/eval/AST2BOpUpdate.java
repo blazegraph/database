@@ -156,6 +156,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
     private static final Logger log = Logger.getLogger(AST2BOpUpdate.class);
 
+    // TODO: remove field and debug output again
+    public static boolean DEBUG_IN_CI = false;
+    
     /**
      * When <code>true</code>, convert the SPARQL UPDATE into a physical
      * operator plan and execute it on the query engine. When <code>false</code>
@@ -809,7 +812,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 while (itr.hasNext()) {
 
                     final BigdataStatement stmt = itr.next();
-
+                    
+                    if (DEBUG_IN_CI) System.err.println("DELETING: " + stmt);
+                    
                     addOrRemoveStatement(context.conn.getSailConnection(), stmt, false/* insert */);
 
                 }
@@ -1028,6 +1033,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 while (itr.hasNext()) {
 
                     final BigdataStatement stmt = itr.next();
+                    if (DEBUG_IN_CI)  System.err.println("INSERTING: " + stmt);
 
                     addOrRemoveStatement(context.conn.getSailConnection(), stmt, true/* insert */);
 
@@ -2202,6 +2208,15 @@ public class AST2BOpUpdate extends AST2BOpUtility {
              *      href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
              *      DELETE/INSERT WHERE handling of blank nodes </a>
              */
+            if (AST2BOpUpdate.DEBUG_IN_CI) {
+                String contextStr = "";
+                if (contexts!=null) {
+                    for (Resource context : contexts) {
+                        contextStr += "," + context;
+                    }
+                }
+                System.err.println("addOrRemoveStatement deleting statement: " + s + " / " + p + " / " + o + " / " + contextStr);
+            }
             conn.removeStatements(s, p, o, contexts);
 
         }

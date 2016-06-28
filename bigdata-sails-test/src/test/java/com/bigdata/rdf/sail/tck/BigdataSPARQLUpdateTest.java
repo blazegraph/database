@@ -59,6 +59,8 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdate;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
  * Integration with the openrdf SPARQL 1.1 update test suite.
@@ -444,6 +446,8 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
     public void testTicket571() throws RepositoryException,
             MalformedQueryException, UpdateExecutionException,
             QueryEvaluationException {
+        
+        AST2BOpUpdate.DEBUG_IN_CI = true;
 
         final URI graphA = f.createURI("http://example.org/graphA");
         final URI tempGraph = f.createURI("http://example.org/tmp");
@@ -562,6 +566,8 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             assertEquals("tempGraph", 2L, countSolutions(query));
             
         }
+
+        AST2BOpUpdate.DEBUG_IN_CI = false;
 
     }
     
