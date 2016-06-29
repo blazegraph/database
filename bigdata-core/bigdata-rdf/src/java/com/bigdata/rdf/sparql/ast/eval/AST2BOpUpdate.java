@@ -52,6 +52,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
@@ -98,6 +99,7 @@ import com.bigdata.rdf.error.SparqlDynamicErrorException.UnknownContentTypeExcep
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
@@ -631,6 +633,18 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 // play the result into a native memory backed solution set stream
                 try {ssstr.put(resItr);} finally {resItr.close();}
                 deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
+                
+                
+                if (AST2BOpUpdate.DEBUG_IN_CI) {
+                    System.err.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ssstr immediately after initialization:");
+                    final ICloseableIterator<IBindingSet[]> itX  = ssstr.get();
+                    while (itX.hasNext()) {
+                        IBindingSet[] bss = itX.next();
+                        for (final IBindingSet bs : bss) {
+                            System.err.println("====> Stored binding set as per ssstr:" + bs);
+                        }
+                    }
+                }
                 
                 // If the query contains a nativeDistinctSPO query hint then
                 // the line below unfortunately isolates the query so that the hint does
@@ -2209,6 +2223,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
              *      DELETE/INSERT WHERE handling of blank nodes </a>
              */
             if (AST2BOpUpdate.DEBUG_IN_CI) {
+                System.err.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ AST2BOpUpdate.addOrRemoveStatement()");
                 String contextStr = "";
                 if (contexts!=null) {
                     for (Resource context : contexts) {

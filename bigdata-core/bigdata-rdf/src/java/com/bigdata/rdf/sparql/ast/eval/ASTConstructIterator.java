@@ -747,6 +747,7 @@ public class ASTConstructIterator implements
              */
             // TODO: this is experimental code
             if (AST2BOpUpdate.DEBUG_IN_CI) {
+                System.err.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ASTConstructIterator.fillBuffer()");
                 for (final String bName : solution.getBindingNames()) {
                     final Binding b = solution.getBinding(bName);
                     final Value v = b.getValue();
@@ -755,13 +756,6 @@ public class ASTConstructIterator implements
                         final BigdataValue bv = (BigdataValue)v;
                         System.err.println("===> bigdataValue=" + bv );
                         System.err.println("-----> bv.getIV()=" + bv.getIV());
-                        if (bv.getIV()!=null) {
-                            try {
-                                System.err.println("-------> bv.getIV().getValue()=" + bv.getIV().getValue());
-                            } catch (Exception e) {
-                                System.err.println("-------> bv.getIV().getValue() throws NotMaterializedException");                            
-                            }
-                        }
     
                         // TODO: 
                         // -> when enabling this, I get exactly the same behavior as in CI,
