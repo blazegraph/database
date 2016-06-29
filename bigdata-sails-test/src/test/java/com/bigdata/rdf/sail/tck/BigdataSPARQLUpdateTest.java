@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -60,7 +61,6 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdate;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
  * Integration with the openrdf SPARQL 1.1 update test suite.
@@ -162,6 +162,10 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
         props.setProperty(Options.TRUTH_MAINTENANCE, "false");
         
         props.setProperty(Options.TEXT_INDEX, "true");
+        
+        // make sure we are using a unique namespace in every run to avoid 
+        // possible interference of value factories floating around
+        props.setProperty(Options.NAMESPACE, "BigdataSPARQLUpdate-"+UUID.randomUUID());
         
         return props;
         
