@@ -3276,8 +3276,6 @@ public class BigdataSail extends SailBase implements Sail {
                     
                     n = database.removeStatements(s, p, o, c);
 
-                    System.err.println("BigdataSail.removeStatements (changeLog==null) deleting statement: " + s + " / " + p + " / " + o + " / " + c + " ---> retValue=" + n);
-
                 } else {
                 
                     final IChunkedOrderedIterator<ISPO> itr = 
@@ -3288,8 +3286,6 @@ public class BigdataSail extends SailBase implements Sail {
                     n = StatementWriter.removeStatements(database, itr, 
                             false/* computeClosureForStatementIdentifiers */,
                             changeLog);
-                    
-                    System.err.println("BigdataSail.removeStatements (changeLog!=null) deleting statement: " + s + " / " + p + " / " + o + " / " + c + " ---> retValue=" + n);
                     
 //                    final IAccessPath<ISPO> ap = 
 //                        database.getAccessPath(s, p, o, c);

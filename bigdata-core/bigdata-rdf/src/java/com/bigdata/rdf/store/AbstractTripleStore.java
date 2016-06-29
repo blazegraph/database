@@ -4503,8 +4503,6 @@ abstract public class AbstractTripleStore extends
 
                 mutationCount += getSPORelation().delete(stmts, numStmts);
                 
-                if (AST2BOpUpdate.DEBUG_IN_CI) System.err.println("Deleting " + numStmts + " for abstractTripleStore " + this + " -> mutationCount=" + mutationCount);
-                
             }
 
         } finally {

@@ -41,7 +41,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -744,28 +743,7 @@ public class ASTConstructIterator implements
             /*
              * Attempt to build a statement from this statement pattern and
              * solution.
-             */
-            // TODO: this is experimental code
-            if (AST2BOpUpdate.DEBUG_IN_CI) {
-                System.err.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ASTConstructIterator.fillBuffer()");
-                for (final String bName : solution.getBindingNames()) {
-                    final Binding b = solution.getBinding(bName);
-                    final Value v = b.getValue();
-                    
-                    if (v instanceof BigdataValue) {
-                        final BigdataValue bv = (BigdataValue)v;
-                        System.err.println("===> bigdataValue=" + bv );
-                        System.err.println("-----> bv.getIV()=" + bv.getIV());
-    
-                        // TODO: 
-                        // -> when enabling this, I get exactly the same behavior as in CI,
-                        //    i.e. the TC fails without deleting the two triples
-                        // bv.clearInternalValue();
-                    }
-                }            
-            }            
-            
-
+             */           
             final BigdataStatement stmt = makeStatement(pat, solution, bnodes);
 
             if (stmt != null) {

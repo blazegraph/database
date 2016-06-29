@@ -119,9 +119,6 @@ public class SPOAccessPath extends AccessPath<ISPO> {
     @Override
     public long removeAll() {
 
-
-        if (AST2BOpUpdate.DEBUG_IN_CI) System.err.println("Deleting for access path " + this);
-
         return getRelation().getContainer().removeStatements(iterator());
 
     }

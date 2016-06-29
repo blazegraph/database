@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import info.aduna.iteration.CloseableIteration;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -52,8 +50,6 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.query.Binding;
-import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.UpdateExecutionException;
@@ -99,10 +95,8 @@ import com.bigdata.rdf.error.SparqlDynamicErrorException.UnknownContentTypeExcep
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.RDFParserOptions;
-import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
@@ -138,13 +132,10 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.stream.Stream.StreamIndexMetadata;
-import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -157,9 +148,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 public class AST2BOpUpdate extends AST2BOpUtility {
 
     private static final Logger log = Logger.getLogger(AST2BOpUpdate.class);
-
-    // TODO: remove field and debug output again
-    public static boolean DEBUG_IN_CI = false;
     
     /**
      * When <code>true</code>, convert the SPARQL UPDATE into a physical
@@ -625,26 +613,16 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 // by the query. i.e. materialization must be done on demand
                 // where needed by the consumer of the itr or the solution set
                 // stream on which the itr is written.
-                final  ICloseableIterator<IBindingSet[]> resItr = 
-                    ASTEvalHelper.evaluateTupleQuery2(
+                final IRunningQuery runningQuery = 
+                    ASTEvalHelper.prepareRunningQuery(
                         context.conn.getTripleStore(), astContainer,
                         context.getQueryBindingSet()/* bindingSets */);
+                final  ICloseableIterator<IBindingSet[]> resItr = 
+                    ASTEvalHelper.evaluateRunningQuery(runningQuery);
 
                 // play the result into a native memory backed solution set stream
                 try {ssstr.put(resItr);} finally {resItr.close();}
                 deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
-                
-                
-                if (AST2BOpUpdate.DEBUG_IN_CI) {
-                    System.err.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ssstr immediately after initialization:");
-                    final ICloseableIterator<IBindingSet[]> itX  = ssstr.get();
-                    while (itX.hasNext()) {
-                        IBindingSet[] bss = itX.next();
-                        for (final IBindingSet bs : bss) {
-                            System.err.println("====> Stored binding set as per ssstr:" + bs);
-                        }
-                    }
-                }
                 
                 // If the query contains a nativeDistinctSPO query hint then
                 // the line below unfortunately isolates the query so that the hint does
@@ -654,7 +632,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         ConstructNode.Annotations.NATIVE_DISTINCT,
                         ConstructNode.Annotations.DEFAULT_NATIVE_DISTINCT);
                 
-                applyUpdate(op, context, deleteInsertWhereStats, queryRoot, ssstr, astContainer, nativeDistinct);
+                applyUpdate(op, context, runningQuery, deleteInsertWhereStats, 
+                            queryRoot, ssstr, astContainer, nativeDistinct);
 
             } finally {
 
@@ -705,6 +684,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      */
     private static void applyUpdate(final DeleteInsertGraph op,
             final AST2BOpUpdateContext context,
+            final IRunningQuery runningQuery,
             final DeleteInsertWhereStats deleteInsertWhereStats,
             final QueryRoot queryRoot, 
             final SolutionSetStream ssstr,
@@ -722,7 +702,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final long beginDeleteNanos = System.nanoTime();
             
             handleDelete(
-                deleteClause, whereClause, context, 
+                deleteClause, whereClause, context, runningQuery,
                 queryRoot, astContainer, ssstr, nativeDistinct);
 
             deleteInsertWhereStats.deleteNanos.set(System.nanoTime() - beginDeleteNanos);
@@ -734,7 +714,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final long beginInsertNanos = System.nanoTime();
 
             handleInsert(
-                insertClause, whereClause, context, 
+                insertClause, whereClause, context, runningQuery,
                 queryRoot,  ssstr, nativeDistinct);
             
             deleteInsertWhereStats.insertNanos.set(System.nanoTime() - beginInsertNanos);
@@ -764,6 +744,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final QuadsDataOrNamedSolutionSet deleteClause,
             final GraphPatternGroup<?> whereClause,
             final AST2BOpUpdateContext context,
+            final IRunningQuery runningQuery,
             final QueryRoot queryRoot, final ASTContainer astContainer,
             final SolutionSetStream ssstr, final boolean nativeDistinct)
             throws QueryEvaluationException, SailException {
@@ -778,7 +759,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         } else {
 
             applyDeleteToBackingStore(
-                deleteClause, whereClause, context, ssstr, nativeDistinct);
+                deleteClause, whereClause, runningQuery, context, ssstr, nativeDistinct);
 
         }
         		
@@ -801,6 +782,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     private static void applyDeleteToBackingStore(
             final QuadsDataOrNamedSolutionSet deleteClause,
             final GraphPatternGroup<?> whereClause,
+            final IRunningQuery runningQuery,
             final AST2BOpUpdateContext context, final SolutionSetStream ssstr,
             final boolean nativeDistinct) throws QueryEvaluationException,
             SailException {
@@ -814,8 +796,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             template.setNativeDistinct(true);
         }
 
-        final TupleQueryResult tqr = wrapIterator(ssstr.get(), context.conn.getTripleStore());
-
+        final TupleQueryResult tqr = 
+            new TupleQueryResultImpl(
+                new LinkedList<String>(),
+                ASTEvalHelper.wrapIntoMaterializingIterator(
+                    new Dechunkerator<IBindingSet>(ssstr.get()), 
+                    runningQuery, context.getAbstractTripleStore(), 
+                    false /* materializeProjectionInQuery */, null /* requiredVars */));     
+        
         try {
 
             final ASTConstructIterator itr = new ASTConstructIterator(context, //
@@ -826,8 +814,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 while (itr.hasNext()) {
 
                     final BigdataStatement stmt = itr.next();
-                    
-                    if (DEBUG_IN_CI) System.err.println("DELETING: " + stmt);
                     
                     addOrRemoveStatement(context.conn.getSailConnection(), stmt, false/* insert */);
 
@@ -938,11 +924,12 @@ public class AST2BOpUpdate extends AST2BOpUtility {
               * SailConnection in case the view is isolated
               * by a transaction.
               */
-             final ICloseableIterator<IBindingSet[]> titr = 
-                 ASTEvalHelper.evaluateTupleQuery2(
+             final IRunningQuery runningQuery = 
+                 ASTEvalHelper.prepareRunningQuery(
                      context.conn.getTripleStore(),
-                     astContainer,
-                     context.getQueryBindingSet()/* bindingSets */);
+                     astContainer, context.getQueryBindingSet()/* bindingSets */);
+             final ICloseableIterator<IBindingSet[]> titr = 
+                 ASTEvalHelper.evaluateRunningQuery(runningQuery);
 
              try {
 
@@ -986,6 +973,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final QuadsDataOrNamedSolutionSet insertClause,
             final GraphPatternGroup<?> whereClause,
             final AST2BOpUpdateContext context,
+            final IRunningQuery runningQuery,
             final QueryRoot queryRoot, SolutionSetStream ssstr,
             final boolean nativeDistinct) throws QueryEvaluationException,
             SailException {
@@ -998,7 +986,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         } else {
 
-            applyInsertToBackingStore(insertClause, whereClause, context, ssstr, nativeDistinct);
+            applyInsertToBackingStore(
+                insertClause, whereClause, runningQuery, context, ssstr, nativeDistinct);
    
         }
     }
@@ -1019,6 +1008,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     private static void applyInsertToBackingStore(
             final QuadsDataOrNamedSolutionSet insertClause,
             final GraphPatternGroup<?> whereClause,
+            final IRunningQuery runningQuery,
             final AST2BOpUpdateContext context, SolutionSetStream ssstr,
             final boolean nativeDistinct) throws QueryEvaluationException,
             SailException {
@@ -1035,8 +1025,15 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             template.setNativeDistinct(true); // FIXME Jeremy: must be able to disable with a query hint.
         }
 
-        final TupleQueryResult tqr = wrapIterator(ssstr.get(), context.conn.getTripleStore());
 
+        final TupleQueryResult tqr = 
+            new TupleQueryResultImpl(
+                new LinkedList<String>(),
+                ASTEvalHelper.wrapIntoMaterializingIterator(
+                    new Dechunkerator<IBindingSet>(ssstr.get()), 
+                    runningQuery, context.getAbstractTripleStore(), 
+                    false /* materializeProjectionInQuery */, null /* requiredVars */));
+        
         try {
 
             final ASTConstructIterator itr = new ASTConstructIterator(context, //
@@ -1047,7 +1044,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 while (itr.hasNext()) {
 
                     final BigdataStatement stmt = itr.next();
-                    if (DEBUG_IN_CI)  System.err.println("INSERTING: " + stmt);
 
                     addOrRemoveStatement(context.conn.getSailConnection(), stmt, true/* insert */);
 
@@ -1112,43 +1108,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             titr.close();
 
         }
-    }
-    
-    
-    /**
-     * Wraps an internal iterator into a Sesame TupleQueryResult iterator.
-     * 
-     * @param it the internal iterator to wrap
-     * @return
-     */
-    // TODO: get defaults right (query hint overrides), look at queryId & required vars. FIXME Refactor so this remains in ASTEvalHelper.
-    private static TupleQueryResult wrapIterator(
-        final ICloseableIterator<IBindingSet[]> it, final AbstractTripleStore db) {
-        
-        final int chunkCapacity = PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY; 
-        
-        final ICloseableIterator<IBindingSet> it1 = new Dechunkerator<IBindingSet>(it);
-        
-        final IChunkedOrderedIterator<IBindingSet> it2 = 
-                new ChunkedWrappedIterator<IBindingSet>(it1, chunkCapacity, IBindingSet.class);
-            
-        final int chunkOfChunksCapacity = 
-            PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY;
-            
-        final long chunkTimeout = 
-            (long)PipelineOp.Annotations.DEFAULT_CHUNK_TIMEOUT;
-        final int termsChunkSize = chunkCapacity;
-        final int blobsChunkSize = chunkCapacity;
-            
-        final CloseableIteration<BindingSet, QueryEvaluationException> it3 = 
-            new Bigdata2Sesame2BindingSetIterator(
-                // Materialize IVs as RDF Values.
-                new BigdataBindingSetResolverator(
-                    db, it2, null /* TODO: queryId */, null /* required vars */, 
-                    chunkCapacity, chunkOfChunksCapacity, 
-                    chunkTimeout,termsChunkSize, blobsChunkSize).start(db.getExecutorService()));
-            
-        return new TupleQueryResultImpl(new LinkedList<String>(), it3);
     }
     
     /**
@@ -2222,16 +2181,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
              *      href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
              *      DELETE/INSERT WHERE handling of blank nodes </a>
              */
-            if (AST2BOpUpdate.DEBUG_IN_CI) {
-                System.err.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ AST2BOpUpdate.addOrRemoveStatement()");
-                String contextStr = "";
-                if (contexts!=null) {
-                    for (Resource context : contexts) {
-                        contextStr += "," + context;
-                    }
-                }
-                System.err.println("addOrRemoveStatement deleting statement: " + s + " / " + p + " / " + o + " / " + contextStr);
-            }
             conn.removeStatements(s, p, o, contexts);
 
         }

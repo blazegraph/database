@@ -451,8 +451,6 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             MalformedQueryException, UpdateExecutionException,
             QueryEvaluationException {
         
-        AST2BOpUpdate.DEBUG_IN_CI = true;
-
         final URI graphA = f.createURI("http://example.org/graphA");
         final URI tempGraph = f.createURI("http://example.org/tmp");
         final URI s = f.createURI("http://example/s>");
@@ -570,8 +568,6 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             assertEquals("tempGraph", 2L, countSolutions(query));
             
         }
-
-        AST2BOpUpdate.DEBUG_IN_CI = false;
 
     }
     
