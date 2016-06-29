@@ -1321,7 +1321,15 @@ public class DataLoader {
 
         if (fmt == null) // fallback
             fmt = rdfFormat;
-                
+        
+        //check -defaultGraph parameter is specified while loading in Quads mode.
+        if(database.isQuads() && defaultGraph == null && fmt != fmt.NQUADS) {
+        	
+        	throw new RuntimeException("Error while loading file " + file +  " into a namespace " + database.getNamespace() + "." + //
+        			" The -defaultGraph parameter must be specified while loading data in Quads mode.");
+        	
+        }
+
         InputStream is = null;
         
         if(log.isInfoEnabled())
