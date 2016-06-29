@@ -493,7 +493,6 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
 //                "LOAD <file:bigdata-sails/src/test/org/openrdf/query/parser/sparql/ticket571.ttl> INTO GRAPH graphA: ;\n"//
         ).execute();
         
-        System.err.println("##### DATA IN DATABASE AFTER INSERT");
         debugPrintSolutions("SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }");
 
         
