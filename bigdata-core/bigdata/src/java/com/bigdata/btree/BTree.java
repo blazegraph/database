@@ -1405,13 +1405,9 @@ public class BTree extends AbstractBTree implements //ICommitter,
                 
             }
 
-            final long raddr = getRoot().getIdentity();
-			
-            if (raddr != IRawStore.NULL) {
-
-                // delete root iff persistent.
-				deleteNodeOrLeaf(raddr);
-
+            final AbstractNode<?> root = getRoot();
+            if (root.isPersistent()) { // delete root iff persistent.
+				deleteNodeOrLeaf(root.getIdentity());
             }
             
             // @todo update bytesOnStore to ZERO.
