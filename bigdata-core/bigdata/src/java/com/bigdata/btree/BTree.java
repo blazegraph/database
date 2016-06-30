@@ -1345,12 +1345,20 @@ public class BTree extends AbstractBTree implements //ICommitter,
     final public void removeAll() {
 
         assertNotReadOnly();
+        
+        final boolean canRecycle;
+        {
+        	final IRawStore store = getStore();
+        	if (store instanceof AbstractJournal) {
+        		canRecycle = ((AbstractJournal) store).getBufferStrategy() instanceof IRWStrategy;
+        	} else {
+        		canRecycle = store instanceof IRWStrategy;
+        	}
+        }
+        
+        final boolean isDeleteMarkers = getIndexMetadata().getDeleteMarkers();
 
-        /*
-         * FIXME simplify conditionals - mgc
-         */
-        if (!getIndexMetadata().getDeleteMarkers()
-                && getStore() instanceof IRWStrategy) {
+        if (canRecycle && !isDeleteMarkers) {
 
             /*
              * Per https://sourceforge.net/apps/trac/bigdata/ticket/221, we
@@ -1409,10 +1417,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
             // @todo update bytesOnStore to ZERO.
             replaceRootWithEmptyLeaf();
 
-        } else if (getIndexMetadata().getDeleteMarkers()
-                || getStore() instanceof IRWStrategy//
-                || metadata.getRawRecords()//
-                ) {
+        } else if (isDeleteMarkers || canRecycle || metadata.getRawRecords()) {
 
 			/*
 			 * Visit each tuple.
@@ -1434,17 +1439,19 @@ public class BTree extends AbstractBTree implements //ICommitter,
             final ITupleIterator itr = rangeIterator(null, null,
                     0/* capacity */, REMOVEALL/* flags */, null/* filter */);
 
+            int count = 0;
             while (itr.hasNext()) {
 
                 itr.next();
-
+                count++;
             }
-            
+
         } else {
             
             replaceRootWithEmptyLeaf();
 
-        }
+        	log.warn("replaceRootWithEmptyLeaf for " + getStore().getClass().getName());
+       }
         
     }
 
