@@ -131,7 +131,7 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
          */
         String[] datatypes = getProperty(
 		        AbstractTripleStore.Options.DATATYPES_TO_TEXT_INDEX,
-		        AbstractTripleStore.Options.DEFAULT_DATATYPES_TO_TEXT_INDEX).split("\\w*,\\w*");
+		        AbstractTripleStore.Options.DEFAULT_DATATYPES_TO_TEXT_INDEX).split("\\W*,\\W*");
         
 		this.datatypesToTextIndex = new LinkedHashSet<URI>(datatypes.length);
 		

@@ -514,20 +514,6 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 	 */
     public void test_text_index_inline_unicode_literals() {
 
-//    	if(true) {
-//    		/*
-//    		 * The full text index supports indexing of inlined literals
-//    		 * since https://jira.blazegraph.com/browse/BLZG-1928.
-//    		 * Although, note that FTS index does not get records retracted
-//    		 * if original literals are removed from triplestore.
-//    		 * TODO We are considering a refactor which would
-//    		 * use a [token S P O : relevance] key for the full text index and
-//    		 * do maintenance on the index when statements are added or retracted.
-//    		 */
-//    		log.warn("Full text index is not supported for inline Unicode at this time.");
-//    		return;
-//    	}
-    	
         final Properties properties = getProperties();
 
 		/*

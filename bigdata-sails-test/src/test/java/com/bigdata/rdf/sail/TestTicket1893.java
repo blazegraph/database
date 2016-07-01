@@ -601,6 +601,40 @@ public class TestTicket1893 extends
         
     }
     
+    /**
+     * case 16a:
+     * INLINE_TEXT_LITERALS is false 
+     * INLINE_XSD_DATATYPE_LITERALS is true 
+     * TEXT_INDEX_DATATYPE_LITERALS is false
+     * DATATYPES_TO_TEXT_INDEX is a list of XSD datatypes
+     * data entered via SPARQL UPDATE
+     */
+    public void test_16a() throws Exception {
+        
+        final String namespace = "test" + UUID.randomUUID();
+        
+        final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
+                true /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/,
+                XMLSchema.BOOLEAN.stringValue()+" , "+XSD.IPV4.stringValue() /*dataTypesToTextIndex*/);
+        
+        insertSparql(cxn);
+        
+        IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
+        assertEquals(0, searchEngine.count(query("1")));
+        assertEquals(0, searchEngine.count(query("2")));
+        assertEquals(0, searchEngine.count(query("3.0")));
+        assertEquals(0, searchEngine.count(query("4.0")));
+        assertEquals(1, searchEngine.count(query("true")));
+        assertEquals(1, searchEngine.count(query("false")));
+        assertEquals(1, searchEngine.count(query("0.0.0.0")));
+        assertEquals(1, searchEngine.count(query("plain")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("english")));
+        
+        endTest(cxn);
+        
+    }
+    
     //////////////////////
     
     /**
@@ -1015,9 +1049,16 @@ public class TestTicket1893 extends
                 inlineXSDDatatypeLiterals, false /* textIndexDatatypeLiterals */);
     }
     
-    
+
     private BigdataSailRepositoryConnection prepareTest(final String namespace, final boolean inlineTextLiterals, 
             final boolean inlineXSDDatatypeLiterals, final boolean textIndexDatatypeLiterals) throws Exception {
+
+        return prepareTest(namespace, inlineTextLiterals, inlineXSDDatatypeLiterals, textIndexDatatypeLiterals, XSD.IPV4.stringValue());
+
+    }
+
+    private BigdataSailRepositoryConnection prepareTest(final String namespace, final boolean inlineTextLiterals, 
+            final boolean inlineXSDDatatypeLiterals, final boolean textIndexDatatypeLiterals, final String dataTypesToTextIndex) throws Exception {
 
         final Properties properties = getProperties();
         
@@ -1034,8 +1075,9 @@ public class TestTicket1893 extends
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.INLINE_XSD_DATATYPE_LITERALS, Boolean.toString(inlineXSDDatatypeLiterals));
 
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.TEXT_INDEX_DATATYPE_LITERALS, Boolean.toString(textIndexDatatypeLiterals));
+
             
-            properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.DATATYPES_TO_TEXT_INDEX, XSD.IPV4.stringValue());
+            properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.DATATYPES_TO_TEXT_INDEX, dataTypesToTextIndex);
 
             properties.setProperty("com.bigdata.namespace."+namespace+".lex."+Options.STORE_BLANK_NODES, Boolean.toString(true));
 

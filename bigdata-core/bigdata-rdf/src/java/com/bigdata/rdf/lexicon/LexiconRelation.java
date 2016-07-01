@@ -2323,15 +2323,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // Inlined literals
         {
             // Scan for the inlined literals.
-            SPORelation terms = (SPORelation) getIndexManager()
+            final SPORelation terms = (SPORelation) getIndexManager()
                     .getResourceLocator().locate(
                             getContainerNamespace() + "."
                                     + SPORelation.NAME_SPO_RELATION,
                             getTimestamp());
 
-            IAccessPath<ISPO> ap = terms.getAccessPath(null/*s*/, null/*p*/, null/*o*/, null/*c*/);
-            IChunkedOrderedIterator<ISPO> apIterator = ap.iterator();
-            IStriterator itr = new Striterator(
+            final IAccessPath<ISPO> ap = terms.getAccessPath(null/*s*/, null/*p*/, null/*o*/, null/*c*/);
+            final IChunkedOrderedIterator<ISPO> apIterator = ap.iterator();
+            final IStriterator itr = new Striterator(
                     apIterator).addFilter(new Filter() {
                         @Override
                         public boolean isValid(Object obj) {
