@@ -87,7 +87,7 @@ public interface HashJoinAnnotations {
 
     /**
      * Boolean flag to be set when we do not want to return the variables
-     * defined by the {#JVMHashIndexOp.Annotations.SELECT} annotation, but
+     * defined by the {@link HashIndexOp.Annotations#SELECT} annotation, but
      * instead calculate the DISTINCT projection over the join variables.
      * This is the approach that we use for many subgroups, where we project
      * in the distinct variables (typically: exactly the join variables),
