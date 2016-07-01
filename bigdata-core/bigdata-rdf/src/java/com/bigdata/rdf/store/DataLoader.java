@@ -1925,15 +1925,15 @@ public class DataLoader {
 	 *            <dd>Compute the RDF(S)+ closure.</dd>
 	 *            <dt>-format</dt>
 	 *            <dd>The format of the file (optional, when not specified the
-     *            format is deduced for each file in turn using the
-     *            {@link RDFFormat} static methods).</dd>
+	 *            format is deduced for each file in turn using the
+	 *            {@link RDFFormat} static methods).</dd>
 	 *            <dt>-baseURI</dt>
 	 *            <dd>The baseURI (optional, when not specified the name of the each
-     *            file load is converted to a URL and used as the baseURI for
-     *            that file).</dd>
+	 *            file load is converted to a URL and used as the baseURI for
+	 *            that file).</dd>
 	 *            <dt>-defaultGraph</dt>
 	 *            <dd>The value that will be used for the graph/context co-ordinate when
-     *            loading data represented in a triple format into a quad store.</dd>
+	 *            loading data represented in a triple format into a quad store.</dd>
 	 *            <dt>-durableQueues</dt>
 	 *            <dd>Files will be renamed to either <code>.good</code> or
 	 *            <code>.fail</code> as they are processed. The files will
