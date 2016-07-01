@@ -83,6 +83,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.journal.Tx;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IInlineURIFactory;
@@ -109,6 +110,8 @@ import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSailHelper;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -132,6 +135,8 @@ import com.bigdata.util.Bytes;
 import com.bigdata.util.NT;
 import com.bigdata.util.concurrent.CanonicalFactory;
 
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -1833,19 +1838,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 nunknown++;
                 
-            } else if (!readOnly && this.textIndex && v instanceof BigdataLiteral) {
+            } 
+            
+            if (!readOnly && this.textIndex && v instanceof BigdataLiteral) {
                 
-                /*
-                 * Some inline IVs will be text indexed per the 
-                 * LexiconConfiguration.
-                 */
-                final URI dt = ((BigdataLiteral) v).getDatatype();
-                if (dt == null || dt.equals(XSD.STRING) || dt.equals(RDF.LANGSTRING)) {
-                    // always text index strings, even inline ones
-                    textIndex.add(v);
-                } else if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
-                    textIndex.add(v);
-                }
+                // Decision if FTS would index particular literal is delegated
+                // to specific FTS implementation.
+                // See https://jira.blazegraph.com/browse/BLZG-1928 (Problems with Full Text Index (continued))
+                textIndex.add(v);
                 
             }
             
@@ -2256,7 +2256,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 protected Object resolve(final Object obj) {
                     final BigdataLiteral lit = (BigdataLiteral) tupSer
                             .deserialize((ITuple<?>) obj);
-                    // System.err.println("lit: "+lit);
                     return lit;
                 }
             });
@@ -2307,11 +2306,46 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 protected Object resolve(final Object obj) {
                     final BigdataLiteral lit = (BigdataLiteral) tupSer
                             .deserialize((ITuple<?>) obj);
-                    // System.err.println("lit: "+lit);
                     return lit;
                 }
             });
 
+            final int capacity = 10000;
+
+            while (itr.hasNext()) {
+
+                textIndexer.index(capacity, itr);
+
+            }
+
+        }
+
+        // Inlined literals
+        {
+            // Scan for the inlined literals.
+            final SPORelation terms = (SPORelation) getIndexManager()
+                    .getResourceLocator().locate(
+                            getContainerNamespace() + "."
+                                    + SPORelation.NAME_SPO_RELATION,
+                            getTimestamp());
+
+            final IAccessPath<ISPO> ap = terms.getAccessPath(null/*s*/, null/*p*/, null/*o*/, null/*c*/);
+            final IChunkedOrderedIterator<ISPO> apIterator = ap.iterator();
+            final IStriterator itr = new Striterator(
+                    apIterator).addFilter(new Filter() {
+                        @Override
+                        public boolean isValid(Object obj) {
+                            IV o = ((ISPO)obj).o();
+                            return o.isLiteral() && o.isInline();
+                            }
+                    }).addFilter(new Resolver() {
+                private static final long serialVersionUID = 1L;
+
+                protected Object resolve(final Object obj) {
+                    final BigdataValue lit = ((ISPO) obj).o().asValue(LexiconRelation.this);
+                    return lit;
+                }
+            });
             final int capacity = 10000;
 
             while (itr.hasNext()) {

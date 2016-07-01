@@ -172,12 +172,6 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
     BigdataValueFactory getValueFactory();
     
     /**
-     * Should the specified datatype be included in the text index (even though
-     * it is an inline datatype, for example IPv4).
-     */
-    boolean isInlineDatatypeToTextIndex(URI datatype);
-
-    /**
      * Get iterator over registered type handlers.
      */
     Iterable<IMathOpHandler> getTypeHandlers();
