@@ -1435,18 +1435,16 @@ public class BTree extends AbstractBTree implements //ICommitter,
             final ITupleIterator itr = rangeIterator(null, null,
                     0/* capacity */, REMOVEALL/* flags */, null/* filter */);
 
-            int count = 0;
             while (itr.hasNext()) {
 
                 itr.next();
-                count++;
+                
             }
 
         } else {
             
             replaceRootWithEmptyLeaf();
 
-//        	log.warn("replaceRootWithEmptyLeaf for " + getStore().getClass().getName());
        }
         
     }
