@@ -359,6 +359,72 @@ public class TestDataLoader extends AbstractTripleStoreTestCase {
 
 	}
 	
+	/**
+	 * Test check defaultGraph parameter is not null while loading in Quads mode.
+	 */
+	public void test_check_defaulGraph_specified_quads_mode() throws IOException {
+
+		final AbstractTripleStore store = getStore();
+		
+		try {
+		
+			if (store.isQuads()) {
+				
+				final Properties properties = new Properties(store.getProperties());
+	
+				final DataLoader dataLoader = new DataLoader(properties, store);
+				
+				// temporary directory where we setup the test.
+				final File tmpDir = File.createTempFile(getClass().getName(), ".tmp");
+				
+				try {
+					
+					tmpDir.delete(); // delete random file name.
+					tmpDir.mkdir(); // recreate it as a directory.
+				
+					// Setup directory with files.
+					final File testFile = new File(tmpDir, "test.nt");
+
+					final String testData = "<s:s1> <p:p1> <o:o1> .";
+
+					writeOnFile(testFile, testData);
+
+					try {
+
+						dataLoader.loadFiles(tmpDir, ""/*baseURI*/, null/*rdfFormat*/, 
+								null/*defaultGraph*/, DataLoader.getFilenameFilter());
+						
+						fail();
+						
+					} catch (RuntimeException ex) {
+						
+						assertTrue(ex.getMessage().contains("-defaultGraph"));
+						
+						if (log.isInfoEnabled())
+							log.debug("Ignoring expected exception: " + ex);
+						
+					}
+				
+				} finally {
+
+					// destroy the temporary directory.
+					recursiveDelete(tmpDir);
+					
+				}
+				
+			} else {
+				
+				return;
+				
+			}
+			
+		} finally {
+
+			store.__tearDownUnitTest();
+		}
+
+	}
+	
 	private void doDurableQueueTest(final DataLoader dataLoader) throws IOException {
 		
 		// temporary directory where we setup the test.
