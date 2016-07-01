@@ -1446,7 +1446,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
             
             replaceRootWithEmptyLeaf();
 
-        	log.warn("replaceRootWithEmptyLeaf for " + getStore().getClass().getName());
+//        	log.warn("replaceRootWithEmptyLeaf for " + getStore().getClass().getName());
        }
         
     }
