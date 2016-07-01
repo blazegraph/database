@@ -938,7 +938,9 @@ public class TestRemoteSparqlBuilderFactory extends
         { 
         	final MapBindingSet bset = new MapBindingSet();
             final BigdataURI tmp1 = valueFactory.createURI("p:p1");
-            final BigdataLiteral tmp2 = valueFactory.createLiteral("lit1");
+            // @see https://jira.blazegraph.com/browse/BLZG-1951 (Strings in federated query not escaped)
+            // this literal tests proper escaping of string literals in prepared SPARQL.
+            final BigdataLiteral tmp2 = valueFactory.createLiteral("\"lit1\"");
             bset.addBinding("p", tmp1);
             bset.addBinding("o", tmp2);
             bindingSets.add(bset);
@@ -958,7 +960,7 @@ public class TestRemoteSparqlBuilderFactory extends
         final String expectedSparqlVersion_10 = new String("SELECT  ?s " + 
 											        		"WHERE { " + //
 											        		"FILTER ( sameTerm( ?p, <p:p1>) ). " + //
-											        		"FILTER ( sameTerm( ?o, \"lit1\") ). " + //
+											        		"FILTER ( sameTerm( ?o, \"\\\"lit1\\\"\") ). " + //
 											        		" ?s ?p ?o " + // 
 											        		"} ").replaceAll("\\s+", " ");
         
@@ -975,7 +977,7 @@ public class TestRemoteSparqlBuilderFactory extends
 											        		" ?s ?p ?o " + // 
 											        		"} " + //
 											        		"VALUES ( ?p ?o) { " + //
-											        		"( <p:p1> \"lit1\" ) " + //
+											        		"( <p:p1> \"\\\"lit1\\\"\" ) " + //
 											        		"} ").replaceAll("\\s+", " ");
         
         assertEquals(expectedSparqlVersion_11, actualQueryStrVersion_11);
@@ -991,7 +993,7 @@ public class TestRemoteSparqlBuilderFactory extends
 														        		" ?s ?p ?o " + // 
 														        		"} " + //
 														        		"BINDINGS ?p ?o { " + //
-														        		"( <p:p1> \"lit1\" ) " + //
+														        		"( <p:p1> \"\\\"lit1\\\"\" ) " + //
 														        		"} ").replaceAll("\\s+", " ");
         
         assertEquals(actualQueryStrVersion_11_DRAFT_BINDINGS, expectedSparqlVersion_11_DRAFT_BINDINGS);
