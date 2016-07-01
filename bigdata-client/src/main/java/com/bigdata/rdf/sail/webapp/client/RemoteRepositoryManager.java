@@ -23,12 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.StringReader;
+import java.net.ConnectException;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
@@ -48,7 +46,9 @@ import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
@@ -168,6 +168,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
      * Show Queries Query Parameter
      */
     private static String SHOW_QUERIES = "showQueries";
+    
+    final ConcurrentHashSet<String> runningQueries = new ConcurrentHashSet<String>();
 
     /**
      * Return the remote client for the transaction manager API.
@@ -517,7 +519,28 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             // Already closed.
             return;
         }
+        try {
+            
+            cancel();
+            
+        } catch (ConnectException e) {
+            
+            log.warn("Could not cancel running queries", e);
+            
+        }
+        
+        runningQueries.clear();
 
+
+        if (our_httpClient == httpClient && httpClient instanceof AutoCloseable) {
+
+            /*
+             * If the caller passed in an AutoCloseable HttpClient, then we shut
+             * it down now.
+             */
+            ((AutoCloseable) httpClient).close();
+
+        }
 
         if (our_httpClient != null) {
       
@@ -561,6 +584,42 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         }
 
         m_closed = true;
+
+    }
+    //
+    private void cancel() throws IOException, Exception {
+
+        if (runningQueries.isEmpty()) {
+            
+            // No cancellation needed
+            
+            return;
+            
+        }
+
+        final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL + "/status", null, null/* txId */);
+
+        opts.addRequestParam(CANCEL_QUERY);
+        
+        opts.addRequestParam(QUERYID, runningQueries.toArray(new String[runningQueries.size()]));
+
+        // Note: handled above.
+        // opts.addRequestParam(QUERYID, queryId.toString());
+
+        JettyResponseListener response = null;
+        try {
+            // Issue request, check response status code.
+            checkResponseCode(response = doConnect(opts));
+            
+        } finally {
+            /*
+             * Ensure that the http response entity is consumed so that the http
+             * connection will be released in a timely fashion.
+             */
+            if (response != null)
+                response.abort();
+
+        }
 
     }
 
@@ -1630,8 +1689,35 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                 queryTimeoutMillis = s == null ? -1L : StringUtil.toLong(s);
             }
 
-            final JettyResponseListener listener = new JettyResponseListener(request, queryTimeoutMillis);
+            final JettyResponseListener listener = new JettyResponseListener(request, queryTimeoutMillis) {
+               
+            	/*
+            	 * The method is called after the response has been processed,
+            	 * so we are removing current queryId from the runningQueries map.
+            	 */
+            	@Override
+                public void onComplete(Result result) {
+                    
+                    super.onComplete(result);
+                    
+                    // In case we are processing a cancel query request, it does not have 
+                    // its own queryId, so we do not need to remove it from runningQueries map. 
+                    if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
+                        if (opts.getRequestParam(QUERYID) != null) {
+                            runningQueries.remove(opts.getRequestParam(QUERYID));
+                        }
+                    }
+                }
+            };
 
+            // In case we are processing a cancel query request, it does not have 
+            // its own queryId, so we are not tracking it in runningQueries map. 
+            if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
+                if (opts.getRequestParam(QUERYID) != null) {
+                    runningQueries.add(opts.getRequestParam(QUERYID));
+                }
+            }
+            
             // Note: Send with a listener is non-blocking.
             request.send(listener);
 
@@ -1646,6 +1732,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
                 if (request != null)
                     request.abort(t);
+                
+                runningQueries.remove(opts.getRequestParam(QUERYID));
 
             } catch (Throwable t2) {
                 log.warn(t2); // ignored.
@@ -2321,6 +2409,105 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         }
 
+    }
+    
+    public ContextsResult contextsResults(final ConnectOptions opts, final UUID queryId) throws IOException, Exception {
+    	
+    	FutureTask<Void> ft = null;
+    	
+    	JettyResponseListener resp = null;
+    	
+    	ContextsResult contextsResult = null;
+    	
+        try {
+        	
+        	resp = doConnect(opts);
+
+            checkResponseCode(resp);         
+            
+            ContextsResult tmp = new ContextsResult(resp.getInputStream()){
+            
+            	private final AtomicBoolean notDone = new AtomicBoolean(true);
+
+	            @Override
+	            public boolean hasNext() throws QueryEvaluationException {
+	
+	                final boolean hasNext = super.hasNext();
+	
+	                if (hasNext == false) {
+	
+	                    notDone.set(false);
+	
+	                }
+	
+	                return hasNext;
+	
+	            }
+
+	            @Override
+	            public void handleClose() throws QueryEvaluationException {
+	
+	                try {
+	
+	                    super.handleClose();
+	
+	                } finally {
+	
+	                    if (notDone.compareAndSet(true, false)) {
+	
+	                        try {
+	                            cancel(queryId);
+	                        } catch (Exception ex) {
+	                            log.warn(ex);
+	                        }
+	
+	                    }
+	
+	                }
+
+	            };
+
+            };;
+            
+            // Wrap as FutureTask so we can cancel.
+            ft = new FutureTask<Void>(tmp, null/* result */);
+            
+            executor.execute(ft);
+            
+            return (contextsResult = tmp);
+  
+          } finally {
+                    	
+        	if (resp != null && contextsResult == null) {
+                /*
+                 * Error handling code path. We have an http response listener
+                 * but we were not able to setup the tuple query result
+                 * listener.
+                 */
+                if (ft != null) {
+                    /*
+                     * We submitted the task to parse the response. Since the
+                     * code is not returning normally (tqrImpl:=null) we cancel
+                     * the FutureTask for the background parse of that response.
+                     */
+                    ft.cancel(true/* mayInterruptIfRunning */);
+                }
+                // Abort the http response handling.
+                resp.abort();
+                try {
+                    /*
+                     * POST back to the server to cancel the request in case it
+                     * is still running on the server.
+                     */
+                    cancel(queryId);
+                } catch (Exception ex) {
+                    log.warn(ex);
+                }
+             
+        	}
+                    
+        }
+    	
     }
 
     /**

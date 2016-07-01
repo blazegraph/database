@@ -339,6 +339,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
          // SPARQL 1.1 Federated Query.
          suite.addTestSuite(TestFederatedQuery.class);
+         
+         suite.addTestSuite(Test_REST_CANCEL.class);
 
       }
 

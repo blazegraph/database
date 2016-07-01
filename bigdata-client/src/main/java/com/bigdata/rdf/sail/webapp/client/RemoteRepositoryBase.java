@@ -25,9 +25,6 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -39,7 +36,6 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.impl.LinkedHashModel;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
@@ -340,60 +336,6 @@ public class RemoteRepositoryBase extends RemoteRepositoryDecls {
            
            // done.
            return new RangeCountResult(rangeCount.get(), elapsedMillis.get());
-
-       } finally {
-
-        if (response != null) {
-           response.abort();
-        }
-        
-       }
-
-   }
-
-   static protected ContextsResult contextsResults(
-           final JettyResponseListener response) throws Exception {
-
-       try {
-           
-           final String contentType = response.getContentType();
-
-           if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
-
-               throw new RuntimeException("Expecting Content-Type of "
-                       + IMimeTypes.MIME_APPLICATION_XML + ", not "
-                       + contentType);
-
-           }
-
-           final SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
-           
-           final Collection<Resource> contexts = 
-                 Collections.synchronizedCollection(new LinkedList<Resource>());
-
-           /*
-            * For example: 
-            * <contexts>
-            * <context uri="http://foo"/>
-            * <context uri="http://bar"/>
-            * </contexts>
-            */
-           parser.parse(response.getInputStream(), new DefaultHandler2(){
-
-              @Override
-               public void startElement(final String uri,
-                       final String localName, final String qName,
-                       final Attributes attributes) {
-
-                   if ("context".equals(qName))
-                    contexts.add(new URIImpl(attributes.getValue("uri")));
-
-               }
-               
-           });
-           
-           // done.
-           return new ContextsResult(contexts);
 
        } finally {
 

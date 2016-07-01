@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.service;
 
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
@@ -50,8 +51,8 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  */
 public class RemoteServiceCallImpl implements RemoteServiceCall {
 
-//    private static final Logger log = Logger
-//            .getLogger(RemoteServiceCallImpl.class);
+    private static final Logger log = Logger
+            .getLogger(RemoteServiceCallImpl.class);
     
     private final ServiceCallCreateParams params;
 
@@ -148,18 +149,20 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
         final TupleQueryResult queryResult;
 
-        try {
-
-            queryResult = repo.tupleResults(o, queryId, null);
-            
-        } finally {
-
-            repo.close();
-            
-        }
+        queryResult = repo.tupleResults(o, queryId, null);
 
         return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
-                        queryResult);
+                        queryResult){
+        	@Override
+        	public void close() {
+        		super.close();
+        		try {
+					repo.close();
+				} catch (Exception e) {
+					log.error("Error while closing remote repository manager", e);
+				}
+        	}
+        };
 
     }
 
