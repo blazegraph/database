@@ -123,8 +123,10 @@ public class AbstractConnectOptions implements IMimeTypes {
 
     /**
      * Request parameters to be formatted as URL query parameters.
+     * 
+     * @see https://github.com/SYSTAP/db-enterprise/issues/30 (NPE arising in HA tests when requestParams is not yet initialized).
      */
-    public Map<String, String[]> requestParams;
+    public final Map<String, String[]> requestParams = new LinkedHashMap<String, String[]>();
 
     /**
      * Optional request headers.
@@ -155,10 +157,10 @@ public class AbstractConnectOptions implements IMimeTypes {
     }
 
     public void addRequestParam(final String name, final String[] vals) {
-
-        if (requestParams == null) {
-            requestParams = new LinkedHashMap<String, String[]>();
-        }
+// Ssee https://github.com/SYSTAP/db-enterprise/issues/30 (NPE arising in HA tests when requestParams is not yet initialized).
+//        if (requestParams == null) {
+//            requestParams = new LinkedHashMap<String, String[]>();
+//        }
 
         requestParams.put(name, vals);
 
