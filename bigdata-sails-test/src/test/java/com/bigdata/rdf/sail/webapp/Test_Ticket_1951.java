@@ -23,27 +23,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryException;
-
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 
 import junit.framework.Test;
 
 
 /**
- * This test checks if plain literals and string literals are properly indexed in FTS,
- * and also rebuild text index produces properly indexed FTS.
- * @see https://jira.blazegraph.com/browse/BLZG-1893
+ * This test checks if literals are properly escaped while streaming potential solutions
+ * into service calls (in RemoteSparqlXXQueryBuilder implementations).
+ * @see https://jira.blazegraph.com/browse/BLZG-1951
  */
 public class Test_Ticket_1951 extends AbstractProtocolTest {
 
@@ -62,14 +54,13 @@ public class Test_Ticket_1951 extends AbstractProtocolTest {
 	
 	/**
 	 * Execute an ASK query including a SERVICE keyword which gets sent back to this server.
-	 * The test succeeeds if the query returns true, and fails otherwise
+	 * The test checks if literal, which needs escaping, is properly streamed through a service call
 	 * @param args
 	 * @throws IOException
 	 */
 	public void test_simple() throws Exception {
 
 		setMethodisPostUrlEncodedData();
-//		m_repo.getRemoteRepositoryManager().createRepository(namespace, properties);
 		BigdataSailRemoteRepositoryConnection conn = m_repo.getBigdataSailRemoteRepository().getConnection();
 		conn.prepareUpdate(QueryLanguage.SPARQL, "INSERT DATA { <a:a> <b:b> \"a\\nb\" }").execute();
 		conn.commit();
