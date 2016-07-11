@@ -1,0 +1,8 @@
+SELECT ?s
+WITH {
+  SELECT * WHERE { ?s <http://p1> <http://o1> }
+} AS %sub1
+WHERE {
+  INCLUDE %sub1
+  ?s <http://p2> <http://o2>
+}

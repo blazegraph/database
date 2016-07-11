@@ -1,0 +1,7 @@
+SELECT ?s
+WHERE {
+	hint:Query hint:maxParallel 10 .
+	?s ?p1 <http://o1> .
+	?s ?p2 <http://o2> .
+	?s ?p3 <http://o3> .
+}

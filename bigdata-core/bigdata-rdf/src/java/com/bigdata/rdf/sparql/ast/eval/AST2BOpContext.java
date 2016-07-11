@@ -264,7 +264,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *      href="https://sourceforge.net/apps/trac/bigdata/ticket/489">Optimize
      *      RDF Value materialization performance on cluster </a>
      */
-    boolean materializeProjectionInQuery = false;
+    boolean materializeProjectionInQuery = true;
 
     /**
      * Set by the {@link ConstructDistinctSPOHint}. When <code>false</code>, no

@@ -22,8 +22,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
-import info.aduna.xml.XMLWriter;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -34,8 +32,6 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -89,8 +85,8 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataBaseContext;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailQuery;
@@ -110,12 +106,12 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
+
+import info.aduna.xml.XMLWriter;
 
 /**
  * Class encapsulates state shared by {@link QueryServlet}(s) for the same
@@ -384,6 +380,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
  			
  			return modelQuery;
  		}
+ 		
+ 		public long getMutationCount() {
+ 			return task.getMutationCount();
+ 		}	
 
     }
 
@@ -1646,7 +1646,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final TupleQueryResultWriter w;
 
-            if (xhtml) {
+            if (explain) {
+
+                /*
+                 * This avoids the overhead associated with RDF/XML
+                 * serialization for the EXPLAIN of a query.
+                 */
+
+                w = new NopTupleQueryResultWriter();
+
+            } else if (xhtml) {
             
                 /*
                  * Override the XMLWriter to ensure that the XSL style sheet is

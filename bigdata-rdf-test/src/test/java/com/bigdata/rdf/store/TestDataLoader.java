@@ -33,6 +33,7 @@ import java.util.Properties;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.store.DataLoader.CommitEnum;
 import com.bigdata.util.InnerCause;
@@ -208,7 +209,127 @@ public class TestDataLoader extends AbstractTripleStoreTestCase {
 		}
 
 	}
+	
+	/**
+	 * Test where an error in a source SHOULD NOT be ignored because default of 
+	 * {@link RDFParserOptions.Options#DEFAULT_STOP_AT_FIRST_ERROR}  is true and we 
+	 * have NOT specified {@link RDFParserOptions.Options#DEFAULT_STOP_AT_FIRST_ERROR}.
+	 * 
+	 * @see BLZG-1895 (DataLoader ignores errors in data when used with default config)
+	 */
+	public void test_DataLoader_ignoreFailures04() throws IOException {
 
+		final AbstractTripleStore store = getStore();
+		
+		try {
+			
+			final DataLoader dataLoader = new DataLoader(store);
+
+			// temporary directory where we setup the test.
+			final File tmpDir = File.createTempFile(getClass().getName(), ".tmp");
+			
+			try {
+				
+				tmpDir.delete(); // delete random file name.
+				tmpDir.mkdir(); // recreate it as a directory.
+			
+				// Setup directory with files.
+				final File testFile = new File(tmpDir, "test.nt");
+
+				final String testData = "< http://my.uri> a <http://URI> .";
+
+				writeOnFile(testFile, testData);
+
+				try {
+
+					dataLoader.loadFiles(tmpDir, ""/*baseURI*/, null/*rdfFormat*/, 
+							null/*defaultGraph*/, DataLoader.getFilenameFilter());
+					
+					fail();
+					
+				} catch (Throwable t) {
+
+					if (!InnerCause.isInnerCause(t, RDFParseException.class)) {
+
+						fail("Expected inner cause " + RDFParseException.class + " not found in " + t, t);
+
+					}
+				}
+			
+			} finally {
+
+				// destroy the temporary directory.
+				recursiveDelete(tmpDir);
+				
+			}
+			
+		} finally {
+
+			store.__tearDownUnitTest();
+		}
+
+	}
+	
+	/**
+	 * Test where an error in a source SHOULD be ignored because we have set 
+	 * value of {@link RDFParserOptions.Options#DEFAULT_STOP_AT_FIRST_ERROR} to false.
+	 * 
+	 * @see BLZG-1895 (DataLoader ignores errors in data when used with default config)
+	 */
+	public void test_DataLoader_ignoreFailures05() throws IOException {
+
+		final AbstractTripleStore store = getStore();
+		
+		try {
+			
+			final Properties properties = new Properties(store.getProperties());
+
+			properties.setProperty(RDFParserOptions.Options.STOP_AT_FIRST_ERROR, "");
+
+			final DataLoader dataLoader = new DataLoader(properties, store);
+
+			// temporary directory where we setup the test.
+			final File tmpDir = File.createTempFile(getClass().getName(), ".tmp");
+			
+			try {
+				
+				tmpDir.delete(); // delete random file name.
+				tmpDir.mkdir(); // recreate it as a directory.
+			
+				// Setup directory with files.
+				final File testFile = new File(tmpDir, "test.nt");
+
+				final String testData = "< http://my.uri> a <http://URI> .";
+
+				writeOnFile(testFile, testData);
+
+				dataLoader.loadFiles(tmpDir, ""/*baseURI*/, null/*rdfFormat*/, 
+							null/*defaultGraph*/, DataLoader.getFilenameFilter());
+					
+
+			} catch (Throwable t) {
+
+				if (InnerCause.isInnerCause(t, RDFParseException.class)) {
+
+					fail("Unexpected inner cause " + RDFParseException.class + " found in " + t, t);
+
+				}
+				
+			} finally {
+
+				// destroy the temporary directory.
+				recursiveDelete(tmpDir);
+				
+			}
+			
+		} finally {
+
+			store.__tearDownUnitTest();
+
+		}
+
+	}
+	
 	/**
 	 * Test durable queues using {@link CommitEnum#Incremental} and {@link ClosureEnum#None}
 	 */
@@ -351,6 +472,72 @@ public class TestDataLoader extends AbstractTripleStoreTestCase {
 			final DataLoader dataLoader = new DataLoader(properties, store);
 
 			doDurableQueueTest(dataLoader);
+			
+		} finally {
+
+			store.__tearDownUnitTest();
+		}
+
+	}
+	
+	/**
+	 * Test check defaultGraph parameter is not null while loading in Quads mode.
+	 */
+	public void test_check_defaulGraph_specified_quads_mode() throws IOException {
+
+		final AbstractTripleStore store = getStore();
+		
+		try {
+		
+			if (store.isQuads()) {
+				
+				final Properties properties = new Properties(store.getProperties());
+	
+				final DataLoader dataLoader = new DataLoader(properties, store);
+				
+				// temporary directory where we setup the test.
+				final File tmpDir = File.createTempFile(getClass().getName(), ".tmp");
+				
+				try {
+					
+					tmpDir.delete(); // delete random file name.
+					tmpDir.mkdir(); // recreate it as a directory.
+				
+					// Setup directory with files.
+					final File testFile = new File(tmpDir, "test.nt");
+
+					final String testData = "<s:s1> <p:p1> <o:o1> .";
+
+					writeOnFile(testFile, testData);
+
+					try {
+
+						dataLoader.loadFiles(tmpDir, ""/*baseURI*/, null/*rdfFormat*/, 
+								null/*defaultGraph*/, DataLoader.getFilenameFilter());
+						
+						fail();
+						
+					} catch (RuntimeException ex) {
+						
+						assertTrue(ex.getMessage().contains("-defaultGraph"));
+						
+						if (log.isInfoEnabled())
+							log.debug("Ignoring expected exception: " + ex);
+						
+					}
+				
+				} finally {
+
+					// destroy the temporary directory.
+					recursiveDelete(tmpDir);
+					
+				}
+				
+			} else {
+				
+				return;
+				
+			}
 			
 		} finally {
 

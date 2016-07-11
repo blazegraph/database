@@ -209,12 +209,6 @@ public class LexiconConfiguration<V extends BigdataValue>
     private final Map<String, IExtension<? extends BigdataValue>> datatype2ext;
     
     /**
-     * The set of inline datatypes that should be included in the text index 
-     * even though they are inline and not normally text indexed.
-     */
-    private final Set<URI> inlineDatatypesToTextIndex;
-
-    /**
      * The set of registered {@link IMathOpHandler}s.
      * 
      * @see BLZG-1592 (ConcurrentModificationException in MathBOp when using expression in BIND)
@@ -287,13 +281,6 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
     
     @Override
-    public boolean isInlineDatatypeToTextIndex(final URI dt) {
-        
-        return dt != null && inlineDatatypesToTextIndex.contains(dt);
-        
-    }
-
-    @Override
     public String toString() {
 
     	final StringBuilder sb = new StringBuilder();
@@ -331,9 +318,6 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         sb.append(", " + AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS + "="
                 + uriFactory.getClass().getName());
-
-        sb.append(", " + LexiconConfiguration.class.getName() + ".inlineDatatypesToTextIndex="
-                + inlineDatatypesToTextIndex);
 
 		sb.append("}");
 
@@ -385,14 +369,6 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.geoSpatial = geoSpatial;
         this.geoSpatialConfig = geoSpatialConfig;
         
-        /*
-         * TODO Make this configurable.
-         */
-        this.inlineDatatypesToTextIndex =
-                new LinkedHashSet<URI>(Arrays.asList(new URI[] {
-                        XSD.IPV4
-                }));
-
 		/*
 		 * Note: These collections are read-only so we do NOT need additional
 		 * synchronization.
@@ -640,7 +616,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         IV<BigdataLiteral, ?> iv = null;
 
-        if (datatype != null && !datatype.equals(XMLSchema.STRING) && datatype2ext.containsKey(datatype.stringValue())) {
+        if (datatype != null && !isStringDatatype(datatype) && datatype2ext.containsKey(datatype.stringValue())) {
 
             /*
              * Check the registered extension factories first.
@@ -665,7 +641,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         if ((iv = createInlineDatatypeIV(value, datatype)) != null)
             return iv;
 
-        if (inlineTextLiterals && maxInlineTextLength > 0) {
+        if (inlineTextLiterals && maxInlineTextLength > 0 && isStringDatatype(datatype)) {
 
             /*
              * Attempt to fully inline the literal.
@@ -680,6 +656,10 @@ public class LexiconConfiguration<V extends BigdataValue>
         return null;
 
     }
+
+	private boolean isStringDatatype(final URI datatype) {
+		return datatype.equals(XMLSchema.STRING) || datatype.equals(RDF.LANGSTRING);
+	}
 
     /**
      * Test the registered {@link IExtension} handlers. If one handles this

@@ -31,12 +31,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.counters.CAT;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IReadOnly;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -72,11 +75,13 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     /** The timestamp of the view of that KB instance. */
     protected final long timestamp;
     
-   /**
+    /**
     * The GRS is required for create/destroy of a relation (triple/quad store,
     * etc).
     */
    private final boolean isGRSRequired;
+    
+   private final CAT mutationCount = new CAT();
 
     @Override
     abstract public boolean isReadOnly();
@@ -304,7 +309,40 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 //                .getUnisolatedConnection();
 
         conn.setAutoCommit(false);
+        
+        /*
+         * Setup a change listener. It will notice the #of mutations.
+         */
 
+        conn.addChangeLog(new IChangeLog(){
+        
+            @Override
+            public final void changeEvent(final IChangeRecord record) {
+                mutationCount.increment();
+            }
+            
+            @Override
+            public void transactionBegin() {
+            }
+            
+            @Override
+            public void transactionPrepare() {
+            }
+            
+            @Override
+            public void transactionCommited(long commitTime) {
+            }
+            
+            @Override
+            public void transactionAborted() {
+            }
+            
+            @Override
+            public void close() {
+            }
+
+        });
+ 
         return conn;
 
     }
@@ -465,5 +503,9 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
       }
 
    }
+    
+    public long getMutationCount() {
+		return this.mutationCount.get();
+	}
 
 }

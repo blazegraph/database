@@ -875,7 +875,8 @@ public class ASTEvalHelper {
 
         final CloseableIteration<BindingSet, QueryEvaluationException> it3; 
 
-        if(materializeProjectionInQuery) {
+        // wrap the iterator if the set of required variables is provided and not empty
+        if(materializeProjectionInQuery && (required==null || required.length!=0)) {
         
             /*
              * The projection of the query is being materialized by the query

@@ -297,17 +297,18 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(TestBigdataSailRemoteRepository.class); // without isolatable indices.
          suite.addTestSuite(TestBigdataSailRemoteRepository.ReadWriteTx.class); // with isolatable indices.
 
-         // Insert tests from trac issues
+         // Insert tests from Trac/Jira issues
          suite.addTestSuite(TestInsertFilterFalse727.class);
          suite.addTestSuite(TestCBD731.class);
          suite.addTestSuite(Test_Ticket_605.class);
+         suite.addTestSuite(Test_Ticket_1951.class);
 
          suite.addTestSuite(TestService794.class);
 
          // Tests for procedure of rebuild text index
          suite.addTestSuite(TestRebuildTextIndex.class);
          suite.addTestSuite(Test_Ticket_1893.class);
-         
+
          if (testMode == TestMode.sids) {
             // Tests that require sids mode.
             suite.addTestSuite(TestRDROperations.class);
@@ -339,6 +340,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
          // SPARQL 1.1 Federated Query.
          suite.addTestSuite(TestFederatedQuery.class);
+         
+         suite.addTestSuite(Test_REST_CANCEL.class);
 
       }
 

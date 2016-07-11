@@ -981,17 +981,26 @@ abstract public class AbstractTripleStore extends
 		 * literals (default {@value #DEFAULT_TEXT_INDEX_DATATYPE_LITERALS}).
 		 * Enabling of this option will cause ALL datatype literals to be presented
 		 * to the full text indexer, including <code>xsd:string</code>,
-		 * <code>xsd:int</code>, etc. If disabled, only <code>xsd:string</code>
-		 * will be indexed.<br>
-		 * Note: only literals placed into Term2ID index may be indexed in a
-		 * full text index, so you might need to disable {@link #INLINE_TEXT_LITERALS}
-		 * and {@link #INLINE_XSD_DATATYPE_LITERALS}.
+		 * <code>xsd:int</code>, etc. If disabled, only plain, <code>xsd:string</code>
+		 * and <code>rdf:langString</code> (language tagged literals), will be indexed.<br>
+		 * Note: literals are text indexed not depending on inlining configuration
+		 * since <a href="https://jira.blazegraph.com/browse/BLZG-1928"> BLZG-1928 </a>
 		 */
         String TEXT_INDEX_DATATYPE_LITERALS = AbstractTripleStore.class
                 .getName() + ".textIndex.datatypeLiterals";
 
         String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
         
+		/**
+		 * List of datatypes, which will be put into full text index even if
+		 * {@link #TEXT_INDEX_DATATYPE_LITERALS} is not enabled
+		 * (default {@value #DEFAULT_DATATYPES_TO_TEXT_INDEX}).
+		 */
+        String DATATYPES_TO_TEXT_INDEX = AbstractTripleStore.class
+                .getName() + ".textIndex.datatypes";
+
+        String DEFAULT_DATATYPES_TO_TEXT_INDEX = "";
+
         /**
          * The name of the {@link IValueCentricTextIndexer} class. The implementation MUST
          * declare a method with the following signature which will be used to

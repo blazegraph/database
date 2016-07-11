@@ -34,6 +34,7 @@ import java.util.concurrent.FutureTask;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
@@ -130,7 +131,9 @@ abstract public class PipelineOp extends BOpBase {
 		/**
 		 * @see #MAX_PARALLEL
 		 */
-		int DEFAULT_MAX_PARALLEL = 5; 
+		int DEFAULT_MAX_PARALLEL = 
+		    System.getProperty(MAX_PARALLEL)==null ? 
+		        5 : Integer.valueOf(System.getProperty(MAX_PARALLEL));
 
 		/**
 		 * For a pipelined operator, this is the maximum number of messages that

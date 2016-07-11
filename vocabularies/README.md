@@ -81,13 +81,13 @@ curl -X POST --data-binary @dataloader.xml --header 'Content-Type:application/xm
 
 This will bulk load the namespace `pubchem` with the files from `/path/to/pubchem-core`.
 
-##Freebase
-[Freebase](https://en.wikipedia.org/wiki/Freebase) was a collaborative online knowledge base.  You can [download](https://developers.google.com/freebase/) the freebase-rdf-latest.gz.
+##Waterloo SPARQL Diversity Test (WatDiv)
+[WatDiv](http://dsg.uwaterloo.ca/watdiv/) is a benchmark designed to _measure how an RDF data management system performs across a wide spectrum of SPARQL queries with varying structural characteristics and selectivity classes._
 
 ###Loading into Blazegraph
-Once you have downloaded the RDF dump, you should use the BulkLoader with the example [freebase.properties](src/main/resources/namespace/freebase/freebase.properties) , customized for your local environment.   Here is the example for using the [BulkLoader](https://wiki.blazegraph.com/wiki/index.php/REST_API#Bulk_Load_Configuration).
+Once you have [generated](http://dsg.uwaterloo.ca/watdiv/#dataset) the WatDiv data, you should use the BulkLoader with the example [watdiv.properties](src/main/resources/namespace/watdiv/watdiv.properties) , customized for your local environment.   Here is the example for using the [BulkLoader](https://wiki.blazegraph.com/wiki/index.php/REST_API#Bulk_Load_Configuration).
 
-Update the file below `dataloader.xml` with your local configuration for `freebase.properties` and the `/path/to/freebase` as well as any other configuration for your local machine.
+Update the file below `dataloader.xml` with your local configuration for `watdiv.properties` and the `/path/to/watdiv` as well as any other configuration for your local machine.
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -111,10 +111,10 @@ Update the file below `dataloader.xml` with your local configuration for `freeba
          <!-- The namespace of the KB instance. Defaults to kb. -->
          <entry key="namespace">kb</entry>
          <!-- The configuration file for the database instance. It must be readable by the web application. -->
-             <entry key="propertyFile">/path/to/freebase.properties</entry>
+             <entry key="propertyFile">/path/to/watdiv.properties</entry>
          <!-- Zero or more files or directories containing the data to be loaded.
                    This should be a comma delimited list. The files must be readable by the web application. -->
-           <entry key="fileOrDirs">/path/to/freebase/</entry>
+           <entry key="fileOrDirs">/path/to/watdiv/</entry>
       </properties>
 ```
 
@@ -124,4 +124,5 @@ Then post it into your running instance.
 curl -X POST --data-binary @dataloader.xml --header 'Content-Type:application/xml' http://localhost:9999/blazegraph/dataloader
 ```
 
-This will bulk load the namespace `kb` with the files from `/path/to/freebase`.
+This will bulk load the namespace `kb` with the files from `/path/to/watdiv`.
+

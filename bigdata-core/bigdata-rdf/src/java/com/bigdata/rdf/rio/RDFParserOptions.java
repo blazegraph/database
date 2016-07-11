@@ -84,8 +84,8 @@ public class RDFParserOptions implements Serializable, IRDFParserOptions {
         String STOP_AT_FIRST_ERROR = RDFParserOptions.class.getName()
                 + ".stopAtFirstError";
 
-// @see http://trac.blazegraph.com/ticket/1055 (Change RDFParser configuration to use BasicaParserSettings)
-        String DEFAULT_STOP_AT_FIRST_ERROR = "false";
+// @see https://jira.blazegraph.com/browse/BLZG-1895 (DataLoader ignores errors in data when used with default config)
+        String DEFAULT_STOP_AT_FIRST_ERROR = "true";
 
         /**
          * Optional boolean property may be used to set

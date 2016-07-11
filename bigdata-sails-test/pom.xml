@@ -370,6 +370,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
       <version>${project.version}</version>
     </dependency>

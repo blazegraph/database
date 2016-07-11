@@ -55,6 +55,7 @@ import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.Query;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.Update;
@@ -70,6 +71,7 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.rdf.sail.webapp.client.ContextsResult;
 import com.bigdata.rdf.sail.webapp.client.IPreparedSparqlUpdate;
 import com.bigdata.rdf.sail.webapp.client.IRemoteTx;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -607,23 +609,35 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 			
 			final RemoteRepository remote = repo.getRemoteRepository();
 
-			final Iterator<Resource> contexts = remote.getContexts().iterator();
+			final ContextsResult contexts = remote.getContexts();
 			
 			return new RepositoryResult<Resource>(new CloseableIteration<Resource, RepositoryException>() {
 
 				@Override
 				public boolean hasNext() throws RepositoryException {
-					return contexts.hasNext();
+					try {
+						return contexts.hasNext();
+					} catch (QueryEvaluationException e) {
+						throw new RepositoryException(e.getCause());
+					}
 				}
 
 				@Override
 				public Resource next() throws RepositoryException {
-					return contexts.next();
+					try {
+						return contexts.next();
+					} catch (QueryEvaluationException e) {
+						throw new RepositoryException(e.getCause());
+					}
 				}
 
 				@Override
 				public void remove() throws RepositoryException {
-					contexts.remove();
+					try {
+						contexts.remove();
+					} catch (QueryEvaluationException e) {
+						throw new RepositoryException(e.getCause());
+					}
 				}
 
 				@Override

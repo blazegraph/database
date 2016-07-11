@@ -181,7 +181,9 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 	        		(BigdataURI) spo.p().asValue(lex), 
 	        		(BigdataValue) spo.o().asValue(lex), 
 	        		c));
+	        setValue(bnode);
         }
+        
         return bnode;
     }
 

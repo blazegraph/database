@@ -37,6 +37,7 @@ import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.webapp.client.ContextsResult;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 
 /**
@@ -241,9 +242,18 @@ public class Test_REST_ESTCARD<S extends IIndexManager> extends
 
 		doInsertbyURL("POST", packagePath + "test_estcard.trig");
 
-		final Collection<Resource> contexts = m_repo.getContexts();
+		final ContextsResult contexts = m_repo.getContexts();
+		
+		int size = 0;
+		
+		while(contexts.hasNext()) {
+			
+			contexts.next();
+			size++;
+			
+		}
 
-		assertEquals(3, contexts.size());
+		assertEquals(3, size);
 
 	}
 

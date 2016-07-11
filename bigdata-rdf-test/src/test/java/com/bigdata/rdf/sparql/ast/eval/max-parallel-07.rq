@@ -1,0 +1,6 @@
+SELECT (COUNT(*) AS ?cnt)
+WHERE {
+  hint:Query hint:maxParallel 10 .
+  ?s <http://p1> ?o1 .
+  ?s <http://p2> ?o2 .
+}
