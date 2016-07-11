@@ -247,6 +247,7 @@ public class BuildInfo {
       <artifactId>slf4j-log4j12</artifactId>
       <version>${slf4j.version}</version>
     </dependency>
+<!--
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
@@ -262,6 +263,7 @@ public class BuildInfo {
       <artifactId>httpcore</artifactId>
       <version>${apache.httpcore.version}</version>
     </dependency>
+-->
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>

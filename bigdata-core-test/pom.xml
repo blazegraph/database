@@ -328,6 +328,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <artifactId>slf4j-log4j12</artifactId>
       <version>${slf4j.version}</version>
     </dependency>
+<!--
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
@@ -343,6 +344,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <artifactId>httpcore</artifactId>
       <version>${apache.httpcore.version}</version>
     </dependency>
+-->
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>
