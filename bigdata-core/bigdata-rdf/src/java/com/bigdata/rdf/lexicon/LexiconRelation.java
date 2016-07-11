@@ -2710,6 +2710,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     
     /**
      * Batch resolution of internal values to {@link BigdataValue}s.
+     * <p>
+     * For each {@link IV} given by the caller, if {@link IV#hasValue()} is 
+     * non-null either on input or through a side-effect of this method, then
+     * {@link BigdataValue#setIV(IV)} will be used to ensure that the {@link BigdataValue}
+     * in the returned {@link Map} points to the caller's {@link IV}.
      * 
      * @param ivs
      *            An collection of internal values
@@ -2909,11 +2914,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
         
-        /*
-         * SidIVs require special handling.
-         */
         for (IV<?,?> iv : ivs) {
+
+            /*
+             * Ensure that BigdataValue->IV is set when IV hasValue().
+             * 
+             * See https://jira.blazegraph.com/browse/BLZG-1956
+             */
+            if(iv.hasValue()) {
+                final BigdataValue value = iv.getValue();
+                if(value!=null && !value.isRealIV())
+                    value.setIV(iv);
+            }
             
+            /*
+             * SidIVs require special handling.
+             */
             if (iv instanceof SidIV) {
 
             	cacheTerms((SidIV<?>) iv, ret);
