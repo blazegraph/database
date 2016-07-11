@@ -792,10 +792,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         		
         template.setDistinctQuads(true);
         		
-        if (nativeDistinct) { // FIXME Jeremy: this flag needs to be controlled by a query hint so it can be disabled. 
-            template.setNativeDistinct(true);
-        }
-
+        /*
+         * FIXME Jeremy: this flag needs to be controlled by a query hint so it
+         * can be disabled.
+         * 
+         * See BLZG-1935 DELETE+WHERE Test Case Fixes
+         */
+        template.setNativeDistinct(nativeDistinct);
+    
         final TupleQueryResult tqr = 
             new TupleQueryResultImpl(
                 new LinkedList<String>(),
@@ -1020,12 +1024,15 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             insertClause.getQuadData().flatten(new ConstructNode(context));
 
         template.setDistinctQuads(true);
-                
-        if (nativeDistinct) {
-            template.setNativeDistinct(true); // FIXME Jeremy: must be able to disable with a query hint.
-        }
 
-
+        /*
+         * FIXME Jeremy: this flag needs to be controlled by a query hint so it
+         * can be disabled.
+         * 
+         * See BLZG-1935 DELETE+WHERE Test Case Fixes
+         */
+        template.setNativeDistinct(nativeDistinct);
+        
         final TupleQueryResult tqr = 
             new TupleQueryResultImpl(
                 new LinkedList<String>(),

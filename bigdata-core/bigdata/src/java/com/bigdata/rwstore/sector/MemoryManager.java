@@ -60,7 +60,6 @@ import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
-import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.service.AbstractTransactionService;

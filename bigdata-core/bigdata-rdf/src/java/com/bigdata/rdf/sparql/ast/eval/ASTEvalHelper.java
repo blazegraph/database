@@ -254,9 +254,9 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-    static public ICloseableIterator<IBindingSet[]> evaluateRunningQuery(final IRunningQuery runningQuery)
+    static ICloseableIterator<IBindingSet[]> evaluateRunningQuery(final IRunningQuery runningQuery)
             throws QueryEvaluationException {
-        
+
         try {
 
             // The iterator draining the query solutions.
@@ -268,6 +268,7 @@ public class ASTEvalHelper {
                 // ensure query is halted.
                 runningQuery.cancel(true/* mayInterruptIfRunning */);
             }
+            
             throw new QueryEvaluationException(t);
             
         }
@@ -275,25 +276,36 @@ public class ASTEvalHelper {
     }
     
     /**
-     * Prepare an {@link IRunningQuery} objects that executes a SELECT query over
-     * the given store for the given astContainer, taking the binding sets as
-     * starting point for evaluation. Does not materialize the results.
+     * Prepare an {@link IRunningQuery} objects that executes a SELECT query
+     * over the given store for the given {@link ASTContainer}, taking the
+     * binding sets as starting point for evaluation. Does not materialize the
+     * results.
      * 
      * @param store
      *            The {@link AbstractTripleStore} having the data.
      * @param astContainer
      *            The {@link ASTContainer}.
      * @param globallyScopedBS
-     *            The initial solution to kick things off.
+     *            The initial solution to kick things off (optional).
      * 
      * @return the {@link IRunningQuery} object
      * 
+     * @throws IllegalArgumentException
+     *             if the store is null
+     * @throws IllegalArgumentException
+     *             if the {@link ASTContainer} is null.
      * @throws QueryEvaluationException
      */
-    static public IRunningQuery prepareRunningQuery(
+    static IRunningQuery prepareRunningQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
             final QueryBindingSet globallyScopedBS)
             throws QueryEvaluationException {
+
+        if (store == null)
+            throw new IllegalArgumentException();
+
+        if (astContainer == null)
+            throw new IllegalArgumentException();
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -311,7 +323,9 @@ public class ASTEvalHelper {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
         
         try {
+            
             return context.queryEngine.eval(queryPlan, astContainer.getOptimizedASTBindingSets());
+            
         } catch (Throwable t) {
             
             throw new QueryEvaluationException(t);
@@ -771,7 +785,7 @@ public class ASTEvalHelper {
      * @return A Sesame {@link CloseableIteration} which will drain
      *         {@link BindingSet}s of materialized RDF {@link Value}s.
      */
-    public static CloseableIteration<BindingSet, QueryEvaluationException> materializingIterator(
+    private static CloseableIteration<BindingSet, QueryEvaluationException> materializingIterator( // was iterator()
             final IRunningQuery runningQuery, final AbstractTripleStore db,
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) {
