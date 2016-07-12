@@ -51,5 +51,16 @@ public interface ICommitter {
      *         previous address should be returned as it is still valid.
      */
     public long handleCommit(long commitTime);
+    
+    /**
+     * Mark an {@link ICommitter} as invalid. This will prevent it from allowing
+     * any writes through to the backing store.
+     * 
+     * @param t
+     *            A cause (required).
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1953
+     */
+    public void invalidate(Throwable t);
 
 }

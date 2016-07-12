@@ -78,6 +78,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexInconsistentError;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ICUVersionRecord;
 import com.bigdata.btree.view.FusedView;
@@ -2842,6 +2843,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //				LRUNexus.getCache(this).clear();
 //
 //			}
+			
+			invalidateCommitters();
 
 			/*
 			 * The buffer strategy has a hook which is used to discard buffered
@@ -4603,6 +4606,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
 	/**
+	 * This method is invoked to mark any persistence capable data structures
+	 * as invalid (in an error state). This ensures that dirty committers are
+	 * not accidentally flushed through after a call to abort().
+	 * 
+	 * @see https://jira.blazegraph.com/browse/BLZG-1953
+	 */
+	protected void invalidateCommitters() {
+
+	    assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+
+        final Throwable t = new StackInfoReport("ABORT");
+
+        for (ICommitter committer : _committers) {
+            if (committer != null)
+                committer.invalidate(t);
+        }
+
+	}
+	
+	/**
 	 * This method is invoked by {@link #abort()} when the store must discard
 	 * any hard references that it may be holding to objects registered as
 	 * {@link ICommitter}s.
@@ -4712,6 +4735,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
         private long lastAddr;
 
+        private volatile Throwable error = null;
+
         private ICUVersionCommitter() {
             
             // the "update" option.
@@ -4728,7 +4753,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * is defined, it is a different version of ICU, and the update flag is
          * set.
          */
+        @Override
         public long handleCommit(final long commitTime) {
+
+            if (error != null)
+                throw new IndexInconsistentError(error);
 
             if(!update && lastAddr != NULL) {
                 
@@ -4766,7 +4795,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             return lastAddr;
             
         }
-	    
+
+        @Override
+        public void invalidate(final Throwable t) {
+
+            if (t == null)
+                throw new IllegalArgumentException();
+
+            if (error == null)
+                error = t;
+
+        }
+        
 	}
 
 	/*

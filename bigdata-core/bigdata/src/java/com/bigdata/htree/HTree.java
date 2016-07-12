@@ -390,6 +390,17 @@ public class HTree extends AbstractHTree
     	
     }
 
+    @Override
+    public void invalidate(final Throwable t) {
+
+        if (t == null)
+            throw new IllegalArgumentException();
+
+        if (error == null)
+            error = t;
+
+    }
+    
     /**
      * Returns an {@link ICounter}. The {@link ICounter} is mutable iff the
      * {@link BTree} is mutable. All {@link ICounter}s returned by this method
