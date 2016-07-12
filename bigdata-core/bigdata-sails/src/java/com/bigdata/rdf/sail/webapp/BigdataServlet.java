@@ -23,7 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Reader;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,7 +46,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
-import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.store.BD;
@@ -64,6 +65,14 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     private static final transient Logger log = Logger.getLogger(BigdataServlet.class); 
 
+    /**
+     * Used to report on the start, normal completion, and abnormal completion
+     * of all REST API tasks.
+     * 
+     * @see BLZG-2015 All REST API mutation and read operations should be logged
+     */
+    private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
+    
     /**
      * The name of the {@link ServletContext} attribute whose value is the
      * {@link BigdataRDFContext}.
@@ -201,7 +210,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     /**
     * Submit a task, await its {@link Future}, flush and commit the servlet
-    * resdponse, and then a <strong>completed</strong> {@link Future} for that
+    * response, and then a <strong>completed</strong> {@link Future} for that
     * task. The task will be run on the appropriate executor service depending
     * on the nature of the backing database and the view required by the task.
     * <p>
@@ -267,12 +276,17 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
          */
 
         final BigdataRDFContext context = getBigdataRDFContext();
-        
-        try {
 
-            // Submit task. Will run.
-            final FutureTask<T> ft = AbstractApiTask.submitApiTask(
-                    indexManager, task);
+        if (txLog.isInfoEnabled()) {
+            txLog.info("REST-API-TASK-START: task=" + task.toString());
+        }
+
+        boolean ok = false;
+        
+        // Submit task. Will run.
+        final FutureTask<T> ft = AbstractApiTask.submitApiTask(indexManager, task);
+
+        try {
 
             // register task.
             context.addTask(task, ft);
@@ -289,6 +303,12 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
              */
             task.flushAndClose();
 
+            ok = true;
+            
+            if (txLog.isInfoEnabled()) {
+                txLog.info("REST-API-TASK-SUCCESS: task=" + task.toString());
+            }
+
             /*
              * TODO Modify to return T rather than Future<T> if we are always
              * doing the get() here? (If we do this then we also need to hook
@@ -300,6 +320,23 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         } finally {
             
             context.removeTask(task.uuid);
+            
+            if(!ok) {
+                final StringWriter sw = new StringWriter();
+                if (ft.isDone()) {
+                    try {
+                        ft.get();
+                        sw.write("N/A"); // No exception was reported.
+                    } catch (Throwable t2) {
+                        // An exception was reported.
+                        final PrintWriter pw = new PrintWriter(sw);
+                        t2.printStackTrace(pw);
+                        pw.flush();
+                        pw.close();
+                    }
+                }
+                txLog.error("REST-API-TASK-ERROR: task=" + task.toString() + ",cause=" + sw);
+            }
 
         }
 
