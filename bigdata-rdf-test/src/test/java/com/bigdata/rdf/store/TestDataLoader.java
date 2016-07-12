@@ -330,6 +330,51 @@ public class TestDataLoader extends AbstractTripleStoreTestCase {
 
 	}
 	
+	
+	
+	/**
+     * Test correct rejection of NQuads document containing invalid URIs, i.e. parsing of
+     * <http://www.lassila.org/ora.rdf#me> <http://xmlns.com/foaf/0.1/knows> <node16s114au1x1> <http://www.lassila.org/ora.rdf> .
+     * fails because <node16s114au1x1> does not represent a valid URI according to the NQuads specification.
+     * 
+     * @see BLZG-2017 (RDF errors in HA test suite when validation is enabled for invalid nquads data)
+     */
+    public void test_DataLoader_failOnIllegalUrisInNQuads() throws IOException {
+
+        final AbstractTripleStore store = getStore();
+        
+        if (!store.isQuads())
+            return;
+
+        try {
+
+            final Properties properties = new Properties(store.getProperties());
+            
+            final DataLoader dataLoader = new DataLoader(properties, store);
+
+            final String resource = "com/bigdata/rdf/store/illegal-uri.nq";
+
+            final String baseURL = new File(resource).toURI().toString();
+
+            dataLoader.loadData(new String[] { resource }, new String[] { baseURL },
+                    new RDFFormat[] { RDFFormat.NQUADS});
+            
+        } catch (RuntimeException e) {
+            
+            assertTrue(e.getCause() instanceof RDFParseException);
+            return; // expected code path
+            
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
+        
+        throw new RuntimeException("Expected to run into parse exception.");
+
+    }
+	
+	
 	/**
 	 * Test durable queues using {@link CommitEnum#Incremental} and {@link ClosureEnum#None}
 	 */
