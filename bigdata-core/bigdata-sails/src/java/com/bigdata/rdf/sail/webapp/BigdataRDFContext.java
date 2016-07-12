@@ -361,7 +361,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
  		 * 
  		 * There is a current difference between the embedded and the REST model in that
  		 * the embedded model uses an arbitrary string as an External ID, but the 
- 		 * REST version uses a timestamp.  The timestap is tightly coupled to the current
+ 		 * REST version uses a timestamp.  The timestamp is tightly coupled to the current
  		 * workbench.
  		 * 
  		 * TODO:  This needs to be refactored into unified model between the embedded and REST clients for tasks.
