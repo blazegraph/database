@@ -41,7 +41,6 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
