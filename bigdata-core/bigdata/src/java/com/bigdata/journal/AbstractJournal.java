@@ -2844,7 +2844,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //
 //			}
 			
-			_name2Addr.invalidate(new StackInfoReport("ABORT"));
+			invalidateCommitters();
 
 			/*
 			 * The buffer strategy has a hook which is used to discard buffered
@@ -2914,7 +2914,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			_committers = new ICommitter[_committers.length];
 
 			// discard any hard references that might be cached.
-			discardCommitters(); // FIXME Should be done before we reset _committers.
+			discardCommitters();
 
             /*
              * Setup new committers, e.g., by reloading from their last root
@@ -4605,6 +4605,24 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+	/**
+	 * This method is invoked to mark any persistence capable data structures
+	 * as invalid (in an error state). This ensures that dirty committers are
+	 * not accidentally flushed through after a call to abort().
+	 * 
+	 * @see https://jira.blazegraph.com/browse/BLZG-1953
+	 */
+	protected void invalidateCommitters() {
+
+        final Throwable t = new StackInfoReport("ABORT");
+
+        for (ICommitter committer : _committers) {
+            if (committer != null)
+                committer.invalidate(t);
+        }
+
+	}
+	
 	/**
 	 * This method is invoked by {@link #abort()} when the store must discard
 	 * any hard references that it may be holding to objects registered as
