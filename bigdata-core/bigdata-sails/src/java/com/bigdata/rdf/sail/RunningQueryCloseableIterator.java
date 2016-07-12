@@ -65,6 +65,7 @@ public class RunningQueryCloseableIterator<E>
 
     }
     
+    @Override
     public void close() {
         if (open) {
             open = false;
@@ -74,6 +75,7 @@ public class RunningQueryCloseableIterator<E>
         }
     }
 
+    @Override
     public boolean hasNext() {
 
         if(open && _hasNext())
@@ -111,6 +113,7 @@ public class RunningQueryCloseableIterator<E>
 
     }
     
+    @Override
     public E next() {
 
         if (!hasNext())
@@ -127,6 +130,7 @@ public class RunningQueryCloseableIterator<E>
     /**
      * Operation is not supported.
      */
+    @Override
     public void remove() {
 
         // Not supported since we are buffering ahead.

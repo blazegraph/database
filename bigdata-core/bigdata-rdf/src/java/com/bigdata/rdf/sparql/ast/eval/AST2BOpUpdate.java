@@ -1087,7 +1087,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     private static void applyInsertToSolutionSet(
             final QuadsDataOrNamedSolutionSet insertClause,
             final AST2BOpUpdateContext context, final QueryRoot queryRoot,
-            SolutionSetStream ssstr) {
+            final SolutionSetStream ssstr) {
         
         /*
          * Target is solution set.
