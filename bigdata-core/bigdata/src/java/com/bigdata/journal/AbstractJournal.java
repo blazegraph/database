@@ -4614,6 +4614,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	protected void invalidateCommitters() {
 
+	    assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+
         final Throwable t = new StackInfoReport("ABORT");
 
         for (ICommitter committer : _committers) {

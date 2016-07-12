@@ -1275,6 +1275,9 @@ public class Name2Addr extends BTree {
             
         }
         
+        // Clear references. They are all invalid.
+        indexCache.clear();
+        
     }
 
     /**
