@@ -1253,6 +1253,30 @@ public class Name2Addr extends BTree {
 
     }
     
+    @Override
+    public void invalidate(final Throwable t) {
+
+        if (t == null)
+            throw new IllegalArgumentException();
+
+        final Iterator<java.util.Map.Entry<String, WeakReference<ICheckpointProtocol>>> itr = indexCacheEntryIterator();
+
+        while (itr.hasNext()) {
+
+            final java.util.Map.Entry<String, WeakReference<ICheckpointProtocol>> e = itr.next();
+
+            final ICheckpointProtocol chk = e.getValue().get();
+
+            if (chk != null) {
+
+                chk.invalidate(t);
+
+            }
+            
+        }
+        
+    }
+
     /**
      * Return a {@link CounterSet} reflecting the named indices that are
      * currently open (more accurately, those open named indices whose

@@ -78,6 +78,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexInconsistentError;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ICUVersionRecord;
 import com.bigdata.btree.view.FusedView;
@@ -2842,6 +2843,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //				LRUNexus.getCache(this).clear();
 //
 //			}
+			
+			_name2Addr.invalidate(new StackInfoReport("ABORT"));
 
 			/*
 			 * The buffer strategy has a hook which is used to discard buffered
@@ -2911,7 +2914,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			_committers = new ICommitter[_committers.length];
 
 			// discard any hard references that might be cached.
-			discardCommitters();
+			discardCommitters(); // FIXME Should be done before we reset _committers.
 
             /*
              * Setup new committers, e.g., by reloading from their last root
@@ -4712,6 +4715,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
         private long lastAddr;
 
+        private volatile Throwable error = null;
+
         private ICUVersionCommitter() {
             
             // the "update" option.
@@ -4728,7 +4733,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * is defined, it is a different version of ICU, and the update flag is
          * set.
          */
+        @Override
         public long handleCommit(final long commitTime) {
+
+            if (error != null)
+                throw new IndexInconsistentError(error);
 
             if(!update && lastAddr != NULL) {
                 
@@ -4766,7 +4775,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             return lastAddr;
             
         }
-	    
+
+        @Override
+        public void invalidate(final Throwable t) {
+
+            if (t == null)
+                throw new IllegalArgumentException();
+
+            if (error == null)
+                error = t;
+
+        }
+        
 	}
 
 	/*

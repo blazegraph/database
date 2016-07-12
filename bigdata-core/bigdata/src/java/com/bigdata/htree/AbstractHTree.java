@@ -35,6 +35,7 @@ import com.bigdata.btree.IReadWriteLockManager;
 import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexInconsistentError;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.ReadWriteLockManager;
@@ -940,6 +941,9 @@ abstract public class AbstractHTree implements ICounterSetAccess,
             
         }
         
+        if( error != null )
+            throw new IndexInconsistentError(ERROR_ERROR_STATE, error);
+        
     }
     
     /**
@@ -951,6 +955,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      * {@link HTree} is committed.  If the backing store does not support atomic
      * commits, then this value will always be ZERO (0L).
      */
+    @Override
     abstract public long getLastCommitTime();
 
 //    /**
