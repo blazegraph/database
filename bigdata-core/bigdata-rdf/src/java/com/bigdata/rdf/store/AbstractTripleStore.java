@@ -126,6 +126,7 @@ import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.sail.RDRHistory;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdate;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
@@ -4505,9 +4506,9 @@ abstract public class AbstractTripleStore extends
             while (itr.hasNext()) {
 
                 final ISPO[] stmts = itr.nextChunk();
-
                 // The #of statements that will be removed.
                 final int numStmts = stmts.length;
+                
 
                 mutationCount += getSPORelation().delete(stmts, numStmts);
                 

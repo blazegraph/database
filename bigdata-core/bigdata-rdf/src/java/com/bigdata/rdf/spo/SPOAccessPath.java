@@ -25,6 +25,7 @@ package com.bigdata.rdf.spo;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;

@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import info.aduna.iteration.CloseableIteration;
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -62,10 +64,8 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.rdf.join.ChunkedMaterializationIterator;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
@@ -92,7 +92,6 @@ import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
-import info.aduna.iteration.CloseableIteration;
 
 /**
  * Helper class for evaluating SPARQL queries.
@@ -248,32 +247,65 @@ public class ASTEvalHelper {
     }
 
     /**
-     * Evaluate a SELECT query without converting the results into openrdf
-     * solutions.
+     * Starts evaluating an {@link IRunningQuery} object, passing back an
+     * iterator from which the solutions may be drained.
      * 
-     * @param store
-     *            The {@link AbstractTripleStore} having the data.
-     * @param queryPlan
-     *            The {@link ASTContainer}.
-     * @param globallyScopedBS
-     *            The initial solution to kick things off.
-     * @param materialize
-     *            When <code>true</code>, {@link IV}s will be materialized
-     *            (their {@link IVCache} association will be set to the
-     *            corresponding RDF {@link Value}). When <code>false</code>,
-     *            this materialization step will be skipped. However, it is
-     *            possible that {@link IV}s in the query plan will be
-     *            materialized anyway (for example, materialization might be
-     *            required to support FILTERs in the query).
-     * 
-     * @return An object from which the solutions may be drained.
+     * @return the iterator from which the solutions may be drained.
      * 
      * @throws QueryEvaluationException
      */
-    static public ICloseableIterator<IBindingSet[]> evaluateTupleQuery2(
-            final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet globallyScopedBS, final boolean materialize)
+    static ICloseableIterator<IBindingSet[]> evaluateRunningQuery(final IRunningQuery runningQuery)
             throws QueryEvaluationException {
+
+        try {
+
+            // The iterator draining the query solutions.
+            return runningQuery.iterator();
+
+        } catch (Throwable t) {
+            
+            if (runningQuery != null) {
+                // ensure query is halted.
+                runningQuery.cancel(true/* mayInterruptIfRunning */);
+            }
+            
+            throw new QueryEvaluationException(t);
+            
+        }
+
+    }
+    
+    /**
+     * Prepare an {@link IRunningQuery} objects that executes a SELECT query
+     * over the given store for the given {@link ASTContainer}, taking the
+     * binding sets as starting point for evaluation. Does not materialize the
+     * results.
+     * 
+     * @param store
+     *            The {@link AbstractTripleStore} having the data.
+     * @param astContainer
+     *            The {@link ASTContainer}.
+     * @param globallyScopedBS
+     *            The initial solution to kick things off (optional).
+     * 
+     * @return the {@link IRunningQuery} object
+     * 
+     * @throws IllegalArgumentException
+     *             if the store is null
+     * @throws IllegalArgumentException
+     *             if the {@link ASTContainer} is null.
+     * @throws QueryEvaluationException
+     */
+    static IRunningQuery prepareRunningQuery(
+            final AbstractTripleStore store, final ASTContainer astContainer,
+            final QueryBindingSet globallyScopedBS)
+            throws QueryEvaluationException {
+
+        if (store == null)
+            throw new IllegalArgumentException();
+
+        if (astContainer == null)
+            throw new IllegalArgumentException();
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -286,98 +318,19 @@ public class ASTEvalHelper {
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
-        // The optimized AST.
-        final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
-        
-        // true iff we can materialize the projection inside of the query plan.
-        final boolean materializeProjectionInQuery = materialize && context.materializeProjectionInQuery
-                && !optimizedQuery.hasSlice();
-
-        final List<String> projectedSet;
-
-        if (materialize) {
-
-            /*
-             * Add a materialization step.
-             */
-            
-            // Get the projection for the query.
-            final IVariable<?>[] projected = astContainer.getOptimizedAST()
-                    .getProjection().getProjectionVars();
-
-            projectedSet = new LinkedList<String>();
-
-            for (IVariable<?> var : projected)
-                projectedSet.add(var.getName());
-
-        } else {
-        
-            /*
-             * Do not add a materialization step.
-             */
-
-            projectedSet = null;
-            
-        }
-
         doSparqlLogging(context);
         
         final PipelineOp queryPlan = astContainer.getQueryPlan();
         
-        IRunningQuery runningQuery = null;
         try {
-
-            // Submit query for evaluation.
-            runningQuery = context.queryEngine.eval(queryPlan, globallyScopedBSAsList);
-
-            // The iterator draining the query solutions.
-            final ICloseableIterator<IBindingSet[]> it1 = runningQuery
-                    .iterator();
-
-            final ICloseableIterator<IBindingSet[]> it2;
-
-            if (materialize && !materializeProjectionInQuery
-                    && !projectedSet.isEmpty()) {
-
-                /*
-                 * Materialize IVs as RDF Values.
-                 * 
-                 * Note: This is the code path when we want to materialize the
-                 * IVs and we can not do so within the query plan because the
-                 * query uses a SLICE. If we want to materialize IVs and there
-                 * is no slice, then the materialization step is done inside of
-                 * the query plan.
-                 * 
-                 * Note: This does not materialize the IVCache for inline IVs.
-                 * The assumption is that the consumer is bigdata aware and can
-                 * use inline IVs directly.
-                 */
-                
-                // The variables to be materialized.
-                final IVariable<?>[] vars = projectedSet
-                        .toArray(new IVariable[projectedSet.size()]);
-
-                // Wrap with chunked materialization logic.
-                it2 = new ChunkedMaterializationIterator(vars,
-                        context.db.getLexiconRelation(),
-                        false/* materializeInlineIVs */, it1);
-
-            } else {
-                
-                it2 = it1;
-                
-            }
             
-            return it2;
-
+            return context.queryEngine.eval(queryPlan, astContainer.getOptimizedASTBindingSets());
+            
         } catch (Throwable t) {
-            if (runningQuery != null) {
-                // ensure query is halted.
-                runningQuery.cancel(true/* mayInterruptIfRunning */);
-            }
+            
             throw new QueryEvaluationException(t);
+            
         }
-
     }
     
     /**
@@ -759,7 +712,7 @@ public class ASTEvalHelper {
              * Wrap up the native bigdata query solution iterator as Sesame
              * compatible iteration with materialized RDF Values.
              */
-            return iterator(runningQuery, ctx.db,
+            return materializingIterator(runningQuery, ctx.db,
                     materializeProjectionInQuery, required);
 
         } catch (Throwable t) {
@@ -811,7 +764,7 @@ public class ASTEvalHelper {
         return new IBindingSet[]{ bindingSet };
 
     }
-    
+   
     
     /**
      * Wrap {@link IRunningQuery} with the logic to materialize {@link IV}s as
@@ -832,7 +785,7 @@ public class ASTEvalHelper {
      * @return A Sesame {@link CloseableIteration} which will drain
      *         {@link BindingSet}s of materialized RDF {@link Value}s.
      */
-    private static CloseableIteration<BindingSet, QueryEvaluationException> iterator(
+    private static CloseableIteration<BindingSet, QueryEvaluationException> materializingIterator( // was iterator()
             final IRunningQuery runningQuery, final AbstractTripleStore db,
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) {
@@ -864,8 +817,66 @@ public class ASTEvalHelper {
          */
         
         // Dechunkify the running query and monitor the Sesame iterator.
-        final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
+        return wrapIntoMaterializingIterator(
+                monitoringDechunkifiedIterator(runningQuery), 
+                runningQuery, db, materializeProjectionInQuery, required);
+    }
+    
+    /**
+     * Wrap the iterator that is passed in as first argument the logic to
+     * materialize {@link IV}s as RDF {@link Value}s. The associated {@link IRunningQuery}
+     * object is used to extract default values only.
+     * 
+     * @param it 
+     *            The base iterator to be wrapped, derived from the IRunningQuery.
+     * @param runningQuery
+     *            The {@link IRunningQuery}.
+     * @param db
+     *            The view of the {@link AbstractTripleStore} against which the
+     *            query is running.
+     * @param materializeProjectionInQuery
+     *            When <code>true</code>, the projection was materialized within
+     *            query plan. When <code>false</code>, this method will take
+     *            responsibility for that materialization step.
+     * @param required
+     *            The variables which must be materialized (optional).
+     * 
+     * @return A Sesame {@link CloseableIteration} which will drain
+     *         {@link BindingSet}s of materialized RDF {@link Value}s.
+     */
+    public static CloseableIteration<BindingSet, QueryEvaluationException> wrapIntoMaterializingIterator(
+            final ICloseableIterator<IBindingSet> it,
+            final IRunningQuery runningQuery, final AbstractTripleStore db,
+            final boolean materializeProjectionInQuery,
+            final IVariable<?>[] required) {
+    
+        /*
+         * FIXME We should not dechunk just to rechunk here. This is not very
+         * efficient.
+         * 
+         * The basic API alignment problem is that the IRunningQuery#iterator()
+         * visits IBindingSet[] chunks while the BigdataBindingSetResolverator
+         * and Bigdata2SesameBindingSetIterator are IChunked(Ordered)Iterators.
+         * That is, they implement #nextChunk(). A very simple class could be
+         * used to align an IBindingSet[] returned by next() with nextChunk(). I
+         * would be surprised if this class did not already exist (in fact, the
+         * class is ChunkedArraysIterator -or- ChunkConsumerIterator).
+         * 
+         * The other issue is that RunningQueryCloseableIterator would APPEAR to
+         * be redundant with QueryResultIterator. However, correct termination
+         * is a tricky business and the current layering obviously works. The
+         * differences in those two classes appear to be (a) whether or not we
+         * invoke cancel() on the IRunningQuery when the iterator is closed and
+         * (b) whether or not we are buffering the last element visited. It is
+         * quite possible that RunningQueryCloseableIterator simply layers on
+         * one or two fixes which SHOULD be incorporated into the
+         * QueryResultIterator.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/483 (Eliminate
+         * unnecessary chunking and dechunking)
+         */
         
+        // Dechunkify the running query and monitor the Sesame iterator.
         final BOp query = runningQuery.getQuery();
         
         final int chunkCapacity = query.getProperty(
@@ -874,7 +885,7 @@ public class ASTEvalHelper {
 
         // Wrap in an IChunkedOrderedIterator
         final IChunkedOrderedIterator<IBindingSet> it2 = new ChunkedWrappedIterator<IBindingSet>(
-                it1, chunkCapacity, IBindingSet.class);
+                it, chunkCapacity, IBindingSet.class);
 
         final CloseableIteration<BindingSet, QueryEvaluationException> it3; 
 
@@ -973,7 +984,7 @@ public class ASTEvalHelper {
      *            
      * @return An {@link ICloseableIterator} which has been dechunkified.
      */
-    private static ICloseableIterator<IBindingSet> iterator(
+    private static ICloseableIterator<IBindingSet> monitoringDechunkifiedIterator(
             final IRunningQuery runningQuery) {
 
         // The iterator draining the query solutions.
@@ -1061,11 +1072,6 @@ public class ASTEvalHelper {
             ctx.setQueryBindingSet(bs);
             ctx.setBindings(bindingSets);
             ctx.setDataset(dataset);
-
-            /*
-             * Convert the query (generates an optimized AST as a side-effect).
-             */
-            AST2BOpUpdate.optimizeUpdateRoot(ctx);
 
             /*
              * Generate and execute physical plans for the update operations.

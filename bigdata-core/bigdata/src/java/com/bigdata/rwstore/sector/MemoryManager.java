@@ -366,7 +366,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
         }
 
 	}
-
+    
+    
     @Override
 	protected void finalize() throws Throwable {
 		// release to pool.

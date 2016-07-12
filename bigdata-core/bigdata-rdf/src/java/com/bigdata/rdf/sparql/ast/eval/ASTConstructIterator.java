@@ -743,8 +743,7 @@ public class ASTConstructIterator implements
             /*
              * Attempt to build a statement from this statement pattern and
              * solution.
-             */
-
+             */           
             final BigdataStatement stmt = makeStatement(pat, solution, bnodes);
 
             if (stmt != null) {

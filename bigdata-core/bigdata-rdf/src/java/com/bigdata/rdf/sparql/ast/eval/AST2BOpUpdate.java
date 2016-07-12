@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -49,11 +50,11 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.impl.TupleQueryResultImpl;
 //import org.openrdf.query.impl.MutableTupleQueryResult;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
@@ -77,18 +78,21 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.QueryEngineUtils;
 import com.bigdata.bop.rdf.update.ChunkedResolutionOp;
 import com.bigdata.bop.rdf.update.CommitOp;
 import com.bigdata.bop.rdf.update.InsertStatementsOp;
 import com.bigdata.bop.rdf.update.ParseOp;
 import com.bigdata.bop.rdf.update.RemoveStatementsOp;
+import com.bigdata.bop.solutions.SolutionSetStream;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.GraphEmptyException;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.GraphExistsException;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.SolutionSetDoesNotExistException;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.SolutionSetExistsException;
 import com.bigdata.rdf.error.SparqlDynamicErrorException.UnknownContentTypeException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.rio.IRDFParserOptions;
@@ -97,7 +101,6 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent.DeleteInsertWhereStats;
-import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
@@ -109,6 +112,7 @@ import com.bigdata.rdf.sparql.ast.CreateGraph;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
@@ -128,13 +132,12 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
-import com.bigdata.striterator.Chunkerator;
+import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.stream.Stream.StreamIndexMetadata;
+import com.bigdata.striterator.Dechunkerator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
-import cutthecrap.utils.striterators.Resolver;
-import cutthecrap.utils.striterators.Striterator;
-import info.aduna.iteration.CloseableIteration;
 
 /**
  * Class handles SPARQL update query plan generation.
@@ -145,7 +148,7 @@ import info.aduna.iteration.CloseableIteration;
 public class AST2BOpUpdate extends AST2BOpUtility {
 
     private static final Logger log = Logger.getLogger(AST2BOpUpdate.class);
-
+    
     /**
      * When <code>true</code>, convert the SPARQL UPDATE into a physical
      * operator plan and execute it on the query engine. When <code>false</code>
@@ -175,37 +178,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      */
     private static final Var<?> s = Var.var("s"), p = Var.var("p"), o = Var
             .var("o"), c = Var.var("c");
-
-    /**
-     * Convert the query
-     * <p>
-     * Note: This is currently a NOP.
-     */
-    protected static void optimizeUpdateRoot(final AST2BOpUpdateContext context) {
-
-//        final ASTContainer astContainer = context.astContainer;
-//
-//        // Clear the optimized AST.
-//        // astContainer.clearOptimizedUpdateAST();
-//
-//        /*
-//         * Build up the optimized AST for the UpdateRoot for each Update to
-//         * be executed. Maybe do this all up front before we run anything since
-//         * we might reorder or regroup some operations (e.g., parallelized LOAD
-//         * operations, parallelized INSERT data operations, etc).
-//         */
-//        final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
-//
-//        /*
-//         * Evaluate each update operation in the optimized UPDATE AST in turn.
-//         */
-//        for (Update op : updateRoot) {
-//  
-//            ...
-//        
-//        }
-
-    }
 
     /**
      * Convert and/or execute the update request.
@@ -558,13 +530,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final ASTContainer astContainer = new ASTContainer(queryRoot);
             /*
              * Inherit 'RESOLVED' flag, so resolution will not be run
-             * for ASTContainer, constracted from parts of already resolved update.
+             * for ASTContainer, constructed from parts of already resolved update.
              */
             astContainer.setProperty(ASTContainer.Annotations.RESOLVED, context.astContainer.getProperty(ASTContainer.Annotations.RESOLVED));
 
-            final QuadsDataOrNamedSolutionSet insertClause = op.getInsertClause();
-
-            if (insertClause == null && op.getDeleteClause() == null) {
+            if (op.getInsertClause() == null && op.getDeleteClause() == null) {
                 
                 /*
                  * DELETE WHERE QuadPattern
@@ -597,477 +567,96 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             }
 
-            final QuadsDataOrNamedSolutionSet deleteClause = op.getDeleteClause();
-
-            // Just the insert clause.
             /*
-             * TODO FIXME Forcing all updates through the delete+insert code path.
-             * 
-             * https://jira.blazegraph.com/browse/BLZG-1913
-             */
-            final boolean isInsertOnly = false; //insertClause != null && deleteClause == null;
+             * DELETE + INSERT.
+			 * 
+			 * Note: The semantics of DELETE + INSERT are that the WHERE
+			 * clause is executed once. The solutions to that need to be fed
+			 * once through the DELETE clause. After the DELETE clause has
+			 * been processed for all solutions to the WHERE clause, the
+			 * INSERT clause is then processed. So, we need to materialize
+			 * the WHERE clause results when both the DELETE clause and the
+			 * INSERT clause are present.
+			 * 
+			 * Note: Unlike operations against a graph, we do NOT perform
+			 * truth maintenance for updates against solution sets,
+			 * therefore we could get by nicely with operations on
+			 * IBindingSet[]s without RDF Value materialization.
+			 * 
+			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
+			 * (SPARQL Cache)
+			 */
+            MemoryManager mmgr = null;
+            AbstractRawStore store = null;
+            SolutionSetStream ssstr = null;
+            try {
 
-//            // Just the delete clause.
-//            final boolean isDeleteOnly = insertClause == null
-//                    && deleteClause != null;
+                // TODO: solution set stream stats contains information about which variables are
+                //       materialized and which are not. This could be exploited by query plans.
+                final StreamIndexMetadata metadata = new StreamIndexMetadata(UUID.randomUUID()); 
+                    
+                final Checkpoint checkpoint = new Checkpoint(metadata);
+                mmgr = QueryEngineUtils.newBoundedNativeMemoryManager(); // Note: Memory restriction (if any) for solutions is independent of the memory restriction for the query (real restriction is 2x the specified one).
+                store = new MemStore(mmgr.createAllocationContext());
+                ssstr = new SolutionSetStream(store, checkpoint, metadata, false /* readOnly */);
 
-            // Both the delete clause and the insert clause.
-            /*
-             * TODO FIXME Forcing all updates through the delete+insert code path.
-             * 
-             * https://jira.blazegraph.com/browse/BLZG-1913
-             */
-            final boolean isDeleteInsert = true; //insertClause != null && deleteClause != null;
-            
-            /*
-             * Run the WHERE clause.
-             */
-
-            if (isDeleteInsert) {
-                
                 /*
-				 * DELETE + INSERT.
-				 * 
-				 * Note: The semantics of DELETE + INSERT are that the WHERE
-				 * clause is executed once. The solutions to that need to be fed
-				 * once through the DELETE clause. After the DELETE clause has
-				 * been processed for all solutions to the WHERE clause, the
-				 * INSERT clause is then processed. So, we need to materialize
-				 * the WHERE clause results when both the DELETE clause and the
-				 * INSERT clause are present.
-				 * 
-				 * FIXME For large intermediate results, we would be much better
-				 * off putting the data onto an HTree (or, better yet, a chain
-				 * of blocks) and processing the bindings as IVs rather than
-				 * materializing them as RDF Values (and even for small data
-				 * sets, we would be better off avoiding materialization of the
-				 * RDF Values and using an ASTConstructIterator which builds
-				 * ISPOs using IVs rather than Values).
-				 * 
-				 * Note: Unlike operations against a graph, we do NOT perform
-				 * truth maintenance for updates against solution sets,
-				 * therefore we could get by nicely with operations on
-				 * IBindingSet[]s without RDF Value materialization.
-				 * 
-				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
-				 * (SPARQL Cache)
-				 */
+                 * Evaluate the WHERE part of the query
+                 * 
+                 * Note: This *MUST* use the view of the tripleStore which is
+                 * associated with the SailConnection in case the view is
+                 * isolated by a transaction.
+                 */
+                final long beginWhereClauseNanos = System.nanoTime();
 
-				final LexiconRelation lexicon = context
-						.getAbstractTripleStore().getLexiconRelation();
+                // Run the WHERE clause; get the result iterator; the solutions
+                // by the query. i.e. materialization must be done on demand
+                // where needed by the consumer of the itr or the solution set
+                // stream on which the itr is written.
+                final IRunningQuery runningQuery = 
+                    ASTEvalHelper.prepareRunningQuery(
+                        context.conn.getTripleStore(), astContainer,
+                        context.getQueryBindingSet()/* bindingSets */);
+                final  ICloseableIterator<IBindingSet[]> resItr = 
+                    ASTEvalHelper.evaluateRunningQuery(runningQuery);
 
-				final int chunkSize = 100; // TODO configure.
-				
-				/*
-				 * Run as a SELECT query.
-				 * 
-				 * Note: This *MUST* use the view of the tripleStore which is
-				 * associated with the SailConnection in case the view is
-				 * isolated by a transaction.
-				 */
+                // play the result into a native memory backed solution set stream
+                try {ssstr.put(resItr);} finally {resItr.close();}
+                deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
+                
+                // If the query contains a nativeDistinctSPO query hint then
+                // the line below unfortunately isolates the query so that the hint does
+                // not impact any other execution, this is hacked by putting a property on the query root.
+                final boolean nativeDistinct = 
+                    astContainer.getOptimizedAST().getProperty(
+                        ConstructNode.Annotations.NATIVE_DISTINCT,
+                        ConstructNode.Annotations.DEFAULT_NATIVE_DISTINCT);
+                
+                applyUpdate(op, context, runningQuery, deleteInsertWhereStats, 
+                            queryRoot, ssstr, astContainer, nativeDistinct);
 
-				// Note: Blocks until the result set is materialized.
-				final long beginWhereClauseNanos = System.nanoTime();
-				final MutableTupleQueryResult result = new MutableTupleQueryResult(
-						ASTEvalHelper.evaluateTupleQuery(
-								context.conn.getTripleStore(), astContainer,
-								context.getQueryBindingSet()/* bindingSets */, null /* dataset */));
-				deleteInsertWhereStats.whereNanos.set(System.nanoTime() - beginWhereClauseNanos);
-				
-				// If the query contains a nativeDistinctSPO query hint then
-				// the line below unfortunately isolates the query so that the hint does
-				// not impact any other execution, this is hacked by putting a property on the query root.
-				
-				final boolean nativeDistinct = astContainer.getOptimizedAST().getProperty(ConstructNode.Annotations.NATIVE_DISTINCT,
-						ConstructNode.Annotations.DEFAULT_NATIVE_DISTINCT);
+            } finally {
 
                 try {
-
-                    // Play it once through the DELETE clause.
-                    if (deleteClause != null) {
-                    	final long beginDeleteNanos = System.nanoTime();
-                    	
-                        // rewind.
-                        result.beforeFirst();
-
-                        // Figure out if operating on solutions or graphs.
-                        final boolean isSolutionSet = deleteClause.isSolutions();
-
-						if (isSolutionSet) {
-
-                            /*
-                             * Target is solution set.
-                             * 
-                             * @see
-                             * https://sourceforge.net/apps/trac/bigdata/ticket
-                             * /524 (SPARQL Cache)
-                             * 
-                             * FIXME [Is this fixed now?] The DELETE+INSERT code
-                             * path is failing because it is based on the DELETE
-                             * FROM SELECT code path below and attempts to
-                             * rewrite the query to use a MINUS operator.
-                             * However, the setup is different in this case
-                             * since we have already run the original WHERE
-                             * clause into a rewindable tuple result set.
-                             * 
-                             * The best way to fix this would be to stay within
-                             * the native IBindingSet[] model and write the
-                             * solutions from the WHERE clause onto a chained
-                             * list of blocks, just as we do when writing on a
-                             * named solution set (or an htree with appropriate
-                             * join variables). That could then be joined into
-                             * the query with an INCLUDE. Since we do not want
-                             * this "temporary" solution set to be visible, we
-                             * could prefix it with a UUID and make sure that it
-                             * is written onto a memory manager, and also make
-                             * sure that we eventually delete the named solution
-                             * set since it should be temporary.
-                             */
-
-							// The named solution set on which we will write.
-							final String solutionSet = deleteClause.getName();
-
-							// A unique named solution set used to INCLUDE the
-							// solutions to be deleted.
-							final String tempSolutionSet = "-" + solutionSet
-									+ "-" + UUID.randomUUID();
-
-							// Write solutions to be deleted onto temp set.
-							context.solutionSetManager.putSolutions(
-									tempSolutionSet,
-									asBigdataIterator(lexicon, chunkSize,
-											result));
-
-							try {
-
-								/*
-								 * Replace WHERE clause with an join group
-								 * containing an INCLUDE for the solutions to be
-								 * removed.
-								 * 
-								 * WHERE := { INCLUDE %namedSet MINUS {INCLUDE %temp} }
-								 */
-//								final JoinGroupNode oldWhereClause = (JoinGroupNode) queryRoot
-//										.getWhereClause();
-						    	    
-								final JoinGroupNode newWhereClause = new JoinGroupNode();
-								queryRoot.setWhereClause(newWhereClause);
-						    	    
-								// Include the source solutions.
-								newWhereClause.addArg(new NamedSubqueryInclude(
-										solutionSet));
-								
-								// MINUS solutions to be removed.
-								final JoinGroupNode minusOp = new JoinGroupNode(
-										new NamedSubqueryInclude(
-												tempSolutionSet));
-								newWhereClause.addArg(minusOp);
-								minusOp.setMinus(true);
-
-//						    	    log.error("oldWhereClause="+oldWhereClause);
-//						    	    log.error("newWhereClause="+newWhereClause);
-
-//								/*
-//								 * Re-write the AST to handle DELETE solutions.
-//								 */
-//								convertQueryForDeleteSolutions(queryRoot,
-//										solutionSet);
-
-								// Set the projection node.
-								queryRoot.setProjection(deleteClause
-										.getProjection());
-
-								/*
-								 * Run as a SELECT query : Do NOT materialize
-								 * IVs.
-								 * 
-								 * Note: This *MUST* use the view of the
-								 * tripleStore which is associated with the
-								 * SailConnection in case the view is isolated
-								 * by a transaction.
-								 */
-								final ICloseableIterator<IBindingSet[]> titr = ASTEvalHelper
-										.evaluateTupleQuery2(
-												context.conn.getTripleStore(),
-												astContainer,
-												context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
-
-								try {
-
-									// Write onto named solution set.
-									context.solutionSetManager.putSolutions(
-											solutionSet, titr);
-
-								} finally {
-
-									titr.close();
-
-								}
-
-							} finally {
-
-								/*
-								 * Make sure that we do not leave this hanging
-								 * around.
-								 */
-
-								context.solutionSetManager
-										.clearSolutions(tempSolutionSet);
-
-							}
-
-						} else {
-
-							/*
-							 * DELETE triples/quads constructed from the
-							 * solutions.
-							 */
-							
-							final ConstructNode template = op.getDeleteClause()
-									.getQuadData().flatten(new ConstructNode(context));
-							
-							template.setDistinctQuads(true);
-							
-							if (nativeDistinct) {
-								template.setNativeDistinct(true);
-							}
-
-                            final ASTConstructIterator itr = new ASTConstructIterator(
-                                    context,//
-                                    context.conn.getTripleStore(), template,
-                                    op.getWhereClause(), null/* bnodesMap */,
-                                    result);
-
-							while (itr.hasNext()) {
-
-								final BigdataStatement stmt = itr.next();
-
-								addOrRemoveStatement(
-										context.conn.getSailConnection(), stmt,
-										false/* insert */);
-
-							}
-
-						}
-
-						deleteInsertWhereStats.deleteNanos.set(System.nanoTime() - beginDeleteNanos);
-						
-					} // End DELETE clause.
-
-                    // Play it once through the INSERT clause.
-                    if (insertClause != null) {
-
-                    	final long beginInsertNanos = System.nanoTime();
-                    	
-                        // rewind.
-                        result.beforeFirst();
-
-                        // Figure out if operating on solutions or graphs.
-                        final boolean isSolutionSet = insertClause.isSolutions();
-
-						if (isSolutionSet) {
-
-							/*
-							 * Target is solution set.
-							 * 
-							 * @see
-							 * https://sourceforge.net/apps/trac/bigdata/ticket
-							 * /524 (SPARQL Cache)
-							 */
-
-							// The named solution set on which we will write.
-							final String solutionSet = insertClause.getName();
-
-							// Set the projection node.
-							queryRoot.setProjection(insertClause.getProjection());
-
-							final ICloseableIterator<IBindingSet[]> titr = asBigdataIterator(
-									lexicon, chunkSize, result);
-
-							try {
-
-								// Write the solutions onto the named solution
-								// set.
-								context.solutionSetManager.putSolutions(solutionSet,
-										titr);
-
-							} finally {
-
-								titr.close();
-
-							}
-
-						} else {
-							
-							/*
-							 * INSERT triples/quads CONSTRUCTed from solutions.
-							 */
-							
-							final ConstructNode template = op.getInsertClause()
-									.getQuadData().flatten(new ConstructNode(context));
-
-							template.setDistinctQuads(true);
-							
-							if (nativeDistinct) {
-								template.setNativeDistinct(true);
-							}
-
-                            final ASTConstructIterator itr = new ASTConstructIterator(
-                                    context,//
-                                    context.conn.getTripleStore(), template,
-                                    op.getWhereClause(), null/* bnodesMap */,
-                                    result);
-
-							while (itr.hasNext()) {
-
-								final BigdataStatement stmt = itr.next();
-
-								addOrRemoveStatement(
-										context.conn.getSailConnection(), stmt,
-										true/* insert */);
-
-							}
-
-						}
-
-						deleteInsertWhereStats.insertNanos.set(System.nanoTime() - beginInsertNanos);
-
-					} // End INSERT clause
-
-                } finally {
-
-                    // Close the result set.
-                    result.close();
-
+                    if (ssstr.isOpen())
+                        ssstr.close();
+                } catch (Exception e) {
+                    log.warn("Problem closing solution set stream:" + e.getMessage());
                 }
 
-            } else {
-
-                
-                /*
-                 * DELETE/INSERT.
-                 * 
-                 * Note: For this code path, only the INSERT clause -or- the
-                 * DELETE clause was specified. We handle the case where BOTH
-                 * clauses were specified above.
-                 */
-                
-                // true iff this is an INSERT
-                final boolean isInsert = insertClause != null;
-//                final boolean isDelete = deleteClause != null;
-  
-                // The clause (either for INSERT or DELETE)
-                final QuadsDataOrNamedSolutionSet clause = isInsert ? insertClause
-                        : deleteClause;
-                
-                assert clause != null;
-
-                // Figure out if operating on solutions or graphs.
-                final boolean isSolutionSet = clause.isSolutions();
-
-                if(isSolutionSet) {
-                    
-                    /*
-                     * Target is solution set.
-                     * 
-                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
-                     * (SPARQL Cache)
-                     */
-                    
-                    // The named solution set on which we will write.
-                    final String solutionSet = clause.getName();
-
-                    // Set the projection node.
-                    queryRoot.setProjection(clause.getProjection());
-
-					if (!isInsert) {
-
-						/*
-						 * Re-write the AST to handle DELETE solutions.
-						 */
-						
-						convertQueryForDeleteSolutions(queryRoot, solutionSet);
-						
-					}
-                    
-                    /*
-					 * Run as a SELECT query : Do NOT materialize IVs.
-					 * 
-					 * Note: This *MUST* use the view of the tripleStore which
-					 * is associated with the SailConnection in case the view is
-					 * isolated by a transaction.
-					 */
-					final ICloseableIterator<IBindingSet[]> result = ASTEvalHelper
-							.evaluateTupleQuery2(context.conn.getTripleStore(),
-									astContainer, context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
-
-                    try {
-
-                        // Write the solutions onto the named solution set.
-						context.solutionSetManager.putSolutions(solutionSet, result);
-
-                    } finally {
-
-                        result.close();
-
-                    }
-                                        
-                } else {
-
-                    /*
-                     * Target is graph.
-                     */
-                    
-                    final QuadData quadData = (insertClause == null ? deleteClause
-                            : insertClause).getQuadData();
-
-                    // Flatten the original WHERE clause into a CONSTRUCT
-                    // template.
-                    final ConstructNode template = quadData
-                            .flatten(new ConstructNode(context));
-
-					template.setDistinctQuads(true);
-
-                    // Set the CONSTRUCT template (quads patterns).
-                    queryRoot.setConstruct(template);
-                    
-                    /*
-					 * Run as a CONSTRUCT query
-					 * 
-					 * FIXME Can we avoid IV materialization for this code path?
-					 * Note that we have to do Truth Maintenance. However, I
-					 * suspect that we do not need to do IV materialization if
-					 * we can tunnel into the Sail's assertion and retraction
-					 * buffers.
-					 * 
-					 * Note: This *MUST* use the view of the tripleStore which
-					 * is associated with the SailConnection in case the view is
-					 * isolated by a transaction.
-					 */
-                    final GraphQueryResult result = ASTEvalHelper
-							.evaluateGraphQuery(context.conn.getTripleStore(),
-									astContainer, context.getQueryBindingSet()/* bindingSets */, null /* dataset */);
-                    
-                    try {
-
-                        while (result.hasNext()) {
-
-                            final BigdataStatement stmt = (BigdataStatement) result
-                                    .next();
-
-                            addOrRemoveStatement(
-                                    context.conn.getSailConnection(), stmt,
-                                    isInsertOnly);
-
-                        }
-
-                    } finally {
-
-                        result.close();
-
-                    }
-
+                try {
+                    if (store.isOpen())
+                        store.close();
+                } catch (Exception e) {
+                    log.warn("Problem closing store:" +  e.getMessage());
                 }
+
+				try {
+				    if (mmgr!=null)
+				        mmgr.close();
+				} catch (Exception e) {
+				    log.warn("Problem closing memory manager:" + e.getMessage());
+				}
 
             }
 
@@ -1077,108 +666,455 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         
     }
 
-	/**
-	 * Efficiently resolve openrdf {@link BindingSet} into a chunked bigdata
-	 * {@link IBindingSet}[] iterator. The closeable semantics of the iteration
-	 * pattern are preserved.
-	 * 
-	 * @param r
-	 *            The {@link LexiconRelation}.
-	 * @param chunkSize
-	 *            When converting the openrdf binding set iteration pattern into
-	 *            a chunked iterator pattern, this will be the target chunk
-	 *            size.
-	 * @param result
-	 *            The openrdf solutions.
-	 * @return An iterator visiting chunked bigdata solutions.
-	 * 
-	 *         TODO We should not have to do this. We should stay within native
-	 *         bigdata IBindingSet[]s and the native bigdata iterators
-	 */
-	private static ICloseableIterator<IBindingSet[]> asBigdataIterator(
-			final LexiconRelation r,
-			final int chunkSize,
-			final CloseableIteration<BindingSet, QueryEvaluationException> result) {
-		
-		// Wrap with streaming iterator pattern.
-		final Striterator sitr = new Striterator(
-				// Chunk up the openrdf solutions.
-				new Chunkerator<BindingSet>(
-						// Convert the Sesame iteration into a Bigdata iterator.
-						new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
-								result), chunkSize));
+    /**
+     * Applies the update operation, running the result produced by the 
+     * given astContainer through the DELETE and INSERT clauses of the 
+     * given op. 
+     * 
+     * @param op the delete+insert graph operator
+     * @param context the active {@link AST2BOpUpdateContext} context
+     * @param deleteInsertWhereStats statistics object in which statistics will be kept
+     * @param queryRoot the query root
+     * @param ssstr the solution set stream used for buffering intermediate solutions
+     * @param astContainer the underlying AST container
+     * @param nativeDistinct whether or not the query has a nativeDistinctSPO hint
+     *
+     * @throws QueryEvaluationException
+     * @throws SailException
+     */
+    private static void applyUpdate(final DeleteInsertGraph op,
+            final AST2BOpUpdateContext context,
+            final IRunningQuery runningQuery,
+            final DeleteInsertWhereStats deleteInsertWhereStats,
+            final QueryRoot queryRoot, 
+            final SolutionSetStream ssstr,
+            final ASTContainer astContainer,
+            final boolean nativeDistinct)
+            throws QueryEvaluationException, SailException {
 
-		// Add filter to batch resolve BindingSet[] => IBindingSet[].
-		sitr.addFilter(new Resolver() {
-			
-			private static final long serialVersionUID = 1L;
+        final QuadsDataOrNamedSolutionSet deleteClause = op.getDeleteClause();
+        final QuadsDataOrNamedSolutionSet insertClause = op.getInsertClause();
+        final GraphPatternGroup<?> whereClause = op.getWhereClause();
+        
+        // play through DELETE clause
+        if (deleteClause != null) {
 
-			@Override
-			protected Object resolve(Object obj) {
+            final long beginDeleteNanos = System.nanoTime();
+            
+            handleDelete(
+                deleteClause, whereClause, context, runningQuery,
+                queryRoot, astContainer, ssstr, nativeDistinct);
 
-				// Visiting openrdf BindingSet[] chunks.
-				final BindingSet[] in = (BindingSet[]) obj;
-				
-				// Batch resolve to IBindingSet[].
-				final IBindingSet[] out = BigdataOpenRDFBindingSetsResolverator
-						.resolveChunk(r, in);
-				
-				// Return Bigdata IBindingSet[].
-				return out;
-			}
-		});
-		
-		return sitr;
+            deleteInsertWhereStats.deleteNanos.set(System.nanoTime() - beginDeleteNanos);
+        }
+   
+        // play through INSERT clause (if requested)
+        if (insertClause != null) {
+            
+            final long beginInsertNanos = System.nanoTime();
 
-	}
+            handleInsert(
+                insertClause, whereClause, context, runningQuery,
+                queryRoot,  ssstr, nativeDistinct);
+            
+            deleteInsertWhereStats.insertNanos.set(System.nanoTime() - beginInsertNanos);
+            
+        }
+    }
+
+    
+    /**
+     * Handles the DELETE part of the update operation, running the result produced
+     * by the  given astContainer through the DELETE clauses of the given op,
+     * playing it either directly into the store or applying it to the solution set
+     * referenced by the deleteClause.
+     * 
+     * @param deleteClause the delete clause
+     * @param whereClause the where clause
+     * @param context the active {@link AST2BOpUpdateContext} context
+     * @param queryRoot the query root
+     * @param ssstr the solution set stream used for buffering intermediate solutions
+     * @param astContainer the underlying AST container
+     * @param nativeDistinct whether or not the query has a nativeDistinctSPO hint
+     *
+     * @throws QueryEvaluationException
+     * @throws SailException
+     */
+    private static void handleDelete(
+            final QuadsDataOrNamedSolutionSet deleteClause,
+            final GraphPatternGroup<?> whereClause,
+            final AST2BOpUpdateContext context,
+            final IRunningQuery runningQuery,
+            final QueryRoot queryRoot, final ASTContainer astContainer,
+            final SolutionSetStream ssstr, final boolean nativeDistinct)
+            throws QueryEvaluationException, SailException {
+
+        assert (deleteClause != null);
+        
+        if (deleteClause.isSolutions()) {
+   
+            applyDeleteToSolutionSet(
+                deleteClause, context, queryRoot, astContainer, ssstr);
+   
+        } else {
+
+            applyDeleteToBackingStore(
+                deleteClause, whereClause, runningQuery, context, ssstr, nativeDistinct);
+
+        }
+        		
+    }
 
     /**
-	 * We need to find and remove the matching solutions. We handle this by
-	 * transforming the WHERE clause with a MINUS joining against the target
-	 * solution set via an INCLUDE. The solutions which are produced by the
-	 * query can then be written directly onto the named solution set. That way,
-	 * both DELETE and INSERT will wind up as putSolutions().
-	 * 
-	 * <pre>
-	 * WHERE {...}
-	 * </pre>
-	 * 
-	 * is rewritten as
-	 * 
-	 * <pre>
-	 * WHERE { INCLUDE %namedSet MINUS { ... } }
-	 * </pre>
-	 * 
-	 * TODO If there is a BIND() to a constant in the SELECT expression, then
-	 * this transform will not capture that binding. We would also need to
-	 * process the PROJECTION and pull down any constants into BIND()s in the
-	 * WHERE clause.
-	 */
-	private static void convertQueryForDeleteSolutions(
-			final QueryRoot queryRoot, final String solutionSet) {
+     * Applies the DELETE by removing the solution set contained in ssstr
+     * from the backing store.
+     * 
+     * @param deleteClause the delete clause
+     * @param whereClause the where clause
+     * @param context the active {@link AST2BOpUpdateContext} context
+     * @param ssstr the solution set stream used for buffering intermediate solutions
+     * @param astContainer the underlying AST container
+     * @param nativeDistinct whether or not the query has a nativeDistinctSPO hint
+     *
+     * @throws QueryEvaluationException
+     * @throws SailException
+     */
+    private static void applyDeleteToBackingStore(
+            final QuadsDataOrNamedSolutionSet deleteClause,
+            final GraphPatternGroup<?> whereClause,
+            final IRunningQuery runningQuery,
+            final AST2BOpUpdateContext context, final SolutionSetStream ssstr,
+            final boolean nativeDistinct) throws QueryEvaluationException,
+            SailException {
+        		
+        final ConstructNode template = 
+            deleteClause.getQuadData().flatten(new ConstructNode(context));
+        		
+        template.setDistinctQuads(true);
+        		
+        /*
+         * FIXME Jeremy: this flag needs to be controlled by a query hint so it
+         * can be disabled.
+         * 
+         * See BLZG-1935 DELETE+WHERE Test Case Fixes
+         */
+        template.setNativeDistinct(nativeDistinct);
+    
+        final TupleQueryResult tqr = 
+            new TupleQueryResultImpl(
+                new LinkedList<String>(),
+                ASTEvalHelper.wrapIntoMaterializingIterator(
+                    new Dechunkerator<IBindingSet>(ssstr.get()), 
+                    runningQuery, context.getAbstractTripleStore(), 
+                    false /* materializeProjectionInQuery */, null /* requiredVars */));     
+        
+        try {
 
-		final JoinGroupNode oldWhereClause = (JoinGroupNode) queryRoot
-				.getWhereClause();
-    	    
-		final JoinGroupNode newWhereClause = new JoinGroupNode();
-    	    
-		queryRoot.setWhereClause(newWhereClause);
-    	    
-		final NamedSubqueryInclude includeOp = new NamedSubqueryInclude(solutionSet);
-    	    
-		newWhereClause.addArg(includeOp);
-    	    
-		final JoinGroupNode minusOp = new JoinGroupNode();
-    	    
-		minusOp.setMinus(true);
-    	    
-		newWhereClause.addArg(minusOp);
-    	    
-		minusOp.addArg(oldWhereClause.clone());
-		
-//    	    log.error("oldWhereClause="+oldWhereClause);
-//    	    log.error("newWhereClause="+newWhereClause);
+            final ASTConstructIterator itr = new ASTConstructIterator(context, //
+                    context.conn.getTripleStore(), template, whereClause, null/* bnodesMap */, tqr);
 
+            try {
+
+                while (itr.hasNext()) {
+
+                    final BigdataStatement stmt = itr.next();
+                    
+                    addOrRemoveStatement(context.conn.getSailConnection(), stmt, false/* insert */);
+
+                }
+
+            } finally {
+
+                itr.close();
+
+            }
+
+        } finally {
+
+            tqr.close();
+
+        }
+        
+    }
+
+    /**
+     * Applies the DELETE by removing the solution set contained in ssstr
+     * from the solution set referenced by the DELETE clause
+     * 
+     * @param deleteClause the delete clause
+     * @param context the active {@link AST2BOpUpdateContext} context
+     * @param queryRoot the query root
+     * @param ssstr the solution set stream used for buffering intermediate solutions
+     * @param astContainer the underlying AST container
+     * @param nativeDistinct whether or not the query has a nativeDistinctSPO hint
+     *
+     * @throws QueryEvaluationException
+     * @throws SailException
+     */
+    private static void applyDeleteToSolutionSet(
+            final QuadsDataOrNamedSolutionSet deleteClause,
+            final AST2BOpUpdateContext context, final QueryRoot queryRoot,
+            final ASTContainer astContainer, SolutionSetStream ssstr)
+            throws QueryEvaluationException {
+        
+        /*
+         * Target is solution set.
+         * 
+         * @see
+         * https://sourceforge.net/apps/trac/bigdata/ticket
+         * /524 (SPARQL Cache)
+         * 
+         * FIXME [Is this fixed now?] The DELETE+INSERT code
+         * path is failing because it is based on the DELETE
+         * FROM SELECT code path below and attempts to
+         * rewrite the query to use a MINUS operator.
+         * However, the setup is different in this case
+         * since we have already run the original WHERE
+         * clause into a rewindable tuple result set.
+         * 
+         * The best way to fix this would be to stay within
+         * the native IBindingSet[] model and write the
+         * solutions from the WHERE clause onto a chained
+         * list of blocks, just as we do when writing on a
+         * named solution set (or an htree with appropriate
+         * join variables). That could then be joined into
+         * the query with an INCLUDE. Since we do not want
+         * this "temporary" solution set to be visible, we
+         * could prefix it with a UUID and make sure that it
+         * is written onto a memory manager, and also make
+         * sure that we eventually delete the named solution
+         * set since it should be temporary.
+         */
+   
+        // A unique named solution set used to INCLUDE the
+         // solutions to be deleted.
+         final String solutionSet = deleteClause.getName();
+         final String tempSolutionSet = "-" + solutionSet + "-" + UUID.randomUUID();
+            
+         // Write solutions to be deleted onto temp set.
+         context.solutionSetManager.putSolutions(tempSolutionSet, ssstr.get());
+
+
+         try {
+
+             /*
+              * Replace WHERE clause with an join group
+              * containing an INCLUDE for the solutions to be
+              * removed.
+              * 
+              * WHERE := { INCLUDE %namedSet MINUS {INCLUDE %temp} }
+              */
+             final JoinGroupNode newWhereClause = new JoinGroupNode();
+             queryRoot.setWhereClause(newWhereClause);
+
+             // Include the source solutions.
+             newWhereClause.addArg(new NamedSubqueryInclude(solutionSet));
+
+             // MINUS solutions to be removed.
+             final JoinGroupNode minusOp = new JoinGroupNode(
+                 new NamedSubqueryInclude(tempSolutionSet));
+             newWhereClause.addArg(minusOp);
+             minusOp.setMinus(true);
+
+             // Set the projection node.
+             queryRoot.setProjection(deleteClause.getProjection());
+
+             /*
+              * Run as a SELECT query : Do NOT materialize
+              * IVs.
+              * 
+              * Note: This *MUST* use the view of the
+              * tripleStore which is associated with the
+              * SailConnection in case the view is isolated
+              * by a transaction.
+              */
+             final IRunningQuery runningQuery = 
+                 ASTEvalHelper.prepareRunningQuery(
+                     context.conn.getTripleStore(),
+                     astContainer, context.getQueryBindingSet()/* bindingSets */);
+             final ICloseableIterator<IBindingSet[]> titr = 
+                 ASTEvalHelper.evaluateRunningQuery(runningQuery);
+
+             try {
+
+                 // Write onto named solution set.
+                 context.solutionSetManager.putSolutions(solutionSet, titr);
+
+             } finally {
+                 
+                 titr.close();
+
+             }
+   
+         } finally {
+   
+             /*
+              * Make sure that we do not leave this hanging around.
+              */
+              context.solutionSetManager.clearSolutions(tempSolutionSet);
+
+         }
+    }
+    
+    /**
+     * Handles the INSERT part of the update operation, running the result produced
+     * by the  given astContainer through the INSERT clauses of the given op,
+     * playing it either directly into the store or applying it to the solution set
+     * referenced by the deleteClause.
+     * 
+     * @param insertClause the delete clause
+     * @param whereClause the where clause
+     * @param context the active {@link AST2BOpUpdateContext} context
+     * @param queryRoot the query root
+     * @param ssstr the solution set stream used for buffering intermediate solutions
+     * @param astContainer the underlying AST container
+     * @param nativeDistinct whether or not the query has a nativeDistinctSPO hint
+     *
+     * @throws QueryEvaluationException
+     * @throws SailException
+     */
+    private static void handleInsert(
+            final QuadsDataOrNamedSolutionSet insertClause,
+            final GraphPatternGroup<?> whereClause,
+            final AST2BOpUpdateContext context,
+            final IRunningQuery runningQuery,
+            final QueryRoot queryRoot, SolutionSetStream ssstr,
+            final boolean nativeDistinct) throws QueryEvaluationException,
+            SailException {
+
+        assert (insertClause != null);
+
+        if (insertClause.isSolutions()) {
+
+            applyInsertToSolutionSet(insertClause, context, queryRoot, ssstr);
+
+        } else {
+
+            applyInsertToBackingStore(
+                insertClause, whereClause, runningQuery, context, ssstr, nativeDistinct);
+   
+        }
+    }
+
+    /**
+     * Applies the INSERT by adding the solution set contained in ssstr
+     * to the backing store.
+     * 
+     * @param insertClause the delete clause
+     * @param whereClause the where clause
+     * @param context the active {@link AST2BOpUpdateContext} context
+     * @param ssstr the solution set stream used for buffering intermediate solutions
+     * @param nativeDistinct whether or not the query has a nativeDistinctSPO hint
+     *
+     * @throws QueryEvaluationException
+     * @throws SailException
+     */
+    private static void applyInsertToBackingStore(
+            final QuadsDataOrNamedSolutionSet insertClause,
+            final GraphPatternGroup<?> whereClause,
+            final IRunningQuery runningQuery,
+            final AST2BOpUpdateContext context, SolutionSetStream ssstr,
+            final boolean nativeDistinct) throws QueryEvaluationException,
+            SailException {
+        /*
+         * INSERT triples/quads CONSTRUCTed from solutions.
+         */
+
+        final ConstructNode template = 
+            insertClause.getQuadData().flatten(new ConstructNode(context));
+
+        template.setDistinctQuads(true);
+
+        /*
+         * FIXME Jeremy: this flag needs to be controlled by a query hint so it
+         * can be disabled.
+         * 
+         * See BLZG-1935 DELETE+WHERE Test Case Fixes
+         */
+        template.setNativeDistinct(nativeDistinct);
+        
+        final TupleQueryResult tqr = 
+            new TupleQueryResultImpl(
+                new LinkedList<String>(),
+                ASTEvalHelper.wrapIntoMaterializingIterator(
+                    new Dechunkerator<IBindingSet>(ssstr.get()), 
+                    runningQuery, context.getAbstractTripleStore(), 
+                    false /* materializeProjectionInQuery */, null /* requiredVars */));
+        
+        try {
+
+            final ASTConstructIterator itr = new ASTConstructIterator(context, //
+                    context.conn.getTripleStore(), template, whereClause, null/* bnodesMap */, tqr);
+
+            try {
+
+                while (itr.hasNext()) {
+
+                    final BigdataStatement stmt = itr.next();
+
+                    addOrRemoveStatement(context.conn.getSailConnection(), stmt, true/* insert */);
+
+                }
+
+            } finally {
+
+                itr.close();
+
+            }
+
+        } finally {
+
+            tqr.close();
+
+        }
+
+    }
+
+    /**
+     * Applies the INSERT by adding the solution set contained in ssstr
+     * to the solution set referenced by the INSERT clause.
+     * 
+     * @param insertClause the delete clause
+     * @param whereClause the where clause
+     * @param context the active {@link AST2BOpUpdateContext} context
+     * @param ssstr the solution set stream used for buffering intermediate solutions
+     * @param nativeDistinct whether or not the query has a nativeDistinctSPO hint
+     *
+     * @throws QueryEvaluationException
+     * @throws SailException
+     */
+
+    private static void applyInsertToSolutionSet(
+            final QuadsDataOrNamedSolutionSet insertClause,
+            final AST2BOpUpdateContext context, final QueryRoot queryRoot,
+            final SolutionSetStream ssstr) {
+        
+        /*
+         * Target is solution set.
+         * 
+         * @see
+         * https://sourceforge.net/apps/trac/bigdata/ticket
+         * /524 (SPARQL Cache)
+         */
+
+        // The named solution set on which we will write.
+        final String solutionSet = insertClause.getName();
+
+        // Set the projection node.
+        queryRoot.setProjection(insertClause.getProjection());
+
+        final ICloseableIterator<IBindingSet[]> titr = ssstr.get();
+
+        try {
+
+            // Write the solutions onto the named solution set.
+            context.solutionSetManager.putSolutions(solutionSet, titr);
+
+        } finally {
+
+            titr.close();
+
+        }
     }
     
     /**
@@ -2565,5 +2501,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     
     private static final IBindingSet[] EMPTY_BINDING_SETS = new IBindingSet[0];
     private static final Resource[] NO_CONTEXTS = new Resource[0];
+    
 
 }

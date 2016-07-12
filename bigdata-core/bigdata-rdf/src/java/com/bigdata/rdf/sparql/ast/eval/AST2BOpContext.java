@@ -260,17 +260,6 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * costs. When we handle materialization outside of the query plan, those
      * materialization costs are not reflected in the query plan statistics.
      * 
-     * FIXME This can not be enabled until we fix a bug where variables in
-     * optional groups (or simple optional statement patterns) are added to the
-     * doneSet when we attempt to materialize them for a filter. The bug is
-     * demonstrated by TestOptionals#test_complex_optional_01() as well as by
-     * some of the TCK optional tests (TestTCK). (This bug is normally masked if
-     * we do materialization outside of the query plan, but a query could be
-     * constructed which would demonstrate the problem even then since the
-     * variable appears within the query plan generator as if it is
-     * "known materialized" when it is only in fact materialized within the
-     * scope of the optional group.)
-     * 
      * @see <a
      *      href="https://sourceforge.net/apps/trac/bigdata/ticket/489">Optimize
      *      RDF Value materialization performance on cluster </a>

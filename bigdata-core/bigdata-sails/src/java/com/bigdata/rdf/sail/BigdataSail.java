@@ -126,6 +126,7 @@ import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdate;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
@@ -3274,7 +3275,7 @@ public class BigdataSail extends SailBase implements Sail {
                 if (changeLog == null) {
                     
                     n = database.removeStatements(s, p, o, c);
-                    
+
                 } else {
                 
                     final IChunkedOrderedIterator<ISPO> itr = 
