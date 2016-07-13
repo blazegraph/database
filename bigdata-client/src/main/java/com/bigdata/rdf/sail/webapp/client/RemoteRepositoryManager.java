@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,7 +49,6 @@ import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
@@ -168,8 +168,14 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
      * Show Queries Query Parameter
      */
     private static String SHOW_QUERIES = "showQueries";
-    
-    final ConcurrentHashSet<String> runningQueries = new ConcurrentHashSet<String>();
+
+    /**
+     * Mapping from the {@link UUID} (as a String) of submitted remote client
+     * requests to the {@link ConnectOptions} for that request.  The keys
+     * of this map are used to support {@link #cancel()} of in-flight client
+     * requests on the remote service.
+     */
+    final private ConcurrentHashMap<String/*UUID*/,ConnectOptions> runningQueries = new ConcurrentHashMap<String/*UUID*/,ConnectOptions>();
 
     /**
      * Return the remote client for the transaction manager API.
@@ -532,15 +538,15 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         runningQueries.clear();
 
 
-        if (our_httpClient == httpClient && httpClient instanceof AutoCloseable) {
-
-            /*
-             * If the caller passed in an AutoCloseable HttpClient, then we shut
-             * it down now.
-             */
-            ((AutoCloseable) httpClient).close();
-
-        }
+//        if (our_httpClient == httpClient && httpClient instanceof AutoCloseable) { // FIXME Duplicative close()?
+//
+//            /*
+//             * If the caller passed in an AutoCloseable HttpClient, then we shut
+//             * it down now.
+//             */
+//            ((AutoCloseable) httpClient).close();
+//
+//        }
 
         if (our_httpClient != null) {
       
@@ -601,7 +607,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         opts.addRequestParam(CANCEL_QUERY);
         
-        opts.addRequestParam(QUERYID, runningQueries.toArray(new String[runningQueries.size()]));
+        opts.addRequestParam(QUERYID, runningQueries.keySet().toArray(new String[]{}));
 
         // Note: handled above.
         // opts.addRequestParam(QUERYID, queryId.toString());
@@ -1714,7 +1720,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             // its own queryId, so we are not tracking it in runningQueries map. 
             if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
                 if (opts.getRequestParam(QUERYID) != null) {
-                    runningQueries.add(opts.getRequestParam(QUERYID));
+                    runningQueries.put(opts.getRequestParam(QUERYID),opts);
                 }
             }
             
