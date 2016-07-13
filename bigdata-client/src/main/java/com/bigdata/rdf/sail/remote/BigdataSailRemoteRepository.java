@@ -252,7 +252,7 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * @param queryId
 	 * @throws Exception
 	 */
-	public void cancel(UUID queryId) throws Exception {
+	public void cancel(final UUID queryId) throws Exception {
 		
 		this.our_mgr.cancel(queryId);
 		

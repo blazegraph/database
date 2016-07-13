@@ -90,7 +90,7 @@ public class Test_REST_CANCEL extends TestCase2 {
         
         final String query = "select * {?s ?p ?o}";
         
-        ExecutorService executor = Executors.newFixedThreadPool(3);
+        final ExecutorService executor = Executors.newFixedThreadPool(3);
         try {
             
             runQuery(query, executor, 0);
@@ -101,9 +101,9 @@ public class Test_REST_CANCEL extends TestCase2 {
 
             remote.getRemoteRepositoryManager().close();
             
-            String[] actual = remote.data.opts.requestParams.get("queryId");
+            final String[] actual = remote.data.opts.requestParams.get("queryId");
             
-            String[] expected = new String[] {
+            final String[] expected = new String[] {
                     uuids[0].toString(),
                     uuids[1].toString(),
                     uuids[2].toString()
