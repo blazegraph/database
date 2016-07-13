@@ -1054,10 +1054,10 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             
             ok = true;
             
-//        } catch (Exception e) {
-//            
-//            ok = InnerCause.isInnerCause(e, HttpException.class);
-//        	throw e;
+        } catch (Exception e) {
+            
+            ok = InnerCause.isInnerCause(e, HttpException.class);
+        	throw e;
         	
         } finally {
         	
@@ -1405,11 +1405,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     }
     
     void assertMapgraphRuntimeAvailable() throws Exception {
+
         if (!mapgraphRuntimeAvailable()) 
             throw new NoGPUAccelerationAvailable();
+        
     }
-
-
     
     /**
      * Return the effective configuration properties for the named data set.
@@ -1445,7 +1445,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         JettyResponseListener response = null;
 
         opts.setAcceptHeader(ConnectOptions.MIME_PROPERTIES_XML);
-        boolean consumeNeeded = true;
+        boolean ok = false;
         try {
 
             checkResponseCode(response = doConnect(opts));
@@ -1474,16 +1474,22 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
             final Properties properties = parser.parse(response.getInputStream());
 
-            consumeNeeded = false;
+            ok = true;
 
             return properties;
+            
         } catch (Exception e) {
-            consumeNeeded = !InnerCause.isInnerCause(e, HttpException.class);
+            
+            ok = InnerCause.isInnerCause(e, HttpException.class);
             throw e;
+            
         } finally {
 
-            if (response != null && consumeNeeded)
+            if (response != null)
                 response.abort();
+            
+            if(!ok)
+                cancelNoThrow(uuid);
 
         }
 
