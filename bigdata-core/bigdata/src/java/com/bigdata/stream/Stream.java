@@ -52,6 +52,7 @@ import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IReadWriteLockManager;
+import com.bigdata.btree.IndexInconsistentError;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.Node;
@@ -110,6 +111,11 @@ abstract public class Stream implements ICheckpointProtocol {
     protected static final String ERROR_READ_ONLY = "Read-only";
 
     /**
+     * The index object is no longer valid.
+     */
+    final protected static String ERROR_ERROR_STATE = "Index is in error state";
+
+    /**
      * The backing store.
      */
     private final IRawStore store;
@@ -125,6 +131,8 @@ abstract public class Stream implements ICheckpointProtocol {
      * protect {@link #writeCheckpoint2()} and similar operations.
      */
     private final IReadWriteLockManager lockManager;
+
+    protected volatile Throwable error;
 
     /**
      * <code>true</code> iff the {@link Stream} is open.
@@ -770,6 +778,9 @@ abstract public class Stream implements ICheckpointProtocol {
 
         }
 
+        if( error != null )
+            throw new IndexInconsistentError(ERROR_ERROR_STATE, error);
+        
     }
 
     /**
@@ -809,6 +820,18 @@ abstract public class Stream implements ICheckpointProtocol {
         
     }
 
+
+    @Override
+    public void invalidate(final Throwable t) {
+
+        if (t == null)
+            throw new IllegalArgumentException();
+
+        if (error == null)
+            error = t;
+
+    }
+    
     @Override
     public long getRecordVersion() {
 
@@ -852,6 +875,7 @@ abstract public class Stream implements ICheckpointProtocol {
         
     }
 
+    @Override
     final public Checkpoint writeCheckpoint2() {
         
         assertNotTransient();

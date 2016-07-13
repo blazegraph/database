@@ -1323,6 +1323,17 @@ public class BTree extends AbstractBTree implements //ICommitter,
     	return writeCheckpoint2().getCheckpointAddr();
     	
     }
+    
+    @Override
+    public void invalidate(final Throwable t) {
+
+        if (t == null)
+            throw new IllegalArgumentException();
+
+        if (error == null)
+            error = t;
+
+    }
 
     /**
      * Remove all entries in the B+Tree.

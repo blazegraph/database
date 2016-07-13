@@ -209,6 +209,11 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
         throw new UnsupportedOperationException(ERROR_READ_ONLY);
     }
 
+    @Override
+    public void invalidate(Throwable t) {
+        // NOP. Not a mutable index.
+    }
+
     /**
      * {@inheritDoc}
      * <p>
