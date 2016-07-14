@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,7 +49,6 @@ import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
@@ -168,8 +168,15 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
      * Show Queries Query Parameter
      */
     private static String SHOW_QUERIES = "showQueries";
-    
-    final ConcurrentHashSet<String> runningQueries = new ConcurrentHashSet<String>();
+
+    /**
+     * Mapping from the {@link UUID} (as a String) of submitted remote client
+     * requests to the {@link ConnectOptions} for that request.  The keys
+     * of this map are used to support {@link #cancel()} of in-flight client
+     * requests on the remote service. The values are just the same {@link UUID}s
+     * (since the value must be non-null).
+     */
+    final private ConcurrentHashMap<String/*UUID*/,String/*UUID*/> runningQueries = new ConcurrentHashMap<String,String>();
 
     /**
      * Return the remote client for the transaction manager API.
@@ -519,28 +526,28 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             // Already closed.
             return;
         }
-        try {
-            
-            cancel();
-            
-        } catch (ConnectException e) {
-            
-            log.warn("Could not cancel running queries", e);
-            
-        }
+//        try {
+//                      // FIXME https://jira.blazegraph.com/browse/BLZG-2021
+//            cancel(); // FIXME https://github.com/SYSTAP/db-enterprise/issues/30 (Review HA test suite errors which might be triggered by this call)
+//            
+//        } catch (ConnectException e) {
+//            
+//            log.warn("Could not cancel running queries", e);
+//            
+//        }
         
         runningQueries.clear();
 
 
-        if (our_httpClient == httpClient && httpClient instanceof AutoCloseable) {
-
-            /*
-             * If the caller passed in an AutoCloseable HttpClient, then we shut
-             * it down now.
-             */
-            ((AutoCloseable) httpClient).close();
-
-        }
+//        if (our_httpClient == httpClient && httpClient instanceof AutoCloseable) { // FIXME Duplicative close()?
+//
+//            /*
+//             * If the caller passed in an AutoCloseable HttpClient, then we shut
+//             * it down now.
+//             */
+//            ((AutoCloseable) httpClient).close();
+//
+//        }
 
         if (our_httpClient != null) {
       
@@ -601,7 +608,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         opts.addRequestParam(CANCEL_QUERY);
         
-        opts.addRequestParam(QUERYID, runningQueries.toArray(new String[runningQueries.size()]));
+        opts.addRequestParam(QUERYID, runningQueries.keySet().toArray(new String[]{}));
 
         // Note: handled above.
         // opts.addRequestParam(QUERYID, queryId.toString());
@@ -661,6 +668,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                 baseServiceURL + "/sparql" : 
                 getRepositoryBaseURLForNamespace(namespace) + "/sparql";
     }
+    
     /**
      * Obtain a flyweight {@link RemoteRepository} for the default namespace
      * associated with the remote service.
@@ -851,8 +859,6 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
          */
         final ConnectOptions opts = newConnectOptions(baseServiceURL + "/namespace", uuid, null/* tx */);
 
-        JettyResponseListener response = null;
-
         // Setup the request entity.
         {
 
@@ -874,12 +880,21 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         }
 
+        JettyResponseListener response = null;
+        boolean ok = false;
         try {
 
             checkResponseCode(response = doConnect(opts));
+            
+            ok = true;
+                    
         } finally {
+            
             if (response != null)
                 response.abort();
+            
+            if(!ok)
+                cancelNoThrow(uuid);
 
         }
 
@@ -925,8 +940,6 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         final ConnectOptions opts = newConnectOptions(baseServiceURL + "/namespace/prepareProperties", uuid,
                 null/* tx */);
 
-        JettyResponseListener response = null;
-
         // Setup the request entity.
         {
 
@@ -948,7 +961,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         }
 
-        boolean consumeNeeded = true;
+        JettyResponseListener response = null;
+        boolean ok = false;
         try {
 
             checkResponseCode(response = doConnect(opts));
@@ -977,35 +991,35 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
             final Properties preparedProperties = parser.parse(response.getInputStream());
 
-            consumeNeeded = false;
+            ok = true;
 
             return preparedProperties;
 
         } catch (Exception e) {
-            consumeNeeded = !InnerCause.isInnerCause(e, HttpException.class);
+            
+            ok = InnerCause.isInnerCause(e, HttpException.class);
             throw e;
 
         } finally {
             if (response != null)
                 response.abort();
-
+            if(!ok)
+                cancelNoThrow(uuid);
         }
 
     }
     
     /**
      * 
-     * 
-     * @param 
-     * @param 
-     * 
-     * @return 
-     * 
+     * @param namespace The namespace
+     * @param forceBuildTextIndex
      * @throws Exception
      */
     public void rebuildTextIndex(final String namespace,
             final boolean forceBuildTextIndex) throws Exception {
-    	rebuildTextIndex(namespace, forceBuildTextIndex, UUID.randomUUID());
+
+        rebuildTextIndex(namespace, forceBuildTextIndex, UUID.randomUUID());
+        
     }
     
     public void rebuildTextIndex(final String namespace,
@@ -1016,9 +1030,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         if (uuid == null)
             throw new IllegalArgumentException();
 
-        final String endpointURL = baseServiceURL + "/namespace/" + namespace + "/textIndex"; 
-        
-        
+        final String endpointURL = baseServiceURL + "/namespace/" + namespace + "/textIndex";
        
         /*
          * Note: This operation does not currently permit embedding into a
@@ -1034,23 +1046,26 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
  
         JettyResponseListener response = null;
 
-        boolean consumeNeeded = true;
+        boolean ok = false;
         
         try {
 
             checkResponseCode(response = doConnect(opts));
             
-            consumeNeeded = false;
+            ok = true;
             
         } catch (Exception e) {
-            consumeNeeded = !InnerCause.isInnerCause(e,
-                    HttpException.class);
+            
+            ok = InnerCause.isInnerCause(e, HttpException.class);
         	throw e;
         	
         } finally {
         	
         	if (response != null)
         		response.abort();
+        	
+        	if(!ok)
+        	    cancelNoThrow(uuid);
 
         }
         
@@ -1088,15 +1103,20 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         opts.method = "DELETE";
 
         JettyResponseListener response = null;
-
+        boolean ok = false;
         try {
 
             checkResponseCode(response = doConnect(opts));
+            
+            ok = true;
 
         } finally {
 
             if (response != null)
                 response.abort();
+            
+            if(!ok)
+                cancelNoThrow(uuid);
 
         }
 
@@ -1136,7 +1156,6 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         if (namespacePublishedToMapgraph(namespace))
             return false; // nothing to be done
-        
         
         final String repositoryUrl = 
             getSparqlEndpointUrlForNamespaceOrDefault(namespace);
@@ -1386,11 +1405,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
     }
     
     void assertMapgraphRuntimeAvailable() throws Exception {
+
         if (!mapgraphRuntimeAvailable()) 
             throw new NoGPUAccelerationAvailable();
+        
     }
-
-
     
     /**
      * Return the effective configuration properties for the named data set.
@@ -1426,7 +1445,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         JettyResponseListener response = null;
 
         opts.setAcceptHeader(ConnectOptions.MIME_PROPERTIES_XML);
-        boolean consumeNeeded = true;
+        boolean ok = false;
         try {
 
             checkResponseCode(response = doConnect(opts));
@@ -1455,16 +1474,22 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
             final Properties properties = parser.parse(response.getInputStream());
 
-            consumeNeeded = false;
+            ok = true;
 
             return properties;
+            
         } catch (Exception e) {
-            consumeNeeded = !InnerCause.isInnerCause(e, HttpException.class);
+            
+            ok = InnerCause.isInnerCause(e, HttpException.class);
             throw e;
+            
         } finally {
 
-            if (response != null && consumeNeeded)
+            if (response != null)
                 response.abort();
+            
+            if(!ok)
+                cancelNoThrow(uuid);
 
         }
 
@@ -1713,8 +1738,9 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             // In case we are processing a cancel query request, it does not have 
             // its own queryId, so we are not tracking it in runningQueries map. 
             if (!opts.requestParams.containsKey(CANCEL_QUERY)) {
-                if (opts.getRequestParam(QUERYID) != null) {
-                    runningQueries.add(opts.getRequestParam(QUERYID));
+                final String uuidStr = opts.getRequestParam(QUERYID);
+                if (uuidStr != null) {
+                    runningQueries.put(uuidStr,uuidStr);
                 }
             }
             
@@ -2027,11 +2053,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
                         if (notDone.compareAndSet(true, false)) {
 
-                            try {
-                                cancel(queryId);
-                            } catch (Exception ex) {
-                                log.warn(ex);
-                            }
+                            cancelNoThrow(queryId);
 
                         }
 
@@ -2073,15 +2095,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                  */
                 response.abort();
 
-                try {
-                    /*
-                     * POST back to the server in an attempt to cancel the
-                     * request if already executing on the server.
-                     */
-                    cancel(queryId);
-                } catch (Exception ex) {
-                    log.warn(ex);
-                }
+                /*
+                 * POST back to the server in an attempt to cancel the
+                 * request if already executing on the server.
+                 */
+                cancelNoThrow(queryId);
 
                 if (listener != null) {
                     listener.closed(queryId);
@@ -2123,17 +2141,13 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
         } finally {
 
             if (response == null) {
-                try {
-                    /*
-                     * Some error prevented our obtaining a response.
-                     * 
-                     * POST back to the server in an attempt to cancel the
-                     * request if already executing on the server.
-                     */
-                    cancel(queryId);
-                } catch (Exception ex) {
-                    log.warn(ex);
-                }
+                /*
+                 * Some error prevented our obtaining a response.
+                 * 
+                 * POST back to the server in an attempt to cancel the
+                 * request if already executing on the server.
+                 */
+                cancelNoThrow(queryId);
             } else {
                 /*
                  * Note: We are not reading anything from the response so I
@@ -2154,9 +2168,32 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
     /**
      * Cancel a query running remotely on the server.
+     * <p>
+     * Note: This method does not throw exceptions. It gets used in clean up
+     * calls for a variety of purposes.
      * 
      * @param queryID
      *            the UUID of the query to cancel
+     */
+    public void cancelNoThrow(final UUID queryId) {
+        try {
+            cancel(queryId);
+        } catch(Throwable t) {
+            try {
+                log.warn("Cancellation failed: "+t, t);
+            } catch(Throwable t1) {
+                // Ignore.
+            }
+        }
+    }
+    
+    /**
+     * Cancel a query running remotely on the server.
+     * 
+     * @param queryID
+     *            the UUID of the query to cancel
+     *            
+     * @throws Exception if something goes wrong.
      */
     public void cancel(final UUID queryId) throws Exception {
 
@@ -2174,21 +2211,13 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
         opts.addRequestParam("cancelQuery");
 
-        // Note: handled above.
-        // opts.addRequestParam(QUERYID, queryId.toString());
-
         JettyResponseListener response = null;
         try {
             // Issue request, check response status code.
             checkResponseCode(response = doConnect(opts));
         } finally {
-            /*
-             * Ensure that the http response entity is consumed so that the http
-             * connection will be released in a timely fashion.
-             */
             if (response != null)
                 response.abort();
-
         }
 
     }
@@ -2346,11 +2375,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
                         if (notDone.compareAndSet(true, false)) {
 
-                            try {
-                                cancel(queryId);
-                            } catch (Exception ex) {
-                                log.warn(ex);
-                            }
+                            cancelNoThrow(queryId);
 
                         }
 
@@ -2393,15 +2418,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                 }
                 // Abort the http response handling.
                 response.abort();
-                try {
-                    /*
-                     * POST back to the server to cancel the request in case it
-                     * is still running on the server.
-                     */
-                    cancel(queryId);
-                } catch (Exception ex) {
-                    log.warn(ex);
-                }
+                /*
+                 * POST back to the server to cancel the request in case it
+                 * is still running on the server.
+                 */
+                cancelNoThrow(queryId);
                 if (listener != null) {
                     listener.closed(queryId);
                 }
@@ -2425,7 +2446,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 
             checkResponseCode(resp);         
             
-            ContextsResult tmp = new ContextsResult(resp.getInputStream()){
+            final ContextsResult tmp = new ContextsResult(resp.getInputStream()){
             
             	private final AtomicBoolean notDone = new AtomicBoolean(true);
 
@@ -2455,11 +2476,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
 	
 	                    if (notDone.compareAndSet(true, false)) {
 	
-	                        try {
-	                            cancel(queryId);
-	                        } catch (Exception ex) {
-	                            log.warn(ex);
-	                        }
+                            cancelNoThrow(queryId);
 	
 	                    }
 	
@@ -2494,15 +2511,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                 }
                 // Abort the http response handling.
                 resp.abort();
-                try {
-                    /*
-                     * POST back to the server to cancel the request in case it
-                     * is still running on the server.
-                     */
-                    cancel(queryId);
-                } catch (Exception ex) {
-                    log.warn(ex);
-                }
+                /*
+                 * POST back to the server to cancel the request in case it
+                 * is still running on the server.
+                 */
+                cancelNoThrow(queryId);
              
         	}
                     
@@ -2571,15 +2584,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
                     // Make sure the response listener is closed.
                     response.abort();
                 }
-                try {
-                    /*
-                     * POST request to server to cancel query in case it is
-                     * still running.
-                     */
-                    cancel(queryId);
-                } catch (Exception ex) {
-                    log.warn(ex);
-                }
+                /*
+                 * POST request to server to cancel query in case it is
+                 * still running.
+                 */
+                cancelNoThrow(queryId);
             }
 
             if (listener != null) {
