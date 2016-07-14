@@ -49,6 +49,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.LexiconConfiguration;
+import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
@@ -427,7 +428,7 @@ public class MockTermResolverOp extends PipelineOp {
       // if literals are not inlined, we need to resolve them
       } else if (!lex.isInlineLiterals() && iv.isLiteral()) {
           
-          ivMap.put(iv, ((AbstractLiteralIV<?,?>)iv).asValue(lex));
+          ivMap.put(iv, ((AbstractInlineIV<?,?>)iv).asValue(lex));
       }
    }
 

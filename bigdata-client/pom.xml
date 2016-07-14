@@ -125,11 +125,6 @@ ga('send', 'pageview');
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-      <version>${apache.httpclient.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>
       <version>${apache.httpmime.version}</version>
     </dependency>

@@ -155,6 +155,7 @@ public class Banner {
                  * Set a logger for any uncaught exceptions.
                  */
                 Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+                    @Override
                     public void uncaughtException(final Thread t,
                             final Throwable e) {
                         log.error("Uncaught exception in thread", e);

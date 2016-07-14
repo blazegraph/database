@@ -3,7 +3,7 @@ set -e
 
 [ -f /etc/blazegraph/blazegraph ] && . /etc/blazegraph/blazegraph
 
-JAVA=`which java 2> /dev/null`
+JAVA=`which java 2> /dev/null` || true
 
 if [ -z "$JAVA" ] ; then
 
@@ -17,29 +17,26 @@ if [ -z "$JAVA" ] ; then
 	echo "* However, to run with openjdk use:  yum install -y java-1.7.0-openjdk-devel          *"
 	echo "*                                                                                     *"
 	echo "* You must install JAVA to start Blazegraph.                                          *"
+	echo "*                                                                                     *"
+	echo "* Once java is installed run:  service blazegraph start                               *"
 	echo "***************************************************************************************"
 	echo ""
 
 fi
 
+        [ -z "$NAME" ] && NAME="blazegraph"
         [ -z "$BLZG_USER" ] && BLZG_USER="blzg"
         [ -z "$BLZG_GROUP" ] && BLZG_GROUP="blzg"
-        [ -z "$BLZG_DATA" ] && BLZG_DATA="/var/lib/blazegraph"
-        [ -z "$BLZG_LOG" ] && BLZG_LOG="/var/log/blazegraph"
+        [ -z "$BLZG_DATA" ] && BLZG_DATA="/var/lib/$NAME"
+        [ -z "$BLZG_LOG" ] && BLZG_LOG="/var/log/$NAME"
 
         # Add the blazegraph group
-        if ! getent group "$BLZG_GROUP" > /dev/null 2>&1 ; then
-            addgroup --system --quiet "$BLZG_GROUP"
-		    #/usr/bin/getent group blzg || /usr/sbin/groupadd -r blzg >& /dev/null
-        fi
+        groupadd -f -r "$BLZG_GROUP" >& /dev/null
 
         # Add the blazegraph user with the home directory
         # Allow the home directory to be created later by the installer
         if ! getent passwd "$BLZG_USER" > /dev/null 2>&1 ; then
-		    #/usr/bin/getent passwd blzg || /usr/sbin/useradd -r -g blzg -d /usr/share/blazegraph -s /sbin/nologin blzg >& /dev/null
-            adduser --system --no-create-home --ingroup "$BLZG_GROUP" \
-                --disabled-password --shell /bin/false \
-                --home /usr/share/blazegraph --quiet "$BLZG_USER"
+		    useradd -r -g "$BLZG_USER" -d /usr/share/$NAME -s /sbin/nologin blzg >& /dev/null
         fi
 
         # Make the blazegraph data and log directories here
@@ -48,9 +45,11 @@ fi
         if [ ! -d "$BLZG_DATA" -a ! -L "$BLZG_DATA" ]; then
             mkdir -p $BLZG_DATA
         fi
+
         if [ ! -d "$BLZG_LOG" -a ! -L "$BLZG_LOG" ]; then
             mkdir -p $BLZG_LOG
         fi
+
         chown -R $BLZG_USER:$BLZG_GROUP $BLZG_DATA
         chown $BLZG_USER:$BLZG_GROUP $BLZG_LOG
 

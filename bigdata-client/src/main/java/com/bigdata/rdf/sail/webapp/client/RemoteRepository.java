@@ -159,11 +159,15 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long postGraphML(final String path, final UUID uuid) throws Exception {
         
+        if(uuid == null)
+            throw new IllegalArgumentException();
+        
         final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("blueprints");
 
         JettyResponseListener response = null;
+        boolean ok = false;
         try {
 
             final File file = new File(path);
@@ -185,6 +189,8 @@ public class RemoteRepository extends RemoteRepositoryBase {
             checkResponseCode(response = doConnect(opts));
 
             final MutationResult result = mutationResults(response);
+            
+            ok = true;
 
             return result.mutationCount;
 
@@ -192,6 +198,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
         	if (response != null)
         		response.abort();
+        	
+        	if(!ok)
+        	    cancelNoThrow(uuid);
             
         }
         
@@ -383,6 +392,17 @@ public class RemoteRepository extends RemoteRepositoryBase {
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
 
+        return getStatements(subj, pred, obj, includeInferred, UUID.randomUUID(), contexts);
+        
+    }
+
+    public GraphQueryResult getStatements(final Resource subj, final URI pred,
+            final Value obj, final boolean includeInferred, final UUID uuid,
+            final Resource... contexts) throws Exception {
+
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
     	if (contexts == null) {
             // Note: May not be a null Resource[] reference.
             // MAY be Resource[null], which is the openrdf nullGraph.
@@ -390,7 +410,6 @@ public class RemoteRepository extends RemoteRepositoryBase {
             throw new IllegalArgumentException();
          }
          
-            final UUID uuid = UUID.randomUUID();
             final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
             opts.addRequestParam("GETSTMTS");
@@ -409,21 +428,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
            	opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-            JettyResponseListener resp = null;
-            try {
-
-               checkResponseCode(resp = doConnect(opts));
-               
-              GraphQueryResult result = mgr.graphResults(opts, null, null);
+           	final GraphQueryResult result = mgr.graphResults(opts, uuid, null/*listener*/);
               
-              return result;
-
-            } finally {
-
-               if (resp != null)
-                  resp.abort();
-
-            }
+           	return result;
 
     }
     
@@ -451,15 +458,24 @@ public class RemoteRepository extends RemoteRepositoryBase {
     * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
     *      not encoded/decoded according to openrdf semantics (REST API) </a>
     */
-   public boolean hasStatement(final Resource s, final URI p, final Value o,
-         final boolean includeInferred, final Resource... c) throws Exception {
+    public boolean hasStatement(final Resource s, final URI p, final Value o,
+            final boolean includeInferred, final Resource... c) throws Exception {
+
+        return hasStatement(s, p, o, includeInferred, UUID.randomUUID(), c);
+        
+    }
+   
+    public boolean hasStatement(final Resource s, final URI p, final Value o,
+         final boolean includeInferred, final UUID uuid, final Resource... c) throws Exception {
+
+      if (uuid == null)
+          throw new IllegalArgumentException();
       if (c == null) {
          // Note: May not be a null Resource[] reference.
          // MAY be Resource[null], which is the openrdf nullGraph.
          // See #1177
          throw new IllegalArgumentException();
       }
-      final UUID uuid = UUID.randomUUID();
       final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
       opts.addRequestParam("HASSTMT");
@@ -477,6 +493,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
       opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(c));
 
       JettyResponseListener resp = null;
+      boolean ok = false;
       try {
 
          opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
@@ -485,6 +502,8 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
          final BooleanResult result = RemoteRepositoryManager.booleanResults(resp);
 
+         ok = true;
+         
          return result.result;
 
       } finally {
@@ -492,18 +511,34 @@ public class RemoteRepository extends RemoteRepositoryBase {
          if (resp != null)
             resp.abort();
 
+         if (!ok)
+            cancelNoThrow(uuid);
+
       }
 
    }
     
-    private String asConstOrVar(final AST2SPARQLUtil util, final String var,
-            final Value val) {
-
-        if (val == null)
-            return var;
-
-        return util.toExternal(val);
-        
+//    private String asConstOrVar(final AST2SPARQLUtil util, final String var,
+//            final Value val) {
+//
+//        if (val == null)
+//            return var;
+//
+//        return util.toExternal(val);
+//        
+//    }
+    
+    /**
+     * Cancel a query running remotely on the server, but do not throw out any
+     * exceptions.
+     * 
+     * @param queryID
+     *             the UUID of the query to cancel
+     */
+    public void cancelNoThrow(final UUID queryId) {
+    
+       mgr.cancelNoThrow(queryId);
+            
     }
     
     /**
@@ -578,6 +613,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
    public long rangeCount(final UUID uuid, final boolean exact, final Resource s, final URI p,
          final Value o, final Resource... c) throws Exception {
 
+      if(uuid == null)
+          throw new IllegalArgumentException();
+       
       if (c == null) {
          // Note: May not be a null Resource[] reference.
          // MAY be Resource[null], which is the openrdf nullGraph.
@@ -603,6 +641,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(c));
         
         JettyResponseListener resp = null;
+        boolean ok = false;
         try {
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
@@ -611,13 +650,18 @@ public class RemoteRepository extends RemoteRepositoryBase {
             
             final RangeCountResult result = rangeCountResults(resp);
             
+            ok = true;
+            
             return result.rangeCount;
             
         } finally {
             
         	if (resp != null)
         		resp.abort();
-                     
+            
+        	if(!ok)
+        	    cancelNoThrow(uuid);
+        	
         }
 
     }
@@ -677,8 +721,11 @@ public class RemoteRepository extends RemoteRepositoryBase {
     /**
     * Return a list of contexts in use in a remote quads database.
     */
-    public ContextsResult getContexts(UUID uuid) throws Exception {
+    public ContextsResult getContexts(final UUID uuid) throws Exception {
     	
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
     	final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("CONTEXTS");
@@ -688,7 +735,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
-            ContextsResult result = mgr.contextsResults(opts, uuid);
+            final ContextsResult result = mgr.contextsResults(opts, uuid);
             
             return result;
   
@@ -696,7 +743,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             
         	if (resp != null)
         		resp.abort();
-                      
+
         }
     	
     }
@@ -743,6 +790,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
         if (add == null)
             throw new IllegalArgumentException();
 
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
         final ConnectOptions opts = mgr.newUpdateConnectOptions(
                 sparqlEndpointURL, uuid, tx);
         
@@ -787,17 +837,13 @@ public class RemoteRepository extends RemoteRepositoryBase {
             if (response != null) {
                 // Abort the http response handling.
                 response.abort();
-                if (!ok) {
-                    try {
-                        /*
-                         * POST back to the server to cancel the request in case
-                         * it is still running on the server.
-                         */
-                        cancel(uuid);
-                    } catch (Exception ex) {
-                        log.warn(ex);
-                    }
-                }
+            }
+            if (!ok) {
+                /*
+                 * POST back to the server to cancel the request in case
+                 * it is still running on the server.
+                 */
+                cancelNoThrow(uuid);
             }
         }
         
@@ -835,6 +881,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public long remove(final RemoveOp remove, final UUID uuid) throws Exception {
 
         if (remove == null)
+            throw new IllegalArgumentException();
+
+        if (uuid == null)
             throw new IllegalArgumentException();
 
         final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
@@ -912,19 +961,16 @@ public class RemoteRepository extends RemoteRepositoryBase {
             if (response != null) {
                 // Abort the http response handling.
                 response.abort();
-                if (!ok) {
-                    try {
-                        /*
-                         * POST back to the server to cancel the request in case
-                         * it is still running on the server.
-                         */
-                        cancel(uuid);
-                    } catch (Exception ex) {
-                        log.warn(ex);
-                    }
-                }
             }
                         
+            if (!ok) {
+                /*
+                 * POST back to the server to cancel the request in case
+                 * it is still running on the server.
+                 */
+                cancelNoThrow(uuid);
+            }
+
         }
         
     }
@@ -987,6 +1033,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
             throw new IllegalArgumentException();
 
         if(add == null)
+            throw new IllegalArgumentException();
+
+        if(uuid == null)
             throw new IllegalArgumentException();
 
         remove.prepareForWire();
@@ -1061,19 +1110,15 @@ public class RemoteRepository extends RemoteRepositoryBase {
             if (response != null) {
                 // Abort the http response handling.
                 response.abort();
-                if (!ok) {
-                    try {
-                        /*
-                         * POST back to the server to cancel the request in case
-                         * it is still running on the server.
-                         */
-                        cancel(uuid);
-                    } catch (Exception ex) {
-                        log.warn(ex);
-                    }
-                }
             }
             
+            if (!ok) {
+                /*
+                 * POST back to the server to cancel the request in case
+                 * it is still running on the server.
+                 */
+                cancelNoThrow(uuid);
+            }
         }
         
     }

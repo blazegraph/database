@@ -958,11 +958,7 @@ if(!BigdataStatics.runKnownBadTests)return; // FIXME Conditionally disabled in C
                 if (ft.isCancelled()) {
                     log.warn("Cancelled task: op=" + tmp.op + ", uuid=" + uuid);
                     // POST CANCEL request.
-                    try {
-                        rmgr.cancel(uuid);
-                    } catch (Throwable t) {
-                        log.warn(t, t);
-                    }
+                    rmgr.cancelNoThrow(uuid);
                 }
                 return;
             }

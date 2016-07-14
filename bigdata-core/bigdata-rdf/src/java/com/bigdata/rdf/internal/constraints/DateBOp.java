@@ -28,11 +28,8 @@ import java.math.BigInteger;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
-
 import javax.xml.datatype.XMLGregorianCalendar;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
 import org.openrdf.query.algebra.evaluation.function.datetime.Timezone;
 import org.openrdf.query.algebra.evaluation.function.datetime.Tz;
@@ -54,7 +51,6 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
-import com.ibm.icu.text.DateFormat;
 
 /**
  * A date expression involving a left IValueExpression operand. The operation to be applied to the operands is specified by the {@link Annotations#OP}
@@ -177,13 +173,46 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
                 	 * FullyInlineTypedLiteralIV is used to keep exact string representation of newDate in literal,
                 	 * that results in different internal representation in contrast to xsd:dateTime values,
                 	 * which represented as LiteralExtensionIV with delegate of XSDLong 
+                	 * Also note, that FullyInlineTypedLiteralIV is used to provide temporary storage for the literal,
+                	 * that will be later resolved by MockTermResolverOp 
                 	 */
-                	Date d = cal.toGregorianCalendar().getTime();
-                	String newDate = new SimpleDateFormat("yyyy-MM-dd").format(d);
-                    return new FullyInlineTypedLiteralIV<>(newDate, null, XSD.DATE);
+                	final Date d = cal.toGregorianCalendar().getTime();
+                	final String newDate;
+                	if (cal.getTimezone() == 0) {
+                    	newDate = new SimpleDateFormat("yyyy-MM-dd").format(d);
+                	} else {
+                    	newDate = new SimpleDateFormat("yyyy-MM-dd z").format(d);
+                	}
+                    return new FullyInlineTypedLiteralIV<>(newDate, null, XSD.DATE, true /* temp */);
                 default:
                     throw new UnsupportedOperationException();
                 }
+            } else if (bl.getDatatype() == null || XSD.STRING.equals(bl.getDatatype())) {
+                /*
+                 * @see https://jira.blazegraph.com/browse/BLZG-1939
+                 * FullyInlineTypedLiteralIV is used to provide temporary storage for the literal,
+                 * that will be later resolved by MockTermResolverOp
+                 * According to https://www.w3.org/TR/sparql11-query/#FunctionMapping
+                 * only subset of XQuery 1.0 and XPath 2.0 Functions and Operators should be
+                 * supported for SPARQL 1.1, those do not include xsd:date constructor,
+                 * however, Blazegraph had supported this SPARQL extension since ver.1.6
+                 * (see https://jira.blazegraph.com/browse/BLZG-1388), but only 
+                 * dateTime to date conversion was implemented per feature request.
+                 * This codepath fixes plain literal and string to date conversion.
+                 * Hours/minutes/seconds/millis fraction has to be removed at this time
+                 * as later processing will convert lexical form as is to dateTime.
+                 * Regex is used to minimize parsing overhead. Structure of the date 
+                 * and dateTime lexical forms is defined in
+                 * https://www.w3.org/TR/xmlschema-2/#dateTime-lexical-representation
+                 * '-'? yyyy '-' mm '-' dd 'T' hh ':' mm ':' ss ('.' s+)? (zzzzzz)?
+                 * https://www.w3.org/TR/xmlschema-2/#date-lexical-representation
+                 * '-'? yyyy '-' mm '-' dd zzzzzz?
+                 * So dateTime to date conversion is as simple as removing following substring:
+                 * 'T' hh ':' mm ':' ss ('.' s+)?
+                 */
+            	final String newDate = left.stringValue().replaceFirst("T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?", "");
+            	return new FullyInlineTypedLiteralIV<>(newDate, null, XSD.DATE, true /* temp */);
+                
             }
         }
         throw new SparqlTypeErrorException();

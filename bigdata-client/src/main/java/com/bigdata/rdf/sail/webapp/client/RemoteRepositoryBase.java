@@ -125,17 +125,25 @@ public class RemoteRepositoryBase extends RemoteRepositoryDecls {
     */
    static public Graph asGraph(final GraphQueryResult result) throws Exception {
 
-       final Graph g = new LinkedHashModel();
+        try {
 
-       while (result.hasNext()) {
+            final Graph g = new LinkedHashModel();
 
-           g.add(result.next());
+            while (result.hasNext()) {
 
-       }
+                g.add(result.next());
 
-       return g;
+            }
 
-   }
+            return g;
+
+        } finally {
+
+            result.close();
+            
+        }
+
+    }
 
    /**
     * Serialize an iteration of statements into a byte[] to send across the

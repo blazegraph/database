@@ -269,6 +269,12 @@ public class Name2Addr extends BTree {
                      * There is no index in the cache for this name. This can
                      * occur if someone is holding a reference to a mutable
                      * BTree and they write on it after a commit or abort.
+                     * 
+                     * Note: This can also occur after BLZG-1953 when an abort()
+                     * forces the indexCache on the live Name2Addr to be cleared
+                     * in order to avoid having concurrent threads associated
+                     * with the unisolated connection flush writes through across
+                     * the abort.
                      */
                     
                     throw new RuntimeException("No index in cache: name="+name);

@@ -150,7 +150,7 @@ public class Depends {
             "http://river.apache.org/");
 
     private final static Dep zookeeper = new ApacheDep("zookeeper",
-            "http://hadoop.apache.org/zookeeper/");
+            "http://zookeeper.apache.org/");
 
     private final static Dep log4j = new ApacheDep("log4j",
             "http://logging.apache.org/log4j/1.2/");
@@ -164,25 +164,16 @@ public class Depends {
      */
 
     private final static Dep apacheCommonsCodec = new ApacheDep(
-            "commons-codec", "http://commons.apache.org/codec/");
+            "commons-codec", "http://commons.apache.org/proper/commons-codec/");
 
     private final static Dep apacheCommonsFileUpload = new ApacheDep(
-            "commons-fileupload", "http://commons.apache.org/fileupload/");
+            "commons-fileupload", "http://commons.apache.org/proper/commons-fileupload/");
 
     private final static Dep apacheCommonsIO = new ApacheDep(
-            "commons-io", "http://commons.apache.org/io/");
+            "commons-io", "http://commons.apache.org/proper/commons-io/");
 
     private final static Dep apacheCommonsLogging = new ApacheDep(
             "commons-logging", "http://commons.apache.org/logging/");
-
-    private final static Dep apacheHttpClient = new ApacheDep("httpclient",
-            "http://hc.apache.org/");
-
-    private final static Dep apacheHttpClientCache = new ApacheDep(
-            "httpclient-cache", "http://hc.apache.org/");
-
-    private final static Dep apacheHttpCore = new ApacheDep("httpcore",
-            "http://hc.apache.org/");
 
     private final static Dep apacheHttpMime = new ApacheDep("httpmime",
             "http://hc.apache.org/");
@@ -195,14 +186,14 @@ public class Depends {
             "https://sourceforge.net/projects/bigdata/");
 
     private final static Dep colt = new Dep("colt",
-            "http://acs.lbl.gov/software/colt/",
-            "http://acs.lbl.gov/software/colt/license.html");
+            "http://dst.lbl.gov/ACSSoftware/colt/",
+            "http://dst.lbl.gov/ACSSoftware/colt/license.html");
 
     private final static Dep dsiutils = new LGPL21Dep("dsiutils",
-            "http://dsiutils.dsi.unimi.it/");
+            "https://github.com/blazegraph/database/blob/master/dsi-utils/");
     
     private final static Dep fastutil = new Dep("fastutil",
-            "http://fastutil.dsi.unimi.it/",
+            "http://fastutil.di.unimi.it/",
             "http://www.apache.org/licenses/LICENSE-2.0.html");
 
 //    private final static Dep iris = new LGPL21Dep("iris",
@@ -215,8 +206,8 @@ public class Depends {
 //            "http://www.alice.unibo.it/xwiki/bin/view/Tuprolog/");
 
     private final static Dep highScaleLib = new Dep("high-scale-lib",
-            "https://sourceforge.net/projects/high-scale-lib/",
-            "http://creativecommons.org/licenses/publicdomain");
+            "https://github.com/stephenc/high-scale-lib/",
+            "https://github.com/stephenc/high-scale-lib/blob/master/LICENSE");
 
 //    private final static Dep cweb = new Dep(
 //            "cweb",
@@ -224,8 +215,8 @@ public class Depends {
 //            "http://www.cognitiveweb.org/legal/license/CognitiveWebOpenSourceLicense-1.1.html");
     
     private final static Dep flot = new Dep("flot",
-            "http://code.google.com/p/flot/",
-            "http://www.opensource.org/licenses/mit-license.php");
+            "http://www.flotcharts.org/",
+            "https://github.com/flot/flot/blob/master/LICENSE.txt");
 
     /**
      * Dual licensed under the MIT (MIT-LICENSE.txt) and GPL (GPL-LICENSE.txt)
@@ -233,13 +224,13 @@ public class Depends {
      */
     private final static Dep jquery = new Dep("jquery",
             "http://jquery.com/",
-            "https://github.com/jquery/jquery/blob/master/MIT-LICENSE.txt");
+            "https://github.com/jquery/jquery/blob/master/LICENSE.txt");
 
     private final static Dep slf4j = new Dep("slf4j", "http://www.slf4j.org/",
             "http://www.slf4j.org/license.html");
     
     private final static Dep sesame = new Dep("sesame",
-            "http://www.openrdf.org/", "http://www.openrdf.org/download.jsp");
+            "http://rdf4j.org/", "https://bitbucket.org/openrdf/sesame/src/master/core/LICENSE.txt");
     
     //Used for RDFa support.  Apache2 License
     private final static Dep semargl = new Dep("semargl",
@@ -247,15 +238,15 @@ public class Depends {
     
     private final static Dep icu = new Dep("ICU",
             "http://site.icu-project.org/",
-            "http://source.icu-project.org/repos/icu/icu/trunk/license.html");
+            "http://source.icu-project.org/repos/icu/icu/trunk/LICENSE");
 
 //    private final static Dep nxparser = new Dep("nxparser",
 //            "http://sw.deri.org/2006/08/nxparser/",
 //            "http://sw.deri.org/2006/08/nxparser/license.txt");
 
     private final static Dep nanohttp = new Dep("nanohttp",
-            "http://elonen.iki.fi/code/nanohttpd/",
-            "http://elonen.iki.fi/code/nanohttpd/#license");
+            "https://github.com/NanoHttpd/nanohttpd",
+            "https://github.com/NanoHttpd/nanohttpd/blob/master/LICENSE.md");
     
     /**
      * Dual licensed under apache 2.0 and Eclipse Public License 1.0. We use the
@@ -265,22 +256,19 @@ public class Depends {
      */
     private final static Dep jetty = new Dep("jetty",
             "http://www.eclipse.org/jetty/",
-            "http://www.apache.org/licenses/LICENSE-2.0.html");
+            "http://www.eclipse.org/jetty/licenses.html");
 
     private final static Dep jsonld = new Dep("jsonld",
             "https://github.com/jsonld-java/jsonld-java/",
-            "https://raw.githubusercontent.com/jsonld-java/jsonld-java/master/LICENCE");
+            "https://github.com/jsonld-java/jsonld-java/blob/master/LICENCE");
     
     private final static Dep servletApi = new ApacheDep("servlet-api",
             "http://tomcat.apache.org");
 
-    /**
-     * Dual licensed under apache 2.0 and LGPL 2.1.  We use the apache 2.0 
-     * license.
-     */
+    //Jackson 2.x is only licensed under Apache 2
     private final static Dep jacksonCore = new Dep("jackson-core", 
             "http://wiki.fasterxml.com/JacksonHome",
-            "http://www.apache.org/licenses/LICENSE-2.0.html");
+            "http://www.apache.org/licenses/LICENSE-2.0");
 
     private final static Dep blueprintsCore = new Dep("blueprints-core", 
             "https://github.com/tinkerpop/blueprints",
@@ -310,9 +298,6 @@ public class Depends {
             apacheCommonsFileUpload,
             apacheCommonsIO,
             apacheCommonsLogging,
-            apacheHttpClient,
-            apacheHttpClientCache,
-            apacheHttpCore,
             apacheHttpMime,
             // webapp
 //            cweb,//
