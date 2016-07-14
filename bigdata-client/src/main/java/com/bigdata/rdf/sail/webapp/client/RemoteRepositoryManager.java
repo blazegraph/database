@@ -526,15 +526,15 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements Aut
             // Already closed.
             return;
         }
-        try {
-            
-            cancel(); // FIXME https://github.com/SYSTAP/db-enterprise/issues/30 (Review HA test suite errors which might be triggered by this call)
-            
-        } catch (ConnectException e) {
-            
-            log.warn("Could not cancel running queries", e);
-            
-        }
+//        try {
+//                      // FIXME https://jira.blazegraph.com/browse/BLZG-2021
+//            cancel(); // FIXME https://github.com/SYSTAP/db-enterprise/issues/30 (Review HA test suite errors which might be triggered by this call)
+//            
+//        } catch (ConnectException e) {
+//            
+//            log.warn("Could not cancel running queries", e);
+//            
+//        }
         
         runningQueries.clear();
 
