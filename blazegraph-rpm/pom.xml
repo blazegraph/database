@@ -191,6 +191,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <provide>blazegraph</provide>
             </provides>
             <requires>
+              <require>/usr/sbin/groupadd</require>
               <require>/usr/sbin/useradd</require>
               <require>/usr/bin/getent</require>
             </requires>
