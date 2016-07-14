@@ -175,15 +175,6 @@ public class Depends {
     private final static Dep apacheCommonsLogging = new ApacheDep(
             "commons-logging", "http://commons.apache.org/logging/");
 
-    private final static Dep apacheHttpClient = new ApacheDep("httpclient",
-            "http://hc.apache.org/");
-
-    private final static Dep apacheHttpClientCache = new ApacheDep(
-            "httpclient-cache", "http://hc.apache.org/");
-
-    private final static Dep apacheHttpCore = new ApacheDep("httpcore",
-            "http://hc.apache.org/");
-
     private final static Dep apacheHttpMime = new ApacheDep("httpmime",
             "http://hc.apache.org/");
 
@@ -307,9 +298,6 @@ public class Depends {
             apacheCommonsFileUpload,
             apacheCommonsIO,
             apacheCommonsLogging,
-            apacheHttpClient,
-            apacheHttpClientCache,
-            apacheHttpCore,
             apacheHttpMime,
             // webapp
 //            cweb,//
