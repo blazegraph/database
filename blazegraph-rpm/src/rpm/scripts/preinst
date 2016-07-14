@@ -3,7 +3,7 @@ set -e
 
 [ -f /etc/blazegraph/blazegraph ] && . /etc/blazegraph/blazegraph
 
-JAVA=`which java 2> /dev/null`
+JAVA=`which java 2> /dev/null` || true
 
 if [ -z "$JAVA" ] ; then
 
