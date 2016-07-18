@@ -156,15 +156,9 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
         if (label == null)
             throw new IllegalArgumentException();
 
-        // check for RDF 1.1 compatibility: language code literal must be of type RDF.LANGSTRING
-        if (languageCode!=null && !RDF.LANGSTRING.equals(RDF.LANGSTRING))
-            throw new IllegalArgumentException(
-                "Literal with language code must have datatype " + RDF.LANGSTRING + 
-                ", but has datatype " + datatypeURI);
-        
         /**
          * https://jira.blazegraph.com/browse/BLZG-2024:
-         * language code datatypes must carry RDF.LANGSTRING type in RDF 1.1
+         * check for RDF 1.1 compatibility: language code literal must be of type RDF.LANGSTRING
          */
         if (languageCode!=null && !RDF.LANGSTRING.equals(datatypeURI)) {
             throw new IllegalArgumentException(
