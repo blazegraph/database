@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -888,7 +889,7 @@ public class IVUtility {
             iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(//
                     str2,//
                     str1, // language
-                    null, // datatype
+                    RDF.LANGSTRING, // implied datatype
                     byteLength//
                     );
             break;
