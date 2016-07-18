@@ -251,49 +251,49 @@ public abstract class AbstractEncodeDecodeMixedIVsTest extends AbstractEncodeDec
 
                 if (fullyInlineUnicode) {
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "foo", "en"/* language */, null/* datatype */));
+                            "foo", "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "bar", "en"/* language */, null/* datatype */));
+                            "bar", "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "goo", "en"/* language */, null/* datatype */));
+                            "goo", "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "baz", "en"/* language */, null/* datatype */));
+                            "baz", "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "foo", "de"/* language */, null/* datatype */));
+                            "foo", "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "bar", "de"/* language */, null/* datatype */));
+                            "bar", "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "goo", "de"/* language */, null/* datatype */));
+                            "goo", "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "baz", "de"/* language */, null/* datatype */));
+                            "baz", "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("",
-                            "en"/* language */, null/* datatype */));
+                            "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("",
-                            "de"/* language */, null/* datatype */));
+                            "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1",
-                            "en"/* language */, null/* datatype */));
+                            "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1",
-                            "de"/* language */, null/* datatype */));
+                            "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12",
-                            "en"/* language */, null/* datatype */));
+                            "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12",
-                            "de"/* language */, null/* datatype */));
+                            "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("2",
-                            "en"/* language */, null/* datatype */));
+                            "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("2",
-                            "de"/* language */, null/* datatype */));
+                            "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("23",
-                            "en"/* language */, null/* datatype */));
+                            "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("23",
-                            "de"/* language */, null/* datatype */));
+                            "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "123", "en"/* language */, null/* datatype */));
+                            "123", "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                            "123", "de"/* language */, null/* datatype */));
+                            "123", "de"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("3",
-                            "en"/* language */, null/* datatype */));
+                            "en"/* language */, RDF.LANGSTRING/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("3",
-                            "de"/* language */, null/* datatype */));
+                            "de"/* language */, RDF.LANGSTRING/* datatype */));
                 }
 
                 if (fullyInlineUnicode) {
@@ -352,11 +352,11 @@ public abstract class AbstractEncodeDecodeMixedIVsTest extends AbstractEncodeDec
                 ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12"));
                 ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123"));
                 
-                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",null/*datatype*/));
-                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",null/*datatype*/));
-                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",null/*datatype*/));
-                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",null/*datatype*/));
-                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",null/*datatype*/));
+                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",RDF.LANGSTRING/*datatype*/));
+                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",RDF.LANGSTRING/*datatype*/));
+                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",RDF.LANGSTRING/*datatype*/));
+                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",RDF.LANGSTRING/*datatype*/));
+                ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",RDF.LANGSTRING/*datatype*/));
     
                 ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("", null, datatype));
                 ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ", null, datatype));

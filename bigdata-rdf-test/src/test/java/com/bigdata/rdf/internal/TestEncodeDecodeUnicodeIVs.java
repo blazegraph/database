@@ -233,49 +233,49 @@ public class TestEncodeDecodeUnicodeIVs extends
 
         final IV<?, ?>[] e = {//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("foo", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("bar", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("goo", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("baz", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("foo", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("bar", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("goo", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("baz", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("1", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("1", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("12", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("12", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("2", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("2", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("23", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("23", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("123", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("123", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("3", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("3", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
         };
 
         doEncodeDecodeTest(e);
@@ -367,21 +367,21 @@ public class TestEncodeDecodeUnicodeIVs extends
                  * Language code literals.
                  */
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("foo", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("bar", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("goo", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("baz", "en"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("foo", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("bar", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("goo", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 new FullyInlineTypedLiteralIV<BigdataLiteral>("baz", "de"/* language */,
-                        null/* datatype */),//
+                        RDF.LANGSTRING/* datatype */),//
                 /*
                  * Datatype literals.
                  */
