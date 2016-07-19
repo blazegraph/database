@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+  <head>
+    <variable name="s"/>
+    <variable name="p"/>
+    <variable name="o"/>
+    <variable name="lang"/>
+    <variable name="dt"/>
+  </head>
+  <results>
+    <result>
+      <binding name="s">
+         <uri>http://example.com/person/peter</uri>
+      </binding>
+      <binding name="p">
+         <uri>http://xmlns.com/foaf/0.1/name</uri>
+      </binding>
+      <binding name="o">
+         <literal datatype="http://www.w3.org/2001/XMLSchema#string" xml:lang="en">Peter</literal>
+      </binding>
+      <binding name="lang">
+         <literal>en</literal>
+      </binding>      
+      <binding name="dt">
+         <uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#langString</uri>
+      </binding>      
+    </result>      
+  </results>
+</sparql>

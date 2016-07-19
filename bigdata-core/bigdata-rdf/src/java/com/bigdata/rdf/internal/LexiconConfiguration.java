@@ -30,13 +30,10 @@ package com.bigdata.rdf.internal;
 import java.math.BigInteger;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 
@@ -742,8 +739,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             if (totalLength <= maxInlineTextLength) {
 
                 return new FullyInlineTypedLiteralIV<BigdataLiteral>(
-                        value.getLabel(), value.getLanguage(),
-                        RDF.LANGSTRING.equals(value.getDatatype()) ? null : value.getDatatype());
+                        value.getLabel(), value.getLanguage(), value.getDatatype());
 
             }
 

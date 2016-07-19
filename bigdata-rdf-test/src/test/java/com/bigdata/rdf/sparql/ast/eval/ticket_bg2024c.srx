@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+  <head>
+    <variable name="s"/>
+    <variable name="p"/>
+    <variable name="o"/>
+  </head>
+  <results>
+    <result>
+      <binding name="s">
+         <uri>http://s</uri>
+      </binding>
+      <binding name="p">
+         <uri>http://p1</uri>
+      </binding>
+      <binding name="o">
+         <literal>abc</literal>
+      </binding>
+    </result>      
+    <result>
+      <binding name="s">
+         <uri>http://s</uri>
+      </binding>
+      <binding name="p">
+         <uri>http://p2</uri>
+      </binding>
+      <binding name="o">
+         <literal datatype="http://www.w3.org/2001/XMLSchema#string">abc</literal>
+      </binding>
+    </result>      
+    <result>
+      <binding name="s">
+         <uri>http://s</uri>
+      </binding>
+      <binding name="p">
+         <uri>http://p3</uri>
+      </binding>
+      <binding name="o">
+         <literal datatype="http://www.w3.org/1999/02/22-rdf-syntax-ns#langString" xml:lang="en">abc</literal>
+      </binding>
+    </result>      
+    <result>
+      <binding name="s">
+         <uri>http://s</uri>
+      </binding>
+      <binding name="p">
+         <uri>http://p4</uri>
+      </binding>
+      <binding name="o">
+         <literal datatype="http://www.w3.org/1999/02/22-rdf-syntax-ns#langString" xml:lang="de">abc</literal>
+      </binding>
+    </result>         
+  </results>
+</sparql>

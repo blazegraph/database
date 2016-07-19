@@ -1,0 +1,4 @@
+<http://s> <http://p1> "abc" .
+<http://s> <http://p2> "abc"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://s> <http://p3> "abc"@en .
+<http://s> <http://p4> "abc"@de .

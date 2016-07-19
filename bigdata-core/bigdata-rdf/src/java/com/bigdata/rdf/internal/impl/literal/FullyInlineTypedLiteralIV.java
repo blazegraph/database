@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal.impl.literal;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IInlineUnicode;
@@ -155,19 +156,27 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
         if (label == null)
             throw new IllegalArgumentException();
 
-        if (languageCode != null && datatypeURI != null)
-            throw new IllegalArgumentException();
-
+        /**
+         * https://jira.blazegraph.com/browse/BLZG-2024:
+         * check for RDF 1.1 compatibility: language code literal must be of type RDF.LANGSTRING
+         */
+        if (languageCode!=null && !RDF.LANGSTRING.equals(datatypeURI)) {
+            throw new IllegalArgumentException(
+                "Discovered language tag literal of wrong datatype: is " + datatypeURI + 
+                ", but must be rdf:langString.");
+        }
+        
         this.label = label;
 
         this.language = languageCode;
 
         this.datatype = datatypeURI;
 
-        if (datatypeURI != null) {
-            this.termCode = ITermIndexCodes.TERM_CODE_DTL;
-        } else if (languageCode != null) {
+        if (languageCode != null) {
+            // we don't save the datatype, implied datatype is rdf:langString
             this.termCode = ITermIndexCodes.TERM_CODE_LCL;
+        } else if (datatypeURI != null) {
+            this.termCode = ITermIndexCodes.TERM_CODE_DTL;
         } else {
             this.termCode = ITermIndexCodes.TERM_CODE_LIT;
         }
@@ -235,10 +244,10 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
 		V v = getValueCache();
 		if (v == null) {
             final BigdataValueFactory f = lex.getValueFactory();
-            if (datatype != null) {
-                v = (V) f.createLiteral(label, datatype);
-            } else if (language != null) {
+            if (language != null) {
                 v = (V) f.createLiteral(label, language);
+            } else if (datatype != null) {
+                v = (V) f.createLiteral(label, datatype);
             } else {
                 v = (V) f.createLiteral(label);
             }
