@@ -7,6 +7,7 @@ import junit.framework.TestCase2;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
@@ -37,11 +38,11 @@ public class TestFullyInlineTypedLiteralIV extends TestCase2 {
 	
 	public void test_InlineLiteralIV_languageCode() {
 
-        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",null/*datatype*/));
-        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",null/*datatype*/));
-        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",null/*datatype*/));
-        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",null/*datatype*/));
-        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",null/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",RDF.LANGSTRING/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",RDF.LANGSTRING/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",RDF.LANGSTRING/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",RDF.LANGSTRING/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",RDF.LANGSTRING/*datatype*/));
 
 	}
 
@@ -96,11 +97,11 @@ public class TestFullyInlineTypedLiteralIV extends TestCase2 {
             ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12"));
             ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123"));
             
-            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",null/*datatype*/));
-            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",null/*datatype*/));
-            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",null/*datatype*/));
-            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",null/*datatype*/));
-            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",null/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",RDF.LANGSTRING/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",RDF.LANGSTRING/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",RDF.LANGSTRING/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",RDF.LANGSTRING/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",RDF.LANGSTRING/*datatype*/));
 
             ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("", null, datatype));
             ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ", null, datatype));
@@ -118,4 +119,22 @@ public class TestFullyInlineTypedLiteralIV extends TestCase2 {
     
 	}
 	
+	public void test_illegal_rdf11_literal() {
+	    
+	    boolean check1=false;
+	    try {
+            new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",null/*datatype*/);	        
+	    } catch (IllegalArgumentException e) {
+	        check1=true; // expected
+	    }
+	    assertTrue(check1);
+	    
+        boolean check2=false;
+        try {
+            new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",XSD.STRING/*datatype*/);
+        } catch (IllegalArgumentException e) {
+            check2=true; // expected
+        }
+        assertTrue(check2);
+	}
 }
