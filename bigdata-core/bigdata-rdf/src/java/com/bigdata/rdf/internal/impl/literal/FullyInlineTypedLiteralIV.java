@@ -244,10 +244,10 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
 		V v = getValueCache();
 		if (v == null) {
             final BigdataValueFactory f = lex.getValueFactory();
-            if (datatype != null) {
-                v = (V) f.createLiteral(label, datatype);
-            } else if (language != null) {
+            if (language != null) {
                 v = (V) f.createLiteral(label, language);
+            } else if (datatype != null) {
+                v = (V) f.createLiteral(label, datatype);
             } else {
                 v = (V) f.createLiteral(label);
             }
