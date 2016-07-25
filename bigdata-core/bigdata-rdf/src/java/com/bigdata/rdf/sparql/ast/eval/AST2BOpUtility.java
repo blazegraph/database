@@ -748,7 +748,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         /*
          * Set a timeout on a query or subquery.
          */
-        {
+        if (left!=null) {
 
             final long timeout = queryBase.getTimeout();
 
