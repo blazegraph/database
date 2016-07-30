@@ -108,7 +108,11 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp implements
 
 		final IVariable<?>[] vars = (IVariable[]) getProperty(Annotations.VARIABLES);
 
-		if (vars == null || vars.length == 0)
+		/**
+		 * https://jira.blazegraph.com/browse/BLZG-2027:
+		 * we need to support empty variables in certain edge cases
+		 */
+		if (vars == null)
 			throw new IllegalArgumentException();
 
     }
