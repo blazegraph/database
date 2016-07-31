@@ -343,6 +343,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          
          suite.addTestSuite(Test_REST_CANCEL.class);
 
+         // TICKETS 
+         
+         suite.addTestSuite(TestTicket2026.class);
       }
 
       return suite;

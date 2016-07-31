@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.impl.extensions;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
@@ -125,10 +126,15 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         
         final String s = value.stringValue();
         
+        // xsd:date may carry a timezone; what we want to save in this case
+        // is the first date (00:00:00.00) in the default timezone, see
+        // https://jira.blazegraph.com/browse/BLZG-2026
+        final boolean setToStartOfDayInDefaultTZ = XSD.DATE.equals(dt);
+        
         /*
          * Returns the current time as UTC milliseconds from the epoch
          */
-        final long l = getTimestamp(s, defaultTZ);
+        final long l = getTimestamp(s, defaultTZ, setToStartOfDayInDefaultTZ);
         
         return createIV(l, dt);
         
@@ -137,8 +143,13 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     /**
      * Convert an xsd:dateTime into its milliseconds from the epoch 
      * representation.
+     * 
+     * @param the dateTime string
+     * @param the default timezone (used if not explicitly provided in the literal)
+     * @param setToStartOfDayInDefaultTZ if set true, the timestamp for the date
+     *          will be set to the start (i.e. 00:00:00.00) of the default timezone's day
      */
-    public static long getTimestamp(final String dateTime, final TimeZone defaultTZ) {
+    public static long getTimestamp(final String dateTime, final TimeZone defaultTZ, final boolean setToStartOfDayInDefaultTZ) {
         
         final XMLGregorianCalendar c = XMLDatatypeUtil.parseCalendar(dateTime);
         
@@ -157,6 +168,24 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         final GregorianCalendar gc = c.toGregorianCalendar();
         gc.setGregorianChange(new Date(Long.MIN_VALUE));
         
+        // if requested, we set the timestamp to the beginning of the default timestamp's date,
+        // see https://jira.blazegraph.com/browse/BLZG-2026
+        if (setToStartOfDayInDefaultTZ) {
+            
+            // compute offsets between timezones
+            final int gcTimezoneOffsetSecs = gc.getTimeZone().getRawOffset() / 1000;
+            final int dfltTimezoneOffsetSecs = defaultTZ.getRawOffset() / 1000;
+            int offsetInSecs = dfltTimezoneOffsetSecs - gcTimezoneOffsetSecs;
+            
+            // for negative offset, we need to adjust modulo one day (86400 secs)
+            if (offsetInSecs < 0) {
+                offsetInSecs = -86400 /* 24 * 60 * 60 */ - offsetInSecs;
+            }
+            
+            // make the adjustment
+            gc.add(Calendar.SECOND, offsetInSecs);
+        }
+        
         /*
          * Returns the current time as milliseconds from the epoch
          */
@@ -173,7 +202,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     public static long getTimestamp(final String dateTime) {
 
         return getTimestamp(dateTime, TimeZone.getTimeZone(
-                AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES_TIMEZONE));
+                AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES_TIMEZONE), false /* setToStartOfDay */);
         
     }
 

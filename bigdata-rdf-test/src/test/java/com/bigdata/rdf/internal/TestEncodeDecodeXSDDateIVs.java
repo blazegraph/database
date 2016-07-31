@@ -95,6 +95,49 @@ public class TestEncodeDecodeXSDDateIVs extends
        
        doComparatorTest(e);
     }
+    
+    
+    /**
+     * Unit test for xsd:date literal encoding with timezone.
+     * See https://jira.blazegraph.com/browse/BLZG-2026.
+     */
+    public void test_encodeDecodeDateWithTimezone() throws Exception {
+
+       final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+       
+       final DateTimeExtension<BigdataValue> ext =  getDateTimeExtensionGMT(vf);
+       
+       final BigdataLiteral[] dt = {
+           vf.createLiteral("1981-12-31-01:00", XSD.DATE), // before GMT -> this day
+           vf.createLiteral("1981-12-31-00:00", XSD.DATE), // GMT -> this day
+           vf.createLiteral("1981-12-31+01:00", XSD.DATE), // after GMT -> past day
+           vf.createLiteral("1981-12-31+03:00", XSD.DATE), // after GMT -> past day
+       };
+       
+       // create associated IVs
+       final IV<?, ?>[] e = new IV[dt.length];
+       for (int i = 0; i < dt.length; i++) {
+          e[i] = ext.createIV(dt[i]);
+       }
+       
+       final String[] expected = { 
+           "1981-12-31", 
+           "1981-12-31", 
+           "1981-12-30",
+           "1981-12-30" 
+       };
+       
+       for (int i = 0; i < e.length; i++) {
+           @SuppressWarnings("rawtypes")
+           final BigdataValue valRoundTrip = ext.asValue((LiteralExtensionIV) e[i], vf);
+           
+           assertEquals(valRoundTrip.toString(), "\"" + expected[i] + "\"^^<http://www.w3.org/2001/XMLSchema#date>");
+        }
+       
+       final IV<?, ?>[] a = doEncodeDecodeTest(e);
+       
+       doComparatorTest(e);
+    }
 
     /**
      * Unit test for xsd:gDay literal encoding.
@@ -347,7 +390,6 @@ public class TestEncodeDecodeXSDDateIVs extends
        
        doComparatorTest(e);
     }
-    
     
     /**
      * Get a {@link DateTimeExtension} object.
