@@ -50,12 +50,14 @@ import org.openrdf.rio.RDFParserRegistry;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.BufferStatementHandler;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.RemoveStatementHandler;
 import com.bigdata.rdf.sail.webapp.InsertServlet.AddStatementHandler;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 
 /**
  * Handler for NanoSparqlServer REST API UPDATE operations (PUT, not SPARQL
@@ -343,6 +345,19 @@ public class UpdateServlet extends BigdataRDFServlet {
             
             final AtomicLong nmodified = new AtomicLong(0L);
 
+            /*
+             * Parse the query before obtaining the connection object.
+             * 
+             * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+             * before obtaining the connection
+             */
+            
+            // Setup the baseURI for this request. 
+            final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+            // Parse the query.
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
             BigdataSailRepositoryConnection repoConn = null;
             BigdataSailConnection conn = null;
             boolean success = false;
@@ -388,7 +403,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 						final AbstractQueryTask queryTask = context
 								.getQueryTask(roconn, namespace,
-										readOnlyTimestamp, queryStr, includeInferred, bindings,
+										readOnlyTimestamp, queryStr, baseURI, astContainer, includeInferred, bindings,
 										deleteQueryFormat.getDefaultMIMEType(),
 										req, resp, os);
 
@@ -595,6 +610,19 @@ public class UpdateServlet extends BigdataRDFServlet {
 
          final AtomicLong nmodified = new AtomicLong(0L);
 
+         /*
+          * Parse the query before obtaining the connection object.
+          * 
+          * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+          * before obtaining the connection
+          */
+         
+         // Setup the baseURI for this request. 
+         final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+         // Parse the query.
+         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
          BigdataSailRepositoryConnection repoConn = null;
          BigdataSailConnection conn = null;
          boolean success = false;
@@ -638,7 +666,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 	               final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
 	
 	               final AbstractQueryTask queryTask = context.getQueryTask(roconn,
-	                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings,
+	                     namespace, ITx.UNISOLATED, queryStr, baseURI, astContainer, includeInferred, bindings,
 	                     deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
 	
 	               switch (queryTask.queryType) {

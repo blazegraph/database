@@ -701,7 +701,20 @@ public class QueryServlet extends BigdataRDFServlet {
 
         @Override
         public Void call() throws Exception {
+
+            /*
+             * Parse the query before obtaining the connection object.
+             * 
+             * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+             * before obtaining the connection
+             */
             
+            // Setup the baseURI for this request. 
+            final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+            // Parse the query.
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
 			BigdataSailRepositoryConnection conn = null;
 			try {
 
@@ -728,7 +741,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final AbstractQueryTask queryTask = context.getQueryTask(
-							conn, namespace, timestamp, queryStr, includeInferred, bindings,
+							conn, namespace, timestamp, queryStr, baseURI, astContainer, includeInferred, bindings,
 							null/* acceptOverride */, req, resp, os);
 
 					// /*

@@ -51,10 +51,12 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 
 /**
  * Handler for DELETE by query (DELETE verb) and DELETE by data (POST).
@@ -93,7 +95,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         final String queryStr = req.getParameter("query");
         
-        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
+//        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
 
         if (queryStr != null) {
             
@@ -243,6 +245,19 @@ public class DeleteServlet extends BigdataRDFServlet {
             
             final AtomicLong nmodified = new AtomicLong(0L);
 
+            /*
+             * Parse the query before obtaining the connection object.
+             * 
+             * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+             * before obtaining the connection
+             */
+            
+            // Setup the baseURI for this request. 
+            final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+            // Parse the query.
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+            
          BigdataSailRepositoryConnection repoConn = null;
          BigdataSailConnection conn = null;
          boolean success = false;
@@ -288,7 +303,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                   final AbstractQueryTask queryTask = context
                         .getQueryTask(roconn, namespace,
-                              readOnlyTimestamp, queryStr, includeInferred, bindings,
+                              readOnlyTimestamp, queryStr, baseURI, astContainer, includeInferred, bindings,
                               format.getDefaultMIMEType(), req, resp,
                               os);
 
@@ -441,6 +456,19 @@ public class DeleteServlet extends BigdataRDFServlet {
 
          final AtomicLong nmodified = new AtomicLong(0L);
 
+         /*
+          * Parse the query before obtaining the connection object.
+          * 
+          * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+          * before obtaining the connection
+          */
+         
+         // Setup the baseURI for this request. 
+         final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+         // Parse the query.
+         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
          BigdataSailRepositoryConnection repoConn = null;
          BigdataSailConnection conn = null;
          boolean success = false;
@@ -476,7 +504,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                final RDFFormat format = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(repoConn,
-                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings,
+                     namespace, ITx.UNISOLATED, queryStr, baseURI, astContainer, includeInferred, bindings,
                      format.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
@@ -579,7 +607,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         final String queryStr = req.getParameter("query");
         
-        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
+//        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
         
         final Map<String, Value> bindings = parseBindings(req, resp);
         if (bindings == null) { // invalid bindings definition generated error response 400 while parsing
