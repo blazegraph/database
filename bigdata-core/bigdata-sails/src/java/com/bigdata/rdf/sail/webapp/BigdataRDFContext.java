@@ -96,7 +96,6 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent.DeleteInsertWhereStats;
-import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -607,6 +606,32 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	public ThreadPoolExecutorBaseStatisticsTask getSampleTask() {
 
 	    return m_queueSampleTask;
+	    
+	}
+	
+    /**
+     * Return the effective baseURI for the request. This may be set using the
+     * {@value #BASE_URI} URL query parameter. If it is not set, it defaults to
+     * the request URL.
+     * 
+     * @param req
+     *            The request.
+     * @param resp
+     *            The response.
+     * 
+     * @return The effective baseURI and never null.
+     */
+    static public String getBaseURI(final HttpServletRequest req, final HttpServletResponse resp) {
+
+        String baseURI = req.getParameter(BASE_URI);
+
+        if (baseURI == null) {
+
+            baseURI = req.getRequestURL().toString();
+
+        }
+
+        return baseURI;
 	    
 	}
 
@@ -2314,40 +2339,51 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
     /**
-	 * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
-	 * <p>
-	 * Note: The {@link OutputStream} is passed in rather than the
-	 * {@link HttpServletResponse} in order to permit operations such as
-	 * "DELETE WITH QUERY" where this method is used in a context which writes
-	 * onto an internal pipe rather than onto the {@link HttpServletResponse}.
-	 * 
-	 * @param namespace
-	 *            The namespace associated with the {@link AbstractTripleStore}
-	 *            view.
-	 * @param timestamp
-	 *            The timestamp associated with the {@link AbstractTripleStore}
-	 *            view.
-	 * @param queryStr
-	 *            The query.
-     * @param includeInferred 
-	 * @param acceptOverride
-	 *            Override the Accept header (optional). This is used by UPDATE
-	 *            and DELETE so they can control the {@link RDFFormat} of the
-	 *            materialized query results.
-	 * @param req
-	 *            The request.
-    * @param resp The response.
-	 * @param os  Where to write the results. Note: This is NOT always the OutputStream associated with the response!  For DELETE-WITH-QUERY and UPDATE-WITH-QUERY this is a PipedOutputStream.
-	 * 
-	 * @return The task.
-	 * 
-	 * @throws IOException
-	 */
+     * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
+     * <p>
+     * Note: The {@link OutputStream} is passed in rather than the
+     * {@link HttpServletResponse} in order to permit operations such as
+     * "DELETE WITH QUERY" where this method is used in a context which writes
+     * onto an internal pipe rather than onto the {@link HttpServletResponse}.
+     * 
+     * @param namespace
+     *            The namespace associated with the {@link AbstractTripleStore}
+     *            view.
+     * @param timestamp
+     *            The timestamp associated with the {@link AbstractTripleStore}
+     *            view.
+     * @param queryStr
+     *            The query (for log messages).
+     * @param baseURI
+     *            The baseURI (since BLZG-2039).
+     * @param astContainer
+     *            The ASTContainer for the already parsed query (since BLZG-2039).
+     * @param includeInferred
+     * @param acceptOverride
+     *            Override the Accept header (optional). This is used by UPDATE
+     *            and DELETE so they can control the {@link RDFFormat} of the
+     *            materialized query results.
+     * @param req
+     *            The request.
+     * @param resp
+     *            The response.
+     * @param os
+     *            Where to write the results. Note: This is NOT always the
+     *            OutputStream associated with the response! For
+     *            DELETE-WITH-QUERY and UPDATE-WITH-QUERY this is a
+     *            PipedOutputStream.
+     * 
+     * @return The task.
+     * 
+     * @throws IOException
+     */
     public AbstractQueryTask getQueryTask(//
     		final BigdataSailRepositoryConnection cxn,//
             final String namespace,//
             final long timestamp,//
             final String queryStr,//
+            final String baseURI,// See BLZG-2039
+            final ASTContainer astContainer,// See BLZG-2039
             final boolean includeInferred, //
             final Map<String, Value> bindings, //
             final String acceptOverride,//
@@ -2357,25 +2393,21 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //            final boolean update//
             ) throws MalformedQueryException, IOException {
 
-        /*
-         * Setup the baseURI for this request. It will be set to request parameter "baseURI" or defaults to requestURI if parameter was not specified.
-         */
-        String baseURI = req.getParameter(BASE_URI);
-        if (baseURI==null) {
-        	baseURI = req.getRequestURL().toString();
-        }
+        if (cxn == null)
+            throw new IllegalArgumentException();
 
-        /*
-         * Parse the query so we can figure out how it will need to be executed.
-         * 
-         * Note: This goes through some pains to make sure that we parse the
-         * query exactly once in order to minimize the resources associated with
-         * the query parser.
-         */
-//        final AbstractTripleStore tripleStore = cxn.getTripleStore();
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
-                .parseQuery2(queryStr, baseURI);
-
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        
+        if (queryStr == null)
+            throw new IllegalArgumentException();
+        
+        if (baseURI == null)
+            throw new IllegalArgumentException();
+        
+        if (astContainer == null)
+            throw new IllegalArgumentException();
+        
         if (log.isDebugEnabled())
             log.debug(astContainer.toString());
 
