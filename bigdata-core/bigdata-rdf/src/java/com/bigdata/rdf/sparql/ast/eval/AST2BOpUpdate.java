@@ -120,6 +120,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -528,6 +529,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             }
 
             final ASTContainer astContainer = new ASTContainer(queryRoot);
+ 
+            // Propagate the analytic mode query hint into the WHERE clause query.
+            // See BLZG-2030 (Analytic flag in workbench not working for UPDATE?)
+            astContainer.setQueryHint(QueryHints.ANALYTIC, Boolean.toString(context.astContainer.getQueryHintAsBoolean(QueryHints.ANALYTIC, QueryHints.DEFAULT_ANALYTIC)));
+
             /*
              * Inherit 'RESOLVED' flag, so resolution will not be run
              * for ASTContainer, constructed from parts of already resolved update.
