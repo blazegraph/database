@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.iteration.CloseableIteration;
-
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -36,13 +34,15 @@ import org.openrdf.model.Value;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+
+import info.aduna.iteration.CloseableIteration;
 
 /**
  * Test suite for wrapping a {@link TempTripleStore} as a {@link BigdataSail}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestTicket422 extends ProxyBigdataSailTestCase {
 
@@ -59,61 +59,76 @@ public class TestTicket422 extends ProxyBigdataSailTestCase {
         super(name);
     }
 
-    public void test_wrapTempTripleStore() throws SailException {
+    public void test_wrapTempTripleStore() throws SailException, InterruptedException {
 
         final BigdataSail sail = getSail();
         
         try {
 
-            final TempTripleStore tempStore = new TempTripleStore(sail
-                    .getDatabase().getIndexManager().getTempStore(), sail
-                    .getDatabase().getProperties(), sail.getDatabase());
-
+            final BigdataSailConnection mainConn = sail.getUnisolatedConnection();
+            
             try {
-
-                final BigdataSail tempSail = new BigdataSail(tempStore,
-                        sail.getDatabase());
-
+            
+                final AbstractTripleStore mainTripleStore = mainConn.getTripleStore();
+    
+                if (mainTripleStore == null)
+                    throw new UnsupportedOperationException();
+                
+                final TempTripleStore tempStore = new TempTripleStore(//
+                        sail.getIndexManager().getTempStore(), //
+                        sail.getProperties(), mainTripleStore);
+    
                 try {
-
-                    tempSail.initialize();
-
-                    final BigdataSailConnection con = tempSail.getConnection();
-
+    
+                    final BigdataSail tempSail = new BigdataSail(tempStore, mainTripleStore);
+    
                     try {
-
-                        final CloseableIteration<? extends Statement, SailException> itr = con
-                                .getStatements((Resource) null, (URI) null,
-                                        (Value) null, (Resource) null);
-
+    
+                        tempSail.initialize();
+    
+                        final BigdataSailConnection con = tempSail.getConnection();
+    
                         try {
-
-                            while (itr.hasNext()) {
-
-                                itr.next();
-
+    
+                            final CloseableIteration<? extends Statement, SailException> itr = con
+                                    .getStatements((Resource) null, (URI) null,
+                                            (Value) null, (Resource) null);
+    
+                            try {
+    
+                                while (itr.hasNext()) {
+    
+                                    itr.next();
+    
+                                }
+                                
+                            } finally {
+    
+                                itr.close();
+    
                             }
+    
                         } finally {
-
-                            itr.close();
-
+    
+                            con.close();
+    
                         }
-
+    
                     } finally {
-
-                        con.close();
-
+    
+                        tempSail.shutDown();
+                        
                     }
-
+    
                 } finally {
-
-                    tempSail.shutDown();
+    
+                    tempStore.close();
                     
                 }
-
+            
             } finally {
-
-                tempStore.close();
+                
+                mainConn.close();
                 
             }
             

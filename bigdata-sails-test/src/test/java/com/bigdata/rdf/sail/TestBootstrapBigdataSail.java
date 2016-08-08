@@ -64,7 +64,6 @@ import com.bigdata.rdf.store.LocalTripleStore;
  * Bootstrap test case for bringing up the {@link BigdataSail}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestBootstrapBigdataSail extends TestCase2 {
 
@@ -454,8 +453,8 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			sail.initialize();
 			service = Executors.newSingleThreadExecutor();
 
-			// wrap a 2nd sail around the same tripleStore.
-			final BigdataSail sail2 = new BigdataSail(sail.getDatabase());
+			// wrap a 2nd sail around the same namespace.
+			final BigdataSail sail2 = new BigdataSail(properties);
 			sail2.initialize();
 
 			Future<Void> f = null;
@@ -746,15 +745,23 @@ public class TestBootstrapBigdataSail extends TestCase2 {
                 
                 int n = 0;
 
-                CloseableIteration<? extends Statement, SailException> itr = readConn
+                final CloseableIteration<? extends Statement, SailException> itr = readConn
                         .getStatements(s, p, o, false/* includeInferred */);
 
+                try {
+                
                 while (itr.hasNext()) {
 
                     itr.next();
                     
                     n++;
 
+                }
+                
+                } finally {
+                    
+                    itr.close();
+                    
                 }
 
                 assertEquals("#statements visited", 0, n);

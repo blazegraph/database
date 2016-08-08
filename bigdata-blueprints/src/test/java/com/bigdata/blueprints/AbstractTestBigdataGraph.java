@@ -24,8 +24,6 @@ package com.bigdata.blueprints;
 
 import java.util.Properties;
 
-import junit.framework.TestCase2;
-
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -35,10 +33,11 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 import com.tinkerpop.blueprints.EdgeTestSuite;
 import com.tinkerpop.blueprints.GraphQueryTestSuite;
 import com.tinkerpop.blueprints.GraphTestSuite;
-import com.tinkerpop.blueprints.TestSuite;
 import com.tinkerpop.blueprints.VertexQueryTestSuite;
 import com.tinkerpop.blueprints.VertexTestSuite;
 import com.tinkerpop.blueprints.impls.GraphTest;
+
+import junit.framework.TestCase2;
 
 /**
  */
@@ -121,7 +120,7 @@ public abstract class AbstractTestBigdataGraph extends TestCase2 {
 
     protected BigdataSail reopenSail(final BigdataSail sail) {
 
-        final Properties properties = sail.getDatabase().getProperties();
+        final Properties properties = sail.getProperties();
 
         if (sail.isOpen()) {
 
@@ -199,15 +198,13 @@ public abstract class AbstractTestBigdataGraph extends TestCase2 {
 //        
 //    }
     
-    private static class BigdataTestSuite extends TestSuite {
-        
-        public BigdataTestSuite(final GraphTest graphTest) {
-            super(graphTest);
-        }
-        
-
-
-    }
+//    private static class BigdataTestSuite extends TestSuite {
+//        
+//        public BigdataTestSuite(final GraphTest graphTest) {
+//            super(graphTest);
+//        }
+//
+//    }
 //    
 //    
 //    private class BigdataGraphTest extends GraphTest {

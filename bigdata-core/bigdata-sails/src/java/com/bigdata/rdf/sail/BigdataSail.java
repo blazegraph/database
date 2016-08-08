@@ -483,8 +483,14 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
      */
-    @Deprecated // Remove this from BigdataSail.  Should only be on the BigdataSailConnection object.
+    @Deprecated // FIXME BLZG-2041 Remove this from BigdataSail.  Should only be on the BigdataSailConnection object.
     final private AbstractTripleStore database;
+    
+    /**
+     * The index manager associated with the database (when there is a focus
+     * store and a main database, then this is the focus store index manager).
+     */
+    final private IIndexManager indexManager;
 
     /**
      * The as-configured properties for the {@link BigdataSail}.
@@ -641,38 +647,30 @@ public class BigdataSail extends SailBase implements Sail {
      */
     private final boolean truthMaintenanceIsSupportable;
     
-    /*
-     * Note: This method has been removed since truth maintenance may now
-     * be suppressed for a BigdataSailConnection.
+    /**
+     * Return the blazegraph namespace associated with the {@link BigdataSail}.
+     * 
+     * @see Options#NAMESPACE
+     * @see BLZG-2023: BigdataSail.getUnisolatedConnection() encapsulation 
      */
-//    /**
-//     * When true, the RDFS closure will be maintained by the <em>SAIL</em>
-//     * implementation (but not by methods that go around the SAIL).
-//     */
-//    public boolean getTruthMaintenance() {
-//        
-//        return truthMaintenance;
-//        
-//    }
-    
-    public IIndexManager getIndexManager() {
-
-        // FIXME BLZG-2023: BigdataSail.getUnisolatedConnection() encapsulation 
-        throw new UnsupportedOperationException();
-//        return indexManager;
-        
-    }
-    
     public String getNamespace() {
         
-        // FIXME BLZG-2023: BigdataSail.getUnisolatedConnection() encapsulation 
         return namespace;
         
     }
     
     /**
-     * The implementation object.
+     * The index manager associated with the database (when there is a focus
+     * store and a main database, then this is the focus store index manager).
+     * 
+     * @see BLZG-2041: BigdataSail.getUnisolatedConnection() encapsulation 
      */
+    public IIndexManager getIndexManager() {
+
+        return indexManager;
+        
+    }
+    
     @Deprecated // This is accessing the AbstractTripleStore without a Connection. 
     public AbstractTripleStore getDatabase() {
         
@@ -694,7 +692,7 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
 //    /**
-//     * Create/re-open the database identified by the properites.
+//     * Create/re-open the database identified by the properties.
 //     * <p>
 //     * Note: This can only be used for {@link AbstractLocalTripleStore}s. The
 //     * {@link ScaleOutTripleStore} uses the {@link DefaultResourceLocator}
@@ -1068,7 +1066,7 @@ public class BigdataSail extends SailBase implements Sail {
      *            {@link AbstractTripleStore} used to resolve the
      *            {@link QueryEngine}. Otherwise it must be the same object as
      *            the <i>database</i>.
-     */
+     */ //FIXME BLZG-2041 Refactor constructor, callers, and locking patterns. 
     public BigdataSail(final AbstractTripleStore database,
             final AbstractTripleStore mainDatabase) {
         
@@ -1077,7 +1075,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         if (mainDatabase == null)
             throw new IllegalArgumentException();
-    
+        
         // default to false here and overwritten by some ctor variants.
         this.closeOnShutdown = false;
         
@@ -1085,6 +1083,13 @@ public class BigdataSail extends SailBase implements Sail {
         
         this.properties = database.getProperties();
 
+        this.namespace = properties.getProperty(Options.NAMESPACE,Options.DEFAULT_NAMESPACE);
+        
+        // Note: We are using the [database] IndexManager.  This is the historical behavior.
+        this.indexManager = database.getIndexManager();
+        
+        this.valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+        
         this.quads = database.isQuads();
         
         this.scaleOut = (database.getIndexManager() instanceof IBigdataFederation);
@@ -1339,7 +1344,7 @@ public class BigdataSail extends SailBase implements Sail {
                      */
                     LexiconRelation.clearTermCacheFactory(vf.getNamespace());
 
-                    database.close();
+//                    database.close();
                     
                 }
                 
@@ -1366,7 +1371,8 @@ public class BigdataSail extends SailBase implements Sail {
 
             if(isOpen()) shutDown();
 
-            database.__tearDownUnitTest();
+//            database.__tearDownUnitTest();
+            getIndexManager().destroy();
 
         } catch (Throwable t) {
 
@@ -1381,7 +1387,7 @@ public class BigdataSail extends SailBase implements Sail {
      * <p>
      * {@inheritDoc}
      */
-    @Override
+    @Override // FIXME BLZG-2041 LexiconRelation constructor no longer overrides the value factory implementation class on this code path!
     final public ValueFactory getValueFactory() {
         
         return valueFactory;
@@ -1389,10 +1395,18 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
 
+    /**
+     * Return false iff the Sail can not provide a writable connection.
+     * <p>
+     * {@inheritDoc}
+     *  
+     *  @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested) 
+     */
     @Override
     final public boolean isWritable() throws SailException {
 
-        return ! database.isReadOnly();
+        return true;
+//        return ! database.isReadOnly();
         
     }
 
