@@ -774,16 +774,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 7, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 7, i);
-                
                 result = tupleQuery.evaluate();
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
@@ -838,19 +840,22 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 5, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 5, i);
                 
                 result = tupleQuery.evaluate();
-
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
                 	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -911,19 +916,22 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 2, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 2, i);
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
                 	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
@@ -988,15 +996,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results: " + i, 2, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results: " + i, 2, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -1067,15 +1078,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results: " + i, 3, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results: " + i, 3, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -1144,15 +1158,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results: " + i, 1, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results: " + i, 1, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -1217,15 +1234,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
-                }
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
 //                assertTrue("wrong # of results: " + i, i == 1);
+                } finally {
+                    result.close();
+                }
                 
                 result = tupleQuery.evaluate();
 
@@ -1289,15 +1309,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertTrue("wrong # of results: " + i, i == (maxRank-minRank+1));
+                } finally {
+                    result.close();
                 }
-                assertTrue("wrong # of results: " + i, i == (maxRank-minRank+1));
                 
                 result = tupleQuery.evaluate();
 
@@ -2173,15 +2196,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 tupleQuery.setBinding("searchQuery", new LiteralImpl(searchQuery));
                 
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 7, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 7, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -2559,15 +2585,18 @@ LIMIT 10 OFFSET 0
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 2, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 2, i);
                 
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
