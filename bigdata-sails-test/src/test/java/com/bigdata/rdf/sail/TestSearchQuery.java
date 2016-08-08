@@ -788,7 +788,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 }
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
                 	cxn.getTripleStore().getLexiconRelation().getSearchEngine();

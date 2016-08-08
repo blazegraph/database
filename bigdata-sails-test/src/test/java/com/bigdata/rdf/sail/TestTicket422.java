@@ -65,6 +65,8 @@ public class TestTicket422 extends ProxyBigdataSailTestCase {
         
         try {
 
+            sail.initialize();
+            
             final BigdataSailConnection mainConn = sail.getUnisolatedConnection();
             
             try {
