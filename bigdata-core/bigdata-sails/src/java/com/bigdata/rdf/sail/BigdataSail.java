@@ -490,12 +490,20 @@ public class BigdataSail extends SailBase implements Sail {
      * The as-configured properties for the {@link BigdataSail}.
      * 
      * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
-     * 
-     * FIXME Make this private.  Since the properties are obtained for the (indexManager, namespace) we can
-     * still have this on the BigdataSail.
      */
     final private Properties properties;
 
+    /**
+     * Return the as-configured properties for the {@link BigdataSail}.
+     * 
+     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+     */
+    public Properties getProperties() {
+        
+        return properties;
+        
+    }
+    
     /**
      * The as-configured Blazegraph namespace for the {@link BigdataSail}.
      * 
@@ -658,8 +666,7 @@ public class BigdataSail extends SailBase implements Sail {
     public String getNamespace() {
         
         // FIXME BLZG-2023: BigdataSail.getUnisolatedConnection() encapsulation 
-        throw new UnsupportedOperationException();
-//        return namespace;
+        return namespace;
         
     }
     

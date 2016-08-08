@@ -157,9 +157,9 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
     }
     
     @Override
-    protected BigdataSail reopenSail(BigdataSail sail) {
+    protected BigdataSail reopenSail(final BigdataSail sail) {
 
-        final Properties properties = sail.database.getProperties();
+        final Properties properties = sail.getProperties();
 
         if (sail.isOpen()) {
 
