@@ -117,7 +117,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
             
 		} finally {
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
         }
 
@@ -198,7 +198,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 		} finally {
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -296,7 +296,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 			
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -334,10 +334,10 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			final ReentrantLock lock = new ReentrantLock();
 			final AtomicBoolean haveFirst = new AtomicBoolean(false);
 			final AtomicBoolean releaseFirst = new AtomicBoolean(false);
-			final AtomicBoolean haveSecond = new AtomicBoolean(false);
+//			final AtomicBoolean haveSecond = new AtomicBoolean(false);
 			final Condition haveFirstConnection = lock.newCondition();
 			final Condition releaseFirstConnection = lock.newCondition();
-			final Condition haveSecondConnection = lock.newCondition();
+//			final Condition haveSecondConnection = lock.newCondition();
 			try {
 
 				final Callable<Void> task1 = new Callable<Void>() {
@@ -425,7 +425,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -531,7 +531,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -569,8 +569,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			{
 
 				// tunnel through to the Journal.
-				final Journal jnl = (Journal) sail.getDatabase()
-						.getIndexManager();
+				final Journal jnl = (Journal) sail.getIndexManager();
 
 				// describe another tripleStore with a distinct namespace.
 				final AbstractTripleStore tripleStore = new LocalTripleStore(
@@ -658,7 +657,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -807,7 +806,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
             if (readConn != null)
                 readConn.close();
             
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
         }
 

@@ -121,7 +121,7 @@ public class TestQuadsAPI extends QuadsTestCase {
         
         try {
     
-            assertEquals(0, sail.database.getNamedGraphCount());
+            assertEquals(0, cxn.getTripleStore().getNamedGraphCount());
             
             assertFalse(cxn.getContextIDs().hasNext());
             
@@ -166,14 +166,14 @@ public class TestQuadsAPI extends QuadsTestCase {
              */
             cxn.flush();//commit();
             
-            assertEquals(2, sail.database.getNamedGraphCount());
+            assertEquals(2, cxn.getTripleStore().getNamedGraphCount());
             
             assertSameIterationAnyOrder(new Resource[] { graphA, graphB }, cxn
                     .getContextIDs());
 
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
         } finally {
@@ -203,7 +203,7 @@ public class TestQuadsAPI extends QuadsTestCase {
         
         try {
     
-            assertEquals(0, sail.database.getNamedGraphCount());
+            assertEquals(0, cxn.getTripleStore().getNamedGraphCount());
             
             assertFalse(cxn.getContextIDs().hasNext());
             
@@ -233,14 +233,14 @@ public class TestQuadsAPI extends QuadsTestCase {
 //            cxn.flush();//commit();
             cxn.commit();
             
-            assertEquals(2, sail.database.getNamedGraphCount());
+            assertEquals(2, cxn.getTripleStore().getNamedGraphCount());
             
             assertSameIterationAnyOrder(new Resource[] { graphA, graphB }, cxn
                     .getContextIDs());
 
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
             
             final String query = 

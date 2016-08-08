@@ -121,12 +121,10 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
-import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdate;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
@@ -482,24 +480,32 @@ public class BigdataSail extends SailBase implements Sail {
     */
     public static final transient URI NULL_GRAPH = BD.NULL_GRAPH;
 
-    final protected AbstractTripleStore database;
-
-    final protected Properties properties;
-    
     /**
-     * The inference engine if the SAIL is using one.
-     * <p>
-     * Note: Requesting this object will cause the axioms to be written onto the
-     * database if they are not already present. If this is a read-only view and
-     * the mutable view does not already have the axioms defined then this will
-     * cause an exception to be thrown since the indices are not writable by the
-     * read-only view.
+     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
      */
-    public InferenceEngine getInferenceEngine() {
+    @Deprecated // Remove this from BigdataSail.  Should only be on the BigdataSailConnection object.
+    final private AbstractTripleStore database;
 
-        return database.getInferenceEngine();
-        
-    }
+    /**
+     * The as-configured properties for the {@link BigdataSail}.
+     * 
+     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+     * 
+     * FIXME Make this private.  Since the properties are obtained for the (indexManager, namespace) we can
+     * still have this on the BigdataSail.
+     */
+    final private Properties properties;
+
+    /**
+     * The as-configured Blazegraph namespace for the {@link BigdataSail}.
+     * 
+     * @see Options#NAMESPACE
+     *  
+     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+     */
+    final private String namespace;
+    
+    final private BigdataValueFactory valueFactory;
     
     /**
      * Return <code>true</code> if the SAIL is using a "quads" mode database.
@@ -641,9 +647,26 @@ public class BigdataSail extends SailBase implements Sail {
 //        
 //    }
     
+    public IIndexManager getIndexManager() {
+
+        // FIXME BLZG-2023: BigdataSail.getUnisolatedConnection() encapsulation 
+        throw new UnsupportedOperationException();
+//        return indexManager;
+        
+    }
+    
+    public String getNamespace() {
+        
+        // FIXME BLZG-2023: BigdataSail.getUnisolatedConnection() encapsulation 
+        throw new UnsupportedOperationException();
+//        return namespace;
+        
+    }
+    
     /**
      * The implementation object.
      */
+    @Deprecated // This is accessing the AbstractTripleStore without a Connection. 
     public AbstractTripleStore getDatabase() {
         
         return database;
@@ -1348,13 +1371,18 @@ public class BigdataSail extends SailBase implements Sail {
     
     /**
      * A {@link BigdataValueFactory}
+     * <p>
+     * {@inheritDoc}
      */
+    @Override
     final public ValueFactory getValueFactory() {
         
-        return database.getValueFactory();
+        return valueFactory;
+//        return database.getValueFactory();
         
     }
 
+    @Override
     final public boolean isWritable() throws SailException {
 
         return ! database.isReadOnly();
@@ -1540,7 +1568,7 @@ public class BigdataSail extends SailBase implements Sail {
         Lock writeLock = null;
         BigdataSailConnection conn = null;
         try {
-            if (getDatabase().getIndexManager() instanceof Journal) {
+            if (getIndexManager() instanceof Journal) {
             /*
              * acquire permit from Journal.
              * 
@@ -1555,8 +1583,7 @@ public class BigdataSail extends SailBase implements Sail {
              * 
              * @see #1137 (Code review of IJournal vs Journal)
              */
-                ((Journal) getDatabase().getIndexManager())
-                        .acquireUnisolatedConnection();
+                ((Journal) getIndexManager()).acquireUnisolatedConnection();
                 acquiredConnection = true;
             }
 
@@ -1601,8 +1628,7 @@ public class BigdataSail extends SailBase implements Sail {
                 }
                 if (acquiredConnection) {
                     // release permit.
-                    ((Journal) getDatabase().getIndexManager())
-                            .releaseUnisolatedConnection();
+                    ((Journal) getIndexManager()).releaseUnisolatedConnection();
                 }
             }
         }
@@ -1688,7 +1714,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
-        final IIndexManager indexManager = database.getIndexManager();
+        final IIndexManager indexManager = getIndexManager();
 
         if (indexManager instanceof IBigdataFederation<?>) {
 
@@ -1708,7 +1734,7 @@ public class BigdataSail extends SailBase implements Sail {
      */
 	protected ITransactionService getTxService() {
 
-		final IIndexManager indexManager = database.getIndexManager();
+		final IIndexManager indexManager = getIndexManager();
 
 		final ITransactionService txService;
 
@@ -1871,6 +1897,21 @@ public class BigdataSail extends SailBase implements Sail {
             return BigdataSail.this;
             
         }
+        
+//        /**
+//         * The inference engine if the SAIL is using one.
+//         * <p>
+//         * Note: Requesting this object will cause the axioms to be written onto the
+//         * database if they are not already present. If this is a read-only view and
+//         * the mutable view does not already have the axioms defined then this will
+//         * cause an exception to be thrown since the indices are not writable by the
+//         * read-only view.
+//         */
+//        private InferenceEngine getInferenceEngine() {
+//
+//            return database.getInferenceEngine();
+//            
+//        }
         
         /**
          * Return the assertion buffer.
@@ -2282,7 +2323,7 @@ public class BigdataSail extends SailBase implements Sail {
                      * closure of the database.
                      */
 
-                    tm = new TruthMaintenance(getInferenceEngine());
+                    tm = new TruthMaintenance(database.getInferenceEngine());
                     
                 } else {
                     
@@ -3772,7 +3813,7 @@ public class BigdataSail extends SailBase implements Sail {
             if (txLog.isInfoEnabled())
                 txLog.info("SAIL-CLOSE-CONN: conn=" + this);
 
-            final IIndexManager im = getDatabase().getIndexManager();
+            final IIndexManager im = getIndexManager();
 
             if (isDirty()) {
                 /*
@@ -4314,7 +4355,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-            getInferenceEngine().computeClosure(null/* focusStore */);
+            database.getInferenceEngine().computeClosure(null/* focusStore */);
 
         }
         

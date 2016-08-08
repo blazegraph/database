@@ -77,8 +77,7 @@ public class BigdataGraphFixture extends AbstractGraphFixture {
     @Override
     public IGraphAccessor newGraphAccessor(final SailConnection ignored) {
 
-        return new BigdataGraphAccessor(sail.getDatabase()
-                .getIndexManager());
+        return new BigdataGraphAccessor(sail.getIndexManager());
 
     }
     

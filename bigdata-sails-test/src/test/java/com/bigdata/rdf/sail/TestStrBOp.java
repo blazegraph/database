@@ -101,7 +101,7 @@ public class TestStrBOp extends QuadsTestCase {
              */
             final URI X = vf.createURI(BD.NAMESPACE + "X");
             final URI dt = vf.createURI(BD.NAMESPACE + "myDatatype");
-            final Literal _1 = vf.createLiteral("foo");
+//            final Literal _1 = vf.createLiteral("foo");
             final Literal _2 = vf.createLiteral("foo", XSD.STRING);
             final Literal _3 = vf.createLiteral("foo", dt);
             final Literal _4 = vf.createLiteral("foo", "EN");
@@ -127,7 +127,7 @@ public class TestStrBOp extends QuadsTestCase {
             cxn.commit();
             
             if (log.isInfoEnabled()) {
-            	log.info(sail.getDatabase().dumpStore());
+                log.info(((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
             }
             
             {
@@ -225,7 +225,7 @@ public class TestStrBOp extends QuadsTestCase {
            */
           final URI X = vf.createURI(BD.NAMESPACE + "X");
           final URI dt = vf.createURI(BD.NAMESPACE + "myDatatype");
-          final Literal _1 = vf.createLiteral("foo");
+//          final Literal _1 = vf.createLiteral("foo");
           final Literal _2 = vf.createLiteral("foo", XSD.STRING);
           final Literal _3 = vf.createLiteral("foo", dt);
           final Literal _4 = vf.createLiteral("foo", "EN");
@@ -251,7 +251,7 @@ public class TestStrBOp extends QuadsTestCase {
           cxn.commit();
           
           if (log.isInfoEnabled()) {
-          	log.info(sail.getDatabase().dumpStore());
+              log.info(((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
           }
           
           {
@@ -356,7 +356,7 @@ SELECT ?s WHERE {
            */
           final URI X = vf.createURI(BD.NAMESPACE + "X");
           final URI dt = vf.createURI(BD.NAMESPACE + "myDatatype");
-          final Literal _1 = vf.createLiteral("foo");
+//          final Literal _1 = vf.createLiteral("foo");
           final Literal _2 = vf.createLiteral("foo", XSD.STRING);
           final Literal _3 = vf.createLiteral("foo", dt);
           final Literal _4 = vf.createLiteral("foo", "EN");
@@ -382,7 +382,7 @@ SELECT ?s WHERE {
           cxn.commit();
           
           if (log.isInfoEnabled()) {
-          	log.info(sail.getDatabase().dumpStore());
+          	log.info(((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
           }
           
           {

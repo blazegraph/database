@@ -1086,12 +1086,10 @@ public class DeleteServlet extends BigdataRDFServlet {
                 long nmodified = 0;
                 if (c != null && c.length > 0) {
                     for (Resource r : c) {
-                        nmodified += conn.getBigdataSail()
-                                .getDatabase().removeStatements(s, p, o, r);
+                        nmodified += conn.getTripleStore().removeStatements(s, p, o, r);
                     }
                 } else {
-                    nmodified += conn.getBigdataSail()
-                            .getDatabase().removeStatements(s, p, o, null);
+                    nmodified += conn.getTripleStore().removeStatements(s, p, o, null);
                 }
                 
                 if (truthMaintenance && suppressTruthMaintenance) {

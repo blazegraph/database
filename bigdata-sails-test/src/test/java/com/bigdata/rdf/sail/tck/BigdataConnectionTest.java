@@ -208,7 +208,7 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
     {
 
         final IIndexManager backend = testRepository == null ? null
-                : ((BigdataSailRepository) testRepository).getDatabase()
+                : ((BigdataSailRepository) testRepository).getSail()
                         .getIndexManager();
 
         /*

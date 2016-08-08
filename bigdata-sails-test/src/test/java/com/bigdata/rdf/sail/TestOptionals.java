@@ -166,7 +166,7 @@ public class TestOptionals extends QuadsTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             String query = 

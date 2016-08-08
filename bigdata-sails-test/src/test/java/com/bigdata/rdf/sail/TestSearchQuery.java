@@ -63,7 +63,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.BDS;
@@ -2539,7 +2538,7 @@ LIMIT 10 OFFSET 0
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
             { 

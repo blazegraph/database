@@ -292,8 +292,7 @@ public class BigdataSailHelper {
      */
     public Properties getProperties(final BigdataSail sail) {
 
-        return getProperties(sail.getDatabase().getIndexManager(), sail
-                .getDatabase().getNamespace());
+        return getProperties(sail.getIndexManager(), sail.getNamespace());
         
     }
     
@@ -310,13 +309,13 @@ public class BigdataSailHelper {
      * 
      * @return The persistent properties.
      */
-    protected Properties getProperties(IIndexManager indexManager,
-            String namespace) {
+    protected Properties getProperties(final IIndexManager indexManager,
+            final String namespace) {
 
-        Map<String, Object> map = indexManager.getGlobalRowStore().read(
+        final Map<String, Object> map = indexManager.getGlobalRowStore().read(
                 RelationSchema.INSTANCE, namespace);
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
 
         properties.putAll(map);
 
@@ -352,8 +351,8 @@ public class BigdataSailHelper {
             final Properties properties) {
 
         return setProperties(//
-                sail.getDatabase().getIndexManager(), //
-                sail.getDatabase().getNamespace(), //
+                sail.getIndexManager(), //
+                sail.getNamespace(), //
                 properties//
         );
         
@@ -439,10 +438,10 @@ public class BigdataSailHelper {
      * 
      * @param sail
      */
-    public static void showLexiconIndexDetails(BigdataSail sail) {
+    public static void showLexiconIndexDetails(final BigdataSail sail) {
         
-        IIndex ndx = sail.getDatabase().getLexiconRelation().getBlobsIndex();
-        IndexMetadata md = ndx.getIndexMetadata();
+        final IIndex ndx = sail.getDatabase().getLexiconRelation().getBlobsIndex();
+        final IndexMetadata md = ndx.getIndexMetadata();
         
         System.out.println("Lexicon:");
         System.out.println(md.toString());

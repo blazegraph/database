@@ -247,7 +247,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                 + ", nreaderThreads=" + nreaderThreads
                                 + ", nwriters=" + nwriters + ", nreaders="
                                 + nreaders + ", indexManager="
-                                + sail.getDatabase().getIndexManager(), ex);
+                                + sail.getIndexManager(), ex);
                     }
                 }
                 if (log.isInfoEnabled())

@@ -112,7 +112,7 @@ public class TestInlineValues extends ProxyBigdataSailTestCase {
             cxn.flush();//commit();
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -179,7 +179,7 @@ public class TestInlineValues extends ProxyBigdataSailTestCase {
             cxn.flush();//commit();
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -246,7 +246,7 @@ public class TestInlineValues extends ProxyBigdataSailTestCase {
             cxn.flush();//commit();
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             {

@@ -45,6 +45,11 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
+    /*
+     * @see BLZG-2041 BigdataSail should not locate the AbstractTripleStore
+     * until a connection is requested
+     */
+    @Deprecated // This is accessing the AbstractTripleStore without a Connection. 
     public AbstractTripleStore getDatabase() {
         
         return ((BigdataSail) getSail()).getDatabase();
@@ -53,14 +58,10 @@ public class BigdataSailRepository extends SailRepository {
 
     @Override
     public BigdataSail getSail() {
-        return (BigdataSail)super.getSail();
+
+        return (BigdataSail) super.getSail();
+
     }
-    
-//    private BigdataSail getBigdataSail() {
-//        
-//        return (BigdataSail) getSail();
-//        
-//    }
 
     /**
      * {@inheritDoc}

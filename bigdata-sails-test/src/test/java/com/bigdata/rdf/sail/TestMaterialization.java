@@ -107,7 +107,7 @@ public class TestMaterialization extends ProxyBigdataSailTestCase {
           cxn.commit();
           
           if (log.isInfoEnabled()) {
-          	log.info(sail.getDatabase().dumpStore());
+              log.info(cxn.getTripleStore().dumpStore());
           }
           
           {

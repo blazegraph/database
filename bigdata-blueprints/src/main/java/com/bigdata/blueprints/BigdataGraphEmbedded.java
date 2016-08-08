@@ -31,13 +31,10 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
-import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -428,7 +425,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      *          Bigdata change records
      * @return
      *          Same records with materialized values
-     */
+     */// FIXME BLZG-2041: materialization will fail if called from transactionAborted() since write set was already discarded?
     protected List<IChangeRecord> materialize(final List<IChangeRecord> records) {
         
         try {
@@ -544,7 +541,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     
         final BigdataSailRepository repo = (BigdataSailRepository) this.getRepository();
         
-        final IIndexManager indexMgr = repo.getDatabase().getIndexManager();
+        final IIndexManager indexMgr = repo.getSail().getIndexManager();
         
         return indexMgr;
         

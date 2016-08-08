@@ -59,7 +59,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -796,15 +795,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     }
 
    /**
-    * @deprecated This is going around REST API. It can be written to that API
-    *             with the added support for ESTCARD exact:=true.
-    *             
     * @see #getExactSize()
     */
    protected long countAll() throws Exception {
     	
-    	return getSail().getDatabase().getExplicitStatementCount(null);
-    	
+//    	return getSail().getDatabase().getExplicitStatementCount(null);
+
+       return m_repo.rangeCount(true/*exact*/, null/*s*/, null/*p*/, null/*o*/);
+       
 //    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 //    	
 //    	final String countQuery = "select * where {?s ?p ?o}";
@@ -818,15 +816,17 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
    /**
     * Return the exact number of statements in the repository.
     * 
-    * @deprecated This is going around REST API. It can be written to that API
-    *             with the added support for ESTCARD exact:=true.
-    * 
     * @see #countAll()
     */
    @Deprecated
    protected long getExactSize() {
 
-       return getSail().getDatabase().getStatementCount(true/* true */);
+       try {
+        return countAll();
+    } catch (Exception e) {
+       throw new RuntimeException(e);
+    }
+//       return getSail().getDatabase().getStatementCount(true/* true */);
 
    }
 

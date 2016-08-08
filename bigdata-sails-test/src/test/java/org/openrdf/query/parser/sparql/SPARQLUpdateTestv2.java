@@ -24,17 +24,10 @@ import java.io.InputStream;
 import java.util.Properties;
 import java.util.UUID;
 
-import junit.framework.TestCase;
-
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.DC;
 import org.openrdf.model.vocabulary.FOAF;
@@ -47,12 +40,10 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.Update;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 import org.slf4j.Logger;
@@ -62,9 +53,11 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.BD;
+
+import junit.framework.TestCase;
 
 /**
  * Tests for SPARQL 1.1 Update functionality.
@@ -171,7 +164,7 @@ public class SPARQLUpdateTestv2 extends TestCase {
         
         final BigdataSail sail = new BigdataSail(props);
         
-        backend = sail.getDatabase().getIndexManager();
+        backend = sail.getIndexManager();
 
         return new BigdataSailRepository(sail);
 

@@ -104,7 +104,7 @@ public class ObjectManager extends ObjectMgrModel {
 
             final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                     .getStandaloneQueryController((Journal) m_repo
-                            .getDatabase().getIndexManager());
+                            .getSail().getIndexManager());
 
             final ICacheConnection cacheConn = CacheConnectionFactory
                     .getExistingCacheConnection(queryEngine);

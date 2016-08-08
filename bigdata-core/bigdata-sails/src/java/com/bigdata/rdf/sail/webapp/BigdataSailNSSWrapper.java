@@ -93,14 +93,14 @@ public class BigdataSailNSSWrapper {
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
 
-            initParams.put(ConfigParams.NAMESPACE, getSail().getDatabase().getNamespace());
+            initParams.put(ConfigParams.NAMESPACE, getSail().getNamespace());
 
             initParams.put(ConfigParams.CREATE, "false");
             
         }
         // Start server for that kb instance.
         m_fixture = NanoSparqlServer.newInstance(0/* port */,
-                getSail().getDatabase().getIndexManager(), initParams);
+                getSail().getIndexManager(), initParams);
 
         m_fixture.start();
 
@@ -138,7 +138,7 @@ public class BigdataSailNSSWrapper {
         
         m_repo = new RemoteRepositoryManager(m_serviceURL,
         		m_httpClient,
-                getSail().getDatabase().getIndexManager().getExecutorService());
+                getSail().getIndexManager().getExecutorService());
 
     }
 
