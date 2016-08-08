@@ -26,6 +26,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -436,11 +437,11 @@ public class BigdataSailHelper {
     /**
      * Shows some interesting details about the terms index.
      * 
-     * @param sail
+     * @param cxn The connection.
      */
-    public static void showLexiconIndexDetails(final BigdataSail sail) {
+    public static void showLexiconIndexDetails(final BigdataSailConnection cxn) {
         
-        final IIndex ndx = sail.getDatabase().getLexiconRelation().getBlobsIndex();
+        final IIndex ndx = cxn.getTripleStore().getLexiconRelation().getBlobsIndex();
         final IndexMetadata md = ndx.getIndexMetadata();
         
         System.out.println("Lexicon:");
@@ -452,16 +453,18 @@ public class BigdataSailHelper {
     /**
      * Shows some interesting details about the primary index for the {@link SPORelation}.
      * 
-     * @param sail
+     * @param cxn The connection.
+     * 
+     * @throws SailException 
+     * @throws InterruptedException 
      */
-    public static void showSPOIndexDetails(final BigdataSail sail) {
+    public static void showSPOIndexDetails(final BigdataSailConnection cxn) {
         
-        final IIndex ndx = sail.getDatabase().getSPORelation()
-                .getPrimaryIndex();
+        final IIndex ndx = cxn.getTripleStore().getSPORelation().getPrimaryIndex();
 
         final IndexMetadata md = ndx.getIndexMetadata();
 
-        System.out.println(md.getName()+":");
+        System.out.println(md.getName() + ":");
         System.out.println(md.toString());
         System.out.println(md.getTupleSerializer().toString());
         
@@ -508,8 +511,9 @@ public class BigdataSailHelper {
      * @throws SailException
      * @throws ConfigurationException
      * @throws IOException
+     * @throws InterruptedException 
      */
-    public static void main(final String[] args) throws SailException, IOException {
+    public static void main(final String[] args) throws SailException, IOException, InterruptedException {
 
         if (args.length == 0) {
 
@@ -664,10 +668,13 @@ public class BigdataSailHelper {
 
             sail.initialize();
 
+            boolean ok = false;
+            final BigdataSailConnection cxn = sail.getUnisolatedConnection();
+            try {
             System.out.println("\npre-modification properties::");
             showProperties(helper.getProperties(sail));
-            showLexiconIndexDetails(sail);
-            showSPOIndexDetails(sail);
+            showLexiconIndexDetails(cxn);
+            showSPOIndexDetails(cxn);
 
             // change some property values.
             if(true) {
@@ -707,7 +714,14 @@ public class BigdataSailHelper {
                 showProperties(helper.setProperties(sail, p));
                 
             }
-
+            
+            ok = true;
+            
+        } finally {
+            if(!ok)
+                cxn.rollback();
+            cxn.close();
+        }
         } finally {
 
             sail.shutDown();

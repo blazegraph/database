@@ -153,7 +153,7 @@ public class TestPaths extends ProxyBigdataSailTestCase {
 			cxn.add(open("sssp.ttl"), "", RDFFormat.TURTLE);
 			cxn.commit();
 
-			log.trace("\n" + sail.getDatabase().dumpStore());
+			log.trace("\n" + cxn.getTripleStore().dumpStore());
 
 			final String query = IOUtils.toString(open("sssp.rq"));
 

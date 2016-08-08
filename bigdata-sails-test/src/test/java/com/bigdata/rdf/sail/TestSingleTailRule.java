@@ -26,14 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.iteration.CloseableIteration;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Properties;
-import java.util.Set;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -53,17 +49,15 @@ import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.EmptyBindingSet;
 import org.openrdf.query.parser.ParsedTupleQuery;
 import org.openrdf.query.parser.QueryParserUtil;
-import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.sail.SailRepository;
-import org.openrdf.repository.sail.SailRepositoryConnection;
-import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
-import org.openrdf.sail.memory.MemoryStore;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
+
+import info.aduna.iteration.CloseableIteration;
 
 /**
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
@@ -124,7 +118,7 @@ public class TestSingleTailRule extends ProxyBigdataSailTestCase {
             testValueRoundTrip(cxn.getSailConnection(), mike, likes, rdf);
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + ((BigdataSail)sail).getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
         } finally {
@@ -149,10 +143,10 @@ public class TestSingleTailRule extends ProxyBigdataSailTestCase {
             
             final String ns = BD.NAMESPACE;
             
-            URI mike = vf.createURI(ns+"Mike");
-            URI likes = vf.createURI(ns+"likes");
-            URI rdf = vf.createURI(ns+"RDF");
-            Literal l1 = vf.createLiteral("Mike");
+            final URI mike = vf.createURI(ns+"Mike");
+//            URI likes = vf.createURI(ns+"likes");
+//            URI rdf = vf.createURI(ns+"RDF");
+            final Literal l1 = vf.createLiteral("Mike");
 /**/
             cxn.setNamespace("ns", ns);
 
@@ -160,12 +154,12 @@ public class TestSingleTailRule extends ProxyBigdataSailTestCase {
             cxn.commit();
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + ((BigdataSail)sail).getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
             {
                 
-                String query = 
+                final String query = 
                     "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
                     "PREFIX ns: <"+ns+"> " +
@@ -178,13 +172,13 @@ public class TestSingleTailRule extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", mike),
                     new BindingImpl("p", RDFS.LABEL),
@@ -197,7 +191,7 @@ public class TestSingleTailRule extends ProxyBigdataSailTestCase {
             
             {
                 
-                String query = 
+                final String query = 
                     "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
                     "PREFIX ns: <"+ns+"> " +
@@ -209,13 +203,13 @@ public class TestSingleTailRule extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", l1),
                 }));

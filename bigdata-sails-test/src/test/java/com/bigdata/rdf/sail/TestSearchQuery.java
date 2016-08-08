@@ -754,7 +754,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
             { 
@@ -789,7 +789,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -801,8 +801,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -853,7 +853,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -871,8 +871,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -926,7 +926,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -944,8 +944,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1003,7 +1003,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1021,8 +1021,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1082,7 +1082,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1100,8 +1100,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1156,10 +1156,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1177,8 +1177,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1232,7 +1232,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1250,8 +1250,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
                     final BindingSet bs = createBindingSet(
@@ -1301,10 +1301,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1322,8 +1322,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1345,7 +1345,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	final String searchQuery = "how now brown cow";
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 
                 final int i = search.count(new FullTextQuery(
                 			searchQuery, 
@@ -2151,7 +2151,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
             { 
@@ -2185,10 +2185,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -2206,8 +2206,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -2569,10 +2569,10 @@ LIMIT 10 OFFSET 0
                 }
                 assertEquals("wrong # of results", 2, i);
                 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -2590,8 +2590,8 @@ LIMIT 10 OFFSET 0
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
