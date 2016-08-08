@@ -425,14 +425,35 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      *          Bigdata change records
      * @return
      *          Same records with materialized values
-     */// FIXME BLZG-2041: materialization will fail if called from transactionAborted() since write set was already discarded?
+     */
     protected List<IChangeRecord> materialize(final List<IChangeRecord> records) {
         
         try {
-            final AbstractTripleStore db = repo.getDatabase();
-
+            
             final List<IChangeRecord> materialized = new LinkedList<IChangeRecord>();
 
+            if(true) {
+                /*
+                 * Note: This code is part of the TP2 API.  I am disabling it
+                 * since we no longer allow access to the AbstractTripleStore
+                 * from the BigdataSail, just the BigdataSailConnection.
+                 * 
+                 * FIXME BLZG-2041 materialize() is disabled since it relies on
+                 * access to the AbstractTripleStore and that is only associated
+                 * with a BigdataSailConnection and no longer with a BigdataSail
+                 * as of BLZG-2041.
+                 * 
+                 * FIXME BLZG-2041: materialize)() will fail to identify any
+                 * statements or lexicon entries that were written in the
+                 * aborted transaction if called from transactionAborted() since
+                 * write set was already discarded.
+                 */
+                return materialized;
+            }
+
+//            final AbstractTripleStore db = repo.getDatabase();
+            final AbstractTripleStore db = null;
+            
             // collect up the ISPOs out of the unresolved change records
             final ISPO[] spos = new ISPO[records.size()];
             int i = 0;

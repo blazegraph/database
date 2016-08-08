@@ -671,12 +671,14 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
-    @Deprecated // This is accessing the AbstractTripleStore without a Connection. 
-    public AbstractTripleStore getDatabase() {
-        
-        return database;
-        
-    }
+    /* Gone since BLZG-2041: This was accessing the AbstractTripleStore without a Connection.
+     */
+//    @Deprecated  
+//    AbstractTripleStore getDatabase() {
+//        
+//        return database;
+//        
+//    }
 
     /**
      * Defaults various properties.

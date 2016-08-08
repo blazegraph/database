@@ -30,8 +30,6 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * Blazegraph specific {@link SailRepository} implementation class.
  * 
@@ -45,16 +43,17 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
-    /*
-     * @see BLZG-2041 BigdataSail should not locate the AbstractTripleStore
-     * until a connection is requested
-     */
-    @Deprecated // This is accessing the AbstractTripleStore without a Connection. 
-    public AbstractTripleStore getDatabase() {
-        
-        return ((BigdataSail) getSail()).getDatabase();
-        
-    }
+//    /* Gone since BLZG-2041: This was accessing the AbstractTripleStore without a Connection.
+//    
+//     * @see BLZG-2041 BigdataSail should not locate the AbstractTripleStore
+//     * until a connection is requested
+//     */
+//    @Deprecated // This is accessing the AbstractTripleStore without a Connection. 
+//    public AbstractTripleStore getDatabase() {
+//        
+//        return ((BigdataSail) getSail()).getDatabase();
+//        
+//    }
 
     @Override
     public BigdataSail getSail() {
