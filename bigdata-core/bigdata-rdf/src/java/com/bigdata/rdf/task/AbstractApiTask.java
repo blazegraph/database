@@ -235,19 +235,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 			final String namespace, final long timestamp)
 			throws RepositoryException {
 
-        final AbstractTripleStore tripleStore = getTripleStore(namespace,
-                timestamp);
-
-        if (tripleStore == null) {
-
-            throw new DatasetNotFoundException("Not found: namespace="
-                    + namespace + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-        }
-
         // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
+        final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
 
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
 
@@ -255,8 +244,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
         if (TimestampUtility.isReadOnly(timestamp)) {
 
-            return (BigdataSailRepositoryConnection) repo
-                    .getReadOnlyConnection(timestamp);
+            return (BigdataSailRepositoryConnection) repo.getReadOnlyConnection(timestamp);
 
         }
 
@@ -285,28 +273,15 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     protected BigdataSailRepositoryConnection getConnection()
             throws SailException, RepositoryException {
 
-        // resolve the default namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, timestamp);
-
-        if (tripleStore == null) {
-
-			throw new DatasetNotFoundException("Not found: namespace="
-					+ namespace);
-
-        }
-
         // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
+        final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
 
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
 
         repo.initialize();
 
-        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
-              .getConnection();
-//                .getUnisolatedConnection();
-
+        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo.getConnection();
+        
         conn.setAutoCommit(false);
         
         /*

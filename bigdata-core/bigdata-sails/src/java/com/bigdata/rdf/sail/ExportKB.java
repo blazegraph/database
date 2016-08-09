@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.iteration.CloseableIteration;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -60,10 +58,13 @@ import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.sparse.ITPS;
+
+import info.aduna.iteration.CloseableIteration;
 
 /**
  * Utility class for exporting the configuration properties and data associated
@@ -74,7 +75,6 @@ import com.bigdata.sparse.ITPS;
  *      Migration</a>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ExportKB {
 
@@ -548,32 +548,51 @@ public class ExportKB {
 
             for (String namespace : namespaces) {
 
-                // Get KB view.
-                final AbstractTripleStore kb = (AbstractTripleStore) indexManager
-                        .getResourceLocator().locate(namespace, commitTime);
-                
-                // The name of the subdirectory on which the properties and RDF
-                // data will be written.
-                final File kbdir = new File(outdir, munge(namespace));
+//                // Get KB view.
+//                final AbstractTripleStore kb = (AbstractTripleStore) indexManager
+//                        .getResourceLocator().locate(namespace, commitTime);
 
-                // Choose an appropriate RDFFormat.
-                RDFFormat fmt = format;
-                if (fmt == null) {
-                    // Choose an appropriate format.
-                    if (kb.isStatementIdentifiers()) {
-                        fmt = RDFFormat.RDFXML;
-                    } else if (kb.isQuads()) {
-                        fmt = RDFFormat.TRIX;
-                    } else {
-                        fmt = RDFFormat.RDFXML;
+                final BigdataSail sail = new BigdataSail(namespace, indexManager);
+                try {
+                    
+                    sail.initialize();
+
+                    final BigdataSailConnection conn = sail.getReadOnlyConnection(commitTime);
+
+                    try {
+                    
+                        // The name of the subdirectory on which the properties and RDF
+                        // data will be written.
+                        final File kbdir = new File(outdir, munge(namespace));
+        
+                        // Choose an appropriate RDFFormat.
+                        RDFFormat fmt = format;
+                        if (fmt == null) {
+                            // Choose an appropriate format.
+                            if (conn.getTripleStore().isStatementIdentifiers()) {
+                                fmt = RDFFormat.RDFXML;
+                            } else if (conn.isQuads()) {
+                                fmt = RDFFormat.TRIX;
+                            } else {
+                                fmt = RDFFormat.RDFXML;
+                            }
+                        }
+                        System.out.println("Exporting " + namespace + " as "
+                                + fmt.getName() + " on " + kbdir);
+                        if (!nothing) {
+                            // Export KB.
+                            new ExportKB(conn.getTripleStore(), kbdir, fmt, includeInferred).export();
+                        }
+
+                    } finally {
+                        
+                        conn.close();
+                        
                     }
+                } finally {
+                    sail.shutDown();
                 }
-                System.out.println("Exporting " + namespace + " as "
-                        + fmt.getName() + " on " + kbdir);
-                if (!nothing) {
-                    // Export KB.
-                    new ExportKB(kb, kbdir, fmt, includeInferred).export();
-                }
+                
             }
 
             // Success.

@@ -62,10 +62,12 @@ public class TestTicket422 extends ProxyBigdataSailTestCase {
     public void test_wrapTempTripleStore() throws SailException, InterruptedException {
 
         final BigdataSail sail = getSail();
-        
+               
         try {
 
             sail.initialize();
+            
+            final String namespace = sail.getNamespace();
             
             final BigdataSailConnection mainConn = sail.getUnisolatedConnection();
             
@@ -78,11 +80,12 @@ public class TestTicket422 extends ProxyBigdataSailTestCase {
                 
                 final TempTripleStore tempStore = new TempTripleStore(//
                         sail.getIndexManager().getTempStore(), //
-                        sail.getProperties(), mainTripleStore);
+                        mainConn.getProperties(), mainTripleStore);
     
                 try {
     
-                    final BigdataSail tempSail = new BigdataSail(tempStore, mainTripleStore);
+                    final BigdataSail tempSail = new BigdataSail(namespace, tempStore.getIndexManager(),
+                            mainTripleStore.getIndexManager());
     
                     try {
     

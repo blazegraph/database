@@ -68,6 +68,7 @@ import java.util.Properties;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -143,7 +144,6 @@ import com.bigdata.rdf.store.BigdataValueIterator;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
@@ -481,35 +481,11 @@ public class BigdataSail extends SailBase implements Sail {
     public static final transient URI NULL_GRAPH = BD.NULL_GRAPH;
 
     /**
-     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
-     */
-    @Deprecated // FIXME BLZG-2041 Remove this from BigdataSail.  Should only be on the BigdataSailConnection object.
-    final private AbstractTripleStore database;
-    
-    /**
      * The index manager associated with the database (when there is a focus
      * store and a main database, then this is the focus store index manager).
      */
     final private IIndexManager indexManager;
 
-    /**
-     * The as-configured properties for the {@link BigdataSail}.
-     * 
-     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
-     */
-    final private Properties properties;
-
-    /**
-     * Return the as-configured properties for the {@link BigdataSail}.
-     * 
-     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
-     */
-    public Properties getProperties() {
-        
-        return properties;
-        
-    }
-    
     /**
      * The as-configured Blazegraph namespace for the {@link BigdataSail}.
      * 
@@ -520,96 +496,6 @@ public class BigdataSail extends SailBase implements Sail {
     final private String namespace;
     
     final private BigdataValueFactory valueFactory;
-    
-    /**
-     * Return <code>true</code> if the SAIL is using a "quads" mode database.
-     * 
-     * @see AbstractTripleStore.Options#QUADS
-     */
-    final public boolean isQuads() {
-
-        return quads;
-        
-    }
-    
-    /**
-     * Return <code>true</code> iff the SAIL is using a namespace that has been
-     * configured to support isolatable indices.
-     * 
-     * @see Options#ISOLATABLE_INDICES
-     */
-    final public boolean isIsolatable() {
-       
-       return isolatable;
-       
-    }
-
-    /**
-     * The configured capacity for the statement buffer(s).
-     * 
-     * @see Options#BUFFER_CAPACITY
-     */
-    final private int bufferCapacity;
-    
-    /**
-     * The configured capacity for blocking queue backing the statement buffer(s).
-     * 
-     * @see Options#QUEUE_CAPACITY
-     */
-    final private int queueCapacity;
-    
-    /**
-     * When true, the SAIL is in the "quads" mode.
-     * 
-     * @see AbstractTripleStore.Options#QUADS
-     */
-    final private boolean quads;
-    
-    /**
-     * When <code>true</code> the SAIL is backed by an
-     * {@link IBigdataFederation}.
-     */
-    final private boolean scaleOut;
-    
-    /**
-     * When true, SAIL will compute entailments at query time that were excluded
-     * from forward closure.
-     * 
-     * @see Options#QUERY_TIME_EXPANDER
-     */
-    final private boolean queryTimeExpander;
-    
-    /**
-     * When true, SAIL will compute an exact size in the {@link
-     * SailConnection#size(Resource[])} method.
-     * 
-     * @see Options#EXACT_SIZE
-     */
-    final private boolean exactSize;
-    
-    /**
-     * When true, auto-commit is allowed. Do not ever use auto-commit, this is
-     * purely used to pass the Sesame test suites.
-     * 
-     * @see Options#ALLOW_AUTO_COMMIT
-     */
-    final private boolean allowAutoCommit;
-    
-    /**
-     * When true, read/write transactions are allowed.
-     * 
-     * @see {@link Options#ISOLATABLE_INDICES}
-     */
-    final private boolean isolatable;
-    
-    /**
-     *  Specifies whether quads in triple mode are rejected (true) or loaded 
-     *  while silently stripping off the context (false). In the latter case, 
-     *  the fireSailChangedEvent will report back the original statements,
-     *  i.e. including the context, although the latter was not stored
-     *  internally.
-     */
-    final private boolean rejectQuadsInTripleMode;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -628,6 +514,9 @@ public class BigdataSail extends SailBase implements Sail {
      * Transient (in the sense of non-restart-safe) map of namespace prefixes
      * to namespaces.  This map is thread-safe and shared across all
      * {@link BigdataSailConnection} instances and across all transactions.
+     * 
+     * FIXME BLZG-2041 Verify that the namespaces should be shared across the
+     * connections. If not, then make this into a per-connection mapping.
      */
     private Map<String, String> namespaces;
 
@@ -636,17 +525,6 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final private QueryEngine queryEngine;
 
-    /**
-     * <code>true</code> iff the {@link BigdataSail} can support truth
-     * maintenance, however truth maintenance may be conditionally suppressed
-     * for a {@link BigdataSailConnection} in order to allow people to
-     * temporarily disable when batching updates into the Sail.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/591 (Manage Truth
-     *      Maintenance)
-     */
-    private final boolean truthMaintenanceIsSupportable;
-    
     /**
      * Return the blazegraph namespace associated with the {@link BigdataSail}.
      * 
@@ -692,51 +570,6 @@ public class BigdataSail extends SailBase implements Sail {
         return properties;
         
     }
-    
-//    /**
-//     * Create/re-open the database identified by the properties.
-//     * <p>
-//     * Note: This can only be used for {@link AbstractLocalTripleStore}s. The
-//     * {@link ScaleOutTripleStore} uses the {@link DefaultResourceLocator}
-//     * pattern and does not have a constructor suitable for just a
-//     * {@link Properties} object.
-//     * 
-//     * @see Options
-//     */
-//    @SuppressWarnings("unchecked")
-//    private static AbstractLocalTripleStore setUp(Properties properties) {
-//
-//        final String val = properties.getProperty(
-//                BigdataSail.Options.STORE_CLASS,
-//                BigdataSail.Options.DEFAULT_STORE_CLASS);
-//
-//        try {
-//
-//            final Class storeClass = Class.forName(val);
-//
-//            if (!AbstractLocalTripleStore.class.isAssignableFrom(storeClass)) {
-//
-//                throw new RuntimeException("Must extend "
-//                        + AbstractLocalTripleStore.class.getName() + " : "
-//                        + storeClass.getName());
-//
-//            }
-//
-//            final Constructor<AbstractLocalTripleStore> ctor = storeClass
-//                    .getConstructor(new Class[] { Properties.class });
-//
-//            final AbstractLocalTripleStore database = ctor
-//                    .newInstance(new Object[] { properties });
-//
-//            return database;
-//
-//        } catch (Exception t) {
-//
-//            throw new RuntimeException(t);
-//
-//        }
-//
-//    }
 
     /**
      * Create or re-open a database instance configured using defaults.
@@ -755,189 +588,19 @@ public class BigdataSail extends SailBase implements Sail {
      */
     public BigdataSail(final Properties properties) {
         
-        this(createLTS(properties));
+        this(properties.getProperty(Options.NAMESPACE,Options.DEFAULT_NAMESPACE), new Journal(properties));
 
         closeOnShutdown = true;
-
-    }
-
-    /**
-     * If the {@link LocalTripleStore} with the appropriate namespace exists,
-     * then return it. Otherwise, create the {@link LocalTripleStore}. When the
-     * properties indicate that full transactional isolation should be
-     * supported, a new {@link LocalTripleStore} will be created within a
-     * transaction in order to ensure that it uses isolatable indices. Otherwise
-     * it is created using the {@link ITx#UNISOLATED} connection.
-     * 
-     * @param properties
-     *            The properties.
-     *            
-     * @return The {@link LocalTripleStore}.
-     */
-    private static LocalTripleStore createLTS(final Properties properties) {
-
-        final Journal journal = new Journal(properties);
         
-       return createLTS(journal, properties);
-
-    }
-    
-    /**
-     * <strong>CAUTION: With the introduction of group commit support the 
-     * correct way to create a new KB instance is using {@link AbstractApiTask}
-     * to submit a {@link CreateKBTask}. This code path will correctly make use
-     * of the group commit mechanisms. A failure to use this approach could 
-     * result in a non-ACID commit!
-     * </strong>
-     * <p>
-     * If the {@link LocalTripleStore} with the appropriate namespace exists,
-     * then return it. Otherwise, create the {@link LocalTripleStore}. When the
-     * properties indicate that full transactional isolation should be
-     * supported, a new {@link LocalTripleStore} will be created within a
-     * transaction in order to ensure that it uses isolatable indices. Otherwise
-     * it is created using the {@link ITx#UNISOLATED} connection.
-     * 
-     * @param properties
-     *            The properties.
-     *            
-     * @return The {@link LocalTripleStore}.
-     * 
-     * @see CreateKBTask
-     * 
-     * @deprecated by {@link CreateKBTask}
-     */
-    public static LocalTripleStore createLTS(final Journal journal,
-            final Properties properties) {
-
-//        final Journal journal = new Journal(properties);
-
-        final ITransactionService txService = 
-            journal.getTransactionManager().getTransactionService();
-        
-        final String namespace = properties.getProperty(
-                BigdataSail.Options.NAMESPACE,
-                BigdataSail.Options.DEFAULT_NAMESPACE);
-        
-        // throws an exception if there are inconsistent properties
-        checkProperties(properties);
-        
-        /*
-         * Note: We need to make this operation mutually exclusive with KB level
-         * writers in order to avoid the possibility of a triggering a commit
-         * during the middle of a BigdataSailConnection level operation (or visa
-         * versa).
-         */
-        boolean acquiredConnection = false;
-        try {
+        if(!exists()) {
+            // Create iff it does not exist (backward compatibility, simple constructor mode).
             try {
-                // acquire the unisolated connection permit.
-                journal.acquireUnisolatedConnection();
-                acquiredConnection = true;
-            } catch (InterruptedException e) {
+                create(properties);
+            } catch (InterruptedException | ExecutionException e) {
                 throw new RuntimeException(e);
             }
-            
-            // Check for pre-existing instance.
-            {
-
-                final LocalTripleStore lts = (LocalTripleStore) journal
-                        .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-                if (lts != null) {
-
-                    return lts;
-
-                }
-
-            }
-            
-            // Create a new instance.
-            {
-            
-                if (Boolean.parseBoolean(properties.getProperty(
-                        BigdataSail.Options.ISOLATABLE_INDICES,
-                        BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
-                
-                    /*
-                     * Isolatable indices: requires the use of a tx to create
-                     * the KB instance.
-                     */
-
-                    final long txCreate = txService.newTx(ITx.UNISOLATED);
-
-                    boolean ok = false;
-                    try {
-                        
-                        final AbstractTripleStore txCreateView = new LocalTripleStore(
-                                journal, namespace, Long.valueOf(txCreate),
-                                properties);
-
-                        // create the kb instance within the tx.
-                        txCreateView.create();
-
-                        // commit the tx.
-                        txService.commit(txCreate);
-                        
-                        ok = true;
-
-                    } finally {
-                        
-                        if (!ok)
-                            txService.abort(txCreate);
-                        
-                    }
-                    
-                } else {
-                    
-                    /*
-                     * Create KB without isolatable indices.
-                     */
-
-                    final LocalTripleStore lts = new LocalTripleStore(
-                            journal, namespace, ITx.UNISOLATED, properties);
-                    
-                    lts.create();
-                    
-                }
-                
-            }
-
-            /*
-             * Now that we have created the instance, either using a tx or the
-             * unisolated connection, locate the triple store resource and
-             * return it.
-             */
-            {
-
-                final LocalTripleStore lts = (LocalTripleStore) journal
-                        .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-                if (lts == null) {
-
-                    /*
-                     * This should only occur if there is a concurrent destroy,
-                     * which is highly unlikely to say the least.
-                     */
-                    throw new RuntimeException("Concurrent create/destroy: "
-                            + namespace);
-
-                }
-
-                return lts;
-                
-            }
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        } finally {
-
-            if (acquiredConnection)
-                journal.releaseUnisolatedConnection();
-
         }
-        
+
     }
 
     /**
@@ -1047,9 +710,10 @@ public class BigdataSail extends SailBase implements Sail {
      * @param database
      *            The instance.
      */
+    @Deprecated // FIXME BLZG-2041 Remove in favor of BigdataSail(namespace,IndexManager)
     public BigdataSail(final AbstractTripleStore database) {
      
-        this(database, database);
+        this(database, database.getIndexManager());
         
     }
 
@@ -1063,172 +727,73 @@ public class BigdataSail extends SailBase implements Sail {
      * 
      * @param database
      *            An existing {@link AbstractTripleStore}.
-     * @param mainDatabase
+     * @param mainIndexManager
      *            When <i>database</i> is a {@link TempTripleStore}, this is the
-     *            {@link AbstractTripleStore} used to resolve the
+     *            {@link IIndexManager} used to resolve the
      *            {@link QueryEngine}. Otherwise it must be the same object as
      *            the <i>database</i>.
-     */ //FIXME BLZG-2041 Refactor constructor, callers, and locking patterns. 
+     */ 
+    @Deprecated // FIXME BLZG-2041 Remove in favor of BigdataSail(namespace,IndexManager) 
     public BigdataSail(final AbstractTripleStore database,
-            final AbstractTripleStore mainDatabase) {
+            final IIndexManager mainIndexManager) {
+
+        this(database.getNamespace(), database.getIndexManager(), mainIndexManager);
         
-        if (database == null)
+    }
+
+    /**
+     * Normal use constructor.
+     * 
+     * @param namespace The namespace.
+     * @param indexManager The index manager (typically a {@link Journal}).
+     */
+    public BigdataSail(final String namespace, final IIndexManager indexManager) {
+        
+        this(namespace, indexManager, indexManager);
+        
+    }
+    
+    /**
+     * Core constructor.
+     * 
+     * @param namespace The namespace.
+     * @param indexManager The index manager on which the data is stored.
+     * @param mainIndexManager Iff the data is stored on a {@link TempTripleStore} then this is the main index manager and will be used to locate the {@link QueryEngine}.
+     * 
+     * @see BLZG-2041 BigdataSail should not locate the AbstractTripleStore until a connection is requested
+     * 
+     * FIXME      BLZG-2041: VERIFY / UPDATE COMMENT: 
+     * To create a {@link BigdataSail} backed by an {@link IBigdataFederation}
+     * use the {@link ScaleOutTripleStore} ctor and then
+     * {@link AbstractTripleStore#create()} the triple store if it does not
+     * exist.
+     */
+    public BigdataSail(final String namespace, final IIndexManager indexManager, 
+            final IIndexManager mainIndexManager) {
+        
+        if (namespace == null)
             throw new IllegalArgumentException();
 
-        if (mainDatabase == null)
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+
+        if (mainIndexManager == null)
             throw new IllegalArgumentException();
         
         // default to false here and overwritten by some ctor variants.
         this.closeOnShutdown = false;
         
-        this.database = database;
+        this.namespace = namespace;
         
-        this.properties = database.getProperties();
-
-        this.namespace = properties.getProperty(Options.NAMESPACE,Options.DEFAULT_NAMESPACE);
-        
-        // Note: We are using the [database] IndexManager.  This is the historical behavior.
-        this.indexManager = database.getIndexManager();
+        this.indexManager = indexManager;
         
         this.valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
         
-        this.quads = database.isQuads();
-        
-        this.scaleOut = (database.getIndexManager() instanceof IBigdataFederation);
-        
-        checkProperties(properties);
-        
-        // truthMaintenance
-        if (database.getAxioms() instanceof NoAxioms || quads || scaleOut) {
-
-            /*
-             * If there is no axioms model then inference is not enabled and
-             * truth maintenance is disabled automatically.
-             */
-
-            truthMaintenanceIsSupportable = false;
-
-        } else {
-
-            truthMaintenanceIsSupportable = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.TRUTH_MAINTENANCE,
-                    BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.TRUTH_MAINTENANCE + "="
-                        + truthMaintenanceIsSupportable);
-
-        }
-        
-        // bufferCapacity
-        {
-            
-            bufferCapacity = Integer.parseInt(properties.getProperty(
-                    BigdataSail.Options.BUFFER_CAPACITY,
-                    BigdataSail.Options.DEFAULT_BUFFER_CAPACITY));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.BUFFER_CAPACITY + "="
-                        + bufferCapacity);
-
-        }
-
-        // queueCapacity
-        {
-            
-            queueCapacity = Integer.parseInt(properties.getProperty(
-                    BigdataSail.Options.QUEUE_CAPACITY,
-                    BigdataSail.Options.DEFAULT_QUEUE_CAPACITY));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.QUEUE_CAPACITY + "="
-                        + queueCapacity);
-
-        }
-
-        // queryTimeExpander
-        if (scaleOut) {
-            
-            /*
-             * Note: Query time expanders are not supported in scale-out. They
-             * involve an expander pattern on the IAccessPath and that is not
-             * compatible with local reads against sharded indices.
-             */
-            queryTimeExpander = false;
-            
-        } else {
-
-            queryTimeExpander = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.QUERY_TIME_EXPANDER,
-                    BigdataSail.Options.DEFAULT_QUERY_TIME_EXPANDER));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
-                        + queryTimeExpander);
-
-        }
-        
-        // exactSize
-        {
-            
-            exactSize = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.EXACT_SIZE,
-                    BigdataSail.Options.DEFAULT_EXACT_SIZE));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.EXACT_SIZE + "="
-                        + exactSize);
-            
-        }
-
-        // allowAutoCommit
-        {
-            
-            allowAutoCommit = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.ALLOW_AUTO_COMMIT,
-                    BigdataSail.Options.DEFAULT_ALLOW_AUTO_COMMIT));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.ALLOW_AUTO_COMMIT + "="
-                        + allowAutoCommit);
-            
-        }
-        
-        // isolatable
-        { 
-            
-            isolatable = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.ISOLATABLE_INDICES,
-                    BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.ISOLATABLE_INDICES + "="
-                        + isolatable);
-            
-        }
-        
-        
-        // allowAutoCommit
-        {
-            
-            rejectQuadsInTripleMode = 
-                Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE,
-                    BigdataSail.Options.DEFAULT_REJECT_QUADS_IN_TRIPLE_MODE));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE + "="
-                        + rejectQuadsInTripleMode);
-            
-        }
-        
-
-        namespaces = 
+        this.namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
-
-        queryEngine = QueryEngineFactory.getInstance().getQueryController(mainDatabase
-                .getIndexManager());
         
+        this.queryEngine = QueryEngineFactory.getInstance().getQueryController(mainIndexManager);
+
     }
     
     /**
@@ -1251,6 +816,70 @@ public class BigdataSail extends SailBase implements Sail {
     public boolean isOpen() {
         
         return openSail;
+        
+    }
+    
+    /**
+     * Create a the configured namespace.
+     * 
+     * @param properties The configuration properties for the namespace.
+     * 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     * 
+     * @see Options#NAMESPACE
+     * 
+     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+     */
+    public void create(final Properties properties) throws InterruptedException, ExecutionException {
+        
+        if ( properties == null )
+            throw new IllegalArgumentException();
+        
+        AbstractApiTask.submitApiTask(indexManager,
+                new CreateKBTask(namespace, properties)
+                ).get();
+            
+    }
+
+    /**
+     * Destroy the configured namespace.
+     * 
+     * @throws SailException
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     * 
+     * @see Options#NAMESPACE
+     * 
+     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+     */
+    public void destroy() throws SailException, InterruptedException, ExecutionException {
+        
+        shutDown();
+        
+        AbstractApiTask.submitApiTask(indexManager,
+                new DestroyKBTask(namespace)
+                ).get();
+            
+    }
+
+    /**
+     * Return true iff the namespace exists at the moment when this check is
+     * performed.
+     * <p>
+     * Note: It is not possible to use this with any guarantees that the namespace
+     * still exists once control is returned to the caller unless the caller is
+     * holding an unisolated connection.
+     * 
+     * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+     */
+    public boolean exists() {
+
+        // Attempt to resolve the namespace. 
+        // FIXME BLZG-2041 BLZG-2023 We MUST NOT test the unisolated view of the locator cache without the global lock.
+        // TODO Should exists submit a task for this?
+        // FIXME CreateKBTask() and DestroyKBTask() also have the same error.
+        return indexManager.getResourceLocator().locate(namespace, ITx.UNISOLATED) != null;
         
     }
     
@@ -1281,6 +910,7 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * Invokes {@link #shutDown()}.
      */
+    @Override
     protected void finalize() throws Throwable {
         
         if(isOpen()) {
@@ -1296,6 +926,7 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
 
+    @Override
     public void shutDown() throws SailException {
         
         assertOpenSail();
@@ -1315,6 +946,7 @@ public class BigdataSail extends SailBase implements Sail {
      * If the backing database was created/opened by the {@link BigdataSail}
      * then it is closed.  Otherwise this is a NOP.
      */
+    @Override
     protected void shutDownInternal() throws SailException {
         
         if (openSail) {
@@ -1407,7 +1039,7 @@ public class BigdataSail extends SailBase implements Sail {
     @Override
     final public boolean isWritable() throws SailException {
 
-        return true;
+        return true; // TODO BLZG-2041 For many index managers, we could test to see if it is readOnly.
 //        return ! database.isReadOnly();
         
     }
@@ -1428,6 +1060,22 @@ public class BigdataSail extends SailBase implements Sail {
     protected NotifyingSailConnection getConnectionInternal() 
         throws SailException {
 
+        final long lastCommitTime = indexManager.getLastCommitTime();
+        
+        final AbstractTripleStore readOnlyTripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, lastCommitTime);
+
+        if(readOnlyTripleStore == null) {
+            
+            throw new SailException("Namespace not found: namespace="+namespace);
+            
+        }
+        
+        final Properties properties = readOnlyTripleStore.getProperties();
+        
+        final boolean isolatable = Boolean.parseBoolean(properties.getProperty(
+                        BigdataSail.Options.ISOLATABLE_INDICES,
+                        BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
+        
         final BigdataSailConnection conn;
         try {
 
@@ -1614,15 +1262,8 @@ public class BigdataSail extends SailBase implements Sail {
             writeLock = lock.writeLock();
             writeLock.lock();
 
-            // Note: The database is a final field for this path. For read-only
-            // and read/write connections we actually do discovery and can find
-            // out that the database no longer exists, in which case we throw a
-            // DataSetNotFoundException
-            assert database != null;
-            
-            // new writable connection.
-            conn = new BigdataSailConnection(database, writeLock, true/* unisolated */)
-                    .startConn();
+            // new unisolated connection.
+            conn = new BigdataSailConnection(writeLock).startConn();
             
             /*
              * Add the RDRHistory class if that feature is enabled.
@@ -1636,11 +1277,6 @@ public class BigdataSail extends SailBase implements Sail {
 //            }
             
         } catch(DatasetNotFoundException ex) {
-            /*
-             * This exception should not be thrown for the UNISOLATED connection
-             * since we know that the database reference is non-null on entry to
-             * the BigdataSailConnection constructor.
-             */
            throw new RuntimeException(ex);
         } finally {
             if (conn == null) {
@@ -1710,18 +1346,41 @@ public class BigdataSail extends SailBase implements Sail {
      * @return The transaction.
      * 
      * @throws IOException
-    * @throws DatasetNotFoundException 
+     * @throws DatasetNotFoundException 
      * @see ITransactionService#newTx(long)
      */
     private BigdataSailConnection _getReadOnlyConnection(final long timestamp)
             throws IOException, DatasetNotFoundException {
-
-        return new BigdataSailReadOnlyConnection(timestamp).startConn();
-
+        final long commitTime;
+        if(timestamp == ITx.READ_COMMITTED) {
+            commitTime = getIndexManager().getLastCommitTime();
+        } else {
+            commitTime = timestamp;
+        }
+        if(!TimestampUtility.isCommitTime(commitTime))
+            throw new IllegalArgumentException("Not a commitTime: timestamp="+timestamp);
+        final ITransactionService txService = getTxService();
+        boolean ok = false;
+        final long txId = txService.newTx(commitTime);
+        try {
+            final BigdataSailConnection conn = new BigdataSailReadOnlyConnection(txId,txService).startConn();
+            ok = true;
+            return conn;
+        } finally {
+            if(!ok) {
+                try {
+                    txService.abort(txId);
+                } catch (IOException ex) {
+                    log.error(ex, ex);
+                }
+            }
+        }
     }
 
 	/**
 	 * Return a connection backed by a read-write transaction.
+	 * 
+	 * @throws DatasetNotFoundException 
 	 * 
 	 * @throws UnsupportedOperationException
 	 *             unless {@link Options#ISOLATABLE_INDICES} was specified when
@@ -1729,13 +1388,13 @@ public class BigdataSail extends SailBase implements Sail {
 	 */
     public BigdataSailConnection getReadWriteConnection() throws IOException {
 
-        if (!isolatable) {
-
-            throw new UnsupportedOperationException(
-                "Read/write transactions are not allowed on this database. " +
-                "See " + Options.ISOLATABLE_INDICES);
-
-        }
+//        if (!isolatable) {
+//
+//            throw new UnsupportedOperationException(
+//                "Read/write transactions are not allowed on this database. " +
+//                "See " + Options.ISOLATABLE_INDICES);
+//
+//        }
 
         final IIndexManager indexManager = getIndexManager();
 
@@ -1745,10 +1404,30 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
-        final Lock readLock = lock.readLock();
-        readLock.lock();
-
-        return new BigdataSailRWTxConnection(readLock).startConn();
+        final ITransactionService txService = getTxService();
+        boolean ok = false;
+        Lock readLock = null;
+        final long txId = txService.newTx(ITx.UNISOLATED); // read/write tx on lastCommitTime.
+        try {
+            readLock = lock.readLock();
+            readLock.lock();
+            final BigdataSailConnection conn = new BigdataSailRWTxConnection(txId,txService,readLock).startConn();
+            ok = true;
+            return conn;
+        } catch(DatasetNotFoundException ex) {
+            throw new RuntimeException(ex);
+        } finally {
+            if(!ok) {
+                if(readLock != null) {
+                    readLock.unlock();
+                }
+                try {
+                    txService.abort(txId);
+                } catch (IOException ex) {
+                    log.error(ex, ex);
+                }
+            }
+        }
 
     }
 
@@ -1813,6 +1492,84 @@ public class BigdataSail extends SailBase implements Sail {
          * True iff the {@link SailConnection} is open.
          */
         protected boolean openConn;
+        
+        /**
+         * <code>true</code> iff the {@link BigdataSail} can support truth
+         * maintenance, however truth maintenance may be conditionally suppressed
+         * for a {@link BigdataSailConnection} in order to allow people to
+         * temporarily disable when batching updates into the Sail.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/591 (Manage Truth
+         *      Maintenance)
+         */
+        private final boolean truthMaintenanceIsSupportable;
+        
+        /**
+         * The configured capacity for the statement buffer(s).
+         * 
+         * @see Options#BUFFER_CAPACITY
+         */
+        final private int bufferCapacity;
+        
+        /**
+         * The configured capacity for blocking queue backing the statement buffer(s).
+         * 
+         * @see Options#QUEUE_CAPACITY
+         */
+        final private int queueCapacity;
+        
+        /**
+         * When true, the SAIL is in the "quads" mode.
+         * 
+         * @see AbstractTripleStore.Options#QUADS
+         */
+        final private boolean quads;
+        
+        /**
+         * When <code>true</code> the SAIL is backed by an
+         * {@link IBigdataFederation}.
+         */
+        final protected boolean scaleOut;
+        
+        /**
+         * When true, SAIL will compute entailments at query time that were excluded
+         * from forward closure.
+         * 
+         * @see Options#QUERY_TIME_EXPANDER
+         */
+        final private boolean queryTimeExpander;
+        
+        /**
+         * When true, SAIL will compute an exact size in the {@link
+         * SailConnection#size(Resource[])} method.
+         * 
+         * @see Options#EXACT_SIZE
+         */
+        final private boolean exactSize;
+        
+        /**
+         * When true, auto-commit is allowed. Do not ever use auto-commit, this is
+         * purely used to pass the Sesame test suites.
+         * 
+         * @see Options#ALLOW_AUTO_COMMIT
+         */
+        final private boolean allowAutoCommit;
+        
+        /**
+         * When true, read/write transactions are allowed.
+         * 
+         * @see {@link Options#ISOLATABLE_INDICES}
+         */
+        protected final boolean isolatable;
+        
+        /**
+         *  Specifies whether quads in triple mode are rejected (true) or loaded 
+         *  while silently stripping off the context (false). In the latter case, 
+         *  the fireSailChangedEvent will report back the original statements,
+         *  i.e. including the context, although the latter was not stored
+         *  internally.
+         */
+        final private boolean rejectQuadsInTripleMode;
         
         /**
          * When true, the RDFS closure will be maintained.
@@ -1900,11 +1657,54 @@ public class BigdataSail extends SailBase implements Sail {
         private final boolean unisolated;
         
         /**
-         * Critical section support in case rollback is not completed cleanly, in which
-         * case calls to commit() will fail until a clean rollback() is made. @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
-
+         * Critical section support in case rollback is not completed cleanly,
+         * in which case calls to commit() will fail until a clean {@link #rollback()}
+         * is made. 
+         * 
+         * @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
          */
         private final AtomicBoolean rollbackRequired = new AtomicBoolean(false);
+
+        /**
+         * The as-configured properties for the {@link BigdataSail}.
+         * 
+         * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+         */
+        final private Properties properties;
+
+        /**
+         * Return the as-configured properties for the {@link BigdataSail}.
+         * 
+         * @see BLZG-2041 (BigdataSail should not locate the AbstractTripleStore until a connection is requested)
+         */
+        public Properties getProperties() {
+            
+            return properties;
+            
+        }
+
+        /**
+         * Return <code>true</code> if the SAIL is using a "quads" mode database.
+         * 
+         * @see AbstractTripleStore.Options#QUADS
+         */
+        final public boolean isQuads() {
+
+            return quads;
+            
+        }
+        
+        /**
+         * Return <code>true</code> iff the SAIL is using a namespace that has been
+         * configured to support isolatable indices.
+         * 
+         * @see Options#ISOLATABLE_INDICES
+         */
+        final public boolean isIsolatable() {
+           
+           return isolatable;
+           
+        }
 
         @Override
         public String toString() {
@@ -2048,27 +1848,169 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Any kind of connection (core constructor).
          * 
+         * @param timestampOrTxId
+         *            Either a commit time or a read/write transaction identifier.
          * @param lock
-         * @param unisolated
-         *            <code>true</code> iff this is an unisolated connection.
-         * @param readOnly
-         *            <code>true</code> iff this is a read-only connection.
          */
-        protected BigdataSailConnection(final Lock lock,
-                final boolean unisolated, final boolean readOnly) {
+        protected BigdataSailConnection(final long timestampOrTxId, final Lock lock) throws DatasetNotFoundException {
 
             this.lock = lock;
 
-            this.unisolated = unisolated;
+            this.unisolated = TimestampUtility.isUnisolated(timestampOrTxId);
             
-            this.readOnly = readOnly;
+            this.readOnly = TimestampUtility.isReadOnly(timestampOrTxId);
 
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, timestampOrTxId);
+            
+            if(tripleStore == null) {
+
+                throw new DatasetNotFoundException("namespace="+namespace);
+                
+            }
+            
+            {
+                
+                this.database = tripleStore;
+                
+                this.properties = database.getProperties();
+
+                this.quads = database.isQuads();
+                
+                this.scaleOut = (database.getIndexManager() instanceof IBigdataFederation);
+                
+                checkProperties(properties);
+                
+                // truthMaintenance
+                if (database.getAxioms() instanceof NoAxioms || quads || scaleOut) {
+
+                    /*
+                     * If there is no axioms model then inference is not enabled and
+                     * truth maintenance is disabled automatically.
+                     */
+
+                    truthMaintenanceIsSupportable = false;
+
+                } else {
+
+                    truthMaintenanceIsSupportable = Boolean.parseBoolean(properties.getProperty(
+                            BigdataSail.Options.TRUTH_MAINTENANCE,
+                            BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.TRUTH_MAINTENANCE + "="
+                                + truthMaintenanceIsSupportable);
+
+                }
+                
+                // bufferCapacity
+                {
+                    
+                    bufferCapacity = Integer.parseInt(properties.getProperty(
+                            BigdataSail.Options.BUFFER_CAPACITY,
+                            BigdataSail.Options.DEFAULT_BUFFER_CAPACITY));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.BUFFER_CAPACITY + "="
+                                + bufferCapacity);
+
+                }
+
+                // queueCapacity
+                {
+                    
+                    queueCapacity = Integer.parseInt(properties.getProperty(
+                            BigdataSail.Options.QUEUE_CAPACITY,
+                            BigdataSail.Options.DEFAULT_QUEUE_CAPACITY));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.QUEUE_CAPACITY + "="
+                                + queueCapacity);
+
+                }
+
+                // queryTimeExpander
+                if (scaleOut) {
+                    
+                    /*
+                     * Note: Query time expanders are not supported in scale-out. They
+                     * involve an expander pattern on the IAccessPath and that is not
+                     * compatible with local reads against sharded indices.
+                     */
+                    queryTimeExpander = false;
+                    
+                } else {
+
+                    queryTimeExpander = Boolean.parseBoolean(properties.getProperty(
+                            BigdataSail.Options.QUERY_TIME_EXPANDER,
+                            BigdataSail.Options.DEFAULT_QUERY_TIME_EXPANDER));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
+                                + queryTimeExpander);
+
+                }
+                
+                // exactSize
+                {
+                    
+                    exactSize = Boolean.parseBoolean(properties.getProperty(
+                            BigdataSail.Options.EXACT_SIZE,
+                            BigdataSail.Options.DEFAULT_EXACT_SIZE));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.EXACT_SIZE + "="
+                                + exactSize);
+                    
+                }
+
+                // allowAutoCommit
+                {
+                    
+                    allowAutoCommit = Boolean.parseBoolean(properties.getProperty(
+                            BigdataSail.Options.ALLOW_AUTO_COMMIT,
+                            BigdataSail.Options.DEFAULT_ALLOW_AUTO_COMMIT));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.ALLOW_AUTO_COMMIT + "="
+                                + allowAutoCommit);
+                    
+                }
+                
+                // isolatable
+                { 
+                    
+                    isolatable = Boolean.parseBoolean(properties.getProperty(
+                            BigdataSail.Options.ISOLATABLE_INDICES,
+                            BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.ISOLATABLE_INDICES + "="
+                                + isolatable);
+                    
+                }
+                
+                // allowAutoCommit
+                {
+                    
+                    rejectQuadsInTripleMode = 
+                        Boolean.parseBoolean(properties.getProperty(
+                            BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE,
+                            BigdataSail.Options.DEFAULT_REJECT_QUADS_IN_TRIPLE_MODE));
+
+                    if (log.isInfoEnabled())
+                        log.info(BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE + "="
+                                + rejectQuadsInTripleMode);
+                    
+                }
+                
+            }
+            
             /*
              * Notice whether or not truth maintenance is enabled.
              * 
              * Note: This property can be changed dynamically.
              */
-            this.truthMaintenance = BigdataSail.this.truthMaintenanceIsSupportable
+            this.truthMaintenance = this.truthMaintenanceIsSupportable
                     && unisolated;
 
             /*
@@ -2082,21 +2024,13 @@ public class BigdataSail extends SailBase implements Sail {
 
         /**
          * Unisolated connections.
-         * 
-         * @param database
-         *            The database. If this is a read-only view, then the
-         *            {@link SailConnection} will not support update.
+         *
          * @param lock
-         * @param unisolated
-         *            <code>true</code> iff this is an unisolated connection.
-         * @param readOnly
-         *            <code>true</code> iff this is a read-only connection.
-       * @throws DatasetNotFoundException 
+         * @throws DatasetNotFoundException 
          */
-        protected BigdataSailConnection(final AbstractTripleStore database,
-                final Lock lock, final boolean unisolated) throws DatasetNotFoundException {
+        protected BigdataSailConnection(final Lock lock) throws DatasetNotFoundException {
 
-            this(lock, unisolated, database.isReadOnly());
+            this(ITx.UNISOLATED, lock);
 
             attach(database);
 
@@ -4789,65 +4723,73 @@ public class BigdataSail extends SailBase implements Sail {
         private long tx;
 
         /**
-         * Constructor starts a new transaction.
+         * Constructor for a new fully isolated read/write transaction.
+         * This constructor uses the caller supplied read/write transaction from the journal's
+         * transaction service and attaches this SAIL connection to the new
+         * view of the database. 
+         * 
+         * @throws DatasetNotFoundException 
          */
-        public BigdataSailRWTxConnection(final Lock readLock)
-                throws IOException {
+        public BigdataSailRWTxConnection(final long txId, final ITransactionService txService, final Lock readLock)
+                throws IOException, DatasetNotFoundException {
 
-            super(readLock, false/* unisolated */, false/* readOnly */);
+            super(readLock);//, false/* unisolated */, false/* readOnly */);
 
-            txService = getTxService();
+            if (!isolatable) {
+
+                throw new UnsupportedOperationException(
+                    "Read/write transactions are not allowed on this database. " +
+                    "See " + Options.ISOLATABLE_INDICES);
+
+            }
+
+            this.txService = txService;
             
-            newTx();
+            newTx(txId);
+            
+        }
+
+        // variant when the caller already has the the tx.
+        protected void newTx(final long txId) throws DatasetNotFoundException {
+            
+            this.tx = txId;
+            
+            // Attach that transaction view to this SailConnection.
+            attach(database);
+
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-NEW-TX : txId=" + tx + ", conn=" + this);
             
         }
         
-        /**
-         * Obtain a new read/write transaction from the journal's
-         * transaction service, and attach this SAIL connection to the new
-         * view of the database. 
-         */
-        protected void newTx() throws IOException {
+        // variant when the method must create the new tx.
+        protected void newTx() throws DatasetNotFoundException, IOException {
 
-            // The view of the database *outside* of this connection.
-            final AbstractTripleStore database = BigdataSail.this.database;
+            boolean ok = false;
             
-            // The namespace of the triple store.
-            final String namespace = database.getNamespace();
-
             // Open a new read/write transaction.
-            this.tx = txService.newTx(ITx.UNISOLATED);
+            final long txId = txService.newTx(ITx.UNISOLATED);
 
             try {
-
-                /*
-                 * Locate a view of the triple store isolated by that
-                 * transaction.
-                 */
-                final AbstractTripleStore txView = (AbstractTripleStore) database
-                        .getIndexManager().getResourceLocator().locate(
-                                namespace, tx);
-
-                // Attach that transaction view to this SailConnection.
-                attach(txView);
-
-                if (txLog.isInfoEnabled())
-                    txLog.info("SAIL-NEW-TX : txId=" + tx + ", conn=" + this);
-
-            } catch (Throwable t) {
-
-                try {
-                    txService.abort(tx);
-                } catch (IOException ex) {
-                    log.error(ex, ex);
+            
+                newTx(txId);
+                
+                ok = true;
+                
+            } finally {
+                
+                if(!ok) {
+                    try {
+                        txService.abort(tx);
+                    } catch (IOException ex) {
+                        log.error(ex, ex);
+                    }
                 }
                 
-                throw new RuntimeException(t);
-                
             }
-
+            
         }
-
+        
         /**
          * {@inheritDoc}
          * <p>
@@ -4913,7 +4855,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 return commitTime;
             
-            } catch(IOException ex) {
+            } catch(IOException|DatasetNotFoundException ex) {
                     
                 throw new SailException(ex);
                 
@@ -4951,7 +4893,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 newTx();
             
-            } catch(IOException ex) {
+            } catch(IOException|DatasetNotFoundException ex) {
                     
                 throw new SailException(ex);
                 
@@ -5027,159 +4969,138 @@ public class BigdataSail extends SailBase implements Sail {
         private final boolean clusterCacheBugFix;
         
         /**
-         * Constructor starts a new transaction.
-       * @throws DatasetNotFoundException 
+         * Constructor starts a new transaction. It
+         * Obtains a new read-only transaction from the journal's transaction
+         * service, and attach this SAIL connection to the new view of the
+         * database.
+         * 
+         * @throws DatasetNotFoundException 
          */
-        BigdataSailReadOnlyConnection(final long timestamp) throws IOException, DatasetNotFoundException {
+        BigdataSailReadOnlyConnection(final long txId,ITransactionService txService) throws IOException, DatasetNotFoundException {
 
-            super(null/* lock */, false/* unisolated */, true/* readOnly */);
+            super(txId, null/* lock */);//, false/* unisolated */, true/* readOnly */);
 
 //            clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
-            clusterCacheBugFix = BigdataSail.this.scaleOut; // identical to the code above.
+            clusterCacheBugFix = this.scaleOut; // identical to the code above.
 
-            txService = getTxService();
-
-            newTx(timestamp);
+            this.txService = txService;
+            
+            // Attach that transaction view to this SailConnection.
+            attach(database);
             
         }
         
-        /**
-         * Obtain a new read-only transaction from the journal's transaction
-         * service, and attach this SAIL connection to the new view of the
-         * database.
-       * @throws DatasetNotFoundException 
-         */
-        protected void newTx(final long timestamp) throws IOException, DatasetNotFoundException {
-            
-            // The view of the database *outside* of this connection.
-            final AbstractTripleStore database = BigdataSail.this.database;
-            
-            // The namespace of the triple store.
-            final String namespace = database.getNamespace();
-
-            if (clusterCacheBugFix) {
-
-                /*
-                 * Use a read-historical operation
-                 */
-                this.tx = timestamp;
-
-                final AbstractTripleStore txView;
-                
-                if (database.getTimestamp() == timestamp) {
-
-                    /*
-                     * We already have the right view (optimization).
-                     * 
-                     * Note: This case is quite common. For example, it occurs
-                     * if the NanoSparqlServer uses a READ_LOCK to pin a commit
-                     * time on the database and then issues it's queries against
-                     * that commit time.
-                     */
-
-                    txView = database;
-                    
-                } else {
-
-                    /*
-                     * Locate a view of the triple store using that
-                     * read-historical timestamp.
-                     */
-
-                    txView = (AbstractTripleStore) database.getIndexManager()
-                            .getResourceLocator().locate(namespace, tx);
-
-                }
-                
-                // Attach that transaction view to this SailConnection.
-                attach(txView);
-
-            } else {
-                
-                /*
-                 * Obtain a new read-only transaction reading from that
-                 * timestamp.
-                 */
-                this.tx = txService.newTx(timestamp);
-
-                try {
-                    
-//                    /*
-//                     * Attempt to discover the commit time that this transaction
-//                     * is reading on.
-//                     */
-//                    final long readsOnCommitTime;
-//                    if (database.getIndexManager() instanceof Journal) {
+//        /**
+//         * Obtain a new read-only transaction from the journal's transaction
+//         * service, and attach this SAIL connection to the new view of the
+//         * database.
+//         * 
+//         * @throws DatasetNotFoundException 
+//         */
+//        protected void newTx(final long timestamp) throws IOException, DatasetNotFoundException {
+//            
+////            // The view of the database *outside* of this connection.
+////            final AbstractTripleStore database = BigdataSail.this.database;
+////            
+////            // The namespace of the triple store.
+////            final String namespace = database.getNamespace();
 //
-//                        final Journal journal = (Journal) database
-//                                .getIndexManager();
+//            if (clusterCacheBugFix) {
 //
-//                        final ITx txObj = journal.getTransactionManager()
-//                                .getTx(this.tx);
+//                /*
+//                 * Use a read-historical operation
+//                 */
+//                this.tx = timestamp;
 //
-//                        if (txObj != null) {
+//                // Attach that transaction view to this SailConnection.
+//                attach(database);
 //
-//                            // found it.
-//                            readsOnCommitTime = txObj.getReadsOnCommitTime();
-//                            
-//                        } else {
+//            } else {
+//                
+//                /*
+//                 * Obtain a new read-only transaction reading from that
+//                 * timestamp.
+//                 */
+//                this.tx = txService.newTx(timestamp);
 //
-//                            /**
-//                             * TODO This can happen in HA because the TxState is
-//                             * not available yet on the followers.
-//                             * 
-//                             * @see <a
-//                             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623">
-//                             *      HA TXS / TXS Bottleneck </a>
-//                             */
-//                            readsOnCommitTime = this.tx;
-//                            
-//                        }
-//
-//                    } else {
-//                        
-//                        readsOnCommitTime = timestamp;
+//                try {
 //                    
+////                    /*
+////                     * Attempt to discover the commit time that this transaction
+////                     * is reading on.
+////                     */
+////                    final long readsOnCommitTime;
+////                    if (database.getIndexManager() instanceof Journal) {
+////
+////                        final Journal journal = (Journal) database
+////                                .getIndexManager();
+////
+////                        final ITx txObj = journal.getTransactionManager()
+////                                .getTx(this.tx);
+////
+////                        if (txObj != null) {
+////
+////                            // found it.
+////                            readsOnCommitTime = txObj.getReadsOnCommitTime();
+////                            
+////                        } else {
+////
+////                            /**
+////                             * TODO This can happen in HA because the TxState is
+////                             * not available yet on the followers.
+////                             * 
+////                             * @see <a
+////                             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623">
+////                             *      HA TXS / TXS Bottleneck </a>
+////                             */
+////                            readsOnCommitTime = this.tx;
+////                            
+////                        }
+////
+////                    } else {
+////                        
+////                        readsOnCommitTime = timestamp;
+////                    
+////                    }
+//                    
+//                    /*
+//                     * Locate a view of the triple store isolated by that
+//                     * transaction.
+//                     * 
+//                     * Note: This will use the readsOnCommitTime for the tx when
+//                     * that is available. This provides better caching.
+//                     * 
+//                     * TODO This change does not work. It causes a test failure
+//                     * in TestConcurrentKBCreate and may also be causing CI
+//                     * problems in TestHA3JournalServer. See r6742, r6743. I
+//                     * have not tracked down why using the [readsOnCommitTime]
+//                     * causes a problem, but what happens is that the
+//                     * DefaultResourceLocator winds up returning [txView :=
+//                     * null] and an IllegalArgumentException is then thrown out
+//                     * of attach(txView).
+//                     */
+//                    final AbstractTripleStore txView = (AbstractTripleStore) database
+//                            .getIndexManager().getResourceLocator()
+//                            .locate(namespace, tx);//readsOnCommitTime);
+//
+//                    // Attach that transaction view to this SailConnection.
+//                    attach(txView);
+//    
+//                } catch (Throwable t) {
+//    
+//                    try {
+//                        txService.abort(tx);
+//                    } catch (IOException ex) {
+//                        log.error(ex, ex);
 //                    }
-                    
-                    /*
-                     * Locate a view of the triple store isolated by that
-                     * transaction.
-                     * 
-                     * Note: This will use the readsOnCommitTime for the tx when
-                     * that is available. This provides better caching.
-                     * 
-                     * TODO This change does not work. It causes a test failure
-                     * in TestConcurrentKBCreate and may also be causing CI
-                     * problems in TestHA3JournalServer. See r6742, r6743. I
-                     * have not tracked down why using the [readsOnCommitTime]
-                     * causes a problem, but what happens is that the
-                     * DefaultResourceLocator winds up returning [txView :=
-                     * null] and an IllegalArgumentException is then thrown out
-                     * of attach(txView).
-                     */
-                    final AbstractTripleStore txView = (AbstractTripleStore) database
-                            .getIndexManager().getResourceLocator()
-                            .locate(namespace, tx);//readsOnCommitTime);
-
-                    // Attach that transaction view to this SailConnection.
-                    attach(txView);
-    
-                } catch (Throwable t) {
-    
-                    try {
-                        txService.abort(tx);
-                    } catch (IOException ex) {
-                        log.error(ex, ex);
-                    }
-    
-                    throw new RuntimeException(t);
-    
-                }
-            
-            }
-            
-        }
+//    
+//                    throw new RuntimeException(t);
+//    
+//                }
+//            
+//            }
+//            
+//        }
 
         /**
          * NOP

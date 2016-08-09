@@ -92,39 +92,33 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
     public void testImplementationDefinedDefaultGraph ()
         throws Exception
     {
-        BigdataSail sail = getTheSail () ;
-        if(!((BigdataSail)sail).isQuads()) {
-            log.info("This test requires quads.");
-            return;
-        }
+        final BigdataSail sail = getTheSail () ;
         final ValueFactory vf = sail.getValueFactory();
-        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
-
-        String ns = "http://xyz.com/test#" ;
-        String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
-        String qs = String.format ( "select ?p ?o where { <%ss> ?p ?o .}", ns ) ;
-
-        Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
-
-        Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "p", new URIImpl ( String.format ( "%sp", ns ) ) )
-                                                                         , new BindingImpl ( "o", new URIImpl ( String.format ( "%so", ns ) ) )
-                                                                         )
-                                                      ) ;
-        run ( sail, cxn, kb, graphs, qs, expected ) ;
+        final RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+        try {
+            final String ns = "http://xyz.com/test#" ;
+            final String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
+            final String qs = String.format ( "select ?p ?o where { <%ss> ?p ?o .}", ns ) ;
+    
+            final Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
+    
+            final Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "p", new URIImpl ( String.format ( "%sp", ns ) ) )
+                                                                                   , new BindingImpl ( "o", new URIImpl ( String.format ( "%so", ns ) ) )
+                                                                                   )
+                                                          ) ;
+            run ( sail, cxn, kb, graphs, qs, expected ) ;
+        } finally {
+            cxn.close();
+        }
     }
 
     public void testExplicitDefaultGraph ()
         throws Exception
     {
-        BigdataSail sail = getTheSail () ;
-        if(!((BigdataSail)sail).isQuads()) {
-            log.info("This test requires quads.");
-            return;
-        }
-
+        final BigdataSail sail = getTheSail () ;
         final ValueFactory vf = sail.getValueFactory();
-        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
-
+        final RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+        try {
         String ns = "http://xyz.com/test#" ;
         String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
         String qs = String.format ( "select ?p ?o from <%sg1> from <%sg2> where { <%ss> ?p ?o .}", ns, ns, ns ) ;
@@ -136,20 +130,18 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
                                                                          )
                                                       ) ;
         run ( sail, cxn, kb, graphs, qs, expected ) ;
+        } finally {
+            cxn.close();
+        }
     }
 
     public void testNamedGraphNoGraphKeyword1 ()
         throws Exception
     {
-        BigdataSail sail = getTheSail () ;
-        if(!((BigdataSail)sail).isQuads()) {
-            log.info("This test requires quads.");
-        return;
-        }
-
+        final BigdataSail sail = getTheSail () ;
         final ValueFactory vf = sail.getValueFactory();
-        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
-
+        final RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+        try {
         String ns = "http://xyz.com/test#" ;
         String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
         String qs = String.format ( "select ?s from named <%sg2> where { ?s ?p ?o .}", ns ) ;
@@ -159,20 +151,18 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
         Collection<BindingSet> expected = getExpected () ;
 
         run ( sail, cxn, kb, graphs, qs, expected ) ;
+        } finally {
+            cxn.close();
+        }
     }
 
     public void testNamedGraphNoGraphKeyword2 ()
         throws Exception
     {
-        BigdataSail sail = getTheSail () ;
-        if(!((BigdataSail)sail).isQuads()) {
-            log.info("This test requires quads.");
-        return;
-        }
-
+        final BigdataSail sail = getTheSail () ;
         final ValueFactory vf = sail.getValueFactory();
-        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
-
+        final RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+        try {
         String ns = "http://xyz.com/test#" ;
         String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
         String qs = String.format ( "select ?s from named <%sg1> from named <%sg2> where { ?s ?p ?o .}", ns, ns ) ;
@@ -182,20 +172,18 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
         Collection<BindingSet> expected = getExpected () ;
 
         run ( sail, cxn, kb, graphs, qs, expected ) ;
+        } finally {
+            cxn.close();
+        }
     }
 
     public void testExplicitDefaultAndNamedGraphNoGraphKeyword ()
         throws Exception
     {
-        BigdataSail sail = getTheSail () ;
-        if(!((BigdataSail)sail).isQuads()) {
-            log.info("This test requires quads.");
-        return;
-        }
-
+        final BigdataSail sail = getTheSail () ;
         final ValueFactory vf = sail.getValueFactory();
-        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
-
+        final RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+        try {
         String ns = "http://xyz.com/test#" ;
         String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
         String qs = String.format ( "select ?s from <%sg1> from named <%sg2> where { ?s ?p ?o .}", ns, ns ) ;
@@ -205,6 +193,9 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
         Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "s", new URIImpl ( String.format ( "%ss", ns ) ) ) ) ) ;
 
         run ( sail, cxn, kb, graphs, qs, expected ) ;
+        } finally {
+            cxn.close();
+        }
     }
 
     private BigdataSail getTheSail ()
@@ -215,17 +206,21 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
         return sail ;
     }
 
-    private RepositoryConnection getRepositoryConnection ( BigdataSail sail )
+    private RepositoryConnection getRepositoryConnection ( final BigdataSail sail )
         throws RepositoryException
     {
-        BigdataSailRepository repo = new BigdataSailRepository ( sail ) ;
-        BigdataSailRepositoryConnection cxn = ( BigdataSailRepositoryConnection )repo.getConnection () ;
+        final BigdataSailRepository repo = new BigdataSailRepository ( sail ) ;
+        final BigdataSailRepositoryConnection cxn = ( BigdataSailRepositoryConnection )repo.getConnection () ;
         cxn.setAutoCommit ( false ) ;
         return cxn ;
     }
 
-    private void run ( BigdataSail sail, RepositoryConnection rc, String kb, Resource graphs [], String qs, Collection<BindingSet> expected )
+    private void run ( final BigdataSail sail, final RepositoryConnection rc, final String kb, final Resource graphs [], final String qs, final Collection<BindingSet> expected )
     {
+        if (!((BigdataSailRepositoryConnection) rc).getSailConnection().isQuads()) {
+            log.info("This test requires quads.");
+            return;
+        }
         try
         {
             for ( Resource g : graphs )

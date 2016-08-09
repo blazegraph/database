@@ -63,9 +63,10 @@ public abstract class AbstractTestBigdataGraph extends TestCase2 {
         
     }
     
+    @Override
     public Properties getProperties() {
         
-        Properties props = new Properties();
+        final Properties props = new Properties();
         
         props.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
                 "false");
@@ -111,8 +112,19 @@ public abstract class AbstractTestBigdataGraph extends TestCase2 {
         return props;
         
     }
+
+    private Properties properties = null;
+
+    @Override
+    protected void tearDown() throws Exception {
+
+        properties = null;
+        
+    }
     
     protected BigdataSail getSail(final Properties properties) {
+        
+        this.properties = properties;
         
         return new BigdataSail(properties);
         
@@ -120,7 +132,7 @@ public abstract class AbstractTestBigdataGraph extends TestCase2 {
 
     protected BigdataSail reopenSail(final BigdataSail sail) {
 
-        final Properties properties = sail.getProperties();
+//        final Properties properties = sail.getProperties();
 
         if (sail.isOpen()) {
 

@@ -226,7 +226,7 @@ public class CreateKBTask extends AbstractApiTask<Void> {
 
             if (isSoloOrLeader) {
 
-                // Attempt to resolve the namespace.
+                // Attempt to resolve the namespace. FIXME BLZG-2041 BLZG-2023 We MUST NOT test the unisolated view of the locator cache without the global lock.
                 if (indexManager.getResourceLocator().locate(namespace,
                         ITx.UNISOLATED) == null) {
 
