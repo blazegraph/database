@@ -479,6 +479,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionPrepare() {
+        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionPrepare();
         }
@@ -489,7 +490,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionCommited(final long commitTime) {
-        notifyRemoves();
+//        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionCommited(commitTime);
         }
@@ -500,7 +501,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionAborted() {
-        notifyRemoves();
+//        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionAborted();
         }

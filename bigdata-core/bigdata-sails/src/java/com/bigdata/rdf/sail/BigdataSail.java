@@ -3680,7 +3680,14 @@ public class BigdataSail extends SailBase implements Sail {
 	
 	            if (txLog.isInfoEnabled())
 	                txLog.info("SAIL-ROLLBACK-CONN: " + this);
-	
+
+	            if(changeLog != null) {
+	                
+	                // Note: Per the API, invoke when preparing to abort() as well as when preparing to commit().
+	                changeLog.transactionPrepare();
+	                
+	            }
+	            
 	            // discard buffered assertions and/or retractions.
 	            clearBuffers();
 	
