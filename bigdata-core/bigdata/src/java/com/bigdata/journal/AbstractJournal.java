@@ -4614,14 +4614,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	protected void invalidateCommitters() {
 
+	    if(log.isDebugEnabled())
+	        log.debug("invalidating commiters for: " + this + ", lastCommitTime: " + this.getLastCommitTime());
+	    
 	    assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
 
-        final Throwable t = new StackInfoReport("ABORT");
-
+	    final Throwable t = new StackInfoReport("ABORT journal " + this + ", lastCommitTime: " + this.getLastCommitTime());
+	    
         for (ICommitter committer : _committers) {
             if (committer != null)
                 committer.invalidate(t);
         }
+
+        // @see BLZG-2023, BLZG-2041.  Discard unisolated views from the resource locator cache.
+        getResourceLocator().clearUnisolatedCache();
 
 	}
 	

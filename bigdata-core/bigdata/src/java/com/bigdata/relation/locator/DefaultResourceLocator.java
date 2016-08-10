@@ -28,7 +28,9 @@
 
 package com.bigdata.relation.locator;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -1117,6 +1119,30 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
 
     }
 
+    @Override
+    public void clearUnisolatedCache() {
+
+        // Discard any unisolated resource views.
+//        resourceCache.clear();
+        final Iterator<Map.Entry<NT, WeakReference<T>>> itr = resourceCache.entryIterator();
+        while (itr.hasNext()) {
+            final Map.Entry<NT, WeakReference<T>> e = itr.next();
+            final NT nt = e.getKey();
+            if (TimestampUtility.isUnisolated(nt.getTimestamp())) {
+                itr.remove();
+            }
+        }
+
+        if (delegate != null) {
+            // And do this on the delegate as well.
+            delegate.clearUnisolatedCache();
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Cleared resource cache");
+
+    }
+                
     /**
      * Causes the {@link IIndexManager} to be tested when attempting to resolve
      * a resource identifiers. The {@link IIndexManager} will be automatically

@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
@@ -42,6 +43,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -136,8 +138,11 @@ public class CreateKBTask extends AbstractApiTask<Void> {
      * Note: This process is not robust if the leader is elected and becomes
      * HAReady and then fails over before the KB is created. The task should be
      * re-submitted by the new leader once that leader is elected.
+     * 
+     * @throws SailException 
+     * @throws InterruptedException 
      */
-    private void doRun() {
+    private void doRun() throws SailException, InterruptedException {
     
        final IIndexManager indexManager = getIndexManager();
        
@@ -226,31 +231,48 @@ public class CreateKBTask extends AbstractApiTask<Void> {
 
             if (isSoloOrLeader) {
 
-                // Attempt to resolve the namespace. FIXME BLZG-2041 BLZG-2023 We MUST NOT test the unisolated view of the locator cache without the global lock.
-                if (indexManager.getResourceLocator().locate(namespace,
-                        ITx.UNISOLATED) == null) {
+                /*
+                 * Note: createLTS() writes on the GRS. This is an atomic row
+                 * store. The change is automatically committed. The unisolated
+                 * view of the BigdataSailConnection is being used solely to
+                 * have the correct locks.
+                 * 
+                 * @see BLZG-2023, BLZG-2041
+                 */
+                final BigdataSailConnection con = getUnisolatedSailConnection(true/*allowIfNamespaceDoesNotExist*/);
+                try {
+                    
+                    // Attempt to resolve the namespace.
+                    if (indexManager.getResourceLocator().locate(namespace, ITx.UNISOLATED) == null) {
 
-                    if(log.isInfoEnabled())
-                    	log.info("Creating KB instance: namespace=" + namespace);
+                        if(log.isInfoEnabled())
+                            log.info("Creating KB instance: namespace=" + namespace);
 
-                    // create the appropriate as configured triple/quad store.
-                    createLTS(jnl, getProperties());
+                        // create the appropriate as configured triple/quad store.
+                        createLTS(jnl, getProperties());
 
-                    if(log.isInfoEnabled())
-                       log.info("Created tripleStore: " + namespace);
-
-                } // if( tripleStore == null )
+                        if(log.isInfoEnabled())
+                           log.info("Created tripleStore: " + namespace);
+                        
+                    }
+                    
+                } finally {
+                    
+                    con.close();
+                    
+                }
 
             }
 
         } else {
 
          // Attempt to resolve the namespace.
-         if (indexManager.getResourceLocator()
-               .locate(namespace, ITx.UNISOLATED) == null) {
+         if (indexManager.getResourceLocator().locate(namespace, ITx.UNISOLATED) == null) {
 
             /*
              * Register triple store for scale-out.
+             * 
+             * Note: Scale-out does not have a global lock.
              */
 
             if (log.isInfoEnabled())

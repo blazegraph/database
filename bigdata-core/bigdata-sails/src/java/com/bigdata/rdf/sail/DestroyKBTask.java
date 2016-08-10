@@ -97,9 +97,9 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
             }
          }
 
-         final AbstractTripleStore tripleStore = getTripleStore();
+         final boolean exists = getIndexManager().getResourceLocator().locate(namespace, ITx.UNISOLATED) != null;
 
-         if (tripleStore == null) {
+         if (!exists) {
 
             throw new DatasetNotFoundException("Not found: namespace="
                   + namespace + ", timestamp="
