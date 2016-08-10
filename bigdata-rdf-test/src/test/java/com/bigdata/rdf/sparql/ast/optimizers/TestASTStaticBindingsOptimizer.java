@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.Constant;
@@ -55,7 +56,13 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.PathNode;
+import com.bigdata.rdf.sparql.ast.PathNode.PathAlternative;
+import com.bigdata.rdf.sparql.ast.PathNode.PathElt;
+import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
+import com.bigdata.rdf.sparql.ast.PathNode.PathSequence;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -2398,4 +2405,114 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       
       assertSameAST(expected, res.getQueryNode());      
    }   
+   
+   /**
+    * Test inlining from BIND clause into property paths, inspired by the case
+    * reported in https://jira.blazegraph.com/browse/BLZG-2042.
+    * 
+    * Given
+    * 
+    * <pre>
+    * SELECT ?s where { BIND(CONST AS ?o) . ?s <http://p1>/<http://p2> ?o }
+    * </pre>
+    * 
+    * , verify that the AST is rewritten as
+    * 
+    * <pre>
+    * SELECT ?s where { ?s <http://p1>/<http://p2> ?o }
+    * </pre>
+    * 
+    * where CONST is the binding for <code>?o</code> in the input solution
+    * and the exogeneous mapping { ?p -> CONST } is added. 
+    */
+   public void testTicketBLZG2042() {
+      
+      final BigdataValueFactory f = store.getValueFactory();
+      final BigdataURI cTestUri = f.createURI("http://www.test.com");
+      final BigdataValue bv1 = store.getValueFactory().asValue(new URIImpl("http://p1"));
+      final BigdataValue bv2 = store.getValueFactory().asValue(new URIImpl("http://p2"));
+
+      final IV cTest = makeIV(cTestUri);
+      final IV iv1 = makeIV(bv1);
+      final IV iv2 = makeIV(bv2);
+      
+      final BigdataValue[] values = new BigdataValue[] { cTestUri };
+      store.getLexiconRelation()
+              .addTerms(values, values.length, false/* readOnly */);
+      
+      final IBindingSet[] bsetsGiven = 
+         new IBindingSet[] { new ListBindingSet() };
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          
+          projection.addProjectionVar(new VarNode("s"));
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          given.setWhereClause(whereClause);
+          
+          whereClause.addChild(
+                new AssignmentNode(new VarNode("o"), new ConstantNode(cTest)));
+          
+          
+          final PathElt elements[] = new PathElt[2];
+          elements[0] = new PathElt(new ConstantNode(iv1),false,PathMod.ZERO_OR_MORE);
+          elements[1] = new PathElt(new ConstantNode(iv2),false,PathMod.ZERO_OR_MORE);
+          
+          final PathNode pn = new PathNode(new PathAlternative(new PathSequence(elements)));
+          whereClause.addChild(new PropertyPathNode(new VarNode("s"), pn, new VarNode("o")));
+          
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          expected.setProjection(projection);
+
+          projection.addProjectionVar(new VarNode("s"));
+
+          final JoinGroupNode whereClause = new JoinGroupNode();
+
+          final PathElt elements[] = new PathElt[2];
+          elements[0] = new PathElt(new ConstantNode(iv1),false,PathMod.ZERO_OR_MORE);
+          elements[1] = new PathElt(new ConstantNode(iv2),false,PathMod.ZERO_OR_MORE);
+          
+          final PathNode pn = new PathNode(new PathAlternative(new PathSequence(elements)));
+          whereClause.addChild(
+              new PropertyPathNode(
+                  new VarNode("s"), 
+                  pn, 
+                  new ConstantNode(new Constant((IVariable) Var.var("o"), cTest)) /* o inlined! */));
+          
+          expected.setWhereClause(whereClause);
+
+      }
+      
+      final ASTStaticBindingsOptimizer rewriter = 
+         new ASTStaticBindingsOptimizer();
+      
+      
+      final AST2BOpContext context = 
+            new AST2BOpContext(new ASTContainer(given), store);
+      
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
+
+      // assert that the bindings set has been modified as expected
+      IBindingSet[] resBs = res.getBindingSets();
+      assertTrue(resBs.length==1);
+      assertTrue(resBs[0].size()==1);
+      assertTrue(resBs[0].get(Var.var("o")).equals(new Constant<IV>(cTest)));
+      
+      assertSameAST(expected, res.getQueryNode());
+   }
+      
+   
 }
