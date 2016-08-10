@@ -63,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -801,14 +802,26 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
 
                for (IVariable<?> spnVar : spn.getProducedBindings()) {
                   
-                  // init list, if necessary
-                  if (!usageMap.containsKey(spnVar)) {
-                     usageMap.put(spnVar, new ArrayList<IQueryNode>());
-                  }
-      
-                  // add node to list
-                  usageMap.get(spnVar).add(node);
+                   registerVarToChildMappingInUsageMap(spnVar, node);
+                   
                }
+           
+            // BLZG-2042: inline BIND information into property path nodes
+            } else if (node instanceof PropertyPathNode) {
+                
+                final PropertyPathNode ppNode = (PropertyPathNode)node;
+                
+                if (ppNode.arity()>=3 /* should always be true, just in case */) {
+                    final BOp subjectNode = ppNode.get(0);
+                    if (subjectNode instanceof VarNode) {
+                        registerVarToChildMappingInUsageMap(((VarNode)subjectNode).getValueExpression(),node);
+                    }
+                    
+                    final BOp objectNode = ppNode.get(2);
+                    if (objectNode instanceof VarNode) {
+                        registerVarToChildMappingInUsageMap(((VarNode)objectNode).getValueExpression(),node);
+                    }
+                }
             }
          }
       }
@@ -914,13 +927,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
 
                for (IVariable<?> spnVar : spn.getProducedBindings()) {
                   
-                  // init list, if necessary
-                  if (!usageMap.containsKey(spnVar)) {
-                     usageMap.put(spnVar, new ArrayList<IQueryNode>());
-                  }
-      
-                  // add node to list
-                  usageMap.get(spnVar).add(child);
+                   registerVarToChildMappingInUsageMap(spnVar,child);
                   
                }
                
@@ -928,9 +935,46 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
 
                extractVarSPUsageInfoChildrenOrSelf((GroupNodeBase)child);
                
+            // BLZG-2042: inline BIND information into property path nodes
+            } else if (child instanceof PropertyPathNode) {
+                
+                final PropertyPathNode ppNode = (PropertyPathNode)child;
+                
+                if (ppNode.arity()>=3 /* should always be true, just in case */) {
+                    final BOp subjectNode = ppNode.get(0);
+                    if (subjectNode instanceof VarNode) {
+                        registerVarToChildMappingInUsageMap(((VarNode)subjectNode).getValueExpression(),child);
+                    }
+                    
+                    final BOp objectNode = ppNode.get(2);
+                    if (objectNode instanceof VarNode) {
+                        registerVarToChildMappingInUsageMap(((VarNode)objectNode).getValueExpression(),child);
+                    }
+                }
             }
          }
       }
+      
+      /**
+       * Registers the mapping between the variable var and the child in the usage map. If var is null
+       * or the child is null, no action will be taken.
+       * 
+       * @param var the variable
+       * @param child the child using the variable
+       */
+      private void registerVarToChildMappingInUsageMap(final IVariable<?> var, final IQueryNode child) {
+          
+          if (var==null)
+              return;
+          
+          if (!usageMap.containsKey(var)) {
+              usageMap.put(var, new ArrayList<IQueryNode>());
+           }
+
+           // add node to list
+           usageMap.get(var).add(child);
+      }
+      
       
       
       /**
@@ -1153,6 +1197,11 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
             
             applyToStatementPattern(val, (StatementPatternNode)node);
 
+         // BLZG-2042: inline BIND information into property path nodes
+         } else if (node instanceof PropertyPathNode) {
+
+            applyToPropertyPathNode(val, (PropertyPathNode)node);
+
          } else {
             
             // other patterns have not been recorded
@@ -1228,6 +1277,45 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
             
          }
       }
+      
+      /**
+       * Applies the {@link InlineTasks} for the class variable with the
+       * parameter val to the given statement pattern node.
+       * 
+       * @param val
+       * @param spn
+       */
+      @SuppressWarnings("rawtypes")
+      private void applyToPropertyPathNode(
+         final IV val, final PropertyPathNode ppn) {
+
+         if (ppn.arity()>=3 /* should always be true, just in case */) {
+
+             final BOp s = ppn.get(0);
+             if (s!=null && s instanceof VarNode && s.get(0).equals(var)) {
+           
+                 final VarNode sVar = (VarNode)s;
+                 final ConstantNode constNode = new ConstantNode(
+                         new Constant<IV>(sVar.getValueExpression(),val));
+                 ppn.setArg(0, constNode);
+           
+             }
+             
+             
+             final BOp o = ppn.get(2);
+             if (o!=null && o instanceof VarNode && o.get(0).equals(var)) {
+           
+                 final VarNode oVar = (VarNode)o;
+                 final ConstantNode constNode = new ConstantNode(
+                         new Constant<IV>(oVar.getValueExpression(),val));
+                 ppn.setArg(2, constNode);
+           
+             }
+             
+         }
+
+      }      
+      
 
       /**
        * Applies the {@link InlineTasks} for the class variable with the
