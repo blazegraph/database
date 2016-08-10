@@ -101,6 +101,7 @@ import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
@@ -517,9 +518,6 @@ public class BigdataSail extends SailBase implements Sail {
      * Transient (in the sense of non-restart-safe) map of namespace prefixes
      * to namespaces.  This map is thread-safe and shared across all
      * {@link BigdataSailConnection} instances and across all transactions.
-     * 
-     * FIXME BLZG-2041 Verify that the namespaces should be shared across the
-     * connections. If not, then make this into a per-connection mapping.
      */
     private Map<String, String> namespaces;
 
@@ -709,11 +707,13 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * Constructor used to wrap an existing {@link AbstractTripleStore}
      * instance.
+     * <p>
+     * Note: Since BLZG-2041, this delegates through to the core constructor
+     * which accepts (namespace, IIndexManager). 
      * 
      * @param database
      *            The instance.
      */
-    @Deprecated // FIXME BLZG-2041 Remove in favor of BigdataSail(namespace,IndexManager)
     public BigdataSail(final AbstractTripleStore database) {
      
         this(database, database.getIndexManager());
@@ -727,6 +727,9 @@ public class BigdataSail extends SailBase implements Sail {
      * use the {@link ScaleOutTripleStore} ctor and then
      * {@link AbstractTripleStore#create()} the triple store if it does not
      * exist.
+     * <p>
+     * Note: Since BLZG-2041, this delegates through to the core constructor
+     * which accepts (namespace, IIndexManager). 
      * 
      * @param database
      *            An existing {@link AbstractTripleStore}.
@@ -736,7 +739,6 @@ public class BigdataSail extends SailBase implements Sail {
      *            {@link QueryEngine}. Otherwise it must be the same object as
      *            the <i>database</i>.
      */ 
-    @Deprecated // FIXME BLZG-2041 Remove in favor of BigdataSail(namespace,IndexManager) 
     public BigdataSail(final AbstractTripleStore database,
             final IIndexManager mainIndexManager) {
 
@@ -745,7 +747,8 @@ public class BigdataSail extends SailBase implements Sail {
     }
 
     /**
-     * Normal use constructor.
+     * Constructor used when the namespace and index manager are known (standard
+     * use case).
      * 
      * @param namespace The namespace.
      * @param indexManager The index manager (typically a {@link Journal}).
@@ -758,18 +761,18 @@ public class BigdataSail extends SailBase implements Sail {
     
     /**
      * Core constructor.
+     * <p>
+     * Note: Scale-out is shard-wise ACID.
+     * To create a {@link BigdataSail} backed by an {@link IBigdataFederation}
+     * use the {@link ScaleOutTripleStore} ctor and then
+     * {@link AbstractTripleStore#create()} the triple store if it does not
+     * exist. See {@link CreateKBTask} which encapsulates this.
      * 
      * @param namespace The namespace.
      * @param indexManager The index manager on which the data is stored.
      * @param mainIndexManager Iff the data is stored on a {@link TempTripleStore} then this is the main index manager and will be used to locate the {@link QueryEngine}.
      * 
      * @see BLZG-2041 BigdataSail should not locate the AbstractTripleStore until a connection is requested
-     * 
-     * FIXME      BLZG-2041: VERIFY / UPDATE COMMENT: 
-     * To create a {@link BigdataSail} backed by an {@link IBigdataFederation}
-     * use the {@link ScaleOutTripleStore} ctor and then
-     * {@link AbstractTripleStore#create()} the triple store if it does not
-     * exist.
      */
     public BigdataSail(final String namespace, final IIndexManager indexManager, 
             final IIndexManager mainIndexManager) {
@@ -880,9 +883,6 @@ public class BigdataSail extends SailBase implements Sail {
     public boolean exists() {
 
         // Attempt to resolve the namespace.
-        // FIXME BLZG-2041 BLZG-2023 We MUST NOT test the unisolated view of the locator cache without the global lock.
-        // TODO Should exists submit a task for this?
-        // FIXME CreateKBTask() and DestroyKBTask() also have the same error.
         return indexManager.getResourceLocator().locate(namespace, ITx.UNISOLATED) != null;
         
     }
@@ -1736,8 +1736,10 @@ public class BigdataSail extends SailBase implements Sail {
         public String toString() {
         	
             return getClass().getName() + "{timestamp="
-                    + TimestampUtility.toString(database.getTimestamp())
-                    + ",open=" + openConn + "}";
+                    + (database==null?"n/a":TimestampUtility.toString(database.getTimestamp()))
+                    + ",open=" + openConn
+                    + ",exists=" + (database!=null)
+                    + "}";
 
         }
 
@@ -2089,8 +2091,11 @@ public class BigdataSail extends SailBase implements Sail {
 
             if(database != null) 
                 attach(database);
-            else if(!allowIfNamespaceDoesNotExist)
+            else if(!allowIfNamespaceDoesNotExist) {
                 throw new IllegalStateException();
+            } else {
+                openConn = true;
+            }
 
         }
         
@@ -2352,6 +2357,12 @@ public class BigdataSail extends SailBase implements Sail {
         
         /**
          * The implementation object.
+         * 
+         * @return The backing {@link AbstractTripleStore} or <code>null</code>
+         * if an unisolated connection was obtained without requiring the
+         * namespace to pre-exist.
+         * 
+         *  @see BLZG-2023, BLZG-2041
          */
         public AbstractTripleStore getTripleStore() {
             
@@ -2376,7 +2387,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public final boolean isReadOnly() {
             
-            return database.isReadOnly();
+            return readOnly;
             
         }
 
@@ -2386,7 +2397,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public final boolean isUnisolated() {
 
-            return database.getTimestamp() == ITx.UNISOLATED;
+            return unisolated;
             
         }
 
@@ -2880,9 +2891,11 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
             
-            bnodes.clear();
+            if(bnodes!=null)
+                bnodes.clear();
             
-            bnodes2.clear();
+            if(bnodes2!=null)
+                bnodes2.clear();
 
         }
 
@@ -3684,6 +3697,8 @@ public class BigdataSail extends SailBase implements Sail {
 	            if(changeLog != null) {
 	                
 	                // Note: Per the API, invoke when preparing to abort() as well as when preparing to commit().
+	                // TODO Unit test for conformance with this behavior.  Also, might be nice to pass boolean indicating whether
+	                // will abort() or attempt to commit.
 	                changeLog.transactionPrepare();
 	                
 	            }
@@ -3692,7 +3707,8 @@ public class BigdataSail extends SailBase implements Sail {
 	            clearBuffers();
 	
 	            // discard the write set.
-	            database.abort();
+	            if(database != null)
+	                database.abort();
 	            
 	            if (changeLog != null) {
 	                
@@ -3759,8 +3775,18 @@ public class BigdataSail extends SailBase implements Sail {
                 changeLog.transactionPrepare();
                 
             }
-            
-            final long commitTime = database.commit();
+
+            final long commitTime;
+            if(database == null) {
+                // Handle case where namespace does not exist when connection was opened.
+                if(getIndexManager() instanceof IAtomicStore) {
+                    commitTime = ((IAtomicStore) getIndexManager()).commit();
+                } else {
+                    commitTime = 0L;
+                }
+            } else {
+                commitTime = database.commit();
+            }
             
             if (txLog.isInfoEnabled())
                 txLog.info("SAIL-COMMIT-CONN : commitTime=" + commitTime

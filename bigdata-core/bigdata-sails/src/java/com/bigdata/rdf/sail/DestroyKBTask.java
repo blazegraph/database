@@ -28,10 +28,9 @@ package com.bigdata.rdf.sail;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
@@ -70,69 +69,110 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
    @Override
    public Void call() throws Exception, DatasetNotFoundException {
 
-      /**
-       * Note: Unless group commit is enabled, we need to make this operation
-       * mutually exclusive with KB level writers in order to avoid the
-       * possibility of a triggering a commit during the middle of a
-       * BigdataSailConnection level operation (or visa versa).
-       * 
-       * Note: When group commit is not enabled, the indexManager will be a
-       * Journal class. When it is enabled, it will merely implement the
-       * IJournal interface.
-       * 
-       * @see #1143 (Isolation broken in NSS when groupCommit disabled)
-       */
-      final IIndexManager indexManager = getIndexManager();
-      final boolean isGroupCommit = indexManager.isGroupCommit();
-      boolean acquiredConnection = false;
-      try {
+       boolean ok = false;
+       
+       final BigdataSailConnection con = getUnisolatedSailConnection(true/*allowIfNamespaceDoesNotExist*/);
 
-         if (!isGroupCommit) {
-            try {
-               // acquire the unisolated connection permit.
-               ((Journal) indexManager).acquireUnisolatedConnection();
-               acquiredConnection = true;
-            } catch (InterruptedException e) {
-               throw new RuntimeException(e);
-            }
-         }
+       try {
 
-         final boolean exists = getIndexManager().getResourceLocator().locate(namespace, ITx.UNISOLATED) != null;
+            final AbstractTripleStore tripleStore = con.getTripleStore();
 
-         if (!exists) {
+            if (tripleStore == null) {
 
-            throw new DatasetNotFoundException("Not found: namespace="
-                  + namespace + ", timestamp="
-                  + TimestampUtility.toString(timestamp));
+              throw new DatasetNotFoundException("Not found: namespace="
+                    + namespace + ", timestamp="
+                    + TimestampUtility.toString(timestamp));
 
-         }
+           }
+           
+           // Destroy the KB instance.
+           tripleStore.destroy();
 
-         // Destroy the KB instance.
-         tripleStore.destroy();
+           // Note: This is the commit point only if group commit is NOT enabled.
+           tripleStore.commit();
+           
+           ok = true;
 
-         // Note: This is the commit point only if group commit is NOT enabled.
-         tripleStore.commit();
+           if (log.isInfoEnabled())
+              log.info("Destroyed: namespace=" + namespace);
+           
+           return null;
+           
+       } finally {
+           
+           if(!ok) {
+               
+               con.rollback();
+               
+           }
+           
+           con.close();
+           
+       }
 
-         if (log.isInfoEnabled())
-            log.info("Destroyed: namespace=" + namespace);
-
-         return null;
-
-      } finally {
-
-         if (!isGroupCommit && acquiredConnection) {
-
-            /**
-             * When group commit is not enabled, we need to release the
-             * unisolated connection.
-             * 
-             * @see #1143 (Isolation broken in NSS when groupCommit disabled)
-             */
-            ((Journal) indexManager).releaseUnisolatedConnection();
-
-         }
-
-      }
+//      /**
+//       * Note: Unless group commit is enabled, we need to make this operation
+//       * mutually exclusive with KB level writers in order to avoid the
+//       * possibility of a triggering a commit during the middle of a
+//       * BigdataSailConnection level operation (or visa versa).
+//       * 
+//       * Note: When group commit is not enabled, the indexManager will be a
+//       * Journal class. When it is enabled, it will merely implement the
+//       * IJournal interface.
+//       * 
+//       * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+//       */
+//      final IIndexManager indexManager = getIndexManager();
+//      final boolean isGroupCommit = indexManager.isGroupCommit();
+//      boolean acquiredConnection = false;
+//      try {
+//
+//         if (!isGroupCommit) {
+//            try {
+//               // acquire the unisolated connection permit.
+//               ((Journal) indexManager).acquireUnisolatedConnection();
+//               acquiredConnection = true;
+//            } catch (InterruptedException e) {
+//               throw new RuntimeException(e);
+//            }
+//         }
+//
+//         final boolean exists = getIndexManager().getResourceLocator().locate(namespace, ITx.UNISOLATED) != null;
+//
+//         if (!exists) {
+//
+//            throw new DatasetNotFoundException("Not found: namespace="
+//                  + namespace + ", timestamp="
+//                  + TimestampUtility.toString(timestamp));
+//
+//         }
+//
+//         // Destroy the KB instance.
+//         tripleStore.destroy();
+//
+//         // Note: This is the commit point only if group commit is NOT enabled.
+//         tripleStore.commit();
+//
+//         if (log.isInfoEnabled())
+//            log.info("Destroyed: namespace=" + namespace);
+//
+//         return null;
+//
+//      } finally {
+//
+//         if (!isGroupCommit && acquiredConnection) {
+//
+//            /**
+//             * When group commit is not enabled, we need to release the
+//             * unisolated connection.
+//             * 
+//             * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+//             */
+//            ((Journal) indexManager).releaseUnisolatedConnection();
+//
+//         }
+//
+//      }
 
    }
 
