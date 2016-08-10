@@ -495,6 +495,9 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final private String namespace;
     
+    /**
+     * A value factory associated with the namespace for the {@link BigdataSail}.
+     */
     final private BigdataValueFactory valueFactory;
     
     /**
@@ -787,7 +790,8 @@ public class BigdataSail extends SailBase implements Sail {
         
         this.indexManager = indexManager;
         
-        this.valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+        // Note: The actual namespace used for the ValueFactory is the namespace of the LexiconRelation.
+        this.valueFactory = BigdataValueFactoryImpl.getInstance(namespace+"."+LexiconRelation.NAME_LEXICON_RELATION);
         
         this.namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
