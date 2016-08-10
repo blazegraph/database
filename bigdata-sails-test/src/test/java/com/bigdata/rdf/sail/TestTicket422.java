@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -59,7 +62,7 @@ public class TestTicket422 extends ProxyBigdataSailTestCase {
         super(name);
     }
 
-    public void test_wrapTempTripleStore() throws SailException, InterruptedException {
+    public void test_wrapTempTripleStore() throws SailException, ExecutionException, InterruptedException {
 
         final BigdataSail sail = getSail();
                
@@ -91,6 +94,8 @@ public class TestTicket422 extends ProxyBigdataSailTestCase {
     
                         tempSail.initialize();
     
+                        tempSail.create(new Properties());
+                        
                         final BigdataSailConnection con = tempSail.getConnection();
     
                         try {

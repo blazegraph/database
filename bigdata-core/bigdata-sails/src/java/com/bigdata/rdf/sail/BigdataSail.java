@@ -2212,7 +2212,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
-        /**
+      /**
        * Attach to a new database view. Useful for transactions.
        * 
        * @param database
@@ -4733,7 +4733,7 @@ public class BigdataSail extends SailBase implements Sail {
         public BigdataSailRWTxConnection(final long txId, final ITransactionService txService, final Lock readLock)
                 throws IOException, DatasetNotFoundException {
 
-            super(readLock);//, false/* unisolated */, false/* readOnly */);
+            super(txId, readLock);//, false/* unisolated */, false/* readOnly */);
 
             if (!isolatable) {
 
@@ -4976,7 +4976,7 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @throws DatasetNotFoundException 
          */
-        BigdataSailReadOnlyConnection(final long txId,ITransactionService txService) throws IOException, DatasetNotFoundException {
+        BigdataSailReadOnlyConnection(final long txId,final ITransactionService txService) throws IOException, DatasetNotFoundException {
 
             super(txId, null/* lock */);//, false/* unisolated */, true/* readOnly */);
 
