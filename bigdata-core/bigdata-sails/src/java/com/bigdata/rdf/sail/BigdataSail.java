@@ -4985,6 +4985,8 @@ public class BigdataSail extends SailBase implements Sail {
 
             this.txService = txService;
             
+            this.tx = txId;
+
             // Attach that transaction view to this SailConnection.
             attach(database);
             
