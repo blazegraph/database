@@ -55,6 +55,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationSchema;
@@ -146,6 +147,13 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
      */
     final /*private*/ transient ConcurrentWeakValueCache<NT, Map<String,Object>> propertyCache;
 
+    /**
+     * Special property used to record the {@link IRawStore#getUUID() UUID} of
+     * the backing {@link IIndexManager} on which the property set for some
+     * namespace was discovered.
+     */
+    private final String STORE_UUID = DefaultResourceLocator.class.getName()+".storeUUID";
+    
     /**
      * Provides locks on a per-namespace basis for higher concurrency.
      */
@@ -540,6 +548,18 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
 
                 if (properties != null) {
 
+                    if(indexManager instanceof IRawStore) {
+
+                        final UUID storeUUID = (UUID) properties.get(STORE_UUID);
+
+                        if (storeUUID != null && !storeUUID.equals(((IRawStore) indexManager).getUUID())) {
+                            // Property set for namespace was found on a
+                            // different store.
+                            continue;
+                        }
+
+                    }
+                    
                     if (INFO) {
 
                         log.info("Found: namespace=" + namespace + " on "
@@ -800,6 +820,9 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
                 if (map != null) {
 
                     // Stuff the properties into the cache.
+                    if (indexManager instanceof IRawStore) {
+                        map.put(STORE_UUID, ((IRawStore) indexManager).getUUID());
+                    }
                     propertyCache.put(nt, map);
 
                 }
@@ -919,17 +942,15 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
             properties.put(RelationSchema.COMMIT_TIME, commitTime2);
 
         }
-        if(indexManager instanceof TemporaryStore && "namespace2".equals(namespace)) {
-            // FIXME BLZG-2023 Remove debug point.
-            log.fatal
-            ("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="
-                    + timestamp + ", propertyCacheHit=" + propertyCacheHit + ", properties=" + properties);
-        }
-        if (INFO||log.isTraceEnabled()) {
+//        if(indexManager instanceof TemporaryStore && "namespace2".equals(namespace)) {
+//            // FIXME BLZG-2023 Remove debug point.
+//            log.fatal
+//            ("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="
+//                    + timestamp + ", propertyCacheHit=" + propertyCacheHit + ", properties=" + properties);
+//        }
+        if (log.isTraceEnabled()) {
 
-//            log.trace
-            log.info
-            ("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="
+            log.trace("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="
                     + timestamp + ", propertyCacheHit=" + propertyCacheHit + ", properties=" + properties);
 
         }

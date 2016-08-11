@@ -172,8 +172,8 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
 
     private void createNamespace(final String namespace) throws Exception {
 //        final Properties properties = new Properties();
-        final Properties properties = getTestMode().getProperties(); // FIXME BLZG-2023: Use the indicated test mode, but also test for triplesPlusTM.
-//        final Properties properties = TestMode.triplesPlusTruthMaintenance.getProperties();
+//        final Properties properties = getTestMode().getProperties(); // FIXME BLZG-2023: Use the indicated test mode, but also test for triplesPlusTM.
+        final Properties properties = TestMode.triplesPlusTruthMaintenance.getProperties();
         properties.put(BigdataSail.Options.NAMESPACE, namespace);
         log.warn(String.format("Create namespace %s...", namespace));
         m_mgr.createRepository(namespace, properties);
