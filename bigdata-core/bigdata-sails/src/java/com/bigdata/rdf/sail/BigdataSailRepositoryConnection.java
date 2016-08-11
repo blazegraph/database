@@ -383,7 +383,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      */
     public AbstractTripleStore getTripleStore() {
 
-        return ((BigdataSailConnection) getSailConnection()).database;
+        return ((BigdataSailConnection) getSailConnection()).getTripleStore();
 
     }
 

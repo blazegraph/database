@@ -1542,8 +1542,10 @@ public class BigdataSail extends SailBase implements Sail {
 
         /**
          * The database view.
+         * 
+         * @see #attach(long)
          */
-        protected AbstractTripleStore database;
+        private AbstractTripleStore database;
 
         /**
          * True iff the database view is read-only.
@@ -1926,9 +1928,9 @@ public class BigdataSail extends SailBase implements Sail {
             {
                 final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, timestampOrTxId);
                 
-                if(tripleStore == null) {
+                if ( tripleStore == null ) {
     
-                    throw new DatasetNotFoundException("namespace="+namespace);
+                    throw new DatasetNotFoundException("namespace=" + namespace);
                     
                 }
                     
@@ -2101,7 +2103,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             this(ITx.UNISOLATED, lock);
 
-            attach(database);
+            attach(ITx.UNISOLATED);
 
         }
         
@@ -2284,22 +2286,30 @@ public class BigdataSail extends SailBase implements Sail {
       /**
        * Attach to a new database view. Useful for transactions.
        * 
-       * @param database
+       * @param timestampOrTxId The timestamp or the transaction identifier for
+       * the view of the database to be attached.
+       * 
        * @throws DatasetNotFoundException
-       *            if the argument is <code>null</code> (in the context of the
-       *            callers (except for the unisolated connection) a
-       *            <code>null</code> value means that the namespace could not
-       *            be discovered using the locator).
+       *            if the namespace can not be located for that timestamp or txId.
        */
-      protected synchronized void attach(final AbstractTripleStore database)
+      protected synchronized void attach(final long timestampOrTxId)
             throws DatasetNotFoundException {
 
-            if (database == null)
-                throw new DatasetNotFoundException();
-            
             BigdataSail.this.assertOpenSail();
+
+            /* Note: This duplicates the locate already made in the core
+             * BigdataSailConnection ctor, but this simplifies some patterns
+             * in how attached is used (less error prone).
+             */
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, timestampOrTxId);
+          
+            if ( tripleStore == null ) {
+
+                throw new DatasetNotFoundException("namespace=" + namespace);
+              
+            }
             
-            this.database = database;
+            this.database = tripleStore;
             
 //            readOnly = database.isReadOnly();            
          
@@ -4835,16 +4845,24 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        @Override
+        protected synchronized void attach(final long timestampOrTxId)
+                throws DatasetNotFoundException {
+            
+            super.attach(timestampOrTxId);
+            
+            this.tx = timestampOrTxId;
+            
+        }
+        
         // variant when the caller already has the the tx.
         protected void newTx(final long txId) throws DatasetNotFoundException {
             
-            this.tx = txId;
-            
             // Attach that transaction view to this SailConnection.
-            attach(database);
+            attach(txId);
 
             if (txLog.isInfoEnabled())
-                txLog.info("SAIL-NEW-TX : txId=" + tx + ", conn=" + this);
+                txLog.info("SAIL-NEW-TX : txId=" + txId + ", conn=" + this);
             
         }
         
@@ -4866,7 +4884,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 if(!ok) {
                     try {
-                        txService.abort(tx);
+                        txService.abort(txId);
                     } catch (IOException ex) {
                         log.error(ex, ex);
                     }
@@ -5071,10 +5089,18 @@ public class BigdataSail extends SailBase implements Sail {
 
             this.txService = txService;
             
-            this.tx = txId;
-
             // Attach that transaction view to this SailConnection.
-            attach(database);
+            attach(txId);
+            
+        }
+        
+        @Override
+        protected synchronized void attach(final long timestampOrTxId)
+                throws DatasetNotFoundException {
+            
+            super.attach(timestampOrTxId);
+            
+            this.tx = timestampOrTxId;
             
         }
         
