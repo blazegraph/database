@@ -1170,7 +1170,7 @@ public class BigdataSail extends SailBase implements Sail {
      * two different models coexisting.  We should talk about that at some 
      * point.
      */
-    // FIXME This should be a canonical lock for the namespace, not per Bigdata
+    // FIXME BLZG-2041 This should be a canonical lock for the namespace, not per Bigdata
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
 
    /**
@@ -1771,9 +1771,9 @@ public class BigdataSail extends SailBase implements Sail {
         @Override
         public String toString() {
         	
-            return getClass().getName() + "{timestamp="
-                    + TimestampUtility.toString(database.getTimestamp())
-                    + ",open=" + openConn
+            return getClass().getName() + "{namespace=" + namespace
+                    + ", timestamp=" + TimestampUtility.toString(database.getTimestamp())
+                    + ", open=" + openConn
                     + "}";
 
         }

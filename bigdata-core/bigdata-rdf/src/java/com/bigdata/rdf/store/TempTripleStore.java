@@ -339,10 +339,11 @@ public class TempTripleStore extends AbstractLocalTripleStore {
             final TemporaryStore tempStore,
             final AbstractTripleStore db) {
 
-        // No side-effect on the db properties please!
-        final Properties tmp = new Properties(db.getProperties());
+        final Properties out = new Properties();
         
-        final Enumeration<Object> e = properties.keys();
+        final Properties in = PropertyUtil.flatCopy(properties);
+
+        final Enumeration<Object> e = in.keys();
 
         while (e.hasMoreElements()) {
 
@@ -356,25 +357,24 @@ public class TempTripleStore extends AbstractLocalTripleStore {
 
             final String key = (String) ekey;
 
-            final String val = properties.getProperty(key);
+            final String val = in.getProperty(key);
 
             // FIXME BLZG-2023, BLZG-2041
-            if (false && BigdataSail.Options.NAMESPACE.equals(key)) {
+            if (BigdataSail.Options.NAMESPACE.equals(key)) {
 
                 // Ensure that the TempTripleStore has a unique namespace.
-                tmp.setProperty(key, val + "_temporaryStore=" + tempStore.getUUID());
+                out.setProperty(key, val + "_temporaryStore=" + tempStore.getUUID());
                 
             } else {
 
-                tmp.setProperty(key, val);
+                out.setProperty(key, val);
 
             }
             
 
         }
 
-        // Flatten everything out.
-        return PropertyUtil.flatCopy(tmp);
+        return out;
 
     }
 

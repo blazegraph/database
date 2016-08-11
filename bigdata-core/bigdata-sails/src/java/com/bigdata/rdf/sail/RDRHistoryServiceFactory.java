@@ -133,7 +133,7 @@ public class RDRHistoryServiceFactory implements CustomServiceFactory {
     public void startConnection(final BigdataSailConnection conn) {
 
         final AbstractTripleStore database = conn.getTripleStore();
-        if (database !=null && database.isRDRHistory()) {
+        if (database.isRDRHistory()) {
             final RDRHistory history = database.getRDRHistoryInstance();
             history.init();
             conn.addChangeLog(history);

@@ -112,10 +112,10 @@ public class HistoryServiceFactory extends CustomServiceFactoryBase {
     @Override
     public void startConnection(final BigdataSailConnection conn) {
 
-        final Properties properties = conn.getProperties();
-//        final AbstractTripleStore tripleStore = conn.getTripleStore();
+//        final Properties properties = conn.getProperties();
+        final AbstractTripleStore tripleStore = conn.getTripleStore();
 
-        if (Boolean.valueOf(properties.getProperty(
+        if (Boolean.valueOf(tripleStore.getProperty(
                 BigdataSail.Options.HISTORY_SERVICE,
                 BigdataSail.Options.DEFAULT_HISTORY_SERVICE))) {
 

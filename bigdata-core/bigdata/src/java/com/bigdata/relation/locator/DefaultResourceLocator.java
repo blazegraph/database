@@ -543,7 +543,7 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
                     if (INFO) {
 
                         log.info("Found: namespace=" + namespace + " on "
-                                + indexManager);
+                                + indexManager + ", properties=" + properties);
 
                     }
 
@@ -632,6 +632,7 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
          */
         Long commitTime2 = null;
         final Map<String, Object> map;
+        final boolean propertyCacheHit;
         if (TimestampUtility.isReadOnly(timestamp)
                 && !TimestampUtility.isReadCommitted(timestamp)) {
 
@@ -767,12 +768,15 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
 
                 // Save reference to the property set.
                 map = cachedMap;
+                propertyCacheHit = true;
 
             } else {
 
                 /*
                  * Property cache miss.
                  */
+                
+                propertyCacheHit = false;
 
                 // Use the GRS view as of that commit point.
                 final SparseRowStore rowStore = indexManager
@@ -882,6 +886,8 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
             // Read the properties from the GRS.
             map = rowStore == null ? null : rowStore.read(
                     RelationSchema.INSTANCE, namespace);
+            
+            propertyCacheHit = false;
 
         }
 
@@ -913,12 +919,18 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
             properties.put(RelationSchema.COMMIT_TIME, commitTime2);
 
         }
+        if(indexManager instanceof TemporaryStore && "namespace2".equals(namespace)) {
+            // FIXME BLZG-2023 Remove debug point.
+            log.fatal
+            ("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="
+                    + timestamp + ", propertyCacheHit=" + propertyCacheHit + ", properties=" + properties);
+        }
+        if (INFO||log.isTraceEnabled()) {
 
-        if (log.isTraceEnabled()) {
-
-            log.trace("Read properties: indexManager=" + indexManager
-                    + ", namespace=" + namespace + ", timestamp=" + timestamp
-                    + " :: " + properties);
+//            log.trace
+            log.info
+            ("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="
+                    + timestamp + ", propertyCacheHit=" + propertyCacheHit + ", properties=" + properties);
 
         }
 
@@ -1050,7 +1062,9 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
 
             if (INFO) {
 
-                log.info("Instance added to cache: " + instance);
+                log.info("Instance added to cache: nt=" + nt + ", instance=" + instance + ", indexManager="
+                        + (instance instanceof AbstractResource ? ((AbstractResource<?>) instance).getIndexManager()
+                                : "n/a"));
 
             }
 
@@ -1124,12 +1138,26 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
 
         // Discard any unisolated resource views.
 //        resourceCache.clear();
-        final Iterator<Map.Entry<NT, WeakReference<T>>> itr = resourceCache.entryIterator();
-        while (itr.hasNext()) {
-            final Map.Entry<NT, WeakReference<T>> e = itr.next();
-            final NT nt = e.getKey();
-            if (TimestampUtility.isUnisolated(nt.getTimestamp())) {
-                itr.remove();
+//        propertyCache.clear();
+        {
+            final Iterator<Map.Entry<NT, WeakReference<T>>> itr = resourceCache.entryIterator();
+            while (itr.hasNext()) {
+                final Map.Entry<NT, WeakReference<T>> e = itr.next();
+                final NT nt = e.getKey();
+                if (TimestampUtility.isUnisolated(nt.getTimestamp())) {
+                    itr.remove();
+//                    resourceCache.remove(nt);
+                }
+            }
+        }{
+            final Iterator<Map.Entry<NT, WeakReference<Map<String,Object>>>> itr = propertyCache.entryIterator();
+            while (itr.hasNext()) {
+                final Map.Entry<NT, WeakReference<Map<String,Object>>> e = itr.next();
+                final NT nt = e.getKey();
+                if (TimestampUtility.isUnisolated(nt.getTimestamp())) {
+                    itr.remove();
+//                    propertyCache.remove(nt);
+                }
             }
         }
 

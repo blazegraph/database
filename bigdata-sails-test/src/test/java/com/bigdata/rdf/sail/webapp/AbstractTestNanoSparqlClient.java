@@ -252,7 +252,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         // Open an unisolated connection on that namespace and figure out what
         // mode the namespace is using.
         {
-            final BigdataSail sail = new BigdataSail(namespace, indexManager);
+            final BigdataSail sail = new BigdataSail(lnamespace, indexManager);
             try {
                 sail.initialize();
                 final BigdataSailConnection con = sail.getUnisolatedConnection();

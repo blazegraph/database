@@ -42,7 +42,11 @@ import org.openrdf.query.QueryEvaluationException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.spo.NoAxiomFilter;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.DaemonThreadFactory;
 
 import junit.framework.Test;
@@ -167,8 +171,10 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
     }
 
     private void createNamespace(final String namespace) throws Exception {
-        final Properties properties = new Properties();
-        properties.put("com.bigdata.rdf.sail.namespace", namespace);
+//        final Properties properties = new Properties();
+        final Properties properties = getTestMode().getProperties(); // FIXME BLZG-2023: Use the indicated test mode, but also test for triplesPlusTM.
+//        final Properties properties = TestMode.triplesPlusTruthMaintenance.getProperties();
+        properties.put(BigdataSail.Options.NAMESPACE, namespace);
         log.warn(String.format("Create namespace %s...", namespace));
         m_mgr.createRepository(namespace, properties);
         log.warn(String.format("Create namespace %s done", namespace));
