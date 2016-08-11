@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
@@ -42,7 +41,7 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.BigdataSail.UnisolatedCallable;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -138,11 +137,9 @@ public class CreateKBTask extends AbstractApiTask<Void> {
      * HAReady and then fails over before the KB is created. The task should be
      * re-submitted by the new leader once that leader is elected.
      * 
-     * @throws SailException 
-     * @throws InterruptedException 
-     * @throws IOException 
+     * @throws Exception 
      */
-    private void doRun() throws SailException, InterruptedException, IOException {
+    private void doRun() throws Exception {
     
        final IIndexManager indexManager = getIndexManager();
        
@@ -239,38 +236,34 @@ public class CreateKBTask extends AbstractApiTask<Void> {
                  * 
                  * @see BLZG-2023, BLZG-2041
                  */
-                boolean ok = false;
-                final BigdataSailConnection con = getUnisolatedSailConnection(true/*allowIfNamespaceDoesNotExist*/);
+                // Wrap with SAIL.
+                final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
                 try {
-                    
-                    final AbstractTripleStore tripleStore = con.getTripleStore();
+                    sail.initialize();
+                    final UnisolatedCallable<Void> task = new UnisolatedCallable<Void>() {
+                        @Override
+                        public Void call() throws Exception {
+                            if (!sail.exists()) {
+                                if (log.isInfoEnabled())
+                                    log.info("Creating KB instance: namespace=" + namespace);
 
-                    if (tripleStore == null) {
+                                // create the appropriate as configured
+                                // triple/quad store.
+                                createLTS(jnl, getProperties());
 
-                        if(log.isInfoEnabled())
-                            log.info("Creating KB instance: namespace=" + namespace);
-
-                        // create the appropriate as configured triple/quad store.
-                        createLTS(jnl, getProperties());
-
-                        if(log.isInfoEnabled())
-                           log.info("Created tripleStore: " + namespace);
-                        
-                        // Note: This is the commit point only if group commit is NOT enabled.                   
-                        con.commit();
-                        
-                        ok = true;
-                        
+                                if (log.isInfoEnabled())
+                                    log.info("Created tripleStore: " + namespace);
+                            }
+                            return null;
+                        }
+                    };
+                    try {
+                        sail.getUnisolatedConnection(task);
+                    } finally {
+                        task.releaseLocks();
                     }
-                    
                 } finally {
-                    
-                    if (!ok) {
-                        con.rollback();
-                    }
-                    
-                    con.close();
-                    
+                    sail.shutDown();
                 }
 
             }

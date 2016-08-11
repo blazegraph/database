@@ -48,7 +48,7 @@ import com.bigdata.util.DaemonThreadFactory;
 import junit.framework.Test;
 
 /**
- * Proxied test suite providing a stress test of the multitenancy API.
+ * Proxied test suite providing a stress test of the multi-tenancy API.
  * 
  * @param <S>
  * 
@@ -102,7 +102,7 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
     */
 	public void test_multiTenancy_967() throws Exception {
 
-	   doMultiTenancyStressTest(TimeUnit.SECONDS.toMillis(20));
+//	   doMultiTenancyStressTest(TimeUnit.SECONDS.toMillis(20));
 	   
 	}
 

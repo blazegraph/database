@@ -5882,8 +5882,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         } else if (TimestampUtility.isReadWriteTx(timestamp)) {
 
-            final long readsOnCommitTime = getLocalTransactionManager().getTx(
-                    timestamp).getReadsOnCommitTime();
+            final ITx tx = getLocalTransactionManager().getTx(timestamp);
+  
+            if (tx == null)
+               throw new TransactionNotFoundException(timestamp);
+
+            final long readsOnCommitTime = tx.getReadsOnCommitTime();
 
             n2a = getName2Addr(readsOnCommitTime);
 

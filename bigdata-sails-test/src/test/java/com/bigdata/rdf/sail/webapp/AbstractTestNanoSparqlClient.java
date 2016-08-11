@@ -74,7 +74,6 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.DestroyKBTask;
@@ -170,7 +169,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 	}
 
-   private BigdataSail createTripleStore(
+   private void createTripleStore(
          final IIndexManager indexManager, final String namespace,
          final Properties properties) throws InterruptedException,
          ExecutionException, SailException {
@@ -186,10 +185,10 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
            if(log.isInfoEnabled())
                log.info("Created tripleStore: " + namespace);
            ok = true;
-           return sail;
+           return;
        } finally {
-           if(!ok)
-           sail.shutDown();
+           if (!ok)
+               sail.shutDown();
        }
        
 //      AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace,
@@ -248,22 +247,32 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		final Properties properties = getProperties();
 
 		// Create the triple store instance.
-        final BigdataSail sail = createTripleStore(indexManager,
-        		lnamespace, properties);
-        final BigdataSailConnection con = sail.getUnisolatedConnection();
-        try {
-            final AbstractTripleStore tripleStore = con.getTripleStore();
-            if (tripleStore.isStatementIdentifiers()) {
-    			testMode = TestMode.sids;
-            } else if (tripleStore.isQuads()) {
-                testMode = TestMode.quads;
-            } else {
-                testMode = TestMode.triples;
+        createTripleStore(indexManager, lnamespace, properties);
+        
+        // Open an unisolated connection on that namespace and figure out what
+        // mode the namespace is using.
+        {
+            final BigdataSail sail = new BigdataSail(namespace, indexManager);
+            try {
+                sail.initialize();
+                final BigdataSailConnection con = sail.getUnisolatedConnection();
+                try {
+                    final AbstractTripleStore tripleStore = con.getTripleStore();
+                    if (tripleStore.isStatementIdentifiers()) {
+                        testMode = TestMode.sids;
+                    } else if (tripleStore.isQuads()) {
+                        testMode = TestMode.quads;
+                    } else {
+                        testMode = TestMode.triples;
+                    }
+                } finally {
+                    con.close();
+                }
+            } finally {
+                sail.shutDown();
             }
-        } finally {
-            con.close();
         }
-		
+
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
 

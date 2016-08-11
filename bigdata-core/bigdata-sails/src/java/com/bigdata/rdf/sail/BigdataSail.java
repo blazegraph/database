@@ -66,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
@@ -101,7 +102,6 @@ import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
@@ -1170,6 +1170,7 @@ public class BigdataSail extends SailBase implements Sail {
      * two different models coexisting.  We should talk about that at some 
      * point.
      */
+    // FIXME This should be a canonical lock for the namespace, not per Bigdata
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
 
    /**
@@ -1232,10 +1233,46 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
 
-        return getUnisolatedConnection(false/*allowIfNamespaceNotFound*/);
+        try {
+            return getUnisolatedConnection(new UnisolatedCallable<BigdataSailConnection>() {
+
+                @Override
+                public BigdataSailConnection call() throws Exception {
+                    // new unisolated connection.
+                    return new BigdataSailConnection(writeLock).startConn();
+                }});
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         
     }
 
+    public static abstract class UnisolatedCallable<T> implements Callable<T> {
+
+        private boolean acquiredConnection;
+        protected Lock writeLock;
+        private IIndexManager indexManager;
+        
+        private void init(final boolean acquiredConnection, final Lock writeLock, final IIndexManager indexManager) {
+            this.acquiredConnection = acquiredConnection;
+            this.writeLock = writeLock;
+            this.indexManager = indexManager;
+        }
+        
+        public void releaseLocks() {
+            // Did not obtain connection.
+            if (writeLock != null) {
+                // release write lock.
+                writeLock.unlock();
+            }
+            if (acquiredConnection) {
+                // release permit.
+                ((Journal) indexManager).releaseUnisolatedConnection();
+            }
+        }
+        
+    }
+    
     /**
      * Obtain the unisolated connection.
      * 
@@ -1243,13 +1280,10 @@ public class BigdataSail extends SailBase implements Sail {
      * even if the namespace does not exist.
      * 
      * @return The connection.
-     * 
-     * @throws InterruptedException
-     * 
-     * FIXME BLZG-2023 Unit test for this code path when arg is true.
+     * @throws Exception 
      */
-    public BigdataSailConnection getUnisolatedConnection(final boolean allowIfNamespaceNotFound) 
-            throws InterruptedException {
+    public <T> T getUnisolatedConnection(final UnisolatedCallable<T> lambda) 
+            throws Exception {
 
         if (lock.writeLock().isHeldByCurrentThread()) {
             /*
@@ -1263,7 +1297,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         boolean acquiredConnection = false;
         Lock writeLock = null;
-        BigdataSailConnection conn = null;
+        boolean ok = false;
         try {
             if (getIndexManager() instanceof Journal) {
             /*
@@ -1287,9 +1321,12 @@ public class BigdataSail extends SailBase implements Sail {
             // acquire the write lock.
             writeLock = lock.writeLock();
             writeLock.lock();
+            
+            lambda.init(acquiredConnection, writeLock, getIndexManager());
 
-            // new unisolated connection.
-            conn = new BigdataSailConnection(allowIfNamespaceNotFound,writeLock).startConn();
+            final T ret = lambda.call();
+            ok = true;
+            return ret;
             
             /*
              * Add the RDRHistory class if that feature is enabled.
@@ -1305,7 +1342,7 @@ public class BigdataSail extends SailBase implements Sail {
         } catch(DatasetNotFoundException ex) {
            throw new RuntimeException(ex);
         } finally {
-            if (conn == null) {
+            if (!ok) {
                 // Did not obtain connection.
                 if (writeLock != null) {
                     // release write lock.
@@ -1317,7 +1354,6 @@ public class BigdataSail extends SailBase implements Sail {
                 }
             }
         }
-        return conn;
 
     }
     
@@ -1736,9 +1772,8 @@ public class BigdataSail extends SailBase implements Sail {
         public String toString() {
         	
             return getClass().getName() + "{timestamp="
-                    + (database==null?"n/a":TimestampUtility.toString(database.getTimestamp()))
+                    + TimestampUtility.toString(database.getTimestamp())
                     + ",open=" + openConn
-                    + ",exists=" + (database!=null)
                     + "}";
 
         }
@@ -1878,16 +1913,10 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @param timestampOrTxId
          *            Either a commit time or a read/write transaction identifier.
-         * @param allowIfNamespaceDoesNotExist 
-         *            For the {@link ITx#UNISOLATED} connection ONLY, optionally
-         *            allow the connection if the namespace does not exist.
          * @param lock
          */
-        protected BigdataSailConnection(final long timestampOrTxId, final boolean allowIfNamespaceDoesNotExist, final Lock lock) throws DatasetNotFoundException {
+        protected BigdataSailConnection(final long timestampOrTxId, final Lock lock) throws DatasetNotFoundException {
 
-            if(allowIfNamespaceDoesNotExist && timestampOrTxId != ITx.UNISOLATED)
-                throw new IllegalArgumentException();
-            
             this.lock = lock;
 
             this.unisolated = TimestampUtility.isUnisolated(timestampOrTxId);
@@ -1897,26 +1926,16 @@ public class BigdataSail extends SailBase implements Sail {
             {
                 final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, timestampOrTxId);
                 
-                if(tripleStore == null && !allowIfNamespaceDoesNotExist) {
+                if(tripleStore == null) {
     
                     throw new DatasetNotFoundException("namespace="+namespace);
                     
-                } else {
-                    
-                    this.database = tripleStore;
-    
-                    if(tripleStore == null) {
-    
-                        this.properties = new Properties();
-    
-                        properties.setProperty(Options.NAMESPACE,namespace);
-                    
-                    } else {
-                        
-                        this.properties = database.getProperties();
-    
-                    }
                 }
+                    
+                this.database = tripleStore;
+
+                this.properties = database.getProperties();
+
             }
 
             {
@@ -1924,15 +1943,8 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 checkProperties(properties);
                 
-                if(database == null) {
+                {
                     
-                    // Code path for unisolated connection w/o a pre-existing namespace.
-                    this.quads = false;
-                    this.truthMaintenanceIsSupportable = false;
-                    
-                } else {
-
-                    // All other code paths.  Only on this code path is Properties meaningful.
                     this.quads = database.isQuads();
                     
                     // truthMaintenance
@@ -2085,17 +2097,11 @@ public class BigdataSail extends SailBase implements Sail {
          * @param lock
          * @throws DatasetNotFoundException 
          */
-        protected BigdataSailConnection(final boolean allowIfNamespaceDoesNotExist, final Lock lock) throws DatasetNotFoundException {
+        protected BigdataSailConnection(final Lock lock) throws DatasetNotFoundException {
 
-            this(ITx.UNISOLATED, allowIfNamespaceDoesNotExist, lock);
+            this(ITx.UNISOLATED, lock);
 
-            if(database != null) 
-                attach(database);
-            else if(!allowIfNamespaceDoesNotExist) {
-                throw new IllegalStateException();
-            } else {
-                openConn = true;
-            }
+            attach(database);
 
         }
         
@@ -3707,8 +3713,7 @@ public class BigdataSail extends SailBase implements Sail {
 	            clearBuffers();
 	
 	            // discard the write set.
-	            if(database != null)
-	                database.abort();
+	            database.abort();
 	            
 	            if (changeLog != null) {
 	                
@@ -3776,17 +3781,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
 
-            final long commitTime;
-            if(database == null) {
-                // Handle case where namespace does not exist when connection was opened.
-                if(getIndexManager() instanceof IAtomicStore) {
-                    commitTime = ((IAtomicStore) getIndexManager()).commit();
-                } else {
-                    commitTime = 0L;
-                }
-            } else {
-                commitTime = database.commit();
-            }
+            final long commitTime = database.commit();
             
             if (txLog.isInfoEnabled())
                 txLog.info("SAIL-COMMIT-CONN : commitTime=" + commitTime
@@ -4824,7 +4819,7 @@ public class BigdataSail extends SailBase implements Sail {
         public BigdataSailRWTxConnection(final long txId, final ITransactionService txService, final Lock readLock)
                 throws IOException, DatasetNotFoundException {
 
-            super(txId, false/*allowIfNamespaceDoesNotExist*/, readLock);//, false/* unisolated */, false/* readOnly */);
+            super(txId, readLock);//, false/* unisolated */, false/* readOnly */);
 
             if (!isolatable) {
 
@@ -5069,7 +5064,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         BigdataSailReadOnlyConnection(final long txId,final ITransactionService txService) throws IOException, DatasetNotFoundException {
 
-            super(txId, false/*allowIfNamespaceDoesNotExist*/, null/* lock */);//, false/* unisolated */, true/* readOnly */);
+            super(txId, null/* lock */);//, false/* unisolated */, true/* readOnly */);
 
 //            clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
             clusterCacheBugFix = this.scaleOut; // identical to the code above.

@@ -257,14 +257,14 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
     }
 
-    protected BigdataSailConnection getUnisolatedSailConnection(final boolean allowIfNamespaceDoesNotExist) throws SailException, InterruptedException {
+    protected BigdataSailConnection getUnisolatedSailConnection() throws SailException, InterruptedException {
         
         // Wrap with SAIL.
         final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
 
         sail.initialize();
 
-        final BigdataSailConnection conn = sail.getUnisolatedConnection(allowIfNamespaceDoesNotExist);
+        final BigdataSailConnection conn = sail.getUnisolatedConnection();
         
         // Setup a change listener. It will notice the #of mutations.
         conn.addChangeLog(new SailChangeLog());

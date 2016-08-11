@@ -29,7 +29,6 @@ package com.bigdata.rdf.sail;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -71,19 +70,19 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
 
        boolean ok = false;
        
-       final BigdataSailConnection con = getUnisolatedSailConnection(true/*allowIfNamespaceDoesNotExist*/);
+       final BigdataSailConnection con = getUnisolatedSailConnection();
 
        try {
 
             final AbstractTripleStore tripleStore = con.getTripleStore();
 
-            if (tripleStore == null) {
-
-              throw new DatasetNotFoundException("Not found: namespace="
-                    + namespace + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-           }
+//            if (tripleStore == null) {
+//
+//              throw new DatasetNotFoundException("Not found: namespace="
+//                    + namespace + ", timestamp="
+//                    + TimestampUtility.toString(timestamp));
+//
+//           }
            
            // Destroy the KB instance.
            tripleStore.destroy();
