@@ -25,7 +25,6 @@ package com.bigdata.rdf.sail;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Properties;
 
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
@@ -36,37 +35,19 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.rdf.sail.BigdataSail.Options;
-
 /**
- * Unit test template for use in submission of bugs.
+ * This test case covers 2 ArrayIndexOutOfBoundsException occurrences:
+ * 1. Overflow of values array in StatementBuffer due to blank nodes are not cleared on flush;
+ * 2. Overflow of values array in MergeUtility due to its capacity computed without reference to blank nodes.
+ * 
+ * Test case covers both data load and insert update.
  * <p>
  * This test case will delegate to an underlying backing store. You can specify
  * this store via a JVM property as follows:
  * <code>-DtestClass=com.bigdata.rdf.sail.TestBigdataSailWithQuads</code>
- * <p>
- * There are three possible configurations for the testClass:
- * <ul>
- * <li>com.bigdata.rdf.sail.TestBigdataSailWithQuads (quads mode)</li>
- * <li>com.bigdata.rdf.sail.TestBigdataSailWithoutSids (triples mode)</li>
- * <li>com.bigdata.rdf.sail.TestBigdataSailWithSids (SIDs mode)</li>
- * </ul>
- * <p>
- * The default for triples and SIDs mode is for inference with truth maintenance
- * to be on. If you would like to turn off inference, make sure to do so in
- * {@link #getProperties()}.
- * 
- * @author Igor Kim
- * @version $Id$
  * 
  * @see https://jira.blazegraph.com/browse/BLZG-1889
- * 		ArrayIndexOutOfBound Exception
- * 
- * This test case covers 2 ArrayIndexOutOfBoundsException occurrences:
- * 1. Overflow of values array in StatementBuffer due to blank nodes are not cleared on flush
- * 2. Overflow of values array in MergeUtility due to its capacity computed without reference to blank nodes
- * 
- * Test case covers both data load and insert update.
+ *      ArrayIndexOutOfBound Exception
  */
 public class TestTicket1889 extends QuadsTestCase {
 	
