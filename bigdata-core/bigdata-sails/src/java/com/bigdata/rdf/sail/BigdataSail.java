@@ -109,6 +109,7 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.changesets.DelegatingChangeLog;
 import com.bigdata.rdf.changesets.IChangeLog;
@@ -1066,7 +1067,13 @@ public class BigdataSail extends SailBase implements Sail {
     @Override
     final public boolean isWritable() throws SailException {
 
-        return true; // TODO BLZG-2041 For many index managers, we could test to see if it is readOnly.
+        if(getIndexManager() instanceof IRawStore) {
+            // For backends that are willing to report whether or not they are
+            // read-only, this returns false if the index manager is read-only.
+            return !((IRawStore)getIndexManager()).isReadOnly();
+        }
+        // Otherwise assume writable (TemporaryStore, Federation).
+        return true;
 //        return ! database.isReadOnly();
         
     }
@@ -1270,10 +1277,12 @@ public class BigdataSail extends SailBase implements Sail {
             @Override
             public BigdataSailConnection call() throws Exception {
                 // new unisolated connection.
-                return new BigdataSailConnection(writeLock).startConn();
+                return new BigdataSailConnection(getWriteLock()).startConn();
             }};
         try {
-            return getUnisolatedConnection(task);
+            // Create and return the unisolated connection object.  It will 
+            // continue to hold the necessary locks.
+            return getUnisolatedConnectionLocksAndRunLambda(task);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -1288,33 +1297,63 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
 
+    /**
+     * Abstract base class permits some patterns in which the {@link Callable}
+     * owns the locks required to obtain the unisolated connection. This is
+     * used by the {@link CreateKBTask} which needs those locks, but which can
+     * not acquire the {@link BigdataSailConnection} yet since the namespace
+     * does not exist yet.
+     * 
+     * @author bryan
+     *
+     * @param <T>
+     * 
+     * @see BLZG-2023, BLZG-2041
+     */
     public static abstract class UnisolatedCallable<T> implements Callable<T> {
 
-        private boolean acquiredConnection;
-        protected Lock writeLock;
+        private boolean didRun = false;
+        private Lock writeLock;
         private IIndexManager indexManager;
         
-        // invoked iff lambda did run.
-        private void lambdaDone(final boolean acquiredConnection, final Lock writeLock, final IIndexManager indexManager) {
+        protected boolean didRun() {
+            return didRun;
+        }
+        
+        private void lambdaDidRun() {
+            didRun = true; 
+         }
+         
+        protected Lock getWriteLock() {
+            return writeLock;
+        }
+        
+        private void init(final Lock writeLock, final IIndexManager indexManager) {
+            if(writeLock == null)
+                throw new IllegalArgumentException();
             if(indexManager == null)
                 throw new IllegalArgumentException();
-            this.acquiredConnection = acquiredConnection;
             this.writeLock = writeLock;
             this.indexManager = indexManager;
         }
         
+        /**
+         * Release any acquired locks.
+         */
+        /*
+         * Note: The code path which obtains the unisolated BigdataSailConnection
+         * object does NOT use this method to release the locks. Instead, that is
+         * handled in BigdataSailConnection.close().
+         */
         public void releaseLocks() {
-            if(indexManager == null) {
-                // Did not run.
+            if(!didRun) {
+                // Did not run, so any locks were already released.
                 return;
             }
-            // Did not obtain connection.
-            if (writeLock != null) {
-                // release write lock.
-                writeLock.unlock();
-            }
-            if (acquiredConnection) {
-                // release permit.
+            // release write lock.
+            writeLock.unlock();
+            // release permit iff running on a Journal.
+            if (indexManager instanceof Journal) {
                 ((Journal) indexManager).releaseUnisolatedConnection();
             }
         }
@@ -1322,17 +1361,21 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
-     * Obtain the unisolated connection.
+     * Obtain the locks required by the unisolated connection and invoke the
+     * caller's lambda.
      * 
-     * @param allowIfNamespaceNotFound When true, the connection will be returned
-     * even if the namespace does not exist.
+     * @param lambda The caller's lambda 
      * 
-     * @return The connection.
+     * @return The value to which the lamba evaluates.
+     * 
      * @throws Exception 
      */
-    public <T> T getUnisolatedConnection(final UnisolatedCallable<T> lambda) 
+    public <T> T getUnisolatedConnectionLocksAndRunLambda(final UnisolatedCallable<T> lambda) 
             throws Exception {
 
+        if(lambda == null)
+            throw new IllegalArgumentException();
+        
         if (lock.writeLock().isHeldByCurrentThread()) {
             /*
              * A thread which already holds this lock already has the open
@@ -1369,9 +1412,14 @@ public class BigdataSail extends SailBase implements Sail {
             // acquire the write lock.
             writeLock = lock.writeLock();
             writeLock.lock();
-            
+            // Set lock and index manager on lambda.
+            lambda.init(writeLock, getIndexManager());
+            // Invoke lambda.
             final T ret = lambda.call();
-            lambda.lambdaDone(acquiredConnection, writeLock, getIndexManager());
+            // Note that lambda did run (successfully). This means that the lambda
+            // is now responsible for calling releaseLocks().
+            lambda.lambdaDidRun();
+            // Did run successfully.
             ok = true;
             return ret;
             

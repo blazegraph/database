@@ -48,8 +48,9 @@ import com.bigdata.rdf.task.AbstractApiTask;
  */
 public class DestroyKBTask extends AbstractApiTask<Void> {
 
-   private static final transient Logger log = Logger
-         .getLogger(DestroyKBTask.class);
+//   private static final transient Logger log = Logger.getLogger(DestroyKBTask.class);
+
+   private static final transient Logger txLog = Logger.getLogger("com.bigdata.txLog");
 
    public DestroyKBTask(final String namespace) {
     
@@ -92,8 +93,8 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
            
            ok = true;
 
-           if (log.isInfoEnabled())
-              log.info("Destroyed: namespace=" + namespace);
+           if (txLog.isInfoEnabled())
+              txLog.info("SAIL-DESTROY-NAMESPACE: namespace=" + namespace);
            
            return null;
            
