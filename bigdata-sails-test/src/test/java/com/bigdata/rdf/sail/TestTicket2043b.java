@@ -39,7 +39,7 @@ import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -72,15 +72,15 @@ import com.bigdata.rdf.store.TempTripleStore.Options;
  * 
  * @author Igor Kim
  * @see https://jira.blazegraph.com/browse/BLZG-2043
- * This testcase checks, that with disabled inlining both existing and not existing literals
+ * This testcase checks, that with enabled inlining both existing and not existing literals
  * parsed as inlined IVs in SPARQL
  */
-public class TestTicket2043 extends QuadsTestCase {
+public class TestTicket2043b extends QuadsTestCase {
 	
-    public TestTicket2043() {
+    public TestTicket2043b() {
 	}
 
-	public TestTicket2043(String arg0) {
+	public TestTicket2043b(String arg0) {
 		super(arg0);
 	}
 	
@@ -89,9 +89,10 @@ public class TestTicket2043 extends QuadsTestCase {
 		Properties properties = super.getProperties();
 
 		// Enable inlining
-		properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "false");
-		properties.setProperty(Options.INLINE_DATE_TIMES, "false");
-		properties.setProperty(Options.INLINE_TEXT_LITERALS, "false");
+		properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "true");
+		properties.setProperty(Options.INLINE_DATE_TIMES, "true");
+		properties.setProperty(Options.INLINE_TEXT_LITERALS, "true");
+		properties.setProperty(Options.MAX_INLINE_TEXT_LENGTH, "1000");
 		
 		return properties;
 	}
@@ -167,7 +168,7 @@ public class TestTicket2043 extends QuadsTestCase {
 			BOp bop = gp.get(i);
 			if (bop instanceof StatementPatternNode && bop.get(2) instanceof ConstantNode) {
 				IV<?, ?> x = ((ConstantNode)bop.get(2)).getValueExpression().get();
-				assertTrue(x instanceof TermId);
+				assertTrue(x instanceof AbstractInlineIV);
 				ivsCnt++;
 			}
 		}
