@@ -51,7 +51,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
  * SERVICE call.
  * <p>
  * To run this test case, specify the following JVM property:
- * <code>-DtestClass=com.bigdata.rdf.sail.TestBigdataSailWithQuads/code>
+ * <code>-DtestClass=com.bigdata.rdf.sail.TestBigdataSailWithQuads</code>
  */
 public class TestTicket632 extends QuadsTestCase {
 
@@ -67,7 +67,7 @@ public class TestTicket632 extends QuadsTestCase {
         //the service solutions don't matter cause the error is from before computing the service solutions
         final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
         ServiceRegistry.getInstance().add(serviceURI, new OpenrdfNativeMockServiceFactory(serviceSolutions));
-        BigdataSail sail = getSail();
+        final BigdataSail sail = getSail();
         try {
             executeQuery(serviceURI, new BigdataSailRepository(sail));
         } finally {            
@@ -76,17 +76,17 @@ public class TestTicket632 extends QuadsTestCase {
         }
     }
 
-    private void executeQuery(URI serviceUri, SailRepository repo) throws RepositoryException, MalformedQueryException, QueryEvaluationException, RDFParseException, IOException, RDFHandlerException {
+    private void executeQuery(final URI serviceUri, final SailRepository repo) throws RepositoryException, MalformedQueryException, QueryEvaluationException, RDFParseException, IOException, RDFHandlerException {
         try {
             repo.initialize();
-            RepositoryConnection conn = repo.getConnection();
-            ValueFactory vf = conn.getValueFactory();
+            final RepositoryConnection conn = repo.getConnection();
+            final ValueFactory vf = conn.getValueFactory();
             conn.setAutoCommit(false);
             try {
-                String query = "SELECT ?x { SERVICE <" + serviceUri.stringValue() + "> { ?x <u:1> ?bool1 } }";
-                TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                final String query = "SELECT ?x { SERVICE <" + serviceUri.stringValue() + "> { ?x <u:1> ?bool1 } }";
+                final TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 q.setBinding("bool1", vf.createLiteral(true));
-                TupleQueryResult tqr = q.evaluate();
+                final TupleQueryResult tqr = q.evaluate();
                 try {
                     tqr.hasNext();
                 } finally {

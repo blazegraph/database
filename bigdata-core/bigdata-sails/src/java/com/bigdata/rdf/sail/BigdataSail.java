@@ -71,6 +71,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -514,6 +515,23 @@ public class BigdataSail extends SailBase implements Sail {
      */
     private boolean closeOnShutdown;
     
+    private enum KnownIsolatableEnum {
+        /** We do not know whether or not the namespace uses isolated indices. */
+        Unknown,
+        /** The namespace uses isolated indices. */
+        Isolated,
+        /** The namespace does not use isolated indices. */
+        Unisolated
+    }
+    
+    /**
+     * Field is used to cache whether or not the namespace uses isolatable
+     * indices. Initially, this is not known. The value becomes known once we
+     * successfully resolve the namespace.  It is cleared if the namespace is
+     * destroyed.
+     */
+    final private AtomicReference<KnownIsolatableEnum> knownIsolatable = new AtomicReference<KnownIsolatableEnum>(KnownIsolatableEnum.Unknown); 
+    
     /**
      * Transient (in the sense of non-restart-safe) map of namespace prefixes
      * to namespaces.  This map is thread-safe and shared across all
@@ -907,6 +925,8 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
+        knownIsolatable.set(KnownIsolatableEnum.Unknown);
+        
         openSail = true;
         
     }
@@ -1067,38 +1087,51 @@ public class BigdataSail extends SailBase implements Sail {
     protected NotifyingSailConnection getConnectionInternal() 
         throws SailException {
 
-        final long lastCommitTime = indexManager.getLastCommitTime();
-        
-        final AbstractTripleStore readOnlyTripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, lastCommitTime);
-
-        if(readOnlyTripleStore == null) {
-            
-            throw new SailException("Namespace not found: namespace="+namespace);
-            
-        }
-        
-        final Properties properties = readOnlyTripleStore.getProperties();
-        
-        final boolean isolatable = Boolean.parseBoolean(properties.getProperty(
-                        BigdataSail.Options.ISOLATABLE_INDICES,
-                        BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
-        
         final BigdataSailConnection conn;
         try {
 
-            // if we have isolatable indices then use a read/write transaction
-            // @todo finish testing so we can enable this
-            if (isolatable) {
-                
-                conn = getReadWriteConnection();
-                
-            } else {
-            
-                conn = getUnisolatedConnection();
+            if ( knownIsolatable.get() == KnownIsolatableEnum.Unknown ) {
 
+                /*
+                 * Resolve whether or not the namespace supports isolatation.
+                 * 
+                 * Note: This pattern is eventually consistent.  At most one
+                 * thread will resolve the data race in the case where the 
+                 * isolation property is not known on entry.
+                 */
+                
+                final long lastCommitTime = indexManager.getLastCommitTime();
+                
+                final AbstractTripleStore readOnlyTripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, lastCommitTime);
+    
+                if(readOnlyTripleStore == null) {
+                    
+                    throw new DatasetNotFoundException("namespace="+namespace);
+                    
+                }
+                
+                final Properties properties = readOnlyTripleStore.getProperties();
+                
+                final boolean isolatable = Boolean.parseBoolean(properties.getProperty(
+                                BigdataSail.Options.ISOLATABLE_INDICES,
+                                BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
+    
+                // Set the flag.
+                knownIsolatable.compareAndSet(KnownIsolatableEnum.Unknown/*expect*/, isolatable?KnownIsolatableEnum.Isolated:KnownIsolatableEnum.Unisolated);
+            
             }
 
-            // Note: post-init moved to startConn().
+            switch(knownIsolatable.get()) {
+            case Isolated:
+                conn = getReadWriteConnection();
+                break;
+            case Unisolated:
+                conn = getUnisolatedConnection();
+                break;
+            case Unknown:
+            default:
+                throw new UnsupportedOperationException();
+            }
 
             return conn;
             
@@ -1233,18 +1266,24 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
 
+        final UnisolatedCallable<BigdataSailConnection> task = new UnisolatedCallable<BigdataSailConnection>() {
+            @Override
+            public BigdataSailConnection call() throws Exception {
+                // new unisolated connection.
+                return new BigdataSailConnection(writeLock).startConn();
+            }};
         try {
-            return getUnisolatedConnection(new UnisolatedCallable<BigdataSailConnection>() {
-
-                @Override
-                public BigdataSailConnection call() throws Exception {
-                    // new unisolated connection.
-                    return new BigdataSailConnection(writeLock).startConn();
-                }});
+            return getUnisolatedConnection(task);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        } finally {
+            /*
+             * Note: WE DO NOT RELEASE THE LOCKS ON THIS CODE PATH. THEY ARE
+             * HELD BY THE CONNECTION OBJECT THAT WE ARE RETURNING TO THE
+             * CALLER.
+             */
         }
         
     }
@@ -1255,13 +1294,20 @@ public class BigdataSail extends SailBase implements Sail {
         protected Lock writeLock;
         private IIndexManager indexManager;
         
-        private void init(final boolean acquiredConnection, final Lock writeLock, final IIndexManager indexManager) {
+        // invoked iff lambda did run.
+        private void lambdaDone(final boolean acquiredConnection, final Lock writeLock, final IIndexManager indexManager) {
+            if(indexManager == null)
+                throw new IllegalArgumentException();
             this.acquiredConnection = acquiredConnection;
             this.writeLock = writeLock;
             this.indexManager = indexManager;
         }
         
         public void releaseLocks() {
+            if(indexManager == null) {
+                // Did not run.
+                return;
+            }
             // Did not obtain connection.
             if (writeLock != null) {
                 // release write lock.
@@ -1324,22 +1370,10 @@ public class BigdataSail extends SailBase implements Sail {
             writeLock = lock.writeLock();
             writeLock.lock();
             
-            lambda.init(acquiredConnection, writeLock, getIndexManager());
-
             final T ret = lambda.call();
+            lambda.lambdaDone(acquiredConnection, writeLock, getIndexManager());
             ok = true;
             return ret;
-            
-            /*
-             * Add the RDRHistory class if that feature is enabled.
-             * 
-             * This happens via RDRHistoryServiceFactory.startConnection() now.
-             */
-//            if (database.isRDRHistory()) {
-//                final RDRHistory history = database.getRDRHistoryInstance();
-//                history.init();
-//                conn.addChangeLog(history);
-//            }
             
         } catch(DatasetNotFoundException ex) {
            throw new RuntimeException(ex);

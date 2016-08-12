@@ -454,7 +454,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			service = Executors.newSingleThreadExecutor();
 
 			// wrap a 2nd sail around the same namespace.
-			final BigdataSail sail2 = new BigdataSail(properties);
+			final BigdataSail sail2 = new BigdataSail(sail.getNamespace(), sail.getIndexManager());
 			sail2.initialize();
 
 			Future<Void> f = null;
@@ -463,6 +463,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 				final Callable<Void> task = new Callable<Void>() {
 
+				    @Override
 					public Void call() throws Exception {
 
 						SailConnection conn1 = null;
