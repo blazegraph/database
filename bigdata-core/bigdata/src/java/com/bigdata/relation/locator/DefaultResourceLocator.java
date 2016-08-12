@@ -942,12 +942,7 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
             properties.put(RelationSchema.COMMIT_TIME, commitTime2);
 
         }
-//        if(indexManager instanceof TemporaryStore && "namespace2".equals(namespace)) {
-//            // FIXME BLZG-2023 Remove debug point.
-//            log.fatal
-//            ("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="
-//                    + timestamp + ", propertyCacheHit=" + propertyCacheHit + ", properties=" + properties);
-//        }
+
         if (log.isTraceEnabled()) {
 
             log.trace("Read properties: indexManager=" + indexManager + ", namespace=" + namespace + ", timestamp="

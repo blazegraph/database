@@ -59,6 +59,7 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.util.InnerCause;
 
 /**
  * Bootstrap test case for bringing up the {@link BigdataSail}.
@@ -500,16 +501,21 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				// connection.
 				f = service.submit(task);
 
-				// wait up to a timeout to verify that the task blocked rather
-				// than acquiring the 2nd connection.
-				f.get(250, TimeUnit.MILLISECONDS);
+//				// wait up to a timeout to verify that the task blocked rather
+//				// than acquiring the 2nd connection.
+//				f.get(250, TimeUnit.MILLISECONDS);
+				f.get();
 
-			} catch (TimeoutException e) {
+			} catch (ExecutionException e) {
 
-				/*
-				 * This is the expected outcome.
-				 */
-				log.info("timeout");
+                if (InnerCause.isInnerCause(e, UnisolatedConnectionNotReentrantException.class)) {
+                    /*
+                     * This is the expected outcome.
+                     */
+                    log.info(e);
+                } else {
+                    throw e;
+			    }
 
 			} finally {
 
