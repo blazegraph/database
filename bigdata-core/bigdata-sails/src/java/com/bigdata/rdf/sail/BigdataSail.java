@@ -1241,6 +1241,8 @@ public class BigdataSail extends SailBase implements Sail {
                     // new unisolated connection.
                     return new BigdataSailConnection(writeLock).startConn();
                 }});
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
