@@ -1205,7 +1205,12 @@ public class ASTDeferredIVResolution {
                         	if (label.isEmpty()) {
                         		iv = ivs[i];
                         	} else {
-                        		iv = ASTDeferredIVResolutionInitializer.decode(label, dte.name());
+                        		// @see https://jira.blazegraph.com/browse/BLZG-2043 (xsd:integer IV not properly resolved when inlining disabled)
+                        		// At this point null IV means, that LexiconRelation has not resolved it against triplestore, nor it could be inlined
+                        		// according to inlining configuration, so we should use mockIV, as it was behavior of 1.5.1 version and prior
+                        		// (before BLZG-1176 SPARQL Parsers should not be db mode aware)
+//                      		iv = ASTDeferredIVResolutionInitializer.decode(label, dte.name());
+                                iv = TermId.mockIV(VTE.valueOf(v));
                         	}
                         } else {
                             iv = TermId.mockIV(VTE.valueOf(v));
