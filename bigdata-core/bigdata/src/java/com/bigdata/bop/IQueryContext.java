@@ -36,7 +36,6 @@ import com.bigdata.rwstore.sector.IMemoryManager;
  * Context for the evaluation of a query pipeline.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IQueryContext {
 

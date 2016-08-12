@@ -36,7 +36,6 @@ import java.util.UUID;
  * database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IOpMessage extends Serializable {
 

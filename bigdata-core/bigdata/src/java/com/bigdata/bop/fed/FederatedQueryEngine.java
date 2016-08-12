@@ -59,8 +59,6 @@ import com.bigdata.service.ResourceService;
  * An {@link IBigdataFederation} aware {@link QueryEngine}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: FederatedQueryEngine.java 3508 2010-09-05 17:02:34Z thompsonbry
- *          $
  */
 public class FederatedQueryEngine extends QueryEngine {
 
@@ -74,11 +72,11 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     public interface Annotations extends QueryEngine.Annotations {
 
-        /**
-         * The class used to map binding sets across the federation.
-         */
-        String CHUNK_HANDLER = FederatedQueryEngine.class.getName()
-                + ".chunkHandler";
+//        /**
+//         * The class used to map binding sets across the federation.
+//         */
+//        String CHUNK_HANDLER = FederatedQueryEngine.class.getName()
+//                + ".chunkHandler";
         
     }
     

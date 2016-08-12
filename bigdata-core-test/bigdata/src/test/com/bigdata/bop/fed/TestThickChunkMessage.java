@@ -61,7 +61,6 @@ import com.bigdata.striterator.Dechunkerator;
  * Unit tests for {@link ThickChunkMessage}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestThickChunkMessage extends TestCase2 {
 
@@ -302,32 +301,40 @@ public class TestThickChunkMessage extends TestCase2 {
 
         final private UUID serviceId = UUID.randomUUID();
         
+        @Override
         public void haltOp(IHaltOpMessage msg) throws RemoteException {
         }
 
+        @Override
         public void startOp(IStartOpMessage msg) throws RemoteException {
         }
 
+        @Override
         public void bufferReady(IChunkMessage<IBindingSet> msg)
                 throws RemoteException {
         }
 
+        @Override
         public void declareQuery(IQueryDecl queryDecl) {
         }
 
+        @Override
         public UUID getServiceUUID() throws RemoteException {
             return serviceId;
         }
 
+        @Override
         public PipelineOp getQuery(UUID queryId)
                 throws RemoteException {
             return null;
         }
 
+        @Override
         public void cancelQuery(UUID queryId, Throwable cause)
                 throws RemoteException {
         }
 
+        @Override
 		public UUID[] getRunningQueries() {
 			return null;
 		}
@@ -339,6 +346,7 @@ public class TestThickChunkMessage extends TestCase2 {
          * {@link IChunkMessage#getQueryController()}, which is an issue to
          * remove the {@link IQueryPeer} proxy from the {@link IChunkMessage}.
          */
+        @Override
         public boolean equals(Object o) {
             final MockQueryController x = (MockQueryController) o;
             return true;

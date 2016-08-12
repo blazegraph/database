@@ -56,8 +56,6 @@ import com.bigdata.util.config.NicUtil;
  * Unit tests for {@link NIOChunkMessage}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestNIOChunkMessage.java 6013 2012-02-12 21:29:01Z thompsonbry
- *          $
  * 
  * @todo test with large source chunks which span more than one direct buffer.
  * 
@@ -86,6 +84,7 @@ public class TestNIOChunkMessage extends TestCase2 {
 
     private ManagedResourceService resourceService;
 
+    @Override
     public void setUp() throws Exception {
 
         resourceService = new ManagedResourceService(new InetSocketAddress(
@@ -101,6 +100,7 @@ public class TestNIOChunkMessage extends TestCase2 {
         
     }
     
+    @Override
     public void tearDown() throws Exception {
 
         if (resourceService != null) {
@@ -237,32 +237,40 @@ public class TestNIOChunkMessage extends TestCase2 {
      */
     private static class MockQueryController implements IQueryClient {
 
+        @Override
         public void haltOp(IHaltOpMessage msg) throws RemoteException {
         }
 
+        @Override
         public void startOp(IStartOpMessage msg) throws RemoteException {
         }
 
+        @Override
         public void bufferReady(IChunkMessage<IBindingSet> msg)
                 throws RemoteException {
         }
 
+        @Override
         public void declareQuery(IQueryDecl queryDecl) {
         }
 
+        @Override
         public UUID getServiceUUID() throws RemoteException {
             return null;
         }
 
+        @Override
         public PipelineOp getQuery(UUID queryId)
                 throws RemoteException {
             return null;
         }
 
+        @Override
         public void cancelQuery(UUID queryId, Throwable cause)
                 throws RemoteException {
         }
 
+        @Override
 		public UUID[] getRunningQueries() {
 			return null;
 		}

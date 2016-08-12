@@ -265,7 +265,7 @@ public class TestFederatedQueryEngine extends
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
                         FederationChunkHandler.TEST_INSTANCE),//
                 }));
 
@@ -338,7 +338,7 @@ public class TestFederatedQueryEngine extends
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
-                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
@@ -457,7 +457,7 @@ public class TestFederatedQueryEngine extends
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
-                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
@@ -627,7 +627,7 @@ public class TestFederatedQueryEngine extends
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
-                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
@@ -774,7 +774,7 @@ public class TestFederatedQueryEngine extends
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
-                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
@@ -921,7 +921,7 @@ public class TestFederatedQueryEngine extends
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
-                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         }));
 
@@ -1131,7 +1131,7 @@ public class TestFederatedQueryEngine extends
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
-                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
                                 FederationChunkHandler.TEST_INSTANCE),//
                         }));
 

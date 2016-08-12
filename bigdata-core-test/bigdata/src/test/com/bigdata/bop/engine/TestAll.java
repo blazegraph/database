@@ -93,6 +93,9 @@ public class TestAll extends TestCase {
         // test suite for local (same JVM) chunk messages.
         suite.addTestSuite(TestLocalChunkMessage.class);
         
+        // test suite for local (same JVM) chunk messages stored on the native heap.
+        suite.addTestSuite(TestLocalNativeChunkMessage.class);
+        
         // test suite for the RunState class.
         suite.addTestSuite(TestRunState.class);
 
