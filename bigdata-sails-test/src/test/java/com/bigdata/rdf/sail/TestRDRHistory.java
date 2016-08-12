@@ -43,6 +43,7 @@ import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -112,6 +113,8 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             final URI o = vf.createURI(":o");
 
             final BigdataStatement stmt = vf.createStatement(s, p, o);
+            
+            // Add statement (first time added).
             cxn.add(stmt);
             cxn.commit();
             
@@ -119,13 +122,20 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
+            // Now 2 statements.
+            // 1. ground statement (Explicit)
+            // 2. <<s,p,o>> blaze:history:added timestamp1
             assertEquals(2, cxn.size());
 
+            // Verify ground statement exists (Explicit).
             {
                 final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, o, true);
                 try {
                     assertTrue(stmts.hasNext());
+                    final BigdataStatement tmp = (BigdataStatement) stmts.next();
+                    assertEquals(StatementEnum.Explicit, tmp.getStatementType());
+                    assertFalse(stmts.hasNext()); // Should be no more statements.
                 } finally {
                     stmts.close();
                 }
@@ -137,13 +147,16 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                         sid, RDRHistory.Vocab.ADDED, null, true);
                 try {
                     assertTrue(stmts.hasNext());
-                    final Literal l = (Literal) stmts.next().getObject();
-                    assertTrue(l.getDatatype().equals(XSD.DATETIME));
+                    final BigdataStatement tmp = (BigdataStatement) stmts.next();
+                    final Literal l = (Literal) tmp.getObject();
+                    assertEquals(XSD.DATETIME, l.getDatatype());
+                    assertFalse(stmts.hasNext()); // Should be no more statements.
                 } finally {
                     stmts.close();
                 }
             }
             
+            // Remove statement (first time removed).
             cxn.remove(stmt);
             cxn.commit();
 
@@ -151,8 +164,13 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
+            // Now 3 statements
+            // 1. ground statement (was Explicit, now History)
+            // 2. <<s,p,o>> blaze:history:added timestamp1
+            // 3. <<s,p,o>> blaze:history:removed timestamp2
             assertEquals(3, cxn.size());
 
+            // Verify ground statement no longer found (is History mode now).
             {
                 final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, o, true);
@@ -163,19 +181,22 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 }
             }
 
+            // Verify blaze:history:removed now found.
             {
                 final BigdataBNode sid = vf.createBNode(stmt);
                 final RepositoryResult<Statement> stmts = cxn.getStatements(
                         sid, RDRHistory.Vocab.REMOVED, null, true);
                 try {
                     assertTrue(stmts.hasNext());
-                    final Literal l = (Literal) stmts.next().getObject();
-                    assertTrue(l.getDatatype().equals(XSD.DATETIME));
+                    final BigdataStatement tmp = (BigdataStatement) stmts.next();
+                    final Literal l = (Literal) tmp.getObject();
+                    assertEquals(XSD.DATETIME, l.getDatatype());
                 } finally {
                     stmts.close();
                 }
             }
-            
+
+            // Add same statement again (2nd time).
             cxn.add(stmt);
             cxn.commit();
             
@@ -183,8 +204,14 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
+            // Now 4 statements
+            // 1. ground statement (was History, now Explicit)
+            // 2. <<s,p,o>> blaze:history:added timestamp1
+            // 3. <<s,p,o>> blaze:history:removed timestamp2
+            // 4. <<s,p,o>> blaze:history:added timestamp3
             assertEquals(4, cxn.size());
 
+            // Ground statement is found again.
             {
                 final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, o, true);
@@ -216,7 +243,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                         }
                     }
                     assertEquals(2, adds);
-                    assertEquals(2, removes);
+                    assertEquals(1, removes);
                 } finally {
                     stmts.close();
                 }

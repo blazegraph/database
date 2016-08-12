@@ -61,10 +61,8 @@ import com.bigdata.util.InnerCause;
  */
 public class CreateKBTask extends AbstractApiTask<Void> {
 
-    private static final transient Logger log = Logger
-            .getLogger(CreateKBTask.class);
-
-//    private final IIndexManager indexManager;
+    private static final transient Logger log = Logger.getLogger(CreateKBTask.class);
+    private static final transient Logger txLog = Logger.getLogger("com.bigdata.txLog");
     
     /**
      * The effective properties that will be used to create the namespace.
@@ -244,22 +242,21 @@ public class CreateKBTask extends AbstractApiTask<Void> {
                         @Override
                         public Void call() throws Exception {
                             if (!sail.exists()) {
-                                if (log.isInfoEnabled())
-                                    log.info("Creating KB instance: namespace=" + namespace);
-
-                                // create the appropriate as configured
-                                // triple/quad store.
+ 
+                                // create the appropriate as configured triple/quad store.
                                 createLTS(jnl, getProperties());
 
-                                if (log.isInfoEnabled())
-                                    log.info("Created tripleStore: " + namespace);
+                                if (txLog.isInfoEnabled())
+                                    txLog.info("SAIL-CREATE-NAMESPACE: namespace=" + namespace); // FIXME BLZG-2041 document on wiki
                             }
                             return null;
                         }
                     };
                     try {
-                        sail.getUnisolatedConnection(task);
+                        // Do work with appropriate locks are held.
+                        sail.getUnisolatedConnectionLocksAndRunLambda(task);
                     } finally {
+                        // Release locks.
                         task.releaseLocks();
                     }
                 } finally {
@@ -270,26 +267,26 @@ public class CreateKBTask extends AbstractApiTask<Void> {
 
         } else {
 
-         // Attempt to resolve the namespace.
-         if (indexManager.getResourceLocator().locate(namespace, ITx.UNISOLATED) == null) {
-
-            /*
-             * Register triple store for scale-out.
-             * 
-             * Note: Scale-out does not have a global lock.
-             */
-
-            if (log.isInfoEnabled())
-               log.info("Creating KB instance: namespace=" + namespace);
-
-            final ScaleOutTripleStore lts = new ScaleOutTripleStore(
-                  indexManager, namespace, ITx.UNISOLATED, getProperties());
-
-            // Note: Commit in scale-out is shard-wise acid.
-            lts.create();
-
-            if (log.isInfoEnabled())
-               log.info("Created tripleStore: " + namespace);
+             // Attempt to resolve the namespace.
+             if (indexManager.getResourceLocator().locate(namespace, ITx.UNISOLATED) == null) {
+    
+                /*
+                 * Register triple store for scale-out.
+                 * 
+                 * Note: Scale-out does not have a global lock.
+                 */
+    
+                if (log.isInfoEnabled())
+                   log.info("Creating KB instance: namespace=" + namespace);
+    
+                final ScaleOutTripleStore lts = new ScaleOutTripleStore(
+                      indexManager, namespace, ITx.UNISOLATED, getProperties());
+    
+                // Note: Commit in scale-out is shard-wise acid.
+                lts.create();
+    
+                if (txLog.isInfoEnabled())
+                   txLog.info("CREATE: namespace=" + namespace);
 
          } // if( tripleStore == null )
 

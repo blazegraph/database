@@ -89,7 +89,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
     }
     
     /**
-     * Overriden to allow the subject-centric full text index.
+     * Overridden to allow the subject-centric full text index.
      */
     @Override
     public Properties getProperties() {
@@ -402,6 +402,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 repo.initialize();
 
                 { // load ontology and optionally the entity data.
+                    boolean ok = false;
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         cxn.setAutoCommit(false);
@@ -413,26 +414,27 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             cxn.add(test_restart_2);
                         }
                         cxn.commit();
-                    } catch (Exception ex) {
-                        cxn.rollback();
-                        throw ex;
+                        ok = true;
                     } finally {
+                        if(!ok)
+                            cxn.rollback();
                         cxn.close();
                     }
                 }
 
                 if (doYouWantMeToBreak) {
                     // load the entity data.
+                    boolean ok = false;
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         cxn.setAutoCommit(false);
                         log.info("loading entity data");
                         cxn.add(test_restart_2);
                         cxn.commit();
-                    } catch (Exception ex) {
-                        cxn.rollback();
-                        throw ex;
+                        ok = true;
                     } finally {
+                        if (!ok)
+                            cxn.rollback();
                         cxn.close();
                     }
                 }
