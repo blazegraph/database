@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import org.openrdf.model.Resource;
@@ -87,7 +88,8 @@ public class TestTicket422 extends ProxyBigdataSailTestCase {
     
                 try {
     
-                    final BigdataSail tempSail = new BigdataSail(namespace, tempStore.getIndexManager(),
+                    // Note: The namespace of the tempSail MUST be distinct from the namespace of the main Sail.
+                    final BigdataSail tempSail = new BigdataSail(namespace+"-"+UUID.randomUUID(), tempStore.getIndexManager(),
                             mainTripleStore.getIndexManager());
     
                     try {

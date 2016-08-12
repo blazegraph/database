@@ -70,6 +70,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -103,6 +104,8 @@ import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
@@ -814,6 +817,21 @@ public class BigdataSail extends SailBase implements Sail {
         
         // Note: The actual namespace used for the ValueFactory is the namespace of the LexiconRelation.
         this.valueFactory = BigdataValueFactoryImpl.getInstance(namespace+"."+LexiconRelation.NAME_LEXICON_RELATION);
+
+        // Canonical pattern to obtain a lock used make unisolated and read/write tx operations MUTEX.
+        {
+//            this.lock = new ReentrantReadWriteLock(false/*fair*/);
+            // Attempt to resolve.
+            ReentrantReadWriteLock lock = locks.get(namespace);
+            if (lock == null ) {
+                final ReentrantReadWriteLock tmp = locks.putIfAbsent(namespace, lock = new ReentrantReadWriteLock(false/*false*/));
+                if(tmp != null) {
+                    // lost data race.
+                    lock = tmp;
+                }
+            }
+            this.lock = lock;
+        }
         
         this.namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
@@ -1193,6 +1211,13 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
+     * Cache for the {@link #lock}s.
+     */
+    final static private transient ConcurrentWeakValueCache<String/*namespace*/, ReentrantReadWriteLock> locks
+    = new ConcurrentWeakValueCacheWithTimeout<String, ReentrantReadWriteLock>(
+            20/*cacheCapacity*/, TimeUnit.MILLISECONDS.toNanos(10000/*cacheTimeout*/));
+    
+    /**
      * Used to coordinate between read/write transactions and the unisolated
      * connection.
      * <p>
@@ -1209,9 +1234,10 @@ public class BigdataSail extends SailBase implements Sail {
      * as tasks which get scheduled.  Probably it is dangerous to have these 
      * two different models coexisting.  We should talk about that at some 
      * point.
+     *
+     * @see BLZG-2041 This needs to be a canonical lock for the namespace, not per BigdataSail instance.
      */
-    // FIXME BLZG-2041 This should be a canonical lock for the namespace, not per Bigdata
-    final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
+    final private ReentrantReadWriteLock lock;
 
    /**
     * Return an unisolated connection to the database. The unisolated connection
@@ -1382,8 +1408,7 @@ public class BigdataSail extends SailBase implements Sail {
              * unisolated connection and will deadlock when it attempts to
              * obtain the permit for that connection from the Journal.
              */
-            throw new IllegalStateException(
-                    "UNISOLATED connection is not reentrant.");
+            throw new UnisolatedConnectionNotReentrantException();
         }
 
         boolean acquiredConnection = false;
