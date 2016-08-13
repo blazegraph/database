@@ -49,8 +49,13 @@ final class RTONEdgesQueryHint extends AbstractIntQueryHint {
 
     @Override
     public Integer validate(final String value) {
-
-        int i = Integer.valueOf(value);
+        
+        final int i;
+        try {
+            i = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Not an integer value: hint=" + getName() + ", value=" + value);
+        }
         
         if (i <= 0)
             throw new IllegalArgumentException("Must be positive: hint="
