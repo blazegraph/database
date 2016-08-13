@@ -112,7 +112,7 @@ ga('send', 'pageview');
       <version>${servlet.version}</version>
     </dependency>
     <dependency>
-      <groupId>colt</groupId>
+      <groupId>com.blazegraph</groupId>
       <artifactId>colt</artifactId>
       <version>${colt.version}</version>
     </dependency>

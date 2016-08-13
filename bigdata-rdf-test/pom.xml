@@ -154,7 +154,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       <version>${highscalelib.version}</version>
     </dependency>
     <dependency>
-      <groupId>colt</groupId>
+      <groupId>com.blazegraph</groupId>
       <artifactId>colt</artifactId>
       <version>${colt.version}</version>
     </dependency>

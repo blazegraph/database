@@ -154,7 +154,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
       <version>${highscalelib.version}</version>
     </dependency>
     <dependency>
-      <groupId>colt</groupId>
+      <groupId>com.blazegraph</groupId>
       <artifactId>colt</artifactId>
       <version>${colt.version}</version>
     </dependency>

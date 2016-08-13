@@ -222,7 +222,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <apache.httpmime.version>4.4</apache.httpmime.version>
     <highscalelib.version>1.1.2</highscalelib.version>
     <log4j.version>1.2.17</log4j.version>
-    <colt.version>1.2.0</colt.version>
+    <colt.version>${project.version}</colt.version>
     <fastutil.version>6.5.16</fastutil.version>
     <lgplutils.version>1.0.7-270114</lgplutils.version>
     <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
@@ -348,6 +348,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </activation>
       <modules>
         <module>junit-ext</module>
+        <module>colt</module>
         <module>ctc-striterators</module>
         <module>lgpl-utils</module>
         <module>dsi-utils</module>
@@ -379,6 +380,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </activation>
       <modules>
         <module>junit-ext</module>
+        <module>colt</module>
         <module>ctc-striterators</module>
         <module>lgpl-utils</module>
         <module>dsi-utils</module>
