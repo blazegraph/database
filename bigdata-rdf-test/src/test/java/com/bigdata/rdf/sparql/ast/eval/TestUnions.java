@@ -31,7 +31,6 @@ package com.bigdata.rdf.sparql.ast.eval;
  * Test suite for UNION.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
 
