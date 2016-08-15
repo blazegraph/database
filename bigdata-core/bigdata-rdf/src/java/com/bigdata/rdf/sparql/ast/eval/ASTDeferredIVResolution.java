@@ -62,7 +62,7 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
-import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+orimport com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -676,6 +676,17 @@ public class ASTDeferredIVResolution {
     
             }
             
+            // GROUP BY clause
+            {
+                final GroupByNode groupBy = queryRoot.getGroupBy();
+                
+                if (groupBy != null) {
+                	
+                	fillInIV(store, groupBy);
+                	
+                }
+            
+            }
             // HAVING clause
             {
                 final HavingNode having = queryRoot.getHaving();
