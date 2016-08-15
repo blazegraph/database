@@ -11,7 +11,7 @@ Please also visit us at our: [website](https://www.blazegraph.com), [wiki](https
 
 Find an issue?   Need help?  See [JIRA](https://jira.blazegraph.com) or purchase [Support](https://www.blazegraph.com/buy).
 
-Reporting a security issue: [Security](Security.md)
+Reporting a security issue: [Security Reporting](Security.md).
 
 ###Quick Start with the Executable Jar
 Up and running with Blazegraph in under 30 seconds:  [Quick Start](https://wiki.blazegraph.com/wiki/index.php/Quick_Start).
