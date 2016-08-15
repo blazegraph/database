@@ -27,51 +27,53 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.hints;
 
+import com.bigdata.bop.engine.IChunkHandler;
 import com.bigdata.bop.engine.NativeHeapStandloneChunkHandler;
-import com.bigdata.bop.join.HTreeHashJoinUtility;
-import com.bigdata.bop.join.IHashJoinUtility;
-import com.bigdata.bop.join.JVMHashJoinUtility;
-import com.bigdata.bop.join.SolutionSetHashJoinOp;
-import com.bigdata.htree.HTree;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Query hint for turning analytic query on/off.
- * <p>
- * TODO Allow this to be specified for each hash index build rather than just
- * globally for the query execution context. The primary consumer of hash
- * indices is the {@link SolutionSetHashJoinOp}. That operator implementation
- * identical for both JVM and {@link HTree} based hash joins. Therefore, we
- * could make the decision about whether to use the {@link JVMHashJoinUtility}
- * or the {@link HTreeHashJoinUtility} when building the hash index by
- * annotating that operator and then let the {@link SolutionSetHashJoinOp}
- * handle the hash join by delegating to the appropriate
- * {@link IHashJoinUtility} implementation.
+ * Query hint deciding on the {@link IChunkHandler} to be used.
+ * 
+ * @see BLZG-533 (Vector query engine on the native heap)
  */
-final class AnalyticQueryHint extends AbstractBooleanQueryHint {
+final class QueryEngineChunkHandlerQueryHint extends AbstractQueryHint<QueryEngineChunkHandlerEnum> {
 
-    protected AnalyticQueryHint() {
-        super(QueryHints.ANALYTIC, QueryHints.DEFAULT_ANALYTIC);
+    protected QueryEngineChunkHandlerQueryHint() {
+        super(QueryHints.QUERY_ENGINE_CHUNK_HANDLER,
+                QueryEngineChunkHandlerEnum.valueOf(QueryHints.DEFAULT_QUERY_ENGINE_CHUNK_HANDLER.getClass()));
     }
 
     @Override
     public void handle(final AST2BOpContext context, final QueryRoot queryRoot,
-            final QueryHintScope scope, final ASTBase op, final Boolean value) {
+            final QueryHintScope scope, final ASTBase op, final QueryEngineChunkHandlerEnum value) {
 
         switch (scope) {
         case Query:
-            context.nativeHashJoins = value;
-            context.nativeDistinctSolutions = value;
-            context.nativeDistinctSPO = value;
-            context.queryEngineChunkHandler = NativeHeapStandloneChunkHandler.NATIVE_HEAP_INSTANCE;
+            switch(value) {
+            case Managed:
+                context.queryEngineChunkHandler = NativeHeapStandloneChunkHandler.MANAGED_HEAP_INSTANCE;
+                break;
+            case Native:
+                context.queryEngineChunkHandler = NativeHeapStandloneChunkHandler.NATIVE_HEAP_INSTANCE;
+                break;
+            default:
+                throw new UnsupportedOperationException();
+            }
             return;
         }
 
         throw new QueryHintException(scope, op, getName(), value);
 
+    }
+
+    @Override
+    public QueryEngineChunkHandlerEnum validate(final String value) {
+        
+        return QueryEngineChunkHandlerEnum.valueOf(value);
+        
     }
 
 }

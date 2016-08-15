@@ -334,6 +334,10 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                     // blocking put()
                     queue.put(msg);
                     getQueryEngine().counters.bufferedChunkMessageCount.increment();
+                    if (msg instanceof LocalNativeChunkMessage) {
+                        getQueryEngine().counters.bufferedChunkMessageBytesOnNativeHeap
+                                .add(((LocalNativeChunkMessage) msg).getByteCount());
+                    }
                 } finally {
                     // Queue unblocked
                     getQueryEngine().counters.blockedWorkQueueCount.decrement();
@@ -625,6 +629,17 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 // #of messages accepted from the work queue.
                 final int naccepted = accepted.size();
                 getQueryEngine().counters.bufferedChunkMessageCount.add(-naccepted);
+                {
+                    long byteCount = 0;
+                    for(IChunkMessage<?> msg : accepted) {
+                        if (msg instanceof LocalNativeChunkMessage) {
+                            byteCount += ((LocalNativeChunkMessage) msg).getByteCount();
+                        }
+                    }
+                    if(byteCount!=0) {
+                        getQueryEngine().counters.bufferedChunkMessageBytesOnNativeHeap.add(-byteCount);
+                    }
+                }
                 // #of messages remaining on the work queue.
                 final int nremaining = queue.size();
                 if (nremaining == 0) {

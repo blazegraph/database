@@ -66,6 +66,12 @@ public class LocalNativeChunkMessage implements IChunkMessage<IBindingSet> {
     private final MemStore mmgr;
 
     /**
+     * The #of bytes of data written onto the {@link SolutionSetStream} for
+     * the {@link IChunkMessage}.
+     */
+    private final long byteCount;
+    
+    /**
      * false unless the chunk has been released.
      */
     private boolean released;
@@ -108,6 +114,8 @@ public class LocalNativeChunkMessage implements IChunkMessage<IBindingSet> {
     @Override
     public int getSolutionCount() {
 
+        final SolutionSetStream ssstr = this.ssstr;
+        
         if (ssstr == null)
             return 0;
         
@@ -119,6 +127,16 @@ public class LocalNativeChunkMessage implements IChunkMessage<IBindingSet> {
 
         return (int) nsolutions;
 
+    }
+
+    /**
+     * Return the byte count of the solutions on the native heap for this chunk
+     * message.
+     */
+    public long getByteCount() {
+        
+        return byteCount;
+        
     }
 
     public LocalNativeChunkMessage(final IQueryClient queryController,
@@ -172,6 +190,7 @@ public class LocalNativeChunkMessage implements IChunkMessage<IBindingSet> {
             
             this.mmgr = null;
             this.ssstr = null;
+            this.byteCount = 0L;
             
         } else {
             
@@ -198,6 +217,12 @@ public class LocalNativeChunkMessage implements IChunkMessage<IBindingSet> {
 
             this.ssstr = ssstr;
             this.mmgr = store;
+            
+//            // Note: This reports the size in bytes on sector boundaries (1M blocks).
+//            this.byteCount = store.size();
+            
+            // This reports the actual size of the allocation for the PSOutputStream.
+            this.byteCount = store.getByteCount(ssstr.getRootAddr());
 
         }
         

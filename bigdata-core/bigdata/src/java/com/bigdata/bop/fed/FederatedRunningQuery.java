@@ -342,7 +342,7 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
         
         return query.getProperty(
                 QueryEngine.Annotations.CHUNK_HANDLER,
-                FederationChunkHandler.INSTANCE); // FIXME BLZG-533 Control from QueryHints / Environment.
+                FederationChunkHandler.INSTANCE);
         
     }
 

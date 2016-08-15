@@ -106,6 +106,7 @@ public class QueryHintRegistry {
 
         // Analytic query mode.
         add(new AnalyticQueryHint());
+        add(new QueryEngineChunkHandlerQueryHint());
         add(new NativeDistinctQueryHint());
         add(new NativeDistinctSPOHint());
         add(new NativeDistinctSPOThresholdHint());
