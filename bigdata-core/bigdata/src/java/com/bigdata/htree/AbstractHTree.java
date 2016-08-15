@@ -28,6 +28,7 @@ import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexInconsistentError;
 import com.bigdata.btree.Node;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.ReadWriteLockManager;
@@ -903,7 +904,9 @@ abstract public class AbstractHTree implements ICounterSetAccess,
             throw new UnsupportedOperationException(ERROR_READ_ONLY);
             
         }
-        
+
+        if( error != null )
+            throw new IndexInconsistentError(ERROR_ERROR_STATE, error);
     }
     
     /**
