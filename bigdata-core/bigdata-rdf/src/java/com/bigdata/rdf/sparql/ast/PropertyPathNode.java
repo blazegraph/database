@@ -222,7 +222,7 @@ public class PropertyPathNode extends
 	    final StringBuilder sb = new StringBuilder();
 
 	    final Integer id = (Integer)getProperty(BOp.Annotations.BOP_ID);
-        sb.append("StatementPatternNode");
+        sb.append("PropertyPathNode");
         if (id != null) {
             sb.append("[").append(id.toString()).append("]");
         }
