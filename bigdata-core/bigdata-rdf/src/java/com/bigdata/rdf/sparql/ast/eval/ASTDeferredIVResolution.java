@@ -29,6 +29,7 @@ import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -226,7 +227,7 @@ public class ASTDeferredIVResolution {
             if (!termsResolver.deferred.isEmpty()) {
                 termsResolver.resolveIVs(store);
             }
-            
+            // fast path for pre-resolved query.
         	return new DeferredResolutionResult(resolvedBindingset, resolvedDataset);
         }
         
@@ -278,6 +279,15 @@ public class ASTDeferredIVResolution {
 
         ast.setProperty(Annotations.RESOLVED, Boolean.TRUE);
 
+        // Note: Full recursive traversal can be used to inspect post-condition of all bops.
+//        if(true) {
+//            final Iterator<BOp> itr = BOpUtility.preOrderIteratorWithAnnotations(ast);
+//            while(itr.hasNext()) {
+//                final BOp bop = itr.next();
+//                log.error("bop="+bop);
+//            }
+//        }
+        
         return new DeferredResolutionResult(resolvedBindingset, resolvedDataset);
     }
 
@@ -1250,7 +1260,7 @@ public class ASTDeferredIVResolution {
         for(final Runnable r: deferredRunnables) {
             r.run();
         }
-        
+
     }
     
 }

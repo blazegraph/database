@@ -231,8 +231,7 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         inlineIV3.setValue((BigdataLiteral) valueFactory.createLiteral("2",
                 XSD.SHORT));
         
-        inlineIV4 = XSDBooleanIV.TRUE;
-        
+        inlineIV4 = (XSDBooleanIV<?>) valueFactory.createLiteral(true);
         
         fullyInlinedTypedLiteralIV = 
             new FullyInlineTypedLiteralIV<>("Test 123", null, null);

@@ -790,7 +790,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                                     getEncoder().resolveCachedValues(outSolution);
                                     
                                     if (askVar!=null) {
-                                        outSolution.set(askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                                        outSolution.set(askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.valueOf(true)));
                                     }
                                     
                                     // Output this solution.
@@ -838,7 +838,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                        if (askVar!=null) {
                            leftSolutionWithoutMatch.set(
                              askVar, 
-                             new Constant<XSDBooleanIV<?>>(XSDBooleanIV.FALSE));
+                             new Constant<XSDBooleanIV<?>>(XSDBooleanIV.valueOf(false)));
                            outputBuffer.add(leftSolutionWithoutMatch);
                        }
                        break;
@@ -870,7 +870,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                        if (askVar!=null) {
                            existsSolution.set(
                              askVar, 
-                             new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                             new Constant<XSDBooleanIV<?>>(XSDBooleanIV.valueOf(true)));
                            outputBuffer.add(existsSolution);
                        }
                        break;

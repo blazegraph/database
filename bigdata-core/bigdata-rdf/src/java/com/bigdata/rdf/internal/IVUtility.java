@@ -628,8 +628,10 @@ public class IVUtility {
         switch (dte) {
         case XSDBoolean: {
             final byte x = KeyBuilder.decodeByte(key[o]);
-            final AbstractLiteralIV iv = (x == 0) ? 
-                    XSDBooleanIV.FALSE : XSDBooleanIV.TRUE;
+            final boolean isTrue = (x != 0);
+            final AbstractLiteralIV iv = XSDBooleanIV.valueOf(isTrue);
+//            final AbstractLiteralIV iv = (x == 0) ? 
+//                    XSDBooleanIV.FALSE : XSDBooleanIV.TRUE;
             return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDByte: {
