@@ -1,0 +1,63 @@
+##Reporting a Blazegraph Security Issue##
+
+For customers and Blazegraph users, please send an email to security [at] blazegraph.com to report a security issue. You may send an encrypted message using the public key below.
+
+This alias is monitored on a daily basis.   All security reports are acknowledged within 24 hours.   Mitigations for reported security issues are made in a reasonable timeframe, which may be as quickly as 24 hours for high-severity issues.
+
+###Public Key###
+Please use the public key below for transmitting any sensitive information to the security alias.
+
+```
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Comment: GPGTools - https://gpgtools.org
+
+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
+rhyYbfDxXZ5AmI/7AhitkQ==
+=e5hN
+-----END PGP PUBLIC KEY BLOCK-----
+```

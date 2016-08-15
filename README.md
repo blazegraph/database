@@ -12,10 +12,15 @@ Please also visit us at our: [website](https://www.blazegraph.com), [wiki](https
 Find an issue?   Need help?  See [JIRA](https://jira.blazegraph.com) or purchase [Support](https://www.blazegraph.com/buy).
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 Reporting a security issue: [Security Reporting](Security.md).
 
 >>>>>>> 9d7584a... Update for security formatting BLZG-2053
+=======
+Reporting a security issue: [Security](Security.md)
+
+>>>>>>> 85c7595... BLZG-2053:   Update for security reporting procedures.
 ###Quick Start with the Executable Jar
 Up and running with Blazegraph in under 30 seconds:  [Quick Start](https://wiki.blazegraph.com/wiki/index.php/Quick_Start).
 
