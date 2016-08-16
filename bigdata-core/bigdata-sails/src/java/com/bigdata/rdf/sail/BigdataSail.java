@@ -1303,7 +1303,11 @@ public class BigdataSail extends SailBase implements Sail {
             @Override
             public BigdataSailConnection call() throws Exception {
                 // new unisolated connection.
-                return new BigdataSailConnection(getWriteLock()).startConn();
+                final BigdataSailConnection cnxn =  new BigdataSailConnection(getWriteLock()).startConn();
+                
+    			manageConnection(cnxn);
+    			
+    			return cnxn;
             }};
         try {
             // Create and return the unisolated connection object.  It will 
@@ -1536,6 +1540,9 @@ public class BigdataSail extends SailBase implements Sail {
         try {
             final BigdataSailConnection conn = new BigdataSailReadOnlyConnection(txId,txService).startConn();
             ok = true;
+            
+			manageConnection(conn);
+
             return conn;
         } finally {
             if(!ok) {
@@ -1584,6 +1591,9 @@ public class BigdataSail extends SailBase implements Sail {
             readLock.lock();
             final BigdataSailConnection conn = new BigdataSailRWTxConnection(txId,txService,readLock).startConn();
             ok = true;
+            
+			manageConnection(conn);
+
             return conn;
         } catch(DatasetNotFoundException ex) {
             throw new RuntimeException(ex);
