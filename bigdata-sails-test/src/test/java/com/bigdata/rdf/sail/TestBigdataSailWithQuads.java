@@ -202,8 +202,21 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         
     }
     
+    private Properties properties = null;
+    
+    @Override
+    protected void tearDown(final ProxyBigdataSailTestCase testCase) throws Exception {
+
+        super.tearDown(testCase);
+        
+        properties = null;
+        
+    }
+    
     @Override
     protected BigdataSail getSail(final Properties properties) {
+
+        this.properties = properties;
         
         return new BigdataSail(properties);
         
@@ -233,7 +246,7 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
     @Override
     protected BigdataSail reopenSail(final BigdataSail sail) {
 
-        final Properties properties = sail.database.getProperties();
+//        final Properties properties = sail.getProperties();
 
         if (sail.isOpen()) {
 

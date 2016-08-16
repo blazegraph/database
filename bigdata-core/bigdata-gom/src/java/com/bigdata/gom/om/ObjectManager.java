@@ -55,7 +55,6 @@ import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -82,16 +81,18 @@ public class ObjectManager extends ObjectMgrModel {
      *            database.
      * @param cxn
      *            A connection to the database.
+     *            
+     * @throws RepositoryException 
      */
-    public ObjectManager(final String endpoint, final BigdataSailRepository cxn) {
+    public ObjectManager(final String endpoint, final BigdataSailRepository cxn) throws RepositoryException {
 
         super(endpoint, (BigdataValueFactory) cxn.getValueFactory());
 
         m_repo = cxn;
 
-        final AbstractTripleStore tripleStore = cxn.getDatabase();
+//        final AbstractTripleStore tripleStore = cxn.getDatabase();
 
-        this.readOnly = tripleStore.isReadOnly();
+        this.readOnly = !cxn.isWritable();
 
         /*
          * FIXME The DESCRIBE cache feature is not yet finished. This code will
@@ -104,15 +105,17 @@ public class ObjectManager extends ObjectMgrModel {
 
             final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                     .getStandaloneQueryController((Journal) m_repo
-                            .getDatabase().getIndexManager());
+                            .getSail().getIndexManager());
 
             final ICacheConnection cacheConn = CacheConnectionFactory
                     .getExistingCacheConnection(queryEngine);
 
             if (cacheConn != null) {
 
-                m_describeCache = cacheConn.getDescribeCache(
-                        tripleStore.getNamespace(), tripleStore.getTimestamp());
+                // FIXME The sail is no longer associated with a timestamp. See BLZG-2041.
+                m_describeCache = null;
+//                m_describeCache = cacheConn.getDescribeCache(
+//                        cxn.getSail().getNamespace(), cxn.getSail().getTimestamp());
 
             } else {
 
@@ -325,6 +328,12 @@ public class ObjectManager extends ObjectMgrModel {
      * @return The {@link IV} -or- <code>null</code> iff this is a read-only
      *         connection and the {@link BigdataResource} associated with that
      *         {@link IGPO} is not in the lexicon.
+     * 
+     *         FIXME This code path is horribly inefficient. It is create a new
+     *         connection for each such resolution (since BLZG-2041) and
+     *         handling resolution on an object by object basis. It is also not
+     *         making a clear distinction between a read-only and up-to-the
+     *         moment read/write connection.
      */
     private IV<?, ?> addResolveIV(final IGPO gpo) {
 
@@ -342,11 +351,33 @@ public class ObjectManager extends ObjectMgrModel {
             
             final BigdataValue[] values = new BigdataValue[] { id };
 
-            m_repo.getDatabase().getLexiconRelation()
+            BigdataSailRepositoryConnection conn = null;
+            
+            try {
+            
+                conn = getQueryConnection();
+                
+                conn.getTripleStore().getLexiconRelation()
                     .addTerms(values, values.length, readOnly);
-
+    
             // Note: MAY still be null!
             iv = id.getIV();
+                
+            } catch(RepositoryException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            } finally {
+                
+                if (conn != null) {
+                    try {
+                        conn.close();
+                    } catch (RepositoryException ex2) {
+                        log.warn(ex2, ex2);
+                    }
+                }
+                
+            }
 
         }
 

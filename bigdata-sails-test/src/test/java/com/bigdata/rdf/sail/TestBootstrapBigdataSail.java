@@ -59,12 +59,12 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.util.InnerCause;
 
 /**
  * Bootstrap test case for bringing up the {@link BigdataSail}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestBootstrapBigdataSail extends TestCase2 {
 
@@ -117,7 +117,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
             
 		} finally {
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
         }
 
@@ -198,7 +198,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 		} finally {
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -296,7 +296,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 			
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -334,10 +334,10 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			final ReentrantLock lock = new ReentrantLock();
 			final AtomicBoolean haveFirst = new AtomicBoolean(false);
 			final AtomicBoolean releaseFirst = new AtomicBoolean(false);
-			final AtomicBoolean haveSecond = new AtomicBoolean(false);
+//			final AtomicBoolean haveSecond = new AtomicBoolean(false);
 			final Condition haveFirstConnection = lock.newCondition();
 			final Condition releaseFirstConnection = lock.newCondition();
-			final Condition haveSecondConnection = lock.newCondition();
+//			final Condition haveSecondConnection = lock.newCondition();
 			try {
 
 				final Callable<Void> task1 = new Callable<Void>() {
@@ -425,7 +425,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -454,8 +454,8 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			sail.initialize();
 			service = Executors.newSingleThreadExecutor();
 
-			// wrap a 2nd sail around the same tripleStore.
-			final BigdataSail sail2 = new BigdataSail(sail.getDatabase());
+			// wrap a 2nd sail around the same namespace.
+			final BigdataSail sail2 = new BigdataSail(sail.getNamespace(), sail.getIndexManager());
 			sail2.initialize();
 
 			Future<Void> f = null;
@@ -464,6 +464,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 				final Callable<Void> task = new Callable<Void>() {
 
+				    @Override
 					public Void call() throws Exception {
 
 						SailConnection conn1 = null;
@@ -500,16 +501,21 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				// connection.
 				f = service.submit(task);
 
-				// wait up to a timeout to verify that the task blocked rather
-				// than acquiring the 2nd connection.
-				f.get(250, TimeUnit.MILLISECONDS);
+//				// wait up to a timeout to verify that the task blocked rather
+//				// than acquiring the 2nd connection.
+//				f.get(250, TimeUnit.MILLISECONDS);
+				f.get();
 
-			} catch (TimeoutException e) {
+			} catch (ExecutionException e) {
 
-				/*
-				 * This is the expected outcome.
-				 */
-				log.info("timeout");
+                if (InnerCause.isInnerCause(e, UnisolatedConnectionNotReentrantException.class)) {
+                    /*
+                     * This is the expected outcome.
+                     */
+                    log.info(e);
+                } else {
+                    throw e;
+			    }
 
 			} finally {
 
@@ -531,7 +537,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -569,8 +575,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			{
 
 				// tunnel through to the Journal.
-				final Journal jnl = (Journal) sail.getDatabase()
-						.getIndexManager();
+				final Journal jnl = (Journal) sail.getIndexManager();
 
 				// describe another tripleStore with a distinct namespace.
 				final AbstractTripleStore tripleStore = new LocalTripleStore(
@@ -658,7 +663,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -747,15 +752,23 @@ public class TestBootstrapBigdataSail extends TestCase2 {
                 
                 int n = 0;
 
-                CloseableIteration<? extends Statement, SailException> itr = readConn
+                final CloseableIteration<? extends Statement, SailException> itr = readConn
                         .getStatements(s, p, o, false/* includeInferred */);
 
+                try {
+                
                 while (itr.hasNext()) {
 
                     itr.next();
                     
                     n++;
 
+                }
+                
+                } finally {
+                    
+                    itr.close();
+                    
                 }
 
                 assertEquals("#statements visited", 0, n);
@@ -807,7 +820,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
             if (readConn != null)
                 readConn.close();
             
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
         }
 

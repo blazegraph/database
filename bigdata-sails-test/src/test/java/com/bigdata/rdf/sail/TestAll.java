@@ -37,7 +37,6 @@ import org.apache.log4j.Logger;
  * Test suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 

@@ -32,7 +32,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
@@ -44,7 +43,7 @@ import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.TestSparqlUpdateCommit.CommitCounter;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -54,6 +53,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
 
     private static final Logger log = Logger.getLogger(TestRDRHistory.class);
     
+    @Override
     public Properties getProperties() {
         
         return getProperties(RDRHistory.class);
@@ -62,7 +62,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
 
     public Properties getProperties(final Class<? extends RDRHistory> cls) {
         
-        Properties props = super.getProperties();
+        final Properties props = super.getProperties();
         
         // no inference
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
@@ -112,7 +112,9 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             final URI p = vf.createURI(":p");
             final URI o = vf.createURI(":o");
 
-            BigdataStatement stmt = vf.createStatement(s, p, o);
+            final BigdataStatement stmt = vf.createStatement(s, p, o);
+            
+            // Add statement (first time added).
             cxn.add(stmt);
             cxn.commit();
             
@@ -120,25 +122,41 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
-            assertTrue(cxn.size() == 2);
+            // Now 2 statements.
+            // 1. ground statement (Explicit)
+            // 2. <<s,p,o>> blaze:history:added timestamp1
+            assertEquals(2, cxn.size());
 
+            // Verify ground statement exists (Explicit).
             {
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, o, true);
-                assertTrue(stmts.hasNext());
-                stmts.close();
+                try {
+                    assertTrue(stmts.hasNext());
+                    final BigdataStatement tmp = (BigdataStatement) stmts.next();
+                    assertEquals(StatementEnum.Explicit, tmp.getStatementType());
+                    assertFalse(stmts.hasNext()); // Should be no more statements.
+                } finally {
+                    stmts.close();
+                }
             }
 
             {
-                BigdataBNode sid = vf.createBNode(stmt);
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final BigdataBNode sid = vf.createBNode(stmt);
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         sid, RDRHistory.Vocab.ADDED, null, true);
-                assertTrue(stmts.hasNext());
-                Literal l = (Literal) stmts.next().getObject();
-                assertTrue(l.getDatatype().equals(XSD.DATETIME));
-                stmts.close();
+                try {
+                    assertTrue(stmts.hasNext());
+                    final BigdataStatement tmp = (BigdataStatement) stmts.next();
+                    final Literal l = (Literal) tmp.getObject();
+                    assertEquals(XSD.DATETIME, l.getDatatype());
+                    assertFalse(stmts.hasNext()); // Should be no more statements.
+                } finally {
+                    stmts.close();
+                }
             }
             
+            // Remove statement (first time removed).
             cxn.remove(stmt);
             cxn.commit();
 
@@ -146,25 +164,39 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
-            assertTrue(cxn.size() == 3);
+            // Now 3 statements
+            // 1. ground statement (was Explicit, now History)
+            // 2. <<s,p,o>> blaze:history:added timestamp1
+            // 3. <<s,p,o>> blaze:history:removed timestamp2
+            assertEquals(3, cxn.size());
 
+            // Verify ground statement no longer found (is History mode now).
             {
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, o, true);
-                assertFalse(stmts.hasNext());
-                stmts.close();
+                try {
+                    assertFalse(stmts.hasNext());
+                } finally {
+                    stmts.close();
+                }
             }
 
+            // Verify blaze:history:removed now found.
             {
-                BigdataBNode sid = vf.createBNode(stmt);
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final BigdataBNode sid = vf.createBNode(stmt);
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         sid, RDRHistory.Vocab.REMOVED, null, true);
-                assertTrue(stmts.hasNext());
-                Literal l = (Literal) stmts.next().getObject();
-                assertTrue(l.getDatatype().equals(XSD.DATETIME));
-                stmts.close();
+                try {
+                    assertTrue(stmts.hasNext());
+                    final BigdataStatement tmp = (BigdataStatement) stmts.next();
+                    final Literal l = (Literal) tmp.getObject();
+                    assertEquals(XSD.DATETIME, l.getDatatype());
+                } finally {
+                    stmts.close();
+                }
             }
-            
+
+            // Add same statement again (2nd time).
             cxn.add(stmt);
             cxn.commit();
             
@@ -172,37 +204,49 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
-            assertTrue(cxn.size() == 4);
+            // Now 4 statements
+            // 1. ground statement (was History, now Explicit)
+            // 2. <<s,p,o>> blaze:history:added timestamp1
+            // 3. <<s,p,o>> blaze:history:removed timestamp2
+            // 4. <<s,p,o>> blaze:history:added timestamp3
+            assertEquals(4, cxn.size());
 
+            // Ground statement is found again.
             {
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, o, true);
-                assertTrue(stmts.hasNext());
-                stmts.close();
+                try {
+                    assertTrue(stmts.hasNext());
+                } finally {
+                    stmts.close();
+                }
             }
 
             {
-                BigdataBNode sid = vf.createBNode(stmt);
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final BigdataBNode sid = vf.createBNode(stmt);
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         sid, null, null, true);
-                int adds = 0;
-                int removes = 0;
-                while (stmts.hasNext()) {
-                    final Statement result = stmts.next();
-                    Literal l = (Literal) result.getObject();
-                    assertTrue(l.getDatatype().equals(XSD.DATETIME));
-                    final URI action = result.getPredicate();
-                    if (action.equals(RDRHistory.Vocab.ADDED)) {
-                        adds++;
-                    } else if (action.equals(RDRHistory.Vocab.REMOVED)) {
-                        removes++;
-                    } else {
-                        fail();
+                try {
+                    int adds = 0;
+                    int removes = 0;
+                    while (stmts.hasNext()) {
+                        final Statement result = stmts.next();
+                        final Literal l = (Literal) result.getObject();
+                        assertTrue(l.getDatatype().equals(XSD.DATETIME));
+                        final URI action = result.getPredicate();
+                        if (action.equals(RDRHistory.Vocab.ADDED)) {
+                            adds++;
+                        } else if (action.equals(RDRHistory.Vocab.REMOVED)) {
+                            removes++;
+                        } else {
+                            fail();
+                        }
                     }
+                    assertEquals(2, adds);
+                    assertEquals(1, removes);
+                } finally {
+                    stmts.close();
                 }
-                assertTrue(adds == 2);
-                assertTrue(removes == 1);
-                stmts.close();
             }
             
         } finally {
@@ -245,38 +289,50 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
-            assertTrue(cxn.size() == 3);
+            assertEquals(3, cxn.size());
 
             {
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, o, true);
-                assertTrue(stmts.hasNext());
-                stmts.close();
+                try {
+                    assertTrue(stmts.hasNext());
+                } finally {
+                    stmts.close();
+                }
             }
 
             {
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         s, p, l, true);
-                assertTrue(stmts.hasNext());
-                stmts.close();
+                try {
+                    assertTrue(stmts.hasNext());
+                } finally {
+                    stmts.close();
+                }
             }
 
             {
-                BigdataBNode sid = vf.createBNode(stmt1);
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final BigdataBNode sid = vf.createBNode(stmt1);
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         sid, RDRHistory.Vocab.ADDED, null, true);
-                assertFalse(stmts.hasNext());
-                stmts.close();
+                try {
+                    assertFalse(stmts.hasNext());
+                } finally {
+                    stmts.close();
+                }
             }
             
             {
-                BigdataBNode sid = vf.createBNode(stmt2);
-                RepositoryResult<Statement> stmts = cxn.getStatements(
+                final BigdataBNode sid = vf.createBNode(stmt2);
+                final RepositoryResult<Statement> stmts = cxn.getStatements(
                         sid, RDRHistory.Vocab.ADDED, null, true);
-                assertTrue(stmts.hasNext());
-                Literal l2 = (Literal) stmts.next().getObject();
-                assertTrue(l2.getDatatype().equals(XSD.DATETIME));
-                stmts.close();
+                try {
+                    assertTrue(stmts.hasNext());
+                    final Literal l2 = (Literal) stmts.next().getObject();
+                    assertTrue(l2.getDatatype().equals(XSD.DATETIME));
+                } finally {
+                    stmts.close();
+                }
             }
             
         } finally {
@@ -352,7 +408,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
-            assertTrue(cxn.size() == 10);
+            assertEquals(10, cxn.size());
             
             {
                 final String sparql =
@@ -371,17 +427,20 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 
                 final TupleQueryResult result =
                         cxn.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
-                
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet bs = result.next();
-                    i++;
-                    if (log.isDebugEnabled()) {
-                        log.debug(bs);
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet bs = result.next();
+                        i++;
+                        if (log.isDebugEnabled()) {
+                            log.debug(bs);
+                        }
                     }
+
+                    assertEquals(3, i);
+                } finally {
+                    result.close();
                 }
-                
-                assertTrue(i == 3);
             }
 
             {
@@ -398,17 +457,20 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 
                 final TupleQueryResult result =
                         cxn.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
-                
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet bs = result.next();
-                    i++;
-                    if (log.isDebugEnabled()) {
-                        log.debug(bs);
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet bs = result.next();
+                        i++;
+                        if (log.isDebugEnabled()) {
+                            log.debug(bs);
+                        }
                     }
+                    
+                    assertEquals(6, i);
+                } finally {
+                    result.close();
                 }
-                
-                assertTrue(i == 6);
             }
 
             {
@@ -425,17 +487,20 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 
                 final TupleQueryResult result =
                         cxn.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
-                
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet bs = result.next();
-                    i++;
-                    if (log.isDebugEnabled()) {
-                        log.debug(bs);
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet bs = result.next();
+                        i++;
+                        if (log.isDebugEnabled()) {
+                            log.debug(bs);
+                        }
                     }
+                    
+                    assertEquals(2, i);
+                } finally {
+                    result.close();
                 }
-                
-                assertTrue(i == 2);
             }
 
         } finally {
@@ -473,15 +538,14 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             cxn.add(stmt);
             cxn.commit();
 
-            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
+            assertEquals(1, cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false));
             
             cxn.remove(stmt);
             cxn.add(stmt);
             cxn.commit();
 
-            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
-            
-            
+            assertEquals(1, cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false));
+                        
         } finally {
             if (cxn != null)
                 cxn.close();
@@ -520,15 +584,15 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             cxn.add(stmt);
             cxn.commit();
 
-            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
+            assertEquals(1, cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false));
             
             cxn.remove(stmt);
             cxn.add(stmt);
             cxn.add(stmt2);
             cxn.commit();
 
-            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
-            assertTrue(cxn.getTripleStore().getAccessPath(sid2, null, null).rangeCount(false) == 1);
+            assertEquals(1, cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false));
+            assertEquals(1, cxn.getTripleStore().getAccessPath(sid2, null, null).rangeCount(false));
             
             
         } finally {

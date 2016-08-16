@@ -27,9 +27,9 @@ import java.util.Arrays;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Graph;
+import org.openrdf.model.Model;
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.OWL;
@@ -71,18 +71,18 @@ public class TestTicket610 extends ProxyBigdataSailTestCase {
     
     public void testBug() throws Exception {
     	
+        final URI a = new URIImpl(":a");
+        final URI b = new URIImpl(":b");
+        
+        final Model data = new LinkedHashModel(Arrays.asList(new StatementImpl[] {
+        		new StatementImpl(a, RDF.TYPE, OWL.TRANSITIVEPROPERTY),
+        		new StatementImpl(b, RDFS.SUBPROPERTYOF, a),
+        }));
+	  	
         /*
          * The bigdata store, backed by a temporary journal file.
          */
 	  	final BigdataSail sail = getSail();
-	  	
-        final URI a = new URIImpl(":a");
-        final URI b = new URIImpl(":b");
-        
-        final Graph data = new GraphImpl(Arrays.asList(new StatementImpl[] {
-        		new StatementImpl(a, RDF.TYPE, OWL.TRANSITIVEPROPERTY),
-        		new StatementImpl(b, RDFS.SUBPROPERTYOF, a),
-        }));
 	  	
 	  	try {
 	  	
@@ -111,8 +111,7 @@ public class TestTicket610 extends ProxyBigdataSailTestCase {
 	  				final AbstractTripleStore store = cxn.getTripleStore();
 	  				
 	  				if (log.isDebugEnabled()) {
-		  				final StringBuilder sb = store.dumpStore(true, true, false);
-		  				System.err.println(sb);
+		  				log.info(store.dumpStore(true, true, false));
 	  				}
 	  				
 	  				assertFalse("should not have the (<b> rdf:type owl:TransitiveProperty) inference", store.hasStatement(b, RDF.TYPE, OWL.TRANSITIVEPROPERTY));

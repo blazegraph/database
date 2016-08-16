@@ -31,17 +31,20 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.counters.CAT;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IReadOnly;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -76,6 +79,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     * etc).
     */
    private final boolean isGRSRequired;
+    
+   private final CAT mutationCount = new CAT();
 
     @Override
     abstract public boolean isReadOnly();
@@ -153,42 +158,42 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
     }
 
-    /**
-    * Return a view of the {@link AbstractTripleStore} for the namespace and
-    * timestamp associated with this task.
-    * 
-    * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
-    *         found for that namespace and timestamp.
-    */
-   protected AbstractTripleStore getTripleStore() {
-   
-      return getTripleStore(namespace, timestamp);
-      
-   }
-    
-    /**
-     * Return a view of the {@link AbstractTripleStore} for the given namespace
-     * that will read on the commit point associated with the given timestamp.
-     * 
-     * @param namespace
-     *            The namespace.
-     * @param timestamp
-     *            The timestamp or {@link ITx#UNISOLATED} to obtain a read/write
-     *            view of the index.
-     * 
-     * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
-     *         found for that namespace and timestamp.
-     */
-    protected AbstractTripleStore getTripleStore(final String namespace,
-            final long timestamp) {
-
-        // resolve the default namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, timestamp);
-
-        return tripleStore;
-
-    }
+//    /**
+//    * Return a view of the {@link AbstractTripleStore} for the namespace and
+//    * timestamp associated with this task.
+//    * 
+//    * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
+//    *         found for that namespace and timestamp.
+//    */
+//   protected AbstractTripleStore getTripleStore() {
+//   
+//      return getTripleStore(namespace, timestamp);
+//      
+//   }
+//    
+//    /**
+//     * Return a view of the {@link AbstractTripleStore} for the given namespace
+//     * that will read on the commit point associated with the given timestamp.
+//     * 
+//     * @param namespace
+//     *            The namespace.
+//     * @param timestamp
+//     *            The timestamp or {@link ITx#UNISOLATED} to obtain a read/write
+//     *            view of the index.
+//     * 
+//     * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
+//     *         found for that namespace and timestamp.
+//     */
+//    protected AbstractTripleStore getTripleStore(final String namespace,
+//            final long timestamp) {
+//
+//        // resolve the default namespace.
+//        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+//                .getResourceLocator().locate(namespace, timestamp);
+//
+//        return tripleStore;
+//
+//    }
 
     /**
      * Return a connection transaction, which may be either read-only or support
@@ -230,19 +235,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 			final String namespace, final long timestamp)
 			throws RepositoryException {
 
-        final AbstractTripleStore tripleStore = getTripleStore(namespace,
-                timestamp);
-
-        if (tripleStore == null) {
-
-            throw new DatasetNotFoundException("Not found: namespace="
-                    + namespace + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-        }
-
         // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
+        final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
 
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
 
@@ -250,8 +244,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
         if (TimestampUtility.isReadOnly(timestamp)) {
 
-            return (BigdataSailRepositoryConnection) repo
-                    .getReadOnlyConnection(timestamp);
+            return (BigdataSailRepositoryConnection) repo.getReadOnlyConnection(timestamp);
 
         }
 
@@ -264,6 +257,22 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
     }
 
+    protected BigdataSailConnection getUnisolatedSailConnection() throws SailException, InterruptedException {
+        
+        // Wrap with SAIL.
+        final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
+
+        sail.initialize();
+
+        final BigdataSailConnection conn = sail.getUnisolatedConnection();
+        
+        // Setup a change listener. It will notice the #of mutations.
+        conn.addChangeLog(new SailChangeLog());
+        
+        return conn;
+
+    }
+	
     /**
     * Return a connection for the namespace. If the task is associated with
     * either a read/write transaction or an {@link ITx#UNISOLATED} view of the
@@ -279,33 +288,51 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     */
     protected BigdataSailRepositoryConnection getConnection()
             throws SailException, RepositoryException {
-
-        // resolve the default namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, timestamp);
-
-        if (tripleStore == null) {
-
-			throw new DatasetNotFoundException("Not found: namespace="
-					+ namespace);
-
-        }
-
+    
         // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
+        final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
 
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
 
         repo.initialize();
 
-        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
-              .getConnection();
-//                .getUnisolatedConnection();
-
+        final BigdataSailRepositoryConnection conn = repo.getConnection();
+        
         conn.setAutoCommit(false);
-
+        
+        // Setup a change listener. It will notice the #of mutations.
+        conn.addChangeLog(new SailChangeLog());
+        
         return conn;
 
+    }
+    
+    private class SailChangeLog implements IChangeLog {
+
+            @Override
+            public final void changeEvent(final IChangeRecord record) {
+                mutationCount.increment();
+            }
+            
+            @Override
+            public void transactionBegin() {
+            }
+            
+            @Override
+            public void transactionPrepare() {
+            }
+            
+            @Override
+            public void transactionCommited(long commitTime) {
+            }
+            
+            @Override
+            public void transactionAborted() {
+            }
+            
+            @Override
+            public void close() {
+            }
     }
     
     /**
@@ -464,5 +491,9 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
       }
 
    }
+    
+    public long getMutationCount() {
+		return this.mutationCount.get();
+	}
 
 }

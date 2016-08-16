@@ -2,6 +2,7 @@ package com.bigdata.rdf.sparql.ast.service.history;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
@@ -111,6 +112,7 @@ public class HistoryServiceFactory extends CustomServiceFactoryBase {
     @Override
     public void startConnection(final BigdataSailConnection conn) {
 
+//        final Properties properties = conn.getProperties();
         final AbstractTripleStore tripleStore = conn.getTripleStore();
 
         if (Boolean.valueOf(tripleStore.getProperty(

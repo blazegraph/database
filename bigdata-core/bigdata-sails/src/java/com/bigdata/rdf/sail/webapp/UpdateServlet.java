@@ -49,12 +49,15 @@ import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.BufferStatementHandler;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.RemoveStatementHandler;
 import com.bigdata.rdf.sail.webapp.InsertServlet.AddStatementHandler;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 
 /**
  * Handler for NanoSparqlServer REST API UPDATE operations (PUT, not SPARQL
@@ -130,7 +133,9 @@ public class UpdateServlet extends BigdataRDFServlet {
         final String namespace = getNamespace(req);
 
         final String queryStr = req.getParameter(QueryServlet.ATTR_QUERY);
-
+        
+        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
+        
         if (queryStr == null)
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Required parameter not found: " + QueryServlet.ATTR_QUERY);
@@ -223,6 +228,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 							ITx.UNISOLATED, //
 							queryStr,//
 							baseURI,//
+							suppressTruthMaintenance, //
 							bindings,//
 							rdfParserFactory,//
 							defaultContextDelete,//
@@ -237,6 +243,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 	                     ITx.UNISOLATED, //
 	                     queryStr,//
 	                     baseURI,//
+	                     suppressTruthMaintenance, //
 	                     bindings,//
 	                     rdfParserFactory,//
 	                     defaultContextDelete,//
@@ -282,6 +289,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
     	private final String queryStr;
         private final String baseURI;
+        private final boolean suppressTruthMaintenance;
         private final RDFParserFactory parserFactory;
         private final Resource[] defaultContextDelete;
         private final Resource[] defaultContextInsert;
@@ -309,6 +317,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 final String namespace, final long timestamp,
                 final String queryStr,//
                 final String baseURI,
+                final boolean suppressTruthMaintenance,//
                 final Map<String, Value> bindings,
                 final RDFParserFactory parserFactory,
                 final Resource[] defaultContextDelete,//
@@ -317,6 +326,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             super(req, resp, namespace, timestamp);
             this.queryStr = queryStr;
             this.baseURI = baseURI;
+            this.suppressTruthMaintenance = suppressTruthMaintenance;
             this.bindings = bindings;
             this.parserFactory = parserFactory;
             this.defaultContextDelete = defaultContextDelete;
@@ -335,11 +345,35 @@ public class UpdateServlet extends BigdataRDFServlet {
             
             final AtomicLong nmodified = new AtomicLong(0L);
 
-            BigdataSailRepositoryConnection conn = null;
+            /*
+             * Parse the query before obtaining the connection object.
+             * 
+             * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+             * before obtaining the connection
+             */
+            
+            // Setup the baseURI for this request. 
+            final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+            // Parse the query.
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
+            BigdataSailRepositoryConnection repoConn = null;
+            BigdataSailConnection conn = null;
             boolean success = false;
             try {
+            	
+            	repoConn = getConnection();
         
-				conn = getConnection();
+				conn = repoConn.getSailConnection();
+				
+				boolean truthMaintenance = conn.getTruthMaintenance();
+				
+				if(truthMaintenance && suppressTruthMaintenance){
+					
+					conn.setTruthMaintenance(false);
+					
+				}
 
 				{
 
@@ -369,7 +403,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 						final AbstractQueryTask queryTask = context
 								.getQueryTask(roconn, namespace,
-										readOnlyTimestamp, queryStr, includeInferred, bindings,
+										readOnlyTimestamp, queryStr, baseURI, astContainer, includeInferred, bindings,
 										deleteQueryFormat.getDefaultMIMEType(),
 										req, resp, os);
 
@@ -400,9 +434,8 @@ public class UpdateServlet extends BigdataRDFServlet {
 							rdfParser
 									.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-							rdfParser.setRDFHandler(new RemoveStatementHandler(
-									conn.getSailConnection(), nmodified,
-									defaultContextDelete));
+							rdfParser.setRDFHandler(new RemoveStatementHandler(conn,
+									nmodified, defaultContextDelete));
 
 							// Wrap as Future.
 							final FutureTask<Void> ft = new FutureTask<Void>(
@@ -419,7 +452,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 							// Await the Future (of the Query)
 							ft.get();
-
+							
 						}
 
 						// Run INSERT
@@ -444,7 +477,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 									.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
 							rdfParser.setRDFHandler(new AddStatementHandler(
-									conn.getSailConnection(), nmodified,
+									conn, nmodified,
 									defaultContextInsert));
 
 							/*
@@ -463,6 +496,12 @@ public class UpdateServlet extends BigdataRDFServlet {
 						}
 						
 					}
+
+				}
+				
+				if (truthMaintenance && suppressTruthMaintenance) {
+					
+					conn.setTruthMaintenance(true);
 
 				}
 
@@ -487,6 +526,12 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                 }
                 
+                if (repoConn != null) {
+
+                   repoConn.close();
+
+                }
+                
             }
 
         }
@@ -508,6 +553,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
       private final String queryStr;
       private final String baseURI;
+      private final boolean suppressTruthMaintenance;
       private final RDFParserFactory parserFactory;
       private final Resource[] defaultContextDelete;
       private final Resource[] defaultContextInsert;
@@ -521,7 +567,7 @@ public class UpdateServlet extends BigdataRDFServlet {
        *           The timestamp used to obtain a mutable connection.
        * @param baseURI
        *           The base URI for the operation.
-     * @param bindings 
+       * @param bindings 
        * @param defaultContextDelete
        *           When removing statements, the context(s) for triples without
        *           an explicit named graph when the KB instance is operating in
@@ -536,6 +582,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             final long timestamp,
             final String queryStr,//
             final String baseURI,
+            final boolean suppressTruthMaintenance, //
             final Map<String, Value> bindings,
             final RDFParserFactory parserFactory,
             final Resource[] defaultContextDelete,//
@@ -544,6 +591,7 @@ public class UpdateServlet extends BigdataRDFServlet {
          super(req, resp, namespace, timestamp);
          this.queryStr = queryStr;
          this.baseURI = baseURI;
+         this.suppressTruthMaintenance = suppressTruthMaintenance;
          this.bindings = bindings;
          this.parserFactory = parserFactory;
          this.defaultContextDelete = defaultContextDelete;
@@ -562,120 +610,167 @@ public class UpdateServlet extends BigdataRDFServlet {
 
          final AtomicLong nmodified = new AtomicLong(0L);
 
-         BigdataSailRepositoryConnection conn = null;
+         /*
+          * Parse the query before obtaining the connection object.
+          * 
+          * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+          * before obtaining the connection
+          */
+         
+         // Setup the baseURI for this request. 
+         final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+         // Parse the query.
+         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
+         BigdataSailRepositoryConnection repoConn = null;
+         BigdataSailConnection conn = null;
          boolean success = false;
          try {
+        	 
+        	repoConn = getConnection(); 
 
-            conn = getConnection();
-
-            {
-
-               if (log.isInfoEnabled())
-                  log.info("update with query: " + queryStr);
-
-               final BigdataRDFContext context = BigdataServlet
-                     .getBigdataRDFContext(req.getServletContext());
-
-               /*
-                * Note: pipe is drained by this thread to consume the query
-                * results, which are the statements to be deleted.
-                */
-               final PipedOutputStream os = new PipedOutputStream();
-
-               // Use this format for the query results.
-               final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
-
-               final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings,
-                     deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
-
-               switch (queryTask.queryType) {
-               case DESCRIBE:
-               case CONSTRUCT:
-                  break;
-               default:
-                  throw new MalformedQueryException(
-                        "Must be DESCRIBE or CONSTRUCT query");
-               }
-
-               // Run DELETE
-               {
-
-                  final RDFParserFactory factory = RDFParserRegistry
-                        .getInstance().get(deleteQueryFormat);
-
-                  final RDFParser rdfParser = factory.getParser();
-
-                  rdfParser.setValueFactory(conn.getTripleStore()
-                        .getValueFactory());
-
-                  rdfParser.setVerifyData(false);
-
-                  rdfParser.setStopAtFirstError(true);
-
-                  rdfParser
-                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
-
-//                  rdfParser.setRDFHandler(new BufferStatementHandler(conn
-//                        .getSailConnection(), nmodified, defaultContextDelete));
-
-                  final BufferStatementHandler buffer = new BufferStatementHandler(
-                        conn.getSailConnection(), nmodified, defaultContextDelete);
-                  
-                  rdfParser.setRDFHandler(buffer);
-
-                  // Wrap as Future.
-                  final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
-
-                  // Submit query for evaluation.
-                  context.queryService.execute(ft);
-
-                  // Reads on the statements produced by the query.
-                  final InputStream is = newPipedInputStream(os);
-
-                  // Run parser : visited statements will be buffered.
-                  rdfParser.parse(is, baseURI);
-
-                  // Await the Future (of the Query)
-                  ft.get();
-
-                  // Delete the buffered statements.
-                  buffer.removeAll();
-
-               }
-
-               // Run INSERT
-               {
-
-                  /*
-                   * There is a request body, so let's try and parse it.
-                   */
-
-                  final RDFParser rdfParser = parserFactory.getParser();
-
-                  rdfParser.setValueFactory(conn.getTripleStore()
-                        .getValueFactory());
-
-                  rdfParser.setVerifyData(true);
-
-                  rdfParser.setStopAtFirstError(true);
-
-                  rdfParser
-                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
-
-                  rdfParser.setRDFHandler(new AddStatementHandler(conn
-                        .getSailConnection(), nmodified, defaultContextInsert));
-
-                  /*
-                   * Run the parser, which will cause statements to be inserted.
-                   */
-                  rdfParser.parse(req.getInputStream(), baseURI);
-
-               }
-
+            conn = repoConn.getSailConnection();
+            
+            boolean truthMaintenance = conn.getTruthMaintenance();
+            
+            if(truthMaintenance && suppressTruthMaintenance){
+            	
+            	conn.setTruthMaintenance(false);
+            	
             }
+             
+            BigdataSailRepositoryConnection roconn = null;
+            try {
+            	
+            	final long readOnlyTimestamp = ITx.READ_COMMITTED;
 
-            conn.commit();
+				roconn = getQueryConnection(namespace,
+						readOnlyTimestamp);
+
+	            {
+	            	
+	               if (log.isInfoEnabled())
+	                  log.info("update with query: " + queryStr);
+	
+	               final BigdataRDFContext context = BigdataServlet
+	                     .getBigdataRDFContext(req.getServletContext());
+	
+	               /*
+	                * Note: pipe is drained by this thread to consume the query
+	                * results, which are the statements to be deleted.
+	                */
+	               final PipedOutputStream os = new PipedOutputStream();
+	               
+	                // Use this format for the query results.
+	               final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
+	
+	               final AbstractQueryTask queryTask = context.getQueryTask(roconn,
+	                     namespace, ITx.UNISOLATED, queryStr, baseURI, astContainer, includeInferred, bindings,
+	                     deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
+	
+	               switch (queryTask.queryType) {
+	               case DESCRIBE:
+	               case CONSTRUCT:
+	                  break;
+	               default:
+	                  throw new MalformedQueryException(
+	                        "Must be DESCRIBE or CONSTRUCT query");
+	               }
+	
+	               // Run DELETE
+	               {
+	
+	                  final RDFParserFactory factory = RDFParserRegistry
+	                        .getInstance().get(deleteQueryFormat);
+	
+	                  final RDFParser rdfParser = factory.getParser();
+	
+	                  rdfParser.setValueFactory(conn.getTripleStore()
+	                        .getValueFactory());
+	
+	                  rdfParser.setVerifyData(false);
+	
+	                  rdfParser.setStopAtFirstError(true);
+	
+	                  rdfParser
+	                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+	
+	//                  rdfParser.setRDFHandler(new BufferStatementHandler(conn
+	//                        .getSailConnection(), nmodified, defaultContextDelete));
+	
+	                  final BufferStatementHandler buffer = new BufferStatementHandler(
+	                        conn, nmodified, defaultContextDelete);
+	                  
+	                  rdfParser.setRDFHandler(buffer);
+	
+	                  // Wrap as Future.
+	                  final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+	
+	                  // Submit query for evaluation.
+	                  context.queryService.execute(ft);
+	
+	                  // Reads on the statements produced by the query.
+	                  final InputStream is = newPipedInputStream(os);
+	
+	                  // Run parser : visited statements will be buffered.
+	                  rdfParser.parse(is, baseURI);
+	
+	                  // Await the Future (of the Query)
+	                  ft.get();
+	
+	                  // Delete the buffered statements.
+	                  buffer.removeAll();
+	                  	
+	               }
+	
+	               // Run INSERT
+	               {
+	
+	                  /*
+	                   * There is a request body, so let's try and parse it.
+	                   */
+	
+	                  final RDFParser rdfParser = parserFactory.getParser();
+	
+	                  rdfParser.setValueFactory(conn.getTripleStore()
+	                        .getValueFactory());
+	
+	                  rdfParser.setVerifyData(true);
+	
+	                  rdfParser.setStopAtFirstError(true);
+	
+	                  rdfParser
+	                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+	
+	                  rdfParser.setRDFHandler(new AddStatementHandler(conn,
+	                        nmodified, defaultContextInsert));
+	
+	                  /*
+	                   * Run the parser, which will cause statements to be inserted.
+	                   */
+	                  rdfParser.parse(req.getInputStream(), baseURI);
+	
+	               }
+	               
+	            }
+
+            }finally {
+            	
+            	if (roconn != null) {
+					// close the read-only connection for the query.
+					roconn.rollback();
+				}
+            	
+            }
+            
+            if (truthMaintenance && suppressTruthMaintenance) {
+            	
+            	conn.setTruthMaintenance(true);
+            	
+            }
+            
+         	conn.commit();
 
             success = true;
 
@@ -695,6 +790,12 @@ public class UpdateServlet extends BigdataRDFServlet {
                conn.close();
 
             }
+            
+            if (repoConn != null) {
+
+               repoConn.close();
+
+             }
 
          }
 
@@ -765,6 +866,8 @@ public class UpdateServlet extends BigdataRDFServlet {
         }
 
         final String baseURI = req.getRequestURL().toString();
+        
+        final boolean suppressTruthMaintenance = getBooleanValue(req, QueryServlet.ATTR_TRUTH_MAINTENANCE, false);
      
         /*
          * Allow the caller to specify the default context for insert.
@@ -812,6 +915,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                     new UpdateWithBodyTask(req, resp, namespace,
                             ITx.UNISOLATED, //
                             baseURI,//
+                            suppressTruthMaintenance, //
                             remove,//
                             defaultContextDelete,//
                             add,//
@@ -845,6 +949,7 @@ public class UpdateServlet extends BigdataRDFServlet {
     private static class UpdateWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;
+        private final boolean suppressTruthMaintenance;
         private final FileItem remove;
         private final FileItem add;
         private final Resource[] defaultContextDelete;
@@ -871,6 +976,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
                 final String baseURI,
+                final boolean suppressTruthMaintenance,//
                 final FileItem remove,
                 final Resource[] defaultContextDelete,//
                 final FileItem add,
@@ -878,6 +984,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 ) {
             super(req, resp, namespace, timestamp);
             this.baseURI = baseURI;
+            this.suppressTruthMaintenance = suppressTruthMaintenance;
             this.remove = remove;
             this.defaultContextDelete = defaultContextDelete;
             this.add = add;
@@ -896,24 +1003,35 @@ public class UpdateServlet extends BigdataRDFServlet {
             
             final AtomicLong nmodified = new AtomicLong(0L);
 
-            BigdataSailRepositoryConnection conn = null;
+            BigdataSailRepositoryConnection repoConn = null;
+            BigdataSailConnection conn = null;
             boolean success = false;
             try {
         
-                conn = getConnection();
-
-                if (remove != null) {
+                repoConn = getConnection();
+            	
+            	conn = repoConn.getSailConnection();
+                
+                boolean truthMaintenance = conn.getTruthMaintenance();
+                
+                if(truthMaintenance && suppressTruthMaintenance){
+                	
+                	conn.setTruthMaintenance(false);
+                	
+                }
+                
+                    if (remove != null) {
 
                     final String contentType = remove.getContentType();
 
                     final InputStream is = remove.getInputStream();
 
-                    final RDFHandler handler = new RemoveStatementHandler(
-                            conn.getSailConnection(), nmodified,
+                    final RemoveStatementHandler handler = new RemoveStatementHandler(
+                            conn, nmodified,
                             defaultContextDelete);
 
                     processData(conn, contentType, is, handler, baseURI);
-
+                    
                 }
 
                 if (add != null) {
@@ -923,15 +1041,21 @@ public class UpdateServlet extends BigdataRDFServlet {
                     final InputStream is = add.getInputStream();
 
                     final RDFHandler handler = new AddStatementHandler(
-                            conn.getSailConnection(), nmodified,
+                            conn, nmodified,
                             defaultContextInsert);
 
                     processData(conn, contentType, is, handler, baseURI);
 
                 }
+                
+              	if (truthMaintenance && suppressTruthMaintenance) {
+              		
+              		conn.setTruthMaintenance(true);
+              		
+              	}
 
                 conn.commit();
-
+                
                 success = true;
                 
                 final long elapsed = System.currentTimeMillis() - begin;
@@ -951,11 +1075,17 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                 }
                 
+                if (repoConn != null) {
+
+                   repoConn.close();
+
+                }
+                
             }
 
         }
         
-        private void processData(final BigdataSailRepositoryConnection conn, 
+        private void processData(final BigdataSailConnection conn, 
                 final String contentType, 
                 final InputStream is, 
                 final RDFHandler handler,

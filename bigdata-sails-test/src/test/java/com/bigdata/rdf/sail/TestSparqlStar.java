@@ -54,6 +54,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  */
 public class TestSparqlStar extends ProxyBigdataSailTestCase {
 
+    @Override
     public Properties getProperties() {
         
         return getProperties(RDRHistory.class);
@@ -62,7 +63,7 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 
     public Properties getProperties(final Class<? extends RDRHistory> cls) {
         
-        Properties props = super.getProperties();
+        final Properties props = super.getProperties();
         
         // no inference
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
@@ -125,8 +126,9 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
                 final BigdataURI p1 = vf.createURI("x:order");
                 final BigdataLiteral o1 = vf.createLiteral(5);
             	
+            	final RepositoryResult<Statement> result = cxn.getStatements(s,p,o,true);
+            	try {
                 int cnt = 0;
-            	RepositoryResult<Statement> result = cxn.getStatements(s,p,o,true);
             	while (result.hasNext()) {
             		final BigdataStatement resultStmt = (BigdataStatement) result.next();
             		final BigdataBNode bNode = vf.createBNode(resultStmt);
@@ -134,6 +136,9 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 					cnt++;
             	}
 				assertEquals(1, cnt);
+            	} finally {
+            	    result.close();
+            	}
             }
             
             // check ask
@@ -151,9 +156,9 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
        				"  << <x:s> <x:p> \"d\" >> <x:order> ?o . " +
 					"}";
 	            final TupleQuery tq = cxn.prepareTupleQuery(QueryLanguage.SPARQL, selectStr);
-				TupleQueryResult tqr = tq.evaluate();
-	            final BigdataValue o2 = vf.createLiteral(5);
+				final TupleQueryResult tqr = tq.evaluate();
 				try {
+	            final BigdataValue o2 = vf.createLiteral(5);
 					int cnt = 0;
 					while (tqr.hasNext()) {
 						BindingSet bs = tqr.next();
@@ -173,9 +178,9 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 	            	"  bind ( << <x:s> <x:p> \"d\" >> as ?s ) " +
 					"}";
 	            final TupleQuery tq = cxn.prepareTupleQuery(QueryLanguage.SPARQL, selectStr);
-				TupleQueryResult tqr = tq.evaluate();
-	            final BigdataValue o2 = vf.createLiteral(5);
+				final TupleQueryResult tqr = tq.evaluate();
 				try {
+	            final BigdataValue o2 = vf.createLiteral(5);
 					int cnt = 0;
 					while (tqr.hasNext()) {
 						BindingSet bs = tqr.next();
@@ -270,8 +275,9 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
                 final BigdataURI s1 = vf.createURI("x:r");
                 final BigdataURI p1 = vf.createURI("x:refers");
             	
+                final RepositoryResult<Statement> result = cxn.getStatements(s,p,o,true);
+                try {
                 int cnt = 0;
-            	RepositoryResult<Statement> result = cxn.getStatements(s,p,o,true);
             	while (result.hasNext()) {
             		final BigdataStatement resultStmt = (BigdataStatement) result.next();
             		final BigdataBNode bNode = vf.createBNode(resultStmt);
@@ -279,6 +285,9 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 					cnt++;
             	}
 				assertEquals(1, cnt);
+                } finally {
+                    result.close();
+                }
             }
 
             // check ask
@@ -296,12 +305,12 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
 					"  ?s <x:refers> << <x:s> <x:p> \"d\" >> . " +
 					"}";
 	            final TupleQuery tq = cxn.prepareTupleQuery(QueryLanguage.SPARQL, selectStr);
-				TupleQueryResult tqr = tq.evaluate();
-	            final BigdataURI s2 = vf.createURI("x:r");
+				final TupleQueryResult tqr = tq.evaluate();
 				try {
+	            final BigdataURI s2 = vf.createURI("x:r");
 					int cnt = 0;
 					while (tqr.hasNext()) {
-						BindingSet bs = tqr.next();
+					    final BindingSet bs = tqr.next();
 						assertEquals(s2, bs.getBinding("s").getValue());
 						cnt ++;
 					}
@@ -318,12 +327,12 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
             		"  bind ( << <x:s> <x:p> \"d\" >> as ?o ) " +
 					"}";
 	            final TupleQuery tq = cxn.prepareTupleQuery(QueryLanguage.SPARQL, selectStr);
-				TupleQueryResult tqr = tq.evaluate();
-	            final BigdataURI s2 = vf.createURI("x:r");
+				final TupleQueryResult tqr = tq.evaluate();
 				try {
+	            final BigdataURI s2 = vf.createURI("x:r");
 					int cnt = 0;
 					while (tqr.hasNext()) {
-						BindingSet bs = tqr.next();
+					    final BindingSet bs = tqr.next();
 						assertEquals(s2, bs.getBinding("s").getValue());
 						cnt ++;
 					}
@@ -418,20 +427,28 @@ public class TestSparqlStar extends ProxyBigdataSailTestCase {
                 final BigdataURI s2 = vf.createURI("x:z");
                 final BigdataURI p2 = vf.createURI("x:recurs");
 
-            	RepositoryResult<Statement> result = cxn.getStatements(s,p,o,true);
+            	final RepositoryResult<Statement> result = cxn.getStatements(s,p,o,true);
+            	try {
             	int cnt = 0;
             	while (result.hasNext()) {
             		final BigdataStatement resultStmt = (BigdataStatement) result.next();
             		final BigdataBNode bNode = vf.createBNode(resultStmt);
-                	RepositoryResult<Statement> result2 = cxn.getStatements(s1,p1,bNode,true);
+                    	final RepositoryResult<Statement> result2 = cxn.getStatements(s1,p1,bNode,true);
+                    	try {
                 	while (result2.hasNext()) {
                 		final BigdataStatement result2Stmt = (BigdataStatement) result2.next();
                 		final BigdataBNode bNode2 = vf.createBNode(result2Stmt);
                 		assertTrue(cxn.hasStatement(s2, p2, bNode2, true));
                 		cnt++;
                 	}
+                    	} finally {
+                    	    result2.close();
+                    	}
             	}
 				assertEquals(1, cnt);
+            	} finally {
+            	    result.close();
+            	}
             }
 
             // check ask

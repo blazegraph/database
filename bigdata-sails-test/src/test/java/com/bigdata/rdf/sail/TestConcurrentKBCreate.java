@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
@@ -234,11 +235,13 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
         
     }
 
-   /**
-    * Verify that the named kb exists.
-    */
+    /**
+     * Verify that the named kb exists.
+     * 
+     * @throws SailException
+     */
    private void assertKBExists(final Journal jnl, final String namespace)
-         throws RepositoryException {
+         throws RepositoryException, SailException {
       // Attempt to discover the KB instance.
       BigdataSailRepositoryConnection conn = null;
       try {
@@ -253,11 +256,13 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
       }
    }
 
-   /**
-    * Verify that the named kb does not exist.
-    */
+    /**
+     * Verify that the named kb does not exist.
+     * 
+     * @throws SailException
+     */
    private void assertKBNotFound(final Journal jnl, final String namespace)
-         throws RepositoryException {
+         throws RepositoryException, SailException {
       // Attempt to discover the KB instance.
       BigdataSailRepositoryConnection conn = null;
       try {
@@ -747,11 +752,38 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
      * 
      * @return The connection -or- <code>null</code> if the triple store
      *         instance was not found.
+     * @throws SailException 
      */
     private BigdataSailRepositoryConnection getQueryConnection(
             final IIndexManager indexManager, final String namespace,
-            final long timestamp) throws RepositoryException {
+            final long timestamp) throws RepositoryException, SailException {
 
+//        boolean ok = false;
+//        final BigdataSail sail = new BigdataSail(namespace, indexManager);
+//        try {
+//            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//            repo.initialize();
+//            try {
+//                final BigdataSailRepositoryConnection con;
+//                if (TimestampUtility.isReadOnly(timestamp)) {
+//                    con = repo.getReadOnlyConnection(timestamp);
+//                } else {
+//                    con = repo.getConnection();
+//                }
+//                con.setAutoCommit(false);
+//                ok = true;
+//                return con;
+//            } catch (Throwable t) {
+//                if(InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+//                    return null;
+//                }
+//                throw new RuntimeException(t);
+//            }
+//        } finally {
+//            if(!ok)
+//                sail.shutDown();
+//        }
+        
         /*
          * Note: [timestamp] will be a read-only tx view of the triple store if
          * a READ_LOCK was specified when the NanoSparqlServer was started

@@ -75,6 +75,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      * still approximate as garbage collection by the JVM can cause references
      * to be cleared at any time.
      */
+    @Override
     public int size() {
 
         removeClearedEntries();
@@ -86,6 +87,7 @@ public class ConcurrentWeakValueCache<K, V> implements
     /**
      * The capacity of the backing hard reference queue.
      */
+    @Override
     public int capacity() {
 
         if (queue == null)
@@ -95,6 +97,7 @@ public class ConcurrentWeakValueCache<K, V> implements
         
     }
     
+    @Override
     public void clear() {
 
         if (queue != null) {
@@ -288,6 +291,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      * @see http://en.wikipedia.org/wiki/Lock-free_and_wait-free_algorithms
      * @see http://www.audiomulch.com/~rossb/code/lockfree/
      */
+    @Override
     public V get(final K k) {
 
         final WeakReference<V> ref = map.get(k);
@@ -342,6 +346,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      * @return <code>true</code> iff the map contains an entry for that key
      *         whose weak reference has not been cleared.
      */
+    @Override
     public boolean containsKey(final K k) {
 
         final WeakReference<V> ref = map.get(k);
@@ -398,6 +403,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      *         no entry under the key or if the entry under the key has has its
      *         reference cleared.
      */
+    @Override
     public V put(final K k, final V v) {
 
         try {
@@ -456,6 +462,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      *         <tt>null</tt> if there was no mapping for the key or if the
      *         entry under the key has has its reference cleared.
      */
+    @Override
     public V putIfAbsent(final K k, final V v) {
 
         try {
@@ -593,6 +600,7 @@ public class ConcurrentWeakValueCache<K, V> implements
         
     }
     
+    @Override
     public V remove(final K k) {
 
         try {
@@ -690,6 +698,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      * cause them to be retained any longer than they otherwise would have been
      * retained.
      */
+    @Override
     public Iterator<WeakReference<V>> iterator() {
 
         return map.values().iterator();
@@ -704,6 +713,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      * cause them to be retained any longer than they otherwise would have been
      * retained.
      */
+    @Override
     public Iterator<Map.Entry<K,WeakReference<V>>> entryIterator() {
 
         return map.entrySet().iterator();
@@ -791,6 +801,7 @@ public class ConcurrentWeakValueCache<K, V> implements
 
         }
 
+        @Override
         public String toString() {
 			return super.toString() + "{key=" + k + ",val=" + get() + "}";
         }
