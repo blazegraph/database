@@ -1526,14 +1526,14 @@ public class BigdataSail extends SailBase implements Sail {
      */
     private BigdataSailConnection _getReadOnlyConnection(final long timestamp)
             throws IOException, DatasetNotFoundException {
-        final long commitTime;
-        if(timestamp == ITx.READ_COMMITTED) {
-            commitTime = getIndexManager().getLastCommitTime();
-        } else {
-            commitTime = timestamp;
-        }
-        if(!TimestampUtility.isCommitTime(commitTime))
-            throw new IllegalArgumentException("Not a commitTime: timestamp="+timestamp);
+        final long commitTime = timestamp;
+//        if(timestamp == ITx.READ_COMMITTED) {
+//            commitTime = getIndexManager().getLastCommitTime();
+//        } else {
+//            commitTime = timestamp;
+//        }
+//        if(!TimestampUtility.isCommitTime(commitTime))
+//            throw new IllegalArgumentException("Not a commitTime: timestamp="+timestamp);
         final ITransactionService txService = getTxService();
         boolean ok = false;
         final long txId = txService.newTx(commitTime);
