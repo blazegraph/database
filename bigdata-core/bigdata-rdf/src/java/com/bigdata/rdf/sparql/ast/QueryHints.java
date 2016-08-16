@@ -263,7 +263,7 @@ public interface QueryHints {
 
     IChunkHandler DEFAULT_QUERY_ENGINE_CHUNK_HANDLER = 
             ClassPathUtil.classForName(//
-                    System.getProperty(QUERY_ENGINE_CHUNK_HANDLER,
+                    System.getProperty(QueryHints.class.getName() + "."+QUERY_ENGINE_CHUNK_HANDLER,
                           com.bigdata.bop.engine.ManagedHeapStandloneChunkHandler.class.getName()
 //                            com.bigdata.bop.engine.NativeHeapStandloneChunkHandler.class.getName()
                             ), // preferredClassName,
