@@ -26,6 +26,7 @@ import org.openrdf.sail.SailException;
  * @author Herko ter Horst
  * @author jeen
  * @author Arjohn Kampman
+ * @openrdf
  */
 public abstract class SailBase implements Sail {
 
@@ -94,6 +95,17 @@ public abstract class SailBase implements Sail {
 	 * connection was acquired.
 	 */
 	private final Map<SailConnection, Throwable> activeConnections = new IdentityHashMap<SailConnection, Throwable>();
+	
+	protected void manageConnection(final SailConnection cnxn) {
+		synchronized (activeConnections) {
+			if (activeConnections.containsKey(cnxn)) {
+				throw new IllegalStateException("Connection already managed");
+			}
+			
+			final Throwable stackTrace = debugEnabled() ? new Throwable() : null;
+			activeConnections.put(cnxn, stackTrace);
+		}
+	}
 
 	/*---------*
 	 * Methods *
@@ -232,11 +244,12 @@ public abstract class SailBase implements Sail {
 				throw new IllegalStateException("Sail is not initialized or has been shut down");
 			}
 
-			SailConnection connection = getConnectionInternal();
+			final SailConnection connection = getConnectionInternal();
 
-			Throwable stackTrace = debugEnabled() ? new Throwable() : null;
 			synchronized (activeConnections) {
-				activeConnections.put(connection, stackTrace);
+				if (!activeConnections.containsKey(connection)) {
+					throw new IllegalStateException("Connection is not managed");
+				}
 			}
 
 			return connection;

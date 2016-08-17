@@ -85,6 +85,7 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         suite.addTestSuite(TestConcurrentKBCreate.TestWithoutGroupCommit.class);
 
         suite.addTestSuite(TestTxCreate.class);
+        suite.addTestSuite(TestCnxnCreate.class);
 
         suite.addTestSuite(TestChangeSets.class);
 
