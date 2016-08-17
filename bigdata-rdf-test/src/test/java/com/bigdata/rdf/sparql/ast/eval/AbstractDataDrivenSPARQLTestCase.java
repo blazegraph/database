@@ -106,6 +106,7 @@ import info.aduna.iteration.Iterations;
  * Abstract base class for data driven test suites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  */
 abstract public class AbstractDataDrivenSPARQLTestCase extends
         AbstractDataAndSPARQLTestCase {
