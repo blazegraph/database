@@ -1139,9 +1139,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * isolation property is not known on entry.
                  */
                 
-                final long lastCommitTime = indexManager.getLastCommitTime();
-                
-                final AbstractTripleStore readOnlyTripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, lastCommitTime);
+                final AbstractTripleStore readOnlyTripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
     
                 if(readOnlyTripleStore == null) {
                     

@@ -35,22 +35,17 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
- * Unit test for the creation of a Sail with isolatable indices. This unit test
- * was developed in response to <a
- * href="https://sourceforge.net/apps/trac/bigdata/ticket/252">issue #252</a>,
- * which reported a problem when creating a Sail which supports fully isolated
- * indices and also uses inline date times. The problem goes back to how the
- * {@link LexiconConfiguration} gains access to the ID2TERM index when it is
- * initialized.
+ * Test suite for BLZG-2056 BigdataSailConnections not always closed by
+ * BigdataSail.shutdown()
+ * 
+ * @see https://jira.blazegraph.com/browse/BLZG-2056
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestCnxnCreate extends ProxyBigdataSailTestCase {
 
@@ -117,7 +112,7 @@ public class TestCnxnCreate extends ProxyBigdataSailTestCase {
             
             sail.shutDown();
             
-            log.warn("don - sail.shutDown()");
+            log.info("done - sail.shutDown()");
             
             assertTrue(!uicnxn.isOpen());
             assertTrue(!rocnxn.isOpen());
@@ -126,13 +121,14 @@ public class TestCnxnCreate extends ProxyBigdataSailTestCase {
 
         } finally {
 
-            log.warn("__tearDownUnitTest");
+            log.info("__tearDownUnitTest");
             sail.__tearDownUnitTest();
-            log.warn("done - __tearDownUnitTest");
+            log.info("done - __tearDownUnitTest");
 
         }
 
     }
+    
     /**
      * Test whether connections are auto closed when the Sail is shutdown
      * 
@@ -174,16 +170,16 @@ public class TestCnxnCreate extends ProxyBigdataSailTestCase {
                         
             sail.shutDown();
             
-            log.warn("don - sail.shutDown()");
+            log.info("done - sail.shutDown()");
             
             assertTrue(!cnxn.isOpen());
             
 
         } finally {
 
-            log.warn("__tearDownUnitTest");
+            log.info("__tearDownUnitTest");
             sail.__tearDownUnitTest();
-            log.warn("done - __tearDownUnitTest");
+            log.info("done - __tearDownUnitTest");
 
         }
 
