@@ -27,61 +27,53 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.hints;
 
-import com.bigdata.bop.joinGraph.rto.JGraph;
+import com.bigdata.bop.engine.IChunkHandler;
+import com.bigdata.bop.engine.NativeHeapStandloneChunkHandler;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * The query hint governing the initial sample size for the RTO optimizer.
+ * Query hint deciding on the {@link IChunkHandler} to be used.
  * 
- * @see JGraph
- * @see QueryHints#RTO_LIMIT
+ * @see BLZG-533 (Vector query engine on the native heap)
  */
-final class RTOLimitQueryHint extends AbstractIntQueryHint {
+final class QueryEngineChunkHandlerQueryHint extends AbstractQueryHint<QueryEngineChunkHandlerEnum> {
 
-    public RTOLimitQueryHint() {
-        super(QueryHints.RTO_LIMIT, QueryHints.DEFAULT_RTO_LIMIT);
+    protected QueryEngineChunkHandlerQueryHint() {
+        super(QueryHints.QUERY_ENGINE_CHUNK_HANDLER,
+                QueryEngineChunkHandlerEnum.valueOf(QueryHints.DEFAULT_QUERY_ENGINE_CHUNK_HANDLER.getClass()));
     }
 
     @Override
-    public Integer validate(final String value) {
-
-        final int i;
-        try {
-            i = Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Not an integer value: hint=" + getName() + ", value=" + value);
-        }
-
-        if (i <= 0)
-            throw new IllegalArgumentException("Must be positive: hint="
-                    + getName() + ", value=" + value);
-
-        return i;
-        
-    }
-
-    @Override
-    public void handle(final AST2BOpContext ctx,
-            final QueryRoot queryRoot,
-            final QueryHintScope scope,
-            final ASTBase op, final Integer value) {
+    public void handle(final AST2BOpContext context, final QueryRoot queryRoot,
+            final QueryHintScope scope, final ASTBase op, final QueryEngineChunkHandlerEnum value) {
 
         switch (scope) {
-        case Group:
-        case GroupAndSubGroups:
         case Query:
-        case SubQuery:
-            if (op instanceof JoinGroupNode) {
-                _setAnnotation(ctx, scope, op, getName(), value);
+            switch(value) {
+            case Managed:
+                context.queryEngineChunkHandler = NativeHeapStandloneChunkHandler.MANAGED_HEAP_INSTANCE;
+                break;
+            case Native:
+                context.queryEngineChunkHandler = NativeHeapStandloneChunkHandler.NATIVE_HEAP_INSTANCE;
+                break;
+            default:
+                throw new UnsupportedOperationException();
             }
             return;
         }
+
         throw new QueryHintException(scope, op, getName(), value);
 
+    }
+
+    @Override
+    public QueryEngineChunkHandlerEnum validate(final String value) {
+        
+        return QueryEngineChunkHandlerEnum.valueOf(value);
+        
     }
 
 }

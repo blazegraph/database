@@ -308,6 +308,24 @@ public class AST2BOpUtility extends AST2BOpRTO {
         left = (PipelineOp) left.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
 
+        if (!ctx.isCluster()) {
+
+            /*
+             * For standalone, allow a query hint to override the chunk handler.
+             * 
+             * Note: scale-out is using a different chunk handler, so we would
+             * not want to override it here (in fact, the FederatedRunningQuery
+             * does not permit an override in its getChunkHandler() method).
+             * 
+             * @see BLZG-533 (Vector query engine on native heap)
+             */
+            left = (PipelineOp) left.setProperty(
+                    QueryEngine.Annotations.CHUNK_HANDLER,
+                    ctx.queryEngineChunkHandler
+                    );
+
+        }
+
         // Attach the query plan to the ASTContainer.
         astContainer.setQueryPlan(left);
         

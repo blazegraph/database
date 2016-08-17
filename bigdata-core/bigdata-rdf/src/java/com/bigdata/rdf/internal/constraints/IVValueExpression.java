@@ -472,9 +472,9 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
      */
     protected IV getAndCheckLiteral(final int i, final IBindingSet bs)
             throws SparqlTypeErrorException, NotMaterializedException {
-
+        
         final IV<?, ?> iv = getAndCheckBound(i, bs);
-
+        
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
         

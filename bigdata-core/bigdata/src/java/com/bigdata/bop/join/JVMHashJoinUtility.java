@@ -732,8 +732,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         try {
 
             @SuppressWarnings({ "rawtypes", "unchecked" })
-            final Constant f = askVar == null ? null : new Constant(
-                    XSDBooleanIV.FALSE);
+            final Constant f = askVar == null ? null : new Constant(XSDBooleanIV.valueOf(false));
 
             final JVMHashIndex rightSolutions = getRightSolutions();
 
@@ -966,8 +965,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         try {
 
             @SuppressWarnings({ "rawtypes", "unchecked" })
-            final Constant t = askVar == null ? null : new Constant(
-                    XSDBooleanIV.TRUE);
+            final Constant t = askVar == null ? null : new Constant(XSDBooleanIV.valueOf(true));
             
             final JVMHashIndex rightSolutions = getRightSolutions();
 

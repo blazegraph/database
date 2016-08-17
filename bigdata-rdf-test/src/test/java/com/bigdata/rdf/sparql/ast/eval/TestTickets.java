@@ -47,7 +47,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
- * @version $Id$
  */
 public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 

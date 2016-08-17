@@ -44,7 +44,6 @@ import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.BooleanLiteralImpl;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
@@ -238,6 +237,11 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     	
     }
 
+    @Override
+    public String toString() {
+        return super.toString()+"{namespace="+namespace+"}";
+    }
+    
     @Override
     public BNodeContextFactory newBNodeContext() {
 

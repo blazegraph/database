@@ -31,7 +31,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
-import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 
 /**
  * Base class for RDF value expression BOps that happen to evaluate to an
@@ -96,7 +96,7 @@ public abstract class XSDBooleanIVValueExpression extends
     @Override
     final public XSDBooleanIV get(final IBindingSet bs) {
     	
-        return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;
+        return XSDBooleanIV.valueOf(accept(bs)); 
         
     }
     

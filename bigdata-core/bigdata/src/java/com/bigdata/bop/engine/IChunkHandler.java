@@ -40,7 +40,6 @@ import com.bigdata.bop.IBindingSet;
  * operator, which is a many-to-one mapping.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IChunkHandler {
 

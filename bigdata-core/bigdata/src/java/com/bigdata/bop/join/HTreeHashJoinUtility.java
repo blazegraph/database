@@ -1516,8 +1516,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         try {
 
             @SuppressWarnings({ "rawtypes", "unchecked" })
-            final Constant f = askVar == null ? null : new Constant(
-                    XSDBooleanIV.FALSE);
+            final Constant f = askVar == null ? null : new Constant(XSDBooleanIV.valueOf(false));
 
             if (log.isInfoEnabled()) {
                 final HTree htree = this.getRightSolutions();
@@ -1782,8 +1781,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         try {
 
             @SuppressWarnings({ "rawtypes", "unchecked" })
-            final Constant t = askVar == null ? null : new Constant(
-                    XSDBooleanIV.TRUE);
+            final Constant t = askVar == null ? null : new Constant(XSDBooleanIV.valueOf(true));
             
             final HTree joinSet = getJoinSet();
 
