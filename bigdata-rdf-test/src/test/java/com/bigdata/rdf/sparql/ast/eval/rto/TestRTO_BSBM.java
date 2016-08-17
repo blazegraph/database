@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval.rto;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 
 import junit.framework.AssertionFailedError;
@@ -261,10 +263,12 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         /*
          * Verify that the runtime optimizer produced the expected join path.
          */
+        final List<int[]> expectedOrders = new LinkedList<int[]>();
 
-        final int[] expected = new int[] { 1, 3, 2, 5, 4, 7, 6 };
-
-        assertSameJoinOrder(expected, helper);
+        expectedOrders.add(new int[] { 1, 3, 2, 5, 4, 7, 6 });
+        expectedOrders.add(new int[] { 1, 3, 5, 4, 2, 7, 6 });
+        
+        assertSameJoinOrder(expectedOrders, helper);
         
     }
 
@@ -288,11 +292,16 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
          * construction and join in one operator, there is one less operator
          * in the plan, so the indices decrease by one.
          */
-        final int[] expected = QueryHints.DEFAULT_PIPELINED_HASH_JOIN ?
+        final List<int[]> expectedOrders = new LinkedList<int[]>();
+        
+        expectedOrders.add( QueryHints.DEFAULT_PIPELINED_HASH_JOIN ?
             new int[] { 7, 6, 8, 4, 5, 9, 10 } :
-            new int[] { 8, 7, 9, 5, 6, 10, 11 };
-
-        assertSameJoinOrder(expected, helper);
+            new int[] { 8, 7, 9, 5, 6, 10, 11 }
+                );
+        
+        expectedOrders.add(new int[] { 8, 7, 5, 9, 6, 10, 11 });
+        
+        assertSameJoinOrder(expectedOrders, helper);
 
     }
     
