@@ -74,6 +74,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
@@ -839,6 +840,7 @@ public class BigdataSail extends SailBase implements Sail {
         
         this.queryEngine = QueryEngineFactory.getInstance().getQueryController(mainIndexManager);
 
+        this.runstate = RunstateEnum.Active;
     }
     
     /**
@@ -982,8 +984,20 @@ public class BigdataSail extends SailBase implements Sail {
          */
 //        queryEngine.shutdown();
         
+        /*
+         * Indicate Sail shutdown for SailConnection.close() handling
+         */
+        runstate = RunstateEnum.Shutdown;
+        
         super.shutDown();
         
+        /*
+         * Check current lock to see if it can be acquired.
+         * If not, then replace lock
+         */
+        if (lock.isWriteLocked()) {
+        	locks.put(namespace, new ReentrantReadWriteLock(false/*false*/));
+        }
     }
     
     /**
@@ -4043,7 +4057,11 @@ public class BigdataSail extends SailBase implements Sail {
             } finally {
                 if (lock != null) {
                     // release the reentrant lock
+                	if (BigdataSail.this.runstate == RunstateEnum.Shutdown && !lockHeldByCurrentThread(lock)) {
+                		log.warn("Must replace lock");
+                	} else {
                     lock.unlock();
+                }
                 }
                 if (unisolated && im instanceof Journal) {
                     // release the permit.
@@ -4052,6 +4070,19 @@ public class BigdataSail extends SailBase implements Sail {
                 openConn = false;
             }
             
+        }
+        
+        /**
+         * Must check to see whether the lock is held by the currnet Thread to determine whether it can be unlocked.
+         */
+        boolean lockHeldByCurrentThread(final Lock lock) {
+        	if (lock instanceof ReentrantLock) {
+        		return ((ReentrantLock) lock).isHeldByCurrentThread();
+        	} else if (lock instanceof ReentrantReadWriteLock.WriteLock) {
+        		return ((ReentrantReadWriteLock.WriteLock) lock).isHeldByCurrentThread();
+        	}
+        	
+        	return true; // assume true?
         }
         
         /**

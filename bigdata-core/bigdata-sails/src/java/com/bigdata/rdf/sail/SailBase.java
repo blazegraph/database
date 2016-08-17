@@ -74,6 +74,17 @@ public abstract class SailBase implements Sail {
 	 */
 	private volatile boolean initialized = false;
 
+    protected enum RunstateEnum {
+        /** We do not know whether or not the namespace uses isolated indices. */
+        Inactive,
+        /** We do not know whether or not the namespace uses isolated indices. */
+        Active,
+        /** The namespace uses isolated indices. */
+        Shutdown
+    }
+    
+    protected RunstateEnum runstate = RunstateEnum.Inactive;
+    
 	/**
 	 * Lock used to synchronize the initialization state of a sail.
 	 * <ul>
@@ -89,12 +100,22 @@ public abstract class SailBase implements Sail {
 	 */
 	protected volatile long connectionTimeOut = DEFAULT_CONNECTION_TIMEOUT;
 
+	static class ConnectionContext {
+		final Thread thread;
+		final Throwable trace;
+		
+		ConnectionContext(Thread thread, Throwable trace) {
+			this.thread = thread;
+			this.trace = trace;
+		}
+	}
+	
 	/**
 	 * Map used to track active connections and where these were acquired. The
 	 * Throwable value may be null in case debugging was disable at the time the
 	 * connection was acquired.
 	 */
-	private final Map<SailConnection, Throwable> activeConnections = new IdentityHashMap<SailConnection, Throwable>();
+	private final Map<SailConnection, ConnectionContext> activeConnections = new IdentityHashMap<SailConnection, ConnectionContext>();
 	
 	protected void manageConnection(final SailConnection cnxn) {
 		synchronized (activeConnections) {
@@ -103,7 +124,7 @@ public abstract class SailBase implements Sail {
 			}
 			
 			final Throwable stackTrace = debugEnabled() ? new Throwable() : null;
-			activeConnections.put(cnxn, stackTrace);
+			activeConnections.put(cnxn, new ConnectionContext(Thread.currentThread(), stackTrace));
 		}
 	}
 
@@ -184,6 +205,12 @@ public abstract class SailBase implements Sail {
 				// Check if any active connections exist. If so, wait for a grace
 				// period for them to finish.
 				if (!activeConnections.isEmpty()) {
+					// Interrupt any Connection threads
+					for (ConnectionContext context : activeConnections.values()) {
+						if (context.thread != Thread.currentThread()) {
+							context.thread.interrupt();
+						}
+					}
 					logger.debug("Waiting for active connections to close before shutting down...");
 					try {
 						activeConnections.wait(DEFAULT_CONNECTION_TIMEOUT);
@@ -194,22 +221,22 @@ public abstract class SailBase implements Sail {
 				}
 
 				// Forcefully close any connections that are still open
-				Iterator<Map.Entry<SailConnection, Throwable>> iter = activeConnections.entrySet().iterator();
+				Iterator<Map.Entry<SailConnection, ConnectionContext>> iter = activeConnections.entrySet().iterator();
 				while (iter.hasNext()) {
-					Map.Entry<SailConnection, Throwable> entry = iter.next();
+					Map.Entry<SailConnection, ConnectionContext> entry = iter.next();
 					SailConnection con = entry.getKey();
-					Throwable stackTrace = entry.getValue();
+					ConnectionContext context = entry.getValue();
 
 					iter.remove();
 
-					if (stackTrace == null) {
+					if (context.trace == null) {
 						logger.warn(
 								"Closing active connection due to shut down; consider setting the {} system property",
 								DEBUG_PROP);
 					}
 					else {
 						logger.warn("Closing active connection due to shut down, connection was acquired in",
-								stackTrace);
+								context.trace);
 					}
 
 					try {
