@@ -4262,9 +4262,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 * by {@link Semaphore#release()}. However, uses of this {@link Semaphore}
 	 * should ensure that it is release along all code paths, including a
 	 * finalizer if necessary.
+	 * <p>
+	 * The change to acquire and release Integer.MAX_VALUE permits allows for the
+	 * same semaphore to be used similarly to a read-write lock, with read requests
+	 * acquiring and releasing a single permit.  For this pattern to work we want
+	 * a fair semaphore.
 	 */   
-	private final Semaphore unisolatedSemaphore = new Semaphore(1/* permits */,
-			false/* fair */);
+	private final Semaphore unisolatedSemaphore = new Semaphore(Integer.MAX_VALUE/* permits */,
+			true/* fair */);
 
 	/**
 	 * Acquire a permit for the UNISOLATED connection.
@@ -4273,7 +4278,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 */
 	public void acquireUnisolatedConnection() throws InterruptedException {
 
-		unisolatedSemaphore.acquire();
+		unisolatedSemaphore.acquire(Integer.MAX_VALUE);
 
 		if (log.isDebugEnabled())
 			log.debug("acquired semaphore: availablePermits="
@@ -4314,11 +4319,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 			 * not place an upper bound on the #of permits, but rather sets the
 			 * initial #of permits available.
 			 */
-			throw new IllegalStateException();
+			throw new IllegalStateException("Unisolated semaphore, permits: " + unisolatedSemaphore.availablePermits());
 		}
 
-		unisolatedSemaphore.release();
+		unisolatedSemaphore.release(Integer.MAX_VALUE);
 
+	}
+	
+	public void acquireReadWriteConnection() throws InterruptedException {
+		unisolatedSemaphore.acquire(1); // a single permit is sufficient for non-unisolated
+	}
+	
+	public void releaseReadWriteConnection() {
+		unisolatedSemaphore.release(1);
 	}
 
 	@Override

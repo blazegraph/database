@@ -143,11 +143,12 @@ public class BigdataSailRepository extends SailRepository {
 
 	/**
 	 * Return a connection backed by a read-write transaction.
+	 * @throws InterruptedException 
 	 * 
 	 * @see BigdataSail#getReadWriteConnection()
 	 */
     public BigdataSailRepositoryConnection getReadWriteConnection() 
-        throws RepositoryException {
+        throws RepositoryException, InterruptedException {
         
         try {
             

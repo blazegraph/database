@@ -1371,8 +1371,8 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
         private void init(final Lock writeLock, final IIndexManager indexManager) {
-            if(writeLock == null)
-                throw new IllegalArgumentException();
+//            if(writeLock == null)
+//                throw new IllegalArgumentException();
             if(indexManager == null)
                 throw new IllegalArgumentException();
             this.writeLock = writeLock;
@@ -1393,7 +1393,7 @@ public class BigdataSail extends SailBase implements Sail {
                 return;
             }
             // release write lock.
-            writeLock.unlock();
+            // writeLock.unlock();
             // release permit iff running on a Journal.
             if (indexManager instanceof Journal) {
                 ((Journal) indexManager).releaseUnisolatedConnection();
@@ -1451,8 +1451,8 @@ public class BigdataSail extends SailBase implements Sail {
             }
 
             // acquire the write lock.
-            writeLock = lock.writeLock();
-            writeLock.lock();
+            // writeLock = lock.writeLock();
+            // writeLock.lock();
             // Set lock and index manager on lambda.
             lambda.init(writeLock, getIndexManager());
             // Invoke lambda.
@@ -1469,10 +1469,10 @@ public class BigdataSail extends SailBase implements Sail {
         } finally {
             if (!ok) {
                 // Did not obtain connection.
-                if (writeLock != null) {
-                    // release write lock.
-                    writeLock.unlock();
-                }
+//                if (writeLock != null) {
+//                    // release write lock.
+//                    writeLock.unlock();
+//                }
                 if (acquiredConnection) {
                     // release permit.
                     ((Journal) getIndexManager()).releaseUnisolatedConnection();
@@ -1569,6 +1569,7 @@ public class BigdataSail extends SailBase implements Sail {
 
 	/**
 	 * Return a connection backed by a read-write transaction.
+	 * @throws InterruptedException 
 	 * 
 	 * @throws DatasetNotFoundException 
 	 * 
@@ -1576,7 +1577,7 @@ public class BigdataSail extends SailBase implements Sail {
 	 *             unless {@link Options#ISOLATABLE_INDICES} was specified when
 	 *             the backing triple store instance was provisioned.
 	 */
-    public BigdataSailConnection getReadWriteConnection() throws IOException {
+    public BigdataSailConnection getReadWriteConnection() throws IOException, InterruptedException {
 
 //        if (!isolatable) {
 //
@@ -1596,11 +1597,30 @@ public class BigdataSail extends SailBase implements Sail {
 
         final ITransactionService txService = getTxService();
         boolean ok = false;
+        boolean acquiredConnection = false;
         Lock readLock = null;
         final long txId = txService.newTx(ITx.UNISOLATED); // read/write tx on lastCommitTime.
         try {
-            readLock = lock.readLock();
-            readLock.lock();
+//            readLock = lock.readLock();
+//            readLock.lock();
+            if (getIndexManager() instanceof Journal) {
+            /*
+             * acquire permit from Journal.
+             * 
+             * Note: The [instanceof Journal] test here is correct. What happens
+             * is that an unisolated AbstractTask that is submitted through the
+             * ConcurrencyManager on the Journal is an IJournal (an
+             * IsolatedActionJournal) but not a Journal. Thus the
+             * getUnisolatedConnection() code does not attempt to obtain the
+             * global semaphore. This allows concurrent execution of tasks
+             * requiring unisolated connections for distinct namespaces on the
+             * same journal.
+             * 
+             * @see #1137 (Code review of IJournal vs Journal)
+             */
+                ((Journal) getIndexManager()).acquireReadWriteConnection();
+                acquiredConnection = true;
+            }
             final BigdataSailConnection conn = new BigdataSailRWTxConnection(txId,txService,readLock).startConn();
             ok = true;
             
@@ -1613,6 +1633,9 @@ public class BigdataSail extends SailBase implements Sail {
             if(!ok) {
                 if(readLock != null) {
                     readLock.unlock();
+                }
+                if (acquiredConnection) {
+                    ((Journal) getIndexManager()).releaseReadWriteConnection();
                 }
                 try {
                     txService.abort(txId);
@@ -4062,9 +4085,13 @@ public class BigdataSail extends SailBase implements Sail {
                    		lock.unlock();
                 	}
                 }
-                if (unisolated && im instanceof Journal) {
-                    // release the permit.
-                    ((Journal) im).releaseUnisolatedConnection();
+                if (im instanceof Journal) {
+	                if (unisolated) {
+	                    // release the permit.
+	                    ((Journal) im).releaseUnisolatedConnection();
+	                } else if (!readOnly) {
+	                    ((Journal) im).releaseReadWriteConnection();
+	                }
                 }
                 openConn = false;
             }
