@@ -249,9 +249,9 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         final byte[] key = tuple.getKeyBuffer().array();
 
         final SPO spo = keyOrder.decodeKey(key);
-        if(spo.o instanceof XSDBooleanIV) {
-            System.err.println("Breakpoint: "+spo+", o="+spo.o());
-        }
+//        if(spo.o instanceof XSDBooleanIV) {
+//            System.err.println("Breakpoint: "+spo+", o="+spo.o());
+//        }
         if ((tuple.flags() & IRangeQuery.VALS) == 0) {
 
             // Note: No type or statement identifier information.
