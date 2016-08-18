@@ -70,7 +70,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -105,8 +104,6 @@ import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
@@ -819,27 +816,27 @@ public class BigdataSail extends SailBase implements Sail {
         // Note: The actual namespace used for the ValueFactory is the namespace of the LexiconRelation.
         this.valueFactory = BigdataValueFactoryImpl.getInstance(namespace+"."+LexiconRelation.NAME_LEXICON_RELATION);
 
-        // Canonical pattern to obtain a lock used make unisolated and read/write tx operations MUTEX.
-        {
-//            this.lock = new ReentrantReadWriteLock(false/*fair*/);
-            // Attempt to resolve.
-            ReentrantReadWriteLock lock = locks.get(namespace);
-            if (lock == null ) {
-                final ReentrantReadWriteLock tmp = locks.putIfAbsent(namespace, lock = new ReentrantReadWriteLock(false/*false*/));
-                if(tmp != null) {
-                    // lost data race.
-                    lock = tmp;
-                }
-            }
-            this.lock = lock;
-        }
+//        // Canonical pattern to obtain a lock used make unisolated and read/write tx operations MUTEX.
+//        {
+////            this.lock = new ReentrantReadWriteLock(false/*fair*/);
+//            // Attempt to resolve.
+//            ReentrantReadWriteLock lock = locks.get(namespace);
+//            if (lock == null ) {
+//                final ReentrantReadWriteLock tmp = locks.putIfAbsent(namespace, lock = new ReentrantReadWriteLock(false/*false*/));
+//                if(tmp != null) {
+//                    // lost data race.
+//                    lock = tmp;
+//                }
+//            }
+//            this.lock = lock;
+//        }
         
         this.namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
         
         this.queryEngine = QueryEngineFactory.getInstance().getQueryController(mainIndexManager);
 
-        this.runstate = RunstateEnum.Active;
+//        this.runstate = RunstateEnum.Active;
     }
     
     /**
@@ -983,20 +980,20 @@ public class BigdataSail extends SailBase implements Sail {
          */
 //        queryEngine.shutdown();
         
-        /*
-         * Indicate Sail shutdown for SailConnection.close() handling
-         */
-        runstate = RunstateEnum.Shutdown;
+//        /*
+//         * Indicate Sail shutdown for SailConnection.close() handling
+//         */
+//        runstate = RunstateEnum.Shutdown;
         
         super.shutDown();
         
-        /*
-         * Check current lock to see if it can be acquired.
-         * If not, then replace lock
-         */
-        if (lock.isWriteLocked()) {
-        	locks.put(namespace, new ReentrantReadWriteLock(false/*false*/));
-        }
+//        /*
+//         * Check current lock to see if it can be acquired.
+//         * If not, then replace lock
+//         */
+//        if (lock.isWriteLocked()) {
+//        	locks.put(namespace, new ReentrantReadWriteLock(false/*false*/));
+//        }
     }
     
     /**
@@ -1222,34 +1219,34 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
-    /**
-     * Cache for the {@link #lock}s.
-     */
-    final static private transient ConcurrentWeakValueCache<String/*namespace*/, ReentrantReadWriteLock> locks
-    = new ConcurrentWeakValueCacheWithTimeout<String, ReentrantReadWriteLock>(
-            20/*cacheCapacity*/, TimeUnit.MILLISECONDS.toNanos(10000/*cacheTimeout*/));
-    
-    /**
-     * Used to coordinate between read/write transactions and the unisolated
-     * connection.
-     * <p>
-     * In terms of the SAIL, we do need to prevent people from using (and 
-     * writing on) the unisolated statement indices concurrent with full 
-     * transactions.  The issue is that an UnisolatedReadWriteIndex is used 
-     * (by AbstractRelation) to protect against concurrent operations on the 
-     * same index, but the transaction commit protocol on the journal submits a 
-     * task to the ConcurrencyManager, which will execute when it obtains a lock 
-     * for the necessary index.  These two systems ARE NOT using the same locks.
-     * The UnisolatedReadWriteIndex makes it possible to write code which 
-     * operates as if it has a local index object.  If you use the 
-     * ConcurrencyManager, then all unisolated operations must be submitted 
-     * as tasks which get scheduled.  Probably it is dangerous to have these 
-     * two different models coexisting.  We should talk about that at some 
-     * point.
-     *
-     * @see BLZG-2041 This needs to be a canonical lock for the namespace, not per BigdataSail instance.
-     */
-    final private ReentrantReadWriteLock lock;
+//    /**
+//     * Cache for the {@link #lock}s.
+//     */
+//    final static private transient ConcurrentWeakValueCache<String/*namespace*/, ReentrantReadWriteLock> locks
+//    = new ConcurrentWeakValueCacheWithTimeout<String, ReentrantReadWriteLock>(
+//            20/*cacheCapacity*/, TimeUnit.MILLISECONDS.toNanos(10000/*cacheTimeout*/));
+//    
+//    /**
+//     * Used to coordinate between read/write transactions and the unisolated
+//     * connection.
+//     * <p>
+//     * In terms of the SAIL, we do need to prevent people from using (and 
+//     * writing on) the unisolated statement indices concurrent with full 
+//     * transactions.  The issue is that an UnisolatedReadWriteIndex is used 
+//     * (by AbstractRelation) to protect against concurrent operations on the 
+//     * same index, but the transaction commit protocol on the journal submits a 
+//     * task to the ConcurrencyManager, which will execute when it obtains a lock 
+//     * for the necessary index.  These two systems ARE NOT using the same locks.
+//     * The UnisolatedReadWriteIndex makes it possible to write code which 
+//     * operates as if it has a local index object.  If you use the 
+//     * ConcurrencyManager, then all unisolated operations must be submitted 
+//     * as tasks which get scheduled.  Probably it is dangerous to have these 
+//     * two different models coexisting.  We should talk about that at some 
+//     * point.
+//     *
+//     * @see BLZG-2041 This needs to be a canonical lock for the namespace, not per BigdataSail instance.
+//     */
+//    final private ReentrantReadWriteLock lock;
 
    /**
     * Return an unisolated connection to the database. The unisolated connection
@@ -1315,7 +1312,7 @@ public class BigdataSail extends SailBase implements Sail {
             @Override
             public BigdataSailConnection call() throws Exception {
                 // new unisolated connection.
-                final BigdataSailConnection cnxn =  new BigdataSailConnection(getWriteLock()).startConn();
+                final BigdataSailConnection cnxn = new BigdataSailConnection(/*getWriteLock()*/).startConn();
                 
     			manageConnection(cnxn);
     			
@@ -1355,7 +1352,7 @@ public class BigdataSail extends SailBase implements Sail {
     public static abstract class UnisolatedCallable<T> implements Callable<T> {
 
         private boolean didRun = false;
-        private Lock writeLock;
+//        private Lock writeLock;
         private IIndexManager indexManager;
         
         protected boolean didRun() {
@@ -1366,16 +1363,16 @@ public class BigdataSail extends SailBase implements Sail {
             didRun = true; 
          }
          
-        protected Lock getWriteLock() {
-            return writeLock;
-        }
+//        protected Lock getWriteLock() {
+//            return writeLock;
+//        }
         
-        private void init(final Lock writeLock, final IIndexManager indexManager) {
+        private void init(/*final Lock writeLock,*/ final IIndexManager indexManager) {
 //            if(writeLock == null)
 //                throw new IllegalArgumentException();
             if(indexManager == null)
                 throw new IllegalArgumentException();
-            this.writeLock = writeLock;
+//            this.writeLock = writeLock;
             this.indexManager = indexManager;
         }
         
@@ -1418,14 +1415,14 @@ public class BigdataSail extends SailBase implements Sail {
         if(lambda == null)
             throw new IllegalArgumentException();
         
-        if (lock.writeLock().isHeldByCurrentThread()) {
-            /*
-             * A thread which already holds this lock already has the open
-             * unisolated connection and will deadlock when it attempts to
-             * obtain the permit for that connection from the Journal.
-             */
-            throw new UnisolatedConnectionNotReentrantException();
-        }
+//        if (lock.writeLock().isHeldByCurrentThread()) {
+//            /*
+//             * A thread which already holds this lock already has the open
+//             * unisolated connection and will deadlock when it attempts to
+//             * obtain the permit for that connection from the Journal.
+//             */
+//            throw new UnisolatedConnectionNotReentrantException();
+//        }
 
         boolean acquiredConnection = false;
         Lock writeLock = null;
@@ -1454,7 +1451,7 @@ public class BigdataSail extends SailBase implements Sail {
             // writeLock = lock.writeLock();
             // writeLock.lock();
             // Set lock and index manager on lambda.
-            lambda.init(writeLock, getIndexManager());
+            lambda.init(/*writeLock,*/ getIndexManager());
             // Invoke lambda.
             final T ret = lambda.call();
             // Note that lambda did run (successfully). This means that the lambda
@@ -1598,7 +1595,7 @@ public class BigdataSail extends SailBase implements Sail {
         final ITransactionService txService = getTxService();
         boolean ok = false;
         boolean acquiredConnection = false;
-        Lock readLock = null;
+//        Lock readLock = null;
         final long txId = txService.newTx(ITx.UNISOLATED); // read/write tx on lastCommitTime.
         try {
 //            readLock = lock.readLock();
@@ -1621,7 +1618,7 @@ public class BigdataSail extends SailBase implements Sail {
                 ((Journal) getIndexManager()).acquireReadWriteConnection();
                 acquiredConnection = true;
             }
-            final BigdataSailConnection conn = new BigdataSailRWTxConnection(txId,txService,readLock).startConn();
+            final BigdataSailConnection conn = new BigdataSailRWTxConnection(txId,txService).startConn();
             ok = true;
             
 			manageConnection(conn);
@@ -1631,11 +1628,11 @@ public class BigdataSail extends SailBase implements Sail {
             throw new RuntimeException(ex);
         } finally {
             if(!ok) {
-                if(readLock != null) {
-                    readLock.unlock();
-                }
+//                if(readLock != null) {
+//                    readLock.unlock();
+//                }
                 if (acquiredConnection) {
-                    ((Journal) getIndexManager()).releaseReadWriteConnection();
+                    ((Journal) getIndexManager()).releaseReadWriteConnection(); // FIXME BLZG-2041 Can we push this into the Journal transaction manager?
                 }
                 try {
                     txService.abort(txId);
@@ -1862,11 +1859,11 @@ public class BigdataSail extends SailBase implements Sail {
          */
         private Map<IV, BigdataBNode> bnodes2;
         
-        /**
-         * Used to coordinate between read/write transactions and the unisolated
-         * view.
-         */
-        private final Lock lock;
+//        /**
+//         * Used to coordinate between read/write transactions and the unisolated
+//         * view.
+//         */
+//        private final Lock lock;
 
 		/**
 		 * <code>true</code> iff this is the UNISOLATED connection (only one of
@@ -2069,11 +2066,11 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @param timestampOrTxId
          *            Either a commit time or a read/write transaction identifier.
-         * @param lock
          */
-        protected BigdataSailConnection(final long timestampOrTxId, final Lock lock) throws DatasetNotFoundException {
+//        * @param lock
+        protected BigdataSailConnection(final long timestampOrTxId/*, final Lock lock*/) throws DatasetNotFoundException {
 
-            this.lock = lock;
+//            this.lock = lock;
 
             this.unisolated = TimestampUtility.isUnisolated(timestampOrTxId);
             
@@ -2253,9 +2250,9 @@ public class BigdataSail extends SailBase implements Sail {
          * @param lock
          * @throws DatasetNotFoundException 
          */
-        protected BigdataSailConnection(final Lock lock) throws DatasetNotFoundException {
+        protected BigdataSailConnection(/*final Lock lock*/) throws DatasetNotFoundException {
 
-            this(ITx.UNISOLATED, lock);
+            this(ITx.UNISOLATED/*, lock*/);
 
             attach(ITx.UNISOLATED);
 
@@ -4077,14 +4074,9 @@ public class BigdataSail extends SailBase implements Sail {
                 // notify the SailBase that the connection is no longer in use.
                 BigdataSail.this.connectionClosed(this);
             } finally {
-                if (lock != null) {
-                    // release the reentrant lock
-                	if (BigdataSail.this.runstate == RunstateEnum.Shutdown && !lockHeldByCurrentThread(lock)) {
-                		log.warn("Must replace lock");
-                	} else {
-                   		lock.unlock();
-                	}
-                }
+//                if (lock != null) {
+//                    lock.unlock();
+//                }
                 if (im instanceof Journal) {
 	                if (unisolated) {
 	                    // release the permit.
@@ -5001,10 +4993,10 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @throws DatasetNotFoundException 
          */
-        public BigdataSailRWTxConnection(final long txId, final ITransactionService txService, final Lock readLock)
+        public BigdataSailRWTxConnection(final long txId, final ITransactionService txService)//, final Lock readLock)
                 throws IOException, DatasetNotFoundException {
 
-            super(txId, readLock);//, false/* unisolated */, false/* readOnly */);
+            super(txId/*, readLock*/);//, false/* unisolated */, false/* readOnly */);
 
             if (!isolatable) {
 
@@ -5257,7 +5249,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         BigdataSailReadOnlyConnection(final long txId,final ITransactionService txService) throws IOException, DatasetNotFoundException {
 
-            super(txId, null/* lock */);//, false/* unisolated */, true/* readOnly */);
+            super(txId/*, null lock */);//, false/* unisolated */, true/* readOnly */);
 
 //            clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
             clusterCacheBugFix = this.scaleOut; // identical to the code above.

@@ -4326,8 +4326,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
 	}
 	
+	/**
+	 * Acquire a permit for a read/write isolated transaction.
+	 * 
+	 * @see BLZG-2041
+	 */
 	public void acquireReadWriteConnection() throws InterruptedException {
-		unisolatedSemaphore.acquire(1); // a single permit is sufficient for non-unisolated
+	    /*
+	     * Note: a single permit is sufficient to contend a read/write tx with a global unisolated connection.
+	     */
+		unisolatedSemaphore.acquire(1); 
 	}
 	
 	public void releaseReadWriteConnection() {
