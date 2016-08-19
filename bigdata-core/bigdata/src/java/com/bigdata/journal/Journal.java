@@ -68,6 +68,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.concurrent.AccessSemaphore;
+import com.bigdata.concurrent.AccessSemaphore.Access;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -4258,90 +4260,33 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 * operations on the low level indices and commit/abort processing while it
 	 * holds the permit.
 	 * <p>
-	 * Note: If by some chance the permit has become "lost" it can be rebalanced
-	 * by {@link Semaphore#release()}. However, uses of this {@link Semaphore}
-	 * should ensure that it is release along all code paths, including a
-	 * finalizer if necessary.
-	 * <p>
-	 * The change to acquire and release Integer.MAX_VALUE permits allows for the
-	 * same semaphore to be used similarly to a read-write lock, with read requests
-	 * acquiring and releasing a single permit.  For this pattern to work we want
-	 * a fair semaphore.
+	 * An AccessSemaphore that implements an Exclusive/SharedAccess idiom is used
+	 * to ensure exclusive Unisolated access and shared ReadWrite.
 	 */   
-	private final Semaphore unisolatedSemaphore = new Semaphore(Integer.MAX_VALUE/* permits */,
-			true/* fair */);
+	private final AccessSemaphore accessSemaphore = new AccessSemaphore(Integer.MAX_VALUE/* max shared */);
 
 	/**
-	 * Acquire a permit for the UNISOLATED connection.
+	 * Acquire an Access object for the UNISOLATED connection.
 	 * 
 	 * @throws InterruptedException
 	 */
-	public void acquireUnisolatedConnection() throws InterruptedException {
+	public Access acquireUnisolatedConnectionAccess() throws InterruptedException {
 
-		unisolatedSemaphore.acquire(Integer.MAX_VALUE);
-
-		if (log.isDebugEnabled())
-			log.debug("acquired semaphore: availablePermits="
-					+ unisolatedSemaphore.availablePermits());
-
-		if (unisolatedSemaphore.availablePermits() != 0) {
-			/*
-			 * Note: This test can not be made atomic with the Semaphore API. It
-			 * is possible unbalanced calls to release() could drive the #of
-			 * permits in the Semaphore above ONE (1) since the Semaphore
-			 * constructor does not place an upper bound on the #of permits, but
-			 * rather sets the initial #of permits available. An attempt to
-			 * acquire a permit which has a post-condition with additional
-			 * permits available will therefore "eat" a permit.
-			 */
-			throw new IllegalStateException();
-		}
-
+		return accessSemaphore.acquireExclusive();
 	}
 
 	/**
-	 * Release the permit for the UNISOLATED connection.
-	 * 
-	 * @throws IllegalStateException
-	 *             unless the #of permits available is zero.
-	 */
-	public void releaseUnisolatedConnection() {
-
-		if (log.isDebugEnabled())
-			log.debug("releasing semaphore: availablePermits="
-					+ unisolatedSemaphore.availablePermits());
-
-		if (unisolatedSemaphore.availablePermits() != 0) {
-			/*
-			 * Note: This test can not be made atomic with the Semaphore API. It
-			 * is possible that a concurrent call could drive the #of permits in
-			 * the Semaphore above ONE (1) since the Semaphore constructor does
-			 * not place an upper bound on the #of permits, but rather sets the
-			 * initial #of permits available.
-			 */
-			throw new IllegalStateException("Unisolated semaphore, permits: " + unisolatedSemaphore.availablePermits());
-		}
-
-		unisolatedSemaphore.release(Integer.MAX_VALUE);
-
-	}
-	
-	/**
-	 * Acquire a permit for a read/write isolated transaction.
+	 * Acquire an Access for a read/write isolated transaction.
 	 * 
 	 * @see BLZG-2041
 	 */
-	public void acquireReadWriteConnection() throws InterruptedException {
+	public Access acquireReadWriteConnectionAccess() throws InterruptedException {
 	    /*
-	     * Note: a single permit is sufficient to contend a read/write tx with a global unisolated connection.
+	     * Multiple ReadWrites are permitted shared access
 	     */
-		unisolatedSemaphore.acquire(1); 
+		return accessSemaphore.acquireShared();
 	}
 	
-	public void releaseReadWriteConnection() {
-		unisolatedSemaphore.release(1);
-	}
-
 	@Override
 	public boolean isHAJournal() {
 		return false;

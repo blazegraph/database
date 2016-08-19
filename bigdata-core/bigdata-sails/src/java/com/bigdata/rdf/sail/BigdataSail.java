@@ -104,6 +104,7 @@ import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.concurrent.AccessSemaphore.Access;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
@@ -1312,7 +1313,7 @@ public class BigdataSail extends SailBase implements Sail {
             @Override
             public BigdataSailConnection call() throws Exception {
                 // new unisolated connection.
-                final BigdataSailConnection cnxn = new BigdataSailConnection(/*getWriteLock()*/).startConn();
+                final BigdataSailConnection cnxn = new BigdataSailConnection(access).startConn();
                 
     			manageConnection(cnxn);
     			
@@ -1355,6 +1356,8 @@ public class BigdataSail extends SailBase implements Sail {
 //        private Lock writeLock;
         private IIndexManager indexManager;
         
+        protected Access access;
+        
         protected boolean didRun() {
             return didRun;
         }
@@ -1367,13 +1370,12 @@ public class BigdataSail extends SailBase implements Sail {
 //            return writeLock;
 //        }
         
-        private void init(/*final Lock writeLock,*/ final IIndexManager indexManager) {
-//            if(writeLock == null)
-//                throw new IllegalArgumentException();
+        private void init(final Access access, final IIndexManager indexManager) {
             if(indexManager == null)
                 throw new IllegalArgumentException();
-//            this.writeLock = writeLock;
+            
             this.indexManager = indexManager;
+            this.access = access;
         }
         
         /**
@@ -1389,11 +1391,8 @@ public class BigdataSail extends SailBase implements Sail {
                 // Did not run, so any locks were already released.
                 return;
             }
-            // release write lock.
-            // writeLock.unlock();
-            // release permit iff running on a Journal.
-            if (indexManager instanceof Journal) {
-                ((Journal) indexManager).releaseUnisolatedConnection();
+            if (access != null) {
+                access.release();
             }
         }
         
@@ -1424,8 +1423,7 @@ public class BigdataSail extends SailBase implements Sail {
 //            throw new UnisolatedConnectionNotReentrantException();
 //        }
 
-        boolean acquiredConnection = false;
-        Lock writeLock = null;
+        Access access = null;
         boolean ok = false;
         try {
             if (getIndexManager() instanceof Journal) {
@@ -1443,15 +1441,11 @@ public class BigdataSail extends SailBase implements Sail {
              * 
              * @see #1137 (Code review of IJournal vs Journal)
              */
-                ((Journal) getIndexManager()).acquireUnisolatedConnection();
-                acquiredConnection = true;
+                access = ((Journal) getIndexManager()).acquireUnisolatedConnectionAccess();
             }
 
-            // acquire the write lock.
-            // writeLock = lock.writeLock();
-            // writeLock.lock();
             // Set lock and index manager on lambda.
-            lambda.init(/*writeLock,*/ getIndexManager());
+            lambda.init(access, getIndexManager());
             // Invoke lambda.
             final T ret = lambda.call();
             // Note that lambda did run (successfully). This means that the lambda
@@ -1465,14 +1459,9 @@ public class BigdataSail extends SailBase implements Sail {
            throw new RuntimeException(ex);
         } finally {
             if (!ok) {
-                // Did not obtain connection.
-//                if (writeLock != null) {
-//                    // release write lock.
-//                    writeLock.unlock();
-//                }
-                if (acquiredConnection) {
+                if (access != null) {
                     // release permit.
-                    ((Journal) getIndexManager()).releaseUnisolatedConnection();
+                    access.release();
                 }
             }
         }
@@ -1594,12 +1583,9 @@ public class BigdataSail extends SailBase implements Sail {
 
         final ITransactionService txService = getTxService();
         boolean ok = false;
-        boolean acquiredConnection = false;
-//        Lock readLock = null;
+        Access access = null;
         final long txId = txService.newTx(ITx.UNISOLATED); // read/write tx on lastCommitTime.
         try {
-//            readLock = lock.readLock();
-//            readLock.lock();
             if (getIndexManager() instanceof Journal) {
             /*
              * acquire permit from Journal.
@@ -1615,10 +1601,9 @@ public class BigdataSail extends SailBase implements Sail {
              * 
              * @see #1137 (Code review of IJournal vs Journal)
              */
-                ((Journal) getIndexManager()).acquireReadWriteConnection();
-                acquiredConnection = true;
+                access = ((Journal) getIndexManager()).acquireReadWriteConnectionAccess();
             }
-            final BigdataSailConnection conn = new BigdataSailRWTxConnection(txId,txService).startConn();
+            final BigdataSailConnection conn = new BigdataSailRWTxConnection(access, txId,txService).startConn();
             ok = true;
             
 			manageConnection(conn);
@@ -1628,11 +1613,8 @@ public class BigdataSail extends SailBase implements Sail {
             throw new RuntimeException(ex);
         } finally {
             if(!ok) {
-//                if(readLock != null) {
-//                    readLock.unlock();
-//                }
-                if (acquiredConnection) {
-                    ((Journal) getIndexManager()).releaseReadWriteConnection(); // FIXME BLZG-2041 Can we push this into the Journal transaction manager?
+                if (access != null) {
+                    access.release(); // FIXME BLZG-2041 Can we push this into the Journal transaction manager?
                 }
                 try {
                     txService.abort(txId);
@@ -1707,6 +1689,11 @@ public class BigdataSail extends SailBase implements Sail {
          * True iff the {@link SailConnection} is open.
          */
         protected boolean openConn;
+        
+        /**
+         * Set for Unisolated and ReadWrite connections.
+         */
+        protected Access access;
         
         /**
          * <code>true</code> iff the {@link BigdataSail} can support truth
@@ -2068,13 +2055,13 @@ public class BigdataSail extends SailBase implements Sail {
          *            Either a commit time or a read/write transaction identifier.
          */
 //        * @param lock
-        protected BigdataSailConnection(final long timestampOrTxId/*, final Lock lock*/) throws DatasetNotFoundException {
-
-//            this.lock = lock;
+        protected BigdataSailConnection(final long timestampOrTxId, final Access access) throws DatasetNotFoundException {
 
             this.unisolated = TimestampUtility.isUnisolated(timestampOrTxId);
             
             this.readOnly = TimestampUtility.isReadOnly(timestampOrTxId);
+            
+            this.access = access;
 
             {
                 final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, timestampOrTxId);
@@ -2250,9 +2237,9 @@ public class BigdataSail extends SailBase implements Sail {
          * @param lock
          * @throws DatasetNotFoundException 
          */
-        protected BigdataSailConnection(/*final Lock lock*/) throws DatasetNotFoundException {
+        protected BigdataSailConnection(final Access access) throws DatasetNotFoundException {
 
-            this(ITx.UNISOLATED/*, lock*/);
+            this(ITx.UNISOLATED, access);
 
             attach(ITx.UNISOLATED);
 
@@ -4077,13 +4064,8 @@ public class BigdataSail extends SailBase implements Sail {
 //                if (lock != null) {
 //                    lock.unlock();
 //                }
-                if (im instanceof Journal) {
-	                if (unisolated) {
-	                    // release the permit.
-	                    ((Journal) im).releaseUnisolatedConnection();
-	                } else if (!readOnly) {
-	                    ((Journal) im).releaseReadWriteConnection();
-	                }
+                if (access != null) {
+	                access.release();
                 }
                 openConn = false;
             }
@@ -4993,10 +4975,10 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @throws DatasetNotFoundException 
          */
-        public BigdataSailRWTxConnection(final long txId, final ITransactionService txService)//, final Lock readLock)
+        public BigdataSailRWTxConnection(final Access access, final long txId, final ITransactionService txService)//, final Lock readLock)
                 throws IOException, DatasetNotFoundException {
 
-            super(txId/*, readLock*/);//, false/* unisolated */, false/* readOnly */);
+            super(txId, access);//, false/* unisolated */, false/* readOnly */);
 
             if (!isolatable) {
 
@@ -5249,7 +5231,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         BigdataSailReadOnlyConnection(final long txId,final ITransactionService txService) throws IOException, DatasetNotFoundException {
 
-            super(txId/*, null lock */);//, false/* unisolated */, true/* readOnly */);
+            super(txId, null);//, false/* unisolated */, true/* readOnly */);
 
 //            clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
             clusterCacheBugFix = this.scaleOut; // identical to the code above.
