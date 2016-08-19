@@ -88,7 +88,7 @@ public class IfBOp extends IVValueExpression<IV> implements IPassesMaterializati
             throw new SparqlTypeErrorException();
         }
 
-        if(iv.equals(XSDBooleanIV.TRUE)){
+        if (((XSDBooleanIV) iv).getInlineValue()) {
             final IV exp1 = get(1).get(bs);
             if(exp1==null){
                 throw new SparqlTypeErrorException();

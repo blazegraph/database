@@ -38,6 +38,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
@@ -55,6 +56,7 @@ import com.bigdata.bop.fed.FederatedRunningQuery;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.DelegateBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -100,6 +102,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
     private final static Logger chunkTaskLog = Logger
             .getLogger(ChunkTask.class);
     
+    /**
+     * Used to map {@link IBindingSet}s across the federation or to migrate
+     * solutions from the managed object heap onto the native heap.
+     * 
+     * @see BLZG-533 Vector query engine on native heap.
+     */
+    private final IChunkHandler chunkHandler;
+
     /**
      * A collection of (bopId,partitionId) keys mapped onto a collection of
      * operator task evaluation contexts for currently executing operators for
@@ -219,6 +229,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         super(queryEngine, queryId, controller, clientProxy, query, realSource);
 
+        this.chunkHandler = getChunkHandler(queryEngine, query);
+        
         this.operatorFutures = new ConcurrentHashMap<BSBundle, ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask>>();
 
         if (orderedOperatorQueueMap) {
@@ -321,6 +333,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 try {
                     // blocking put()
                     queue.put(msg);
+                    getQueryEngine().counters.bufferedChunkMessageCount.increment();
+                    if (msg instanceof LocalNativeChunkMessage) {
+                        getQueryEngine().counters.bufferedChunkMessageBytesOnNativeHeap
+                                .add(((LocalNativeChunkMessage) msg).getByteCount());
+                    }
                 } finally {
                     // Queue unblocked
                     getQueryEngine().counters.blockedWorkQueueCount.decrement();
@@ -611,6 +628,18 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                         : Integer.MAX_VALUE);
                 // #of messages accepted from the work queue.
                 final int naccepted = accepted.size();
+                getQueryEngine().counters.bufferedChunkMessageCount.add(-naccepted);
+                {
+                    long byteCount = 0;
+                    for(IChunkMessage<?> msg : accepted) {
+                        if (msg instanceof LocalNativeChunkMessage) {
+                            byteCount += ((LocalNativeChunkMessage) msg).getByteCount();
+                        }
+                    }
+                    if(byteCount!=0) {
+                        getQueryEngine().counters.bufferedChunkMessageBytesOnNativeHeap.add(-byteCount);
+                    }
+                }
                 // #of messages remaining on the work queue.
                 final int nremaining = queue.size();
                 if (nremaining == 0) {
@@ -1955,11 +1984,35 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         
     }
     
-//    @Override
-    protected IChunkHandler getChunkHandler() {
+    /**
+     * Factory returns the effective {@link IChunkHandler} for this query.
+     * 
+     * @param queryEngine
+     * @param query
+     * 
+     * @return The effective {@link IChunkHandler} policy.
+     * 
+     * @see QueryHints#QUERY_ENGINE_CHUNK_HANDLER
+     * @see BLZG-533 Vector query engine on native heap.
+     */
+    protected IChunkHandler getChunkHandler(final QueryEngine queryEngine, final PipelineOp query) {
+
+        /**
+         * Use whatever is configured by the query hints.
+         */
+        return query.getProperty(
+                QueryEngine.Annotations.CHUNK_HANDLER,
+                QueryHints.DEFAULT_QUERY_ENGINE_CHUNK_HANDLER);
         
-        return StandaloneChunkHandler.INSTANCE;
-        
+    }
+
+    /**
+     * Return the effective {@link IChunkHandler} for this query.
+     * 
+     * @see BLZG-533 Vector query engine on native heap.
+     */
+    final protected IChunkHandler getChunkHandler() {
+        return chunkHandler;
     }
 
 }

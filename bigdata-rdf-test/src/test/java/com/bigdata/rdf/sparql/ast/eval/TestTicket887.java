@@ -25,14 +25,12 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 
 /**
- * Test suite for a hesienbug involving BIND. Unlike the other issues this
+ * Test suite for a heisenbug involving BIND. Unlike the other issues this
  * sometimes happens, and is sometimes OK, so we run the test in a loop 20
  * times.
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/708">
  *      Heisenbug </a>
- * 
- * @version $Id$
  */
 public class TestTicket887 extends AbstractDataDrivenSPARQLTestCase {
 

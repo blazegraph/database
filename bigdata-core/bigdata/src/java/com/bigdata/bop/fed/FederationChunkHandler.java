@@ -128,7 +128,6 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
     private final boolean usePOJO;
 
     /**
-     * 
      * @param nioThreshold
      *            The threshold above which the intermediate solutions are
      *            shipped using NIO rather than RMI. This is ignored if
@@ -139,6 +138,12 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
      *            specific logic in the {@link IChunkMessage} serialization.
      */
     public FederationChunkHandler(final int nioThreshold, final boolean usePOJO) {
+        
+        /*
+         * Note: The use of the native heap storage of the solutions in
+         * combination with scale-out is untested.
+         */
+        super(false/*nativeHeap*/);
         
         this.nioThreshold = nioThreshold;
         

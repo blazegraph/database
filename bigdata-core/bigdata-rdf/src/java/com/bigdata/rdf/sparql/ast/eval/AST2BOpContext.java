@@ -33,8 +33,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
@@ -43,6 +41,7 @@ import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.SimpleIdFactory;
+import com.bigdata.bop.engine.IChunkHandler;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.StaticAnalysisStats;
@@ -189,6 +188,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * @see QueryHints#NATIVE_DISTINCT_SOLUTIONS
      */
     public boolean nativeDistinctSolutions = QueryHints.DEFAULT_NATIVE_DISTINCT_SOLUTIONS;
+
+    /**
+     * Controls whether the intermediate solution chunks on the query engine
+     * operator input queues are stored on the native heap and/or the managed
+     * object heap.
+     * 
+     * @see QueryHints#QUERY_ENGINE_CHUNK_HANDLER
+     * @see BLZG-533 (Vector query engine on native heap)
+     */
+    public IChunkHandler queryEngineChunkHandler = QueryHints.DEFAULT_QUERY_ENGINE_CHUNK_HANDLER;
 
     /**
      * 

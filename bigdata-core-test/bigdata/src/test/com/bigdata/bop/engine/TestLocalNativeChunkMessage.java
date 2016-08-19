@@ -33,34 +33,87 @@ import java.util.List;
 import java.util.UUID;
 
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.DefaultQueryAttributes;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.striterator.Dechunkerator;
 
 import junit.framework.TestCase2;
 
 /**
- * Test suite for {@link LocalChunkMessage}.
+ * Test suite for {@link LocalNativeChunkMessage}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestLocalChunkMessage extends TestCase2 {
+public class TestLocalNativeChunkMessage extends TestCase2 {
 
     /**
      * 
      */
-    public TestLocalChunkMessage() {
+    public TestLocalNativeChunkMessage() {
     }
 
     /**
      * @param name
      */
-    public TestLocalChunkMessage(String name) {
+    public TestLocalNativeChunkMessage(String name) {
         super(name);
     }
 
+    private MemoryManager mmgr;
+    private IQueryContext queryContext;
+    private IQueryClient queryController;
+    private UUID queryId;
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        queryController = new MockQueryController();
+        queryId = UUID.randomUUID();
+        mmgr = new MemoryManager(DirectBufferPool.INSTANCE, 1/* nsectors */);
+        queryContext = new IQueryContext() {
+
+            private final IQueryAttributes queryAttributes = new DefaultQueryAttributes();
+            
+            @Override
+            public UUID getQueryId() {
+                return queryId;
+            }
+
+            @Override
+            public IMemoryManager getMemoryManager() {
+                return mmgr;
+            }
+
+            @Override
+            public IQueryAttributes getAttributes() {
+                return queryAttributes;
+            }
+            
+        };
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        queryController = null;
+        queryId = null;
+        if (mmgr != null) {
+            mmgr.close();
+            mmgr = null;
+        }
+        queryContext = null;
+        super.tearDown();
+    }
+    
     /**
      * Unit test for a message with a single chunk containing a single empty
      * binding set.
@@ -69,27 +122,17 @@ public class TestLocalChunkMessage extends TestCase2 {
 
         final List<IBindingSet> data = new LinkedList<IBindingSet>();
         {
-            data.add(new HashBindingSet());
+            data.add(new ListBindingSet());
         }
         
-        final IQueryClient queryController = new MockQueryController();
-        final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
-//        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
-//                10);
-//
-//        // populate the source.
-//        source.add(data.toArray(new IBindingSet[0]));
-//        
-//        // close the source.
-//        source.close();
         
         final IBindingSet[] source = data.toArray(new IBindingSet[0]);
         
         // build the chunk.
-        final IChunkMessage<IBindingSet> msg = new LocalChunkMessage(
-                queryController, queryId, bopId, partitionId, source);
+        final IChunkMessage<IBindingSet> msg = new LocalNativeChunkMessage(
+                queryController, queryId, bopId, partitionId, queryContext, source);
 
         assertTrue(queryController == msg.getQueryController());
 
@@ -112,6 +155,7 @@ public class TestLocalChunkMessage extends TestCase2 {
     /**
      * Unit test for a message with a single chunk of binding sets.
      */
+    @SuppressWarnings("rawtypes")
     public void test_oneChunk() {
 
         final Var<?> x = Var.var("x");
@@ -121,62 +165,52 @@ public class TestLocalChunkMessage extends TestCase2 {
         {
             IBindingSet bset = null;
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("John"));
-                bset.set(y, new Constant<String>("Mary"));
+                bset = new ListBindingSet();
+                bset.set(x, new Constant<IV>(new FullyInlineTypedLiteralIV("John")));
+                bset.set(y, new Constant<IV>(new FullyInlineTypedLiteralIV("Mary")));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Mary"));
-                bset.set(y, new Constant<String>("Paul"));
+                bset = new ListBindingSet();
+                bset.set(x, new Constant<IV>(new FullyInlineTypedLiteralIV("Mary")));
+                bset.set(y, new Constant<IV>(new FullyInlineTypedLiteralIV("Paul")));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Mary"));
-                bset.set(y, new Constant<String>("Jane"));
+                bset = new ListBindingSet();
+                bset.set(x, new Constant<IV>(new FullyInlineTypedLiteralIV("Mary")));
+                bset.set(y, new Constant<IV>(new FullyInlineTypedLiteralIV("Jane")));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Paul"));
-                bset.set(y, new Constant<String>("Leon"));
+                bset = new ListBindingSet();
+                bset.set(x, new Constant<IV>(new FullyInlineTypedLiteralIV("Paul")));
+                bset.set(y, new Constant<IV>(new FullyInlineTypedLiteralIV("Leon")));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Paul"));
-                bset.set(y, new Constant<String>("John"));
+                bset = new ListBindingSet();
+                bset.set(x, new Constant<IV>(new FullyInlineTypedLiteralIV("Paul")));
+                bset.set(y, new Constant<IV>(new FullyInlineTypedLiteralIV("John")));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Leon"));
-                bset.set(y, new Constant<String>("Paul"));
+                bset = new ListBindingSet();
+                bset.set(x, new Constant<IV>(new FullyInlineTypedLiteralIV("Leon")));
+                bset.set(y, new Constant<IV>(new FullyInlineTypedLiteralIV("Paul")));
                 data.add(bset);
             }
 
         }
         
-        final IQueryClient queryController = new MockQueryController();
-        final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
-//        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
-//                10);
-//
-//        // populate the source.
-//        source.add(data.toArray(new IBindingSet[0]));
-//        
-//        // close the source.
-//        source.close();
-//        
+
         final IBindingSet[] source = data.toArray(new IBindingSet[0]);
         
         // build the chunk.
-        final IChunkMessage<IBindingSet> msg = new LocalChunkMessage(
-                queryController, queryId, bopId, partitionId, source);
+        final IChunkMessage<IBindingSet> msg = new LocalNativeChunkMessage(
+                queryController, queryId, bopId, partitionId, queryContext, source);
 
         assertTrue(queryController == msg.getQueryController());
 

@@ -41,6 +41,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -54,7 +55,6 @@ import com.bigdata.bop.join.IDistinctFilter;
 import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp.Annotations;
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -208,14 +208,34 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
          * up a distinct filter for these variables (this is necessary
          * because the ArbitraryLengthPath operator as defined by the W3C
          * returns distinct solutions only.
+         * 
+         * As per the changes introduced in https://jira.blazegraph.com/browse/BLZG-2042,
+         * we also need to consider variables-constant hybrids, i.e. variables that are
+         * represented as constants because they are known to be statically bound to a
+         * given value.
          */
         varsToRetain = new LinkedHashSet<IVariable<?>>();
-        if (leftVar != null)
+        if (leftVar != null) {
             varsToRetain.add(leftVar);
-        if (rightVar != null)
+        } else {
+            final IVariable<?> leftVarInConst = getConstantHybridVariable(leftConst);
+            if (leftVarInConst!=null) {
+                varsToRetain.add(leftVarInConst);
+            }
+        }
+        
+        if (rightVar != null) {
             varsToRetain.add(rightVar);
+        } else {
+            final IVariable<?> rightVarInConst = getConstantHybridVariable(rightConst);
+            if (rightVarInConst!=null) {
+                varsToRetain.add(rightVarInConst);
+            }
+        }
+         
         if (edgeVar != null)
             varsToRetain.add(edgeVar);
+        
         varsToRetain.addAll(projectInVars);
         final IVariable<?>[] varsToRetainList = varsToRetain
                 .toArray(new IVariable<?>[varsToRetain.size()]);
@@ -981,6 +1001,27 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
         IBindingSet bset = bs.clone();
 
         /*
+         * Handle the cases where we have hybrid constant-variable input or
+         * output variables. In that case, the binding for the respective
+         * variable is the constant that it reflects, and we need to add
+         * this binding to the binding set
+         * 
+         * See https://jira.blazegraph.com/browse/BLZG-2042.
+         */
+        if (gearing.inVar==null) {
+            final IVariable<?> constantHybridVar = getConstantHybridVariable(gearing.inConst);
+            if (constantHybridVar!=null) {
+                bset.set(constantHybridVar, gearing.inConst);
+            }
+        }
+        if (gearing.outVar==null) {
+            final IVariable<?> constantHybridVar = getConstantHybridVariable(gearing.outConst);
+            if (constantHybridVar!=null) {
+                bset.set(constantHybridVar, gearing.outConst);
+            }
+        }
+
+        /*
          * Set the binding for the outVar if necessary.
          */
         if (gearing.outVar != null) {
@@ -1013,6 +1054,20 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
 
             out.add(bset);
         }
+    }
+
+
+    /**
+     * Returns the variable hidden behind the constant if the constant is a
+     * constant-variable hybrid. Returns null in all other cases (also if the
+     * input constant is null).
+     * 
+     * @param c the constant
+     * @return the variable contained possibly in the constant, null otherwise
+     */
+    private IVariable<?> getConstantHybridVariable(final IConstant c) {
+     
+        return c instanceof Constant ? ((Constant<?>) c).getVar() : null;
     }
 
     /**

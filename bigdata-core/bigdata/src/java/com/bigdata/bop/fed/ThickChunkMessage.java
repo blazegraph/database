@@ -61,7 +61,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * RDF layer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ThickChunkMessage<E> implements IChunkMessage<E>, Externalizable {
 
@@ -272,6 +271,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Externalizable {
 
         }
 
+        @Override
         public ICloseableIterator<E[]> iterator() {
 
             return source;

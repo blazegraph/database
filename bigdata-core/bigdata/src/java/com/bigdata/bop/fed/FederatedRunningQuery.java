@@ -46,18 +46,15 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.service.IBigdataFederation;
 
 /**
- * Extends {@link ChunkedRunningQuery} to provide additional state and logic required
- * to support distributed query evaluation against an {@link IBigdataFederation}
- * .
+ * Extends {@link ChunkedRunningQuery} to provide additional state and logic
+ * required to support distributed query evaluation against an
+ * {@link IBigdataFederation} .
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: FederatedRunningQuery.java 3511 2010-09-06 20:45:37Z
- *          thompsonbry $
  */
 public class FederatedRunningQuery extends ChunkedRunningQuery {
 
@@ -70,11 +67,6 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
      */
     /*private*/ final UUID queryControllerUUID;
     
-    /**
-     * Used to map {@link IBindingSet}s across the federation.
-     */
-    private final IChunkHandler chunkHandler;
-
     /**
      * A map of all allocation contexts associated with this query.
      * 
@@ -178,10 +170,6 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
 
         this.queryControllerUUID = queryControllerId;
 
-        this.chunkHandler = query.getProperty(
-                FederatedQueryEngine.Annotations.CHUNK_HANDLER,
-                FederationChunkHandler.INSTANCE);
-        
         if (!getQuery().getEvaluationContext().equals(
                 BOpEvaluationContext.CONTROLLER)) {
 
@@ -348,11 +336,13 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
         return cancelled;
 
     }
-
+ 
     @Override
-    protected IChunkHandler getChunkHandler() {
+    protected IChunkHandler getChunkHandler(final QueryEngine queryEngine, final PipelineOp query) {
         
-        return chunkHandler;
+        return query.getProperty(
+                QueryEngine.Annotations.CHUNK_HANDLER,
+                FederationChunkHandler.INSTANCE);
         
     }
 

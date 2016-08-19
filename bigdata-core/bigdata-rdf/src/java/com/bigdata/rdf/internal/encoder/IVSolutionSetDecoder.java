@@ -57,7 +57,6 @@ import com.bigdata.util.BytesUtil;
  * Decoder for {@link IVSolutionSetEncoder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class IVSolutionSetDecoder implements IBindingSetDecoder {
 

@@ -77,6 +77,7 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -1239,7 +1240,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
                 int lastRowId = 0; 
                 while (itr.hasNext()) {
                     bset = itr.next();
-                    final int rowid = ((Integer) bset.get(rtoVar).get())
+                    final int rowid = ((XSDNumericIV) bset.get(rtoVar).get())
                             .intValue();
 //log.warn("rowId="+rowid+",lastRowId="+lastRowId+",bset="+bset);
                     if (rowid < lastRowId && failOutOfOrderEvaluation) {
@@ -1492,7 +1493,7 @@ public class AST2BOpRTO extends AST2BOpJoins {
 
             final IBindingSet bset = in[i].clone();
 
-            bset.set(var, new Constant<Integer>(Integer.valueOf(start + i)));
+            bset.set(var, new Constant<IV>(new XSDNumericIV(start + i)));
 
             out[i] = bset;
 
