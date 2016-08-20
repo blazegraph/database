@@ -958,6 +958,7 @@ public class BigdataSail extends SailBase implements Sail {
         
         if(isOpen()) {
             
+            System.err.println("BigdataSail.finalize forced connection shutdown.");
             if (log.isInfoEnabled())
                 log.info("");
             
