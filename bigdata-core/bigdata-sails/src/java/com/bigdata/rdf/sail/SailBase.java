@@ -74,17 +74,6 @@ public abstract class SailBase implements Sail {
 	 */
 	private volatile boolean initialized = false;
 
-    protected enum RunstateEnum {
-        /** We do not know whether or not the namespace uses isolated indices. */
-        Inactive,
-        /** We do not know whether or not the namespace uses isolated indices. */
-        Active,
-        /** The namespace uses isolated indices. */
-        Shutdown
-    }
-    
-    protected RunstateEnum runstate = RunstateEnum.Inactive;
-    
 	/**
 	 * Lock used to synchronize the initialization state of a sail.
 	 * <ul>
@@ -101,11 +90,11 @@ public abstract class SailBase implements Sail {
 	protected volatile long connectionTimeOut = DEFAULT_CONNECTION_TIMEOUT;
 
 	static class ConnectionContext {
-		final Thread thread;
+//		final Thread thread;
 		final Throwable trace;
 		
-		ConnectionContext(Thread thread, Throwable trace) {
-			this.thread = thread;
+		ConnectionContext(/*Thread thread,*/Throwable trace) {
+//			this.thread = thread;
 			this.trace = trace;
 		}
 	}
@@ -124,7 +113,7 @@ public abstract class SailBase implements Sail {
 			}
 			
 			final Throwable stackTrace = debugEnabled() ? new Throwable() : null;
-			activeConnections.put(cnxn, new ConnectionContext(Thread.currentThread(), stackTrace));
+			activeConnections.put(cnxn, new ConnectionContext(/*Thread.currentThread(),*/ stackTrace));
 		}
 	}
 
@@ -205,12 +194,6 @@ public abstract class SailBase implements Sail {
 				// Check if any active connections exist. If so, wait for a grace
 				// period for them to finish.
 				if (!activeConnections.isEmpty()) {
-					// Interrupt any Connection threads
-					for (ConnectionContext context : activeConnections.values()) {
-						if (context.thread != Thread.currentThread()) {
-							context.thread.interrupt();
-						}
-					}
 					logger.debug("Waiting for active connections to close before shutting down...");
 					try {
 						activeConnections.wait(DEFAULT_CONNECTION_TIMEOUT);

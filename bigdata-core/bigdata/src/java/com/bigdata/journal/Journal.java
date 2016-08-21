@@ -68,6 +68,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.concurrent.AccessSemaphore;
+import com.bigdata.concurrent.AccessSemaphore.Access;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -4258,69 +4260,33 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 * operations on the low level indices and commit/abort processing while it
 	 * holds the permit.
 	 * <p>
-	 * Note: If by some chance the permit has become "lost" it can be rebalanced
-	 * by {@link Semaphore#release()}. However, uses of this {@link Semaphore}
-	 * should ensure that it is release along all code paths, including a
-	 * finalizer if necessary.
+	 * An AccessSemaphore that implements an Exclusive/SharedAccess idiom is used
+	 * to ensure exclusive Unisolated access and shared ReadWrite.
 	 */   
-	private final Semaphore unisolatedSemaphore = new Semaphore(1/* permits */,
-			false/* fair */);
+	private final AccessSemaphore accessSemaphore = new AccessSemaphore(Integer.MAX_VALUE/* max shared */);
 
 	/**
-	 * Acquire a permit for the UNISOLATED connection.
+	 * Acquire an Access object for the UNISOLATED connection.
 	 * 
 	 * @throws InterruptedException
 	 */
-	public void acquireUnisolatedConnection() throws InterruptedException {
+	public Access acquireUnisolatedConnectionAccess() throws InterruptedException {
 
-		unisolatedSemaphore.acquire();
-
-		if (log.isDebugEnabled())
-			log.debug("acquired semaphore: availablePermits="
-					+ unisolatedSemaphore.availablePermits());
-
-		if (unisolatedSemaphore.availablePermits() != 0) {
-			/*
-			 * Note: This test can not be made atomic with the Semaphore API. It
-			 * is possible unbalanced calls to release() could drive the #of
-			 * permits in the Semaphore above ONE (1) since the Semaphore
-			 * constructor does not place an upper bound on the #of permits, but
-			 * rather sets the initial #of permits available. An attempt to
-			 * acquire a permit which has a post-condition with additional
-			 * permits available will therefore "eat" a permit.
-			 */
-			throw new IllegalStateException();
-		}
-
+		return accessSemaphore.acquireExclusive();
 	}
 
 	/**
-	 * Release the permit for the UNISOLATED connection.
+	 * Acquire an Access for a read/write isolated transaction.
 	 * 
-	 * @throws IllegalStateException
-	 *             unless the #of permits available is zero.
+	 * @see BLZG-2041
 	 */
-	public void releaseUnisolatedConnection() {
-
-		if (log.isDebugEnabled())
-			log.debug("releasing semaphore: availablePermits="
-					+ unisolatedSemaphore.availablePermits());
-
-		if (unisolatedSemaphore.availablePermits() != 0) {
+	public Access acquireReadWriteConnectionAccess() throws InterruptedException {
 			/*
-			 * Note: This test can not be made atomic with the Semaphore API. It
-			 * is possible that a concurrent call could drive the #of permits in
-			 * the Semaphore above ONE (1) since the Semaphore constructor does
-			 * not place an upper bound on the #of permits, but rather sets the
-			 * initial #of permits available.
+	     * Multiple ReadWrites are permitted shared access
 			 */
-			throw new IllegalStateException();
-		}
-
-		unisolatedSemaphore.release();
-
+		return accessSemaphore.acquireShared();
 	}
-
+	
 	@Override
 	public boolean isHAJournal() {
 		return false;

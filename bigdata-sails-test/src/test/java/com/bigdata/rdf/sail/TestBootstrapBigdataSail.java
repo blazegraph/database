@@ -60,6 +60,7 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.util.InnerCause;
+import com.bigdata.concurrent.AccessSemaphore.AccessSemaphoreNotReentrantException;
 
 /**
  * Bootstrap test case for bringing up the {@link BigdataSail}.
@@ -508,7 +509,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 			} catch (ExecutionException e) {
 
-                if (InnerCause.isInnerCause(e, UnisolatedConnectionNotReentrantException.class)) {
+                if (InnerCause.isInnerCause(e, AccessSemaphoreNotReentrantException.class)) {
                     /*
                      * This is the expected outcome.
                      */
@@ -568,7 +569,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 		try {
 
 			sail.initialize();
-			service = Executors.newSingleThreadExecutor();
+			service = Executors.newFixedThreadPool(3/*threads*/);
 
 			// wrap a 2nd sail around a different tripleStore.
 			final BigdataSail sail2;
@@ -590,65 +591,50 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 			}
 
-			Future<Void> f = null;
 
 			try {
 
-				final Callable<Void> task = new Callable<Void>() {
+				final Callable<SailConnection> task = new Callable<SailConnection>() {
 
-					public Void call() throws Exception {
+					public SailConnection call() throws Exception {
 
 						SailConnection conn1 = null;
-						SailConnection conn2 = null;
-
-						try {
 
 							log.info("Requesting 1st unisolated connection.");
 
 							conn1 = sail.getUnisolatedConnection();
-
-							log.info("Requesting 2nd unisolated connection.");
-
-							conn2 = sail2.getUnisolatedConnection();
-
-							fail("Not expecting a 2nd unisolated connection");
-
-							return (Void) null;
-
-						} finally {
-
-							if (conn1 != null)
-								conn1.close();
-
-							if (conn2 != null)
-								conn2.close();
-
-						}
+							
+							return conn1;
 					}
 
 				};
 
 				// run task. it should block when attempting to get the 2nd
-				// connection.
-				f = service.submit(task);
+				// connection (on a different thread)
+				Future<SailConnection> f1 = service.submit(task);
+				Future<SailConnection> f2 = service.submit(task);
 
 				// wait up to a timeout to verify that the task blocked rather
 				// than acquiring the 2nd connection.
-				f.get(250, TimeUnit.MILLISECONDS);
-
+				try {
+					f2.get(250, TimeUnit.MILLISECONDS);	
 			} catch (TimeoutException e) {
-
 				/*
 				 * This is the expected outcome.
 				 */
 				log.info("timeout");
+				}
+				
+				f1.get().close();
+				
+				// Now we can get the second connection
+				try {
+					f2.get(250, TimeUnit.MILLISECONDS).close();	
+				} catch (TimeoutException e) {
+					fail("Should have been able to get second connection");
+				}
 
 			} finally {
-
-				if (f != null) {
-					// Cancel task.
-					f.cancel(true/* mayInterruptIfRunning */);
-				}
 
 				if (sail2 != null)
 					sail2.shutDown();

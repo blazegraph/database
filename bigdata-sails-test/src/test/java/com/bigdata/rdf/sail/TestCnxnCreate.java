@@ -106,17 +106,12 @@ public class TestCnxnCreate extends ProxyBigdataSailTestCase {
             
             assertTrue(rocnxn.isOpen());
             
-            final BigdataSailConnection rwcnxn = sail.getReadWriteConnection();
-            
-            assertTrue(rwcnxn.isOpen());
-            
             sail.shutDown();
             
             log.info("done - sail.shutDown()");
             
             assertTrue(!uicnxn.isOpen());
             assertTrue(!rocnxn.isOpen());
-            assertTrue(!rwcnxn.isOpen());
             
 
         } finally {
