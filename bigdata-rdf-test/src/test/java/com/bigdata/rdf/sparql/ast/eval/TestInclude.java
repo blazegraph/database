@@ -48,6 +48,7 @@ import com.bigdata.bop.join.HashIndexOp;
 import com.bigdata.bop.join.NestedLoopJoinOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.SolutionSetHashJoinOp;
+import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
@@ -356,8 +357,11 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
+        // top level should be chunked materialization operator
+        assertTrue(queryPlan instanceof ChunkedMaterializationOp);
+        
         // top level should be the PROJECTION operator.
-        final PipelineOp projectionOp = (PipelineOp) queryPlan;
+        final PipelineOp projectionOp = (PipelineOp) queryPlan.get(0);
         assertTrue(projectionOp instanceof ProjectionOp);
 
         // sole argument should be the PIPELINE JOIN operator.
@@ -528,12 +532,15 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 //                    com.bigdata.bop.join.PipelineJoin[3]()[ com.bigdata.bop.BOp.bopId=3, com.bigdata.bop.join.JoinAnnotations.constraints=null, com.bigdata.bop.BOp.evaluationContext=ANY, com.bigdata.bop.join.AccessPathJoinAnnotations.predicate=SPOPredicate[1]]
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        // top level should be chunked materialization operator
+        assertTrue(queryPlan instanceof ChunkedMaterializationOp);
         
         // top level should be the PROJECTION operator.
-        assertTrue(queryPlan instanceof ProjectionOp);
+        assertTrue(queryPlan.get(0) instanceof ProjectionOp);
 
         // sole argument should be the SOLUTION SET HASH JOIN operator.
-        final PipelineOp solutionSetHashJoinOp = (PipelineOp) queryPlan.get(0);
+        final PipelineOp solutionSetHashJoinOp = (PipelineOp) queryPlan.get(0).get(0);
 
         assertTrue(solutionSetHashJoinOp instanceof SolutionSetHashJoinOp);
 
