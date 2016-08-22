@@ -86,7 +86,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @see TestASTQueryHintOptimizer
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  *          TODO Unit test to verify that hint:optimistic actually changes the
  *          value so the query runs differently (that is, test the query hint

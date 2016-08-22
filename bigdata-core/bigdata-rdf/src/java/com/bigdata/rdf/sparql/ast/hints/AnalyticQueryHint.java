@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.hints;
 
+import com.bigdata.bop.engine.NativeHeapStandloneChunkHandler;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.bop.join.JVMHashJoinUtility;
@@ -65,6 +66,7 @@ final class AnalyticQueryHint extends AbstractBooleanQueryHint {
             context.nativeHashJoins = value;
             context.nativeDistinctSolutions = value;
             context.nativeDistinctSPO = value;
+            context.queryEngineChunkHandler = NativeHeapStandloneChunkHandler.NATIVE_HEAP_INSTANCE;
             return;
         }
 

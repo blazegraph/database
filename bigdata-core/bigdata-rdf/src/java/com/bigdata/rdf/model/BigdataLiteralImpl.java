@@ -59,7 +59,6 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
  * A literal. Use {@link BigdataValueFactory} to create instances of this class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataLiteralImpl extends BigdataValueImpl implements
         BigdataLiteral {
@@ -84,8 +83,8 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         if (label == null)
             throw new IllegalArgumentException();
 
-        if (language != null && datatype != null)
-            throw new IllegalArgumentException();
+//        if (language != null && datatype != null)
+//            throw new IllegalArgumentException();
         
         this.label = label;
         
@@ -97,6 +96,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         
     }
 
+    @Override
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
@@ -127,35 +127,53 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         
     }
     
+    @Override
     public String stringValue() {
        
         return label;
         
     }
 
+    @Override
     final public String getLabel() {
 
         return label;
         
     }
 
+    @Override
     final public String getLanguage() {
 
         return language;
         
     }
 
+    @Override
     final public BigdataURI getDatatype() {
 
         return datatype;
         
     }
 
-    final public int hashCode() {
-        
-        return label.hashCode();
+    /**
+     * @OpenRDF
+     * This is directly copied from LiteralImpl.hashCode() and should be the same as effective Sesame version.
+     * Usecases include for example putting LiteralImpl instances into Set or HashMap and then using BigdataLiteralImpl
+     * to check existance of the item in the Set or retrieve value from HashMap.
+     * @See https://www.w3.org/TR/rdf11-concepts/#dfn-literal-term-equality
+     */
+	@Override
+	public int hashCode() {
+		int hashCode = label.hashCode();
+		if (language != null) {
+			hashCode = 31 * hashCode + language.hashCode();
+		}
+		if (datatype != null) {
+			hashCode = 31 * hashCode + datatype.hashCode();
         
     }
+		return hashCode;
+	}
     
     final public boolean equals(Object o) {
 
@@ -215,60 +233,70 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
      * XSD stuff.
      */
     
+    @Override
     final public boolean booleanValue() {
 
         return XMLDatatypeUtil.parseBoolean(label);
 
     }
 
+    @Override
     final public byte byteValue() {
 
         return XMLDatatypeUtil.parseByte(label);
 
     }
 
+    @Override
     final public short shortValue() {
 
         return XMLDatatypeUtil.parseShort(label);
 
     }
 
+    @Override
     final public int intValue() {
 
         return XMLDatatypeUtil.parseInt(label);
 
     }
 
+    @Override
     final public long longValue() {
 
         return XMLDatatypeUtil.parseLong(label);
 
     }
 
+    @Override
     final public float floatValue() {
 
         return XMLDatatypeUtil.parseFloat(label);
 
     }
 
+    @Override
     final public double doubleValue() {
 
         return XMLDatatypeUtil.parseDouble(label);
 
     }
 
+    @Override
     final public BigInteger integerValue() {
 
         return XMLDatatypeUtil.parseInteger(label);
 
     }
 
+    @Override
     final public BigDecimal decimalValue() {
 
         return XMLDatatypeUtil.parseDecimal(label);
 
     }
 
+    @Override
     final public XMLGregorianCalendar calendarValue() {
 
         return XMLDatatypeUtil.parseCalendar(label);

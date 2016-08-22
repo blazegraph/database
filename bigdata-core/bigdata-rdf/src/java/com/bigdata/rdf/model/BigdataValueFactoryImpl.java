@@ -43,6 +43,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.BooleanLiteralImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
@@ -237,6 +238,11 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     }
 
     @Override
+    public String toString() {
+        return super.toString()+"{namespace="+namespace+"}";
+    }
+    
+    @Override
     public BNodeContextFactory newBNodeContext() {
 
         return new BNodeContextFactory(this);
@@ -364,6 +370,9 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private final BigdataURIImpl xsd_boolean = new BigdataURIImpl(this, xsd
             + "boolean");
 
+    private final BigdataURIImpl rdf_langstring = new BigdataURIImpl(this,
+    		RDF.LANGSTRING.stringValue());
+
 //    private final BigdataLiteralImpl TRUE = new BigdataLiteralImpl(this, "true", null,
 //            xsd_boolean);
 //
@@ -385,7 +394,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
 		final BigdataURIImpl[] a = new BigdataURIImpl[] { xsd_string,
 				xsd_dateTime, xsd_date, xsd_long, xsd_int, xsd_byte, xsd_short,
-				xsd_double, xsd_float, xsd_boolean };
+				xsd_double, xsd_float, xsd_boolean, rdf_langstring };
 
 		for (BigdataURIImpl x : a) {
 

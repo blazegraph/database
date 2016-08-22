@@ -81,7 +81,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
  * suites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
@@ -232,8 +231,7 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         inlineIV3.setValue((BigdataLiteral) valueFactory.createLiteral("2",
                 XSD.SHORT));
         
-        inlineIV4 = XSDBooleanIV.TRUE;
-        
+        inlineIV4 = XSDBooleanIV.valueOf(true);
         
         fullyInlinedTypedLiteralIV = 
             new FullyInlineTypedLiteralIV<>("Test 123", null, null);
@@ -264,6 +262,7 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         
     }
 
+    @Override
     protected void tearDown() throws Exception {
         
         super.tearDown();
@@ -303,13 +302,19 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
                 
     }
 
-    protected void doEncodeDecodeTest(final IBindingSet expected) {
+    protected IBindingSet doEncodeDecodeTest(final IBindingSet expected) {
 
-        doEncodeDecodeTest(expected, testCache);
+        return doEncodeDecodeTest(expected, testCache);
 
     }
 
-    protected void doEncodeDecodeTest(final IBindingSet expected,
+    /**
+     * 
+     * @param expected
+     * @param testCache
+     * @return The decoded binding set.
+     */
+    protected IBindingSet doEncodeDecodeTest(final IBindingSet expected,
             final boolean testCache) {
 
         final byte[] data = encoder.encodeSolution(expected);
@@ -326,6 +331,8 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
                     data.length/* len */, true/* resolveCachedValues */);
 
             assertEquals(expected, actual, testCache);
+        
+            return actual;
         
         } else  {
 
@@ -349,6 +356,8 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
             assertEquals(expected, actual2, testCache);
 
+            return actual2;
+            
         }
         
     }
@@ -943,7 +952,6 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         doEncodeDecodeTest(expected);
 
     }
-
     
     public void testUriExtensionIV() {
         
@@ -1129,4 +1137,32 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
     }
 
+    /**
+     * This issue showed up as part of BLZG-533 (vector query engine on native
+     * heap) where the flags bits (which indicate URI or BNode or Literal) were
+     * not being preserved for a MockIV.
+     * 
+     * @see BLZG-2051 SolutionSetStream incorrectly decodes VTE of MockIVs
+     */
+    @SuppressWarnings("unchecked")
+    public void test_solutionWithMockIVsPreservesFlagsBits() {
+
+        final IBindingSet expected = new ListBindingSet();
+
+        expected.set(Var.var("z"), new Constant<IV<?, ?>>(mockIV3));
+        expected.set(Var.var("d"), new Constant<IV<?, ?>>(mockIVCarryingUri));
+        expected.set(Var.var("e"), new Constant<IV<?, ?>>(mockIVCarryingBNode));
+
+        final IBindingSet decoded = doEncodeDecodeTest(expected);
+        
+        final Constant<IV<?,?>> zval = (Constant<IV<?, ?>>) decoded.get(Var.var("z"));
+        final Constant<IV<?,?>> dval = (Constant<IV<?, ?>>) decoded.get(Var.var("d"));
+        final Constant<IV<?,?>> eval = (Constant<IV<?, ?>>) decoded.get(Var.var("e"));
+        
+        assertEquals(mockIV3.flags(), zval.get().flags());
+        assertEquals(mockIVCarryingUri.flags(), dval.get().flags());
+        assertEquals(mockIVCarryingBNode.flags(), eval.get().flags());
+        
+    }
+    
 }

@@ -35,7 +35,6 @@ import com.bigdata.relation.rule.IRule;
  * comprised of more than one {@link IRule}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestUnion extends AbstractRuleTestCase {
 

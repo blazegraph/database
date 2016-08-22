@@ -40,13 +40,12 @@ import java.util.List;
 import java.util.UUID;
 
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.impl.AbstractIV;
-import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
@@ -87,6 +86,8 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
  * Helper class for {@link IV}s.
+ * 
+ * @openrdf
  */
 /*
  * Note: There are a huge number of warnings in this class, all of which are
@@ -416,8 +417,10 @@ public class IVUtility {
                     if(nullIsNullRef) {
                         return null;
                     }
-                    // Return a "mock" IV consistent with the VTE flags.
-                    return TermId.mockIV(VTE.valueOf(flags));
+                    // Return a "mock" IV consistent with the VTE flags. 
+                    // See BLZG-2051 SolutionSetStream incorrectly decodes VTE of MockIVs
+                    return TermId.mockIV(AbstractIV.getInternalValueTypeEnum(flags));
+//                    return TermId.mockIV(VTE.valueOf(flags));
                 } else {
                     return new TermId(flags, termId);
                 }
@@ -625,8 +628,10 @@ public class IVUtility {
         switch (dte) {
         case XSDBoolean: {
             final byte x = KeyBuilder.decodeByte(key[o]);
-            final AbstractLiteralIV iv = (x == 0) ? 
-                    XSDBooleanIV.FALSE : XSDBooleanIV.TRUE;
+            final boolean isTrue = (x != 0);
+            final AbstractLiteralIV iv = XSDBooleanIV.valueOf(isTrue);
+//            final AbstractLiteralIV iv = (x == 0) ? 
+//                    XSDBooleanIV.FALSE : XSDBooleanIV.TRUE;
             return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDByte: {
@@ -886,7 +891,7 @@ public class IVUtility {
             iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(//
                     str2,//
                     str1, // language
-                    null, // datatype
+                    RDF.LANGSTRING, // implied datatype
                     byteLength//
                     );
             break;

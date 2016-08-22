@@ -592,12 +592,7 @@ public class ASTDeferredIVResolutionInitializer extends ASTVisitorBase {
         final DTE dte = Enum.valueOf(DTE.class, type);
         switch (dte) {
         case XSDBoolean: {
-            final boolean b = Boolean.valueOf(val);
-            if (b) {
-                return XSDBooleanIV.TRUE;
-            } else {
-                return XSDBooleanIV.FALSE;
-            }
+            return XSDBooleanIV.valueOf((Boolean.valueOf(val)));
         }
         case XSDByte: {
             final byte x = Byte.valueOf(val);

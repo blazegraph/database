@@ -481,7 +481,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements P
                      if (outSolution!=null) {
                         if (askVar!=null) {
                            outSolution.set(
-                              askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.TRUE));
+                              askVar, new Constant<XSDBooleanIV<?>>(XSDBooleanIV.valueOf(true)));
                         }
                         outputSolution(outputBuffer, outSolution);
                      }
@@ -516,8 +516,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements P
               if (askVar!=null) {
                  left.set(
                     askVar, 
-                    new Constant<XSDBooleanIV<?>>(
-                       matchExists ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE));
+                    new Constant<XSDBooleanIV<?>>(XSDBooleanIV.valueOf(matchExists)));
                 outputSolution(outputBuffer, left);
               }
               break;

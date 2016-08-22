@@ -42,8 +42,6 @@ import com.bigdata.rdf.internal.IV;
  * Test suite for {@link IVSolutionSetEncoder} and {@link IVSolutionSetDecoder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestIVSolutionSetEncoder.java 6033 2012-02-16 16:12:27Z
- *          thompsonbry $
  */
 public class TestIVSolutionSetEncoder extends AbstractBindingSetEncoderTestCase {
 
