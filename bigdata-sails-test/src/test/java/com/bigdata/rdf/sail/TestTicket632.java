@@ -26,6 +26,8 @@ package com.bigdata.rdf.sail;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
@@ -42,6 +44,7 @@ import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sparql.ast.eval.service.OpenrdfNativeMockServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
@@ -99,4 +102,15 @@ public class TestTicket632 extends QuadsTestCase {
             repo.shutDown();
         }
     }
+    
+    @Override
+    public Properties getProperties() {
+        
+        final Properties properties = getOurDelegate().getProperties();
+        
+        properties.setProperty(Options.NAMESPACE, "freshNamespace-"+UUID.randomUUID());
+        
+        return properties;
+    }
+
 }

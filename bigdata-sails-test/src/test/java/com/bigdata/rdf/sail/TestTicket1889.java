@@ -25,6 +25,8 @@ package com.bigdata.rdf.sail;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Properties;
+import java.util.UUID;
 
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
@@ -34,6 +36,8 @@ import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
+
+import com.bigdata.rdf.sail.BigdataSail.Options;
 
 /**
  * This test case covers 2 ArrayIndexOutOfBoundsException occurrences:
@@ -127,5 +131,15 @@ public class TestTicket1889 extends QuadsTestCase {
 			conn.close();
 		}
 	}
+	
+    @Override
+    public Properties getProperties() {
+        
+        final Properties properties = getOurDelegate().getProperties();
+        
+        properties.setProperty(Options.NAMESPACE, "freshNamespace-"+UUID.randomUUID());
+        
+        return properties;
+    }
 
 }
