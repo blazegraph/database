@@ -1,0 +1,3 @@
+<http://John> <http://fatherOf> <http://LittleJohn> .
+<http://John> <http://fatherOf> <http://LittleJona> .
+<http://LittleJona> <http://knows> <http://Pete> .
