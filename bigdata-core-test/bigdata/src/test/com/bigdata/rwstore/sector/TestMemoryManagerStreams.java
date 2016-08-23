@@ -170,6 +170,29 @@ public class TestMemoryManagerStreams extends TestCase {
 		assert manager.getSlotBytes() == 0;
 	}
 
+	public void testBlobStreamBoundaries() throws IOException, ClassNotFoundException {
+		int start = SectorAllocator.BLOB_SIZE-1;
+		int end = SectorAllocator.BLOB_SIZE*4 + 1;
+		
+		final byte[] data = new byte[end];
+		r.nextBytes(data);
+		
+		for (int n = start; n < end; n++) {
+			final IPSOutputStream out = manager.getOutputStream();
+			out.write(data, 0, n);
+			out.close();
+			long addr1 = out.getAddr();
+			InputStream instr = manager.getInputStream(addr1);
+			final byte[] indat = new byte[n];
+			instr.read(indat);
+			instr.close();
+			
+			manager.free(addr1);			
+		}
+		
+		assert manager.getSlotBytes() == 0;
+	}
+
 	public void testZipStreams() throws IOException, ClassNotFoundException {
 		IPSOutputStream out = manager.getOutputStream();
 		ObjectOutputStream outdat = new ObjectOutputStream(new GZIPOutputStream(out));

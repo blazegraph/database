@@ -21,18 +21,19 @@ public class PSInputStream extends InputStream {
 		int sze = mm.allocationSize(addr);
 		
 		if (sze > SectorAllocator.BLOB_SIZE) {
-			int buffers = 1 + sze/SectorAllocator.BLOB_SIZE;
+			int buffers = 1 + (sze-1)/SectorAllocator.BLOB_SIZE;
 			m_buffers = new ByteBuffer[buffers];
 			// blob header
 			ByteBuffer[] hdr = mm.get((addr & 0xFFFFFFFF00000000L) + ((buffers+1)*4));
 			
 			if (hdr.length > 1)
-				throw new IllegalStateException("Check header size assumptions");
+				throw new IllegalStateException("Check header size assumptions. header.length: " + hdr.length + " > 1");
 			
 			int rem = sze;
 			int hdrsze = hdr[0].getInt();
 			if (hdrsze != buffers) 
-				throw new IllegalStateException("Check blob header assumptions");
+				throw new IllegalStateException("Check blob header assumptions: hdrsize(" 
+						+ hdrsze + ") != buffers(" + buffers + ")");
 			
 			if (hdr[0].remaining() != (buffers*4))
 				throw new IllegalStateException("Check blob header assumptions, remaining: " 
