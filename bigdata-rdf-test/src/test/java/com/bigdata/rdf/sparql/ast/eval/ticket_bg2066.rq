@@ -1,0 +1,6 @@
+SELECT * WHERE
+{
+  ?s <http://fatherOf>* ?o.
+  MINUS { ?o <http://knows>* []. }
+  FILTER(?o != <http://LittleJohn> ).
+} LIMIT 10

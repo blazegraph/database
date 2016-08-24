@@ -194,7 +194,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
             
             final IJoinNode aJoinNode = (IJoinNode) child;
             
-            if (aJoinNode.isOptional()) {
+            if (aJoinNode.isOptional() || aJoinNode.isMinus()) {
                 /*
                  * Note: We do not attach filters to OPTIONAL joins here.
                  * 

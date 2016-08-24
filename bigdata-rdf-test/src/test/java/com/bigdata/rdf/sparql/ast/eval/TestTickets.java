@@ -2605,6 +2605,22 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            ).runTest();    
    }
 
+   
+   /**
+    * Ticket: https://jira.blazegraph.com/browse/BLZG-2066
+    * AssertionError in path query with MINUS 
+    * => testing a variant of the query given in the test case
+    */
+   public void test_ticket_2066() throws Exception {
+       
+       new TestHelper( 
+           "ticket_bg2066",     // test name
+           "ticket_bg2066.rq",  // query file
+           "ticket_bg2066.nt",  // data file
+           "ticket_bg2066.srx"  // result file
+           ).runTest();
+   }
+   
    /**
     * BLZG-911: FROM NAMED clause doesn't work properly
     */
@@ -2632,4 +2648,5 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "workbench1.srx"   // result file
            ).runTest();
    }
+
 }
