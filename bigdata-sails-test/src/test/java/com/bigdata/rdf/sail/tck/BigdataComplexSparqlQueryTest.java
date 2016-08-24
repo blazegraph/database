@@ -168,7 +168,7 @@ public class BigdataComplexSparqlQueryTest extends ComplexSPARQLQueryTest {
         
         final BigdataSail sail = new BigdataSail(props);
         
-        backend = sail.getDatabase().getIndexManager();
+        backend = sail.getIndexManager();
 
         return new BigdataSailRepository(sail);
 

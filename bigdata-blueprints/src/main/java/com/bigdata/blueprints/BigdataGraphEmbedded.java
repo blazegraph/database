@@ -31,13 +31,10 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
-import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -432,10 +429,11 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     protected List<IChangeRecord> materialize(final List<IChangeRecord> records) {
         
         try {
-            final AbstractTripleStore db = repo.getDatabase();
-
+            
             final List<IChangeRecord> materialized = new LinkedList<IChangeRecord>();
 
+            final AbstractTripleStore db = cxn().getTripleStore();
+            
             // collect up the ISPOs out of the unresolved change records
             final ISPO[] spos = new ISPO[records.size()];
             int i = 0;
@@ -481,6 +479,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionPrepare() {
+        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionPrepare();
         }
@@ -491,7 +490,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionCommited(final long commitTime) {
-        notifyRemoves();
+//        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionCommited(commitTime);
         }
@@ -502,7 +501,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionAborted() {
-        notifyRemoves();
+//        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionAborted();
         }
@@ -544,7 +543,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     
         final BigdataSailRepository repo = (BigdataSailRepository) this.getRepository();
         
-        final IIndexManager indexMgr = repo.getDatabase().getIndexManager();
+        final IIndexManager indexMgr = repo.getSail().getIndexManager();
         
         return indexMgr;
         

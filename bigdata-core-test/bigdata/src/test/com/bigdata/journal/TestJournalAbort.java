@@ -205,7 +205,7 @@ public class TestJournalAbort extends TestCase2 {
 	        btree.writeCheckpoint();
 	        jnl.commit();
 	        fail();
-        } catch (Exception e) {
+        } catch (Throwable e) {
         	
         	if(log.isInfoEnabled()) log.info("Expected exception", e);
         	

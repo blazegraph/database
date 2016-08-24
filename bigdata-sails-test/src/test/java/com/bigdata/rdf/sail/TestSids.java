@@ -109,7 +109,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -262,7 +262,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             {

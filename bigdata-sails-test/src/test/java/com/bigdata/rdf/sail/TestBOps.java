@@ -36,7 +36,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.util.language.LanguageTag;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
@@ -46,7 +45,6 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
-import org.semarglproject.vocab.XSD;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.store.BD;
@@ -130,7 +128,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -227,7 +225,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -316,7 +314,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -410,7 +408,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -514,7 +512,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {

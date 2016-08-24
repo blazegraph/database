@@ -1030,7 +1030,7 @@ The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
         
         if (delegate != null && delegate instanceof BigdataSailRepository) {
             
-            backend = ((BigdataSailRepository) delegate).getDatabase()
+            backend = ((BigdataSailRepository) delegate).getSail()
                             .getIndexManager();
             
         }

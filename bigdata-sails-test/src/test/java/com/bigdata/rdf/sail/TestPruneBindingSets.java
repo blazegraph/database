@@ -115,7 +115,7 @@ public class TestPruneBindingSets extends ProxyBigdataSailTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             {

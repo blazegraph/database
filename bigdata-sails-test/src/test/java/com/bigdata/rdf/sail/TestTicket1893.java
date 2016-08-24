@@ -652,8 +652,8 @@ public class TestTicket1893 extends
         
         loadData(cxn);
         
-        BigdataValueFactory vf = cxn.getValueFactory();
-        BigdataValue[] values = new BigdataValue[]{
+        final BigdataValueFactory vf = cxn.getValueFactory();
+        final BigdataValue[] values = new BigdataValue[]{
                 vf.createURI("http://s"),
                 vf.createLiteral("1", XMLSchema.INTEGER),
                 vf.createLiteral(2),

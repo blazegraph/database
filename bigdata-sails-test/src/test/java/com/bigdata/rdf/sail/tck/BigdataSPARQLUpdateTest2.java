@@ -67,6 +67,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -390,7 +391,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
         
         final BigdataSail sail = new BigdataSail(props);
         
-        backend = sail.getDatabase().getIndexManager();
+        backend = sail.getIndexManager();
 
         return new BigdataSailRepository(sail);
 
@@ -435,8 +436,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      */
     protected boolean isSolutionSetUpdateEnabled() {
 
-        final AbstractTripleStore tripleStore = ((BigdataSailRepository) con
-                .getRepository()).getDatabase();
+        final AbstractTripleStore tripleStore = ((BigdataSailRepositoryConnection) con).getTripleStore();
         
         final boolean isolatable = Boolean.parseBoolean(tripleStore.getProperty(
                         BigdataSail.Options.ISOLATABLE_INDICES,

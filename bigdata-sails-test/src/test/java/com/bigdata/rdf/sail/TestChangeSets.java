@@ -48,6 +48,7 @@ import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ModifiedEnum;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
@@ -125,6 +126,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
             cxn = (BigdataSailRepositoryConnection) repo.getConnection();
             cxn.setAutoCommit(false);
+            final AbstractTripleStore tripleStore = cxn.getTripleStore();
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
@@ -166,7 +168,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 
             }
             
@@ -180,7 +182,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
             { // shouldn't see any change records
                 
-                compare(new LinkedList<IChangeRecord>(), changeLog.getLastCommit(sail.getDatabase()));
+                compare(new LinkedList<IChangeRecord>(), changeLog.getLastCommit(tripleStore));
                 
             }
             
@@ -200,12 +202,12 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 
             }
             
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
             
         } finally {
@@ -237,6 +239,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
             cxn = (BigdataSailRepositoryConnection) repo.getConnection();
             cxn.setAutoCommit(false);
+            final AbstractTripleStore tripleStore = cxn.getTripleStore();
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
@@ -278,7 +281,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 
             }
             
@@ -292,7 +295,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
             { // shouldn't see any change records
                 
-                compare(new LinkedList<IChangeRecord>(), changeLog.getLastCommit(sail.getDatabase()));
+                compare(new LinkedList<IChangeRecord>(), changeLog.getLastCommit(tripleStore));
                 
             }
             
@@ -312,12 +315,12 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 
             }
             
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
             
         } finally {
@@ -337,6 +340,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
             cxn = (BigdataSailRepositoryConnection) repo.getConnection();
             cxn.setAutoCommit(false);
+            final AbstractTripleStore tripleStore = cxn.getTripleStore();
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
@@ -375,7 +379,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isDebugEnabled()) {
-                log.debug("\ndump store:\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\ndump store:\n" + tripleStore.dumpStore(true, true, false));
             }
             
             { // should see all of the stmts[] removed
@@ -386,7 +390,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.REMOVED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 
             }
             
@@ -400,7 +404,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
             { // shouldn't see any change records
                 
-                compare(new LinkedList<IChangeRecord>(), changeLog.getLastCommit(sail.getDatabase()));
+                compare(new LinkedList<IChangeRecord>(), changeLog.getLastCommit(tripleStore));
                 
             }
             
@@ -475,15 +479,17 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
 
             cxn.commit();//
             
+            final AbstractTripleStore tripleStore = cxn.getTripleStore();
+            
             // resolve bnodes (sids)
             for (int i = 0; i < add.length; i++) {
-                add[i] = sail.getDatabase().getStatement(add[i]);
+                add[i] = tripleStore.getStatement(add[i]);
             }
             for (int i = 0; i < explicitRemove.length; i++) {
-                explicitRemove[i] = sail.getDatabase().getStatement(explicitRemove[i]);
+                explicitRemove[i] = tripleStore.getStatement(explicitRemove[i]);
             }
             for (int i = 0; i < inferredRemove.length; i++) {
-                inferredRemove[i] = sail.getDatabase().getStatement(inferredRemove[i]);
+                inferredRemove[i] = tripleStore.getStatement(inferredRemove[i]);
             }
 
             {
@@ -494,7 +500,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
             
             }
         
@@ -515,12 +521,12 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.REMOVED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
             
             }
         
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
             
         } finally {
@@ -550,12 +556,12 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
             cxn = (BigdataSailRepositoryConnection) repo.getConnection();
             cxn.setAutoCommit(false);
+            final AbstractTripleStore tripleStore = cxn.getTripleStore();
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
 
-            final InferenceChangeLogReporter changeLog2 = new InferenceChangeLogReporter(
-                    sail.getDatabase());
+            final InferenceChangeLogReporter changeLog2 = new InferenceChangeLogReporter(tripleStore);
             cxn.addChangeLog(changeLog2);
         
             final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
@@ -598,7 +604,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
 
             { 
@@ -611,7 +617,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 assertSameIteratorAnyOrder(inferred, changeLog2.addedIterator());
                 assertSameIteratorAnyOrder(new BigdataStatement[]{}, changeLog2.removedIterator());
             }
@@ -623,7 +629,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
 
             { 
@@ -633,7 +639,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.UPDATED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
             }
             
         } finally {
@@ -662,12 +668,12 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
             cxn = (BigdataSailRepositoryConnection) repo.getConnection();
             cxn.setAutoCommit(false);
+            final AbstractTripleStore tripleStore = cxn.getTripleStore();
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
 
-            final InferenceChangeLogReporter changeLog2 = new InferenceChangeLogReporter(
-                    sail.getDatabase());
+            final InferenceChangeLogReporter changeLog2 = new InferenceChangeLogReporter(tripleStore);
             cxn.addChangeLog(changeLog2);
 
         	final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
@@ -727,7 +733,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 assertSameIteratorAnyOrder(inferredAdd, changeLog2.addedIterator());
                 assertSameIteratorAnyOrder(new BigdataStatement[]{}, changeLog2.removedIterator());
             
@@ -753,14 +759,14 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     expected.add(new ChangeRecord(stmt, ChangeAction.REMOVED));
                 }
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 assertSameIteratorAnyOrder(new BigdataStatement[]{}, changeLog2.addedIterator());
                 assertSameIteratorAnyOrder(inferredRemove, changeLog2.removedIterator());
 
             }
         
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
             
         } finally {
@@ -791,6 +797,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
             cxn = (BigdataSailRepositoryConnection) repo.getConnection();
             cxn.setAutoCommit(false);
+            final AbstractTripleStore tripleStore = cxn.getTripleStore();
 
             final InMemChangeLog changeLog = new InMemChangeLog();
             cxn.addChangeLog(changeLog);
@@ -836,7 +843,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
 
             // test adding a statement that is already an inference - should
@@ -846,7 +853,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
 
             { 
@@ -854,10 +861,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     new LinkedList<IChangeRecord>();
                 expected.add(new ChangeRecord(update, ChangeAction.UPDATED));
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
 
                 // get the latest statement type from the db
-                update = sail.getDatabase().getStatement(update);
+                update = tripleStore.getStatement(update);
                 
                 assertTrue("wrong type", update.isExplicit());
             }
@@ -869,7 +876,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isDebugEnabled()) {
-                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+                log.debug("\n" + tripleStore.dumpStore(true, true, false));
             }
 
             { 
@@ -877,10 +884,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     new LinkedList<IChangeRecord>();
                 expected.add(new ChangeRecord(update, ChangeAction.UPDATED));
                 
-                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                compare(expected, changeLog.getLastCommit(tripleStore));
                 
                 // get the latest statement type from the db
-                update = sail.getDatabase().getStatement(update);
+                update = tripleStore.getStatement(update);
                 
                 assertTrue("wrong type", update.isInferred());
             }
@@ -899,10 +906,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         final Collection<IChangeRecord> extra = new LinkedList<IChangeRecord>();
         Collection<IChangeRecord> missing = new LinkedList<IChangeRecord>();
 
-        int resultCount = 0;
+//        int resultCount = 0;
         int nmatched = 0;
         for (IChangeRecord rec : actual) {
-            resultCount++;
+//            resultCount++;
             boolean match = false;
             if(log.isInfoEnabled())
                 log.info(rec);

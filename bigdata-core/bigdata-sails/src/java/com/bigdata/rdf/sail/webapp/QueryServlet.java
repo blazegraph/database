@@ -1481,13 +1481,11 @@ public class QueryServlet extends BigdataRDFServlet {
                 long rangeCount = 0;
                 if (c != null && c.length > 0) {
                     for (Resource r : c) {
-                        rangeCount += conn.getSailConnection().getBigdataSail()
-                                .getDatabase().getAccessPath(s, p, o, r)
+                        rangeCount += conn.getTripleStore().getAccessPath(s, p, o, r)
                                 .rangeCount(exact);
                     }
                 } else {
-                    rangeCount += conn.getSailConnection().getBigdataSail()
-                            .getDatabase()
+                    rangeCount += conn.getTripleStore()
                             .getAccessPath(s, p, o, (Resource) null)
                             .rangeCount(exact);
                 }
@@ -1921,7 +1919,7 @@ public class QueryServlet extends BigdataRDFServlet {
                 conn = getQueryConnection();
 
                 final AccessPath<?> accessPath = (AccessPath<?>) conn
-                        .getSailConnection().getBigdataSail().getDatabase()
+                        .getTripleStore()
                         .getAccessPath(s, p, o, c);
                 
                 final ClientIndexView ndx = (ClientIndexView) accessPath

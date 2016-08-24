@@ -3,6 +3,8 @@ package com.bigdata.rwstore.sector;
 import java.io.*;
 import java.nio.ByteBuffer;
 
+import org.apache.log4j.Logger;
+
 /************************************************************************
  * PSInputStream
  * 
@@ -11,6 +13,11 @@ import java.nio.ByteBuffer;
  * in-memory storage.
  **/
 public class PSInputStream extends InputStream {
+	
+	/**
+     * Logger.
+     */
+    final private static Logger log = Logger.getLogger(PSInputStream.class);
 	
 	final ByteBuffer[] m_buffers;
 	
@@ -21,34 +28,50 @@ public class PSInputStream extends InputStream {
 		int sze = mm.allocationSize(addr);
 		
 		if (sze > SectorAllocator.BLOB_SIZE) {
-			int buffers = 1 + sze/SectorAllocator.BLOB_SIZE;
+			int buffers = 1 + (sze-1)/SectorAllocator.BLOB_SIZE;
 			m_buffers = new ByteBuffer[buffers];
 			// blob header
 			ByteBuffer[] hdr = mm.get((addr & 0xFFFFFFFF00000000L) + ((buffers+1)*4));
 			
-			if (hdr.length > 1)
-				throw new IllegalStateException("Check header size assumptions");
-			
+			/*
+			 * The header can itself be a blob array of buffers
+			 */
 			int rem = sze;
 			int hdrsze = hdr[0].getInt();
 			if (hdrsze != buffers) 
-				throw new IllegalStateException("Check blob header assumptions");
+				throw new IllegalStateException("Check blob header assumptions: hdrsize(" 
+						+ hdrsze + ") != buffers(" + buffers + ")");
 			
-			if (hdr[0].remaining() != (buffers*4))
-				throw new IllegalStateException("Check blob header assumptions, remaining: " 
-						+ hdr[0].remaining() + " for " + buffers + " buffers");
+			
+			/*
+			 * Calculate the data remaining in all header buffers
+			 */
+			{
+				int totalRemaining = 0;
+				for (ByteBuffer hbuf : hdr) {
+					totalRemaining += hbuf.remaining();
+				}
+				if (totalRemaining != (buffers*4))
+					throw new IllegalStateException("Check blob header assumptions, remaining: " 
+							+ totalRemaining + " for " + buffers + " buffers");
+			}
 			
 			int index = 0;
+			int hdrIndex = 0;
 			while (rem > SectorAllocator.BLOB_SIZE) {
-				long ba = hdr[0].getInt();
+				long ba = hdr[hdrIndex].getInt();
 				ba <<= 32;
 				ByteBuffer[] block = mm.get(ba + SectorAllocator.BLOB_SIZE);
 				m_buffers[index++] = block[0];
 				
 				rem -= SectorAllocator.BLOB_SIZE;
+				
+				if (hdr[hdrIndex].remaining() == 0) {
+					hdrIndex++; // next header buffer
+				}
 			}
 			if (rem > 0) {
-				long ba = hdr[0].getInt();
+				long ba = hdr[hdrIndex].getInt();
 				ba <<= 32;
 				ByteBuffer[] block = mm.get(ba + rem);
 				m_buffers[index] = block[0];

@@ -36,12 +36,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 
-import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.vocab.NoVocabulary;
 
 public class TestMaterialization extends ProxyBigdataSailTestCase {
 
@@ -107,12 +102,12 @@ public class TestMaterialization extends ProxyBigdataSailTestCase {
           cxn.commit();
           
           if (log.isInfoEnabled()) {
-          	log.info(sail.getDatabase().dumpStore());
+              log.info(((BigdataSailRepositoryConnection) cxn).getTripleStore().dumpStore());
           }
           
           {
               
-              String query =
+              final String query =
                   "select * where { ?s ?p ?o . FILTER (regex(?o,\"John\",\"i\")) }";
   
               final SailTupleQuery tupleQuery = (SailTupleQuery)
@@ -189,7 +184,7 @@ public class TestMaterialization extends ProxyBigdataSailTestCase {
             cxn.commit();
             
             if (log.isInfoEnabled()) {
-            	log.info(sail.getDatabase().dumpStore());
+                log.info(((BigdataSailRepositoryConnection) cxn).getTripleStore().dumpStore());
             }
             
             {
@@ -274,7 +269,7 @@ public class TestMaterialization extends ProxyBigdataSailTestCase {
             cxn.commit();
             
             if (log.isInfoEnabled()) {
-            	log.info(sail.getDatabase().dumpStore());
+                log.info(((BigdataSailRepositoryConnection) cxn).getTripleStore().dumpStore());
             }
             
             {

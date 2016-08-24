@@ -136,7 +136,7 @@ public class BigdataGASEngine extends GASEngine {
      */
     public BigdataGASEngine(final Sail sail, final int nthreads) {
      
-        this(((BigdataSail) sail).getDatabase().getIndexManager(), nthreads);
+        this(((BigdataSail) sail).getIndexManager(), nthreads);
         
     }
     

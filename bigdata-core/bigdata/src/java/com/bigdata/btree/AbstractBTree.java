@@ -1426,8 +1426,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         }
         
         if( error != null )
-            throw new IndexInconsistentError(ERROR_ERROR_STATE, error);
-
+            throw new IndexInconsistentError(ERROR_ERROR_STATE + ": " + this.getIndexMetadata().getName() + ", store: " + store, error);
     }
     
     /**

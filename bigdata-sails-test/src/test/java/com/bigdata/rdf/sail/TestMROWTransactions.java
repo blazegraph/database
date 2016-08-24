@@ -247,7 +247,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                 + ", nreaderThreads=" + nreaderThreads
                                 + ", nwriters=" + nwriters + ", nreaders="
                                 + nreaders + ", indexManager="
-                                + sail.getDatabase().getIndexManager(), ex);
+                                + sail.getIndexManager(), ex);
                     }
                 }
                 if (log.isInfoEnabled())
@@ -316,12 +316,12 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
         @Override
         public Long call() throws Exception {
-            final boolean isQuads = sail.isQuads();
             // Thread.sleep(r.nextInt(2000) + 500);
             BigdataSailConnection con = null;
             boolean ok = false;
             try {
                 con = sail.getConnection();
+                final boolean isQuads = con.isQuads();
                 for (int i = 0; i < nwrites; i++) {
                     con.addStatement(subs[r.nextInt(nuris)],
                             preds[r.nextInt(npreds)], subs[r.nextInt(nuris)],

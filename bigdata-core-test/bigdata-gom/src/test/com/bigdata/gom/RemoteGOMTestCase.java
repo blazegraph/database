@@ -177,7 +177,7 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
 
         }
         
-        m_indexManager = repo.getDatabase().getIndexManager();
+        m_indexManager = repo.getSail().getIndexManager();
         m_server = NanoSparqlServer.newInstance(0/* port */, m_indexManager,
                 initParams);
 
