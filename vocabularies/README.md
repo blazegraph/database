@@ -81,6 +81,7 @@ curl -X POST --data-binary @dataloader.xml --header 'Content-Type:application/xm
 
 This will bulk load the namespace `pubchem` with the files from `/path/to/pubchem-core`.
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 ##Waterloo SPARQL Diversity Test (WatDiv)
 [WatDiv](http://dsg.uwaterloo.ca/watdiv/) is a benchmark designed to _measure how an RDF data management system performs across a wide spectrum of SPARQL queries with varying structural characteristics and selectivity classes._
@@ -127,5 +128,7 @@ curl -X POST --data-binary @dataloader.xml --header 'Content-Type:application/xm
 
 This will bulk load the namespace `kb` with the files from `/path/to/watdiv`.
 
+=======
+>>>>>>> 948dd94... Removed freebase vocabulary from general release.
 =======
 >>>>>>> 948dd94... Removed freebase vocabulary from general release.
