@@ -891,7 +891,7 @@ public class IVUtility {
             iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(//
                     str2,//
                     str1, // language
-                    RDF.LANGSTRING, // implied datatype
+                    null, // datatype
                     byteLength//
                     );
             break;
