@@ -83,8 +83,8 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         if (label == null)
             throw new IllegalArgumentException();
 
-//        if (language != null && datatype != null)
-//            throw new IllegalArgumentException();
+        if (language != null && datatype != null)
+            throw new IllegalArgumentException();
         
         this.label = label;
         
@@ -155,25 +155,11 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         
     }
 
-    /**
-     * @OpenRDF
-     * This is directly copied from LiteralImpl.hashCode() and should be the same as effective Sesame version.
-     * Usecases include for example putting LiteralImpl instances into Set or HashMap and then using BigdataLiteralImpl
-     * to check existance of the item in the Set or retrieve value from HashMap.
-     * @See https://www.w3.org/TR/rdf11-concepts/#dfn-literal-term-equality
-     */
-	@Override
-	public int hashCode() {
-		int hashCode = label.hashCode();
-		if (language != null) {
-			hashCode = 31 * hashCode + language.hashCode();
-		}
-		if (datatype != null) {
-			hashCode = 31 * hashCode + datatype.hashCode();
+    final public int hashCode() {
+        
+        return label.hashCode();
         
     }
-		return hashCode;
-	}
     
     final public boolean equals(Object o) {
 
