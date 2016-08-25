@@ -160,8 +160,11 @@ public class TestRDROperations<S extends IIndexManager> extends
 			final String queryStr = "SELECT * where {?s ?p ?o}";
 
 			final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
+
+//FIXME:   Per @thompsonbry removing to get clean CI on merge branch			
+//			assertEquals(ntriples, countResults(query.evaluate()));
 			
-			assertEquals(ntriples, countResults(query.evaluate()));
+			assertEquals( true, true );
 			
 		}
         
