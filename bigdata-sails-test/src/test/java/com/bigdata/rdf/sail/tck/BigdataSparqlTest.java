@@ -151,25 +151,6 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
          * id naming scheme than the sesame one.  Not technically a failure.
          */
         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#bnode01",
-        
-        /*
-         * OpenRDF Sesame tests, which are not compatible with RDF 1.1
-         * @see https://jira.blazegraph.com/browse/BLZG-1147
-         */
-		// test case incompatible with RDF 1.1 - see
-		// http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
-		//"STRDT   TypeErrors",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#strdt03",
-		// test case incompatible with RDF 1.1 - see
-		// http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
-		//"STRLANG   TypeErrors",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#strlang03",
-		// known issue: SES-937
-		// sq03 - Subquery within graph pattern, graph variable is not bound
-		"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#sq03",
-		// issue with NOT IN comparison number to string, generating ValueExprEvaluationException
-		// sparql11-not-in-02 
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-not-in-02",
 
     });
 
@@ -433,15 +414,14 @@ graph ?g {
 }
 =========================================
 * 
-*          subquery03 has been fixed in BLZG-1892. The other 4 queries work 
-* without GPU, but fail in bigdata-gpu.
+*         Currently (Apr 13, 2016) only subquery03 fails.
 * 
          */
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery01",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery02",
-        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03", // fixed in BLZG-1892
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
-        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery01",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery02",
+        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery03",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery04",
+        //"http://www.w3.org/2009/sparql/docs/tests/data-sparql11/subquery/manifest#subquery05",
 
         /*
 The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
@@ -1188,7 +1168,6 @@ The following two are covered by: https://jira.blazegraph.com/browse/BLZG-1721
     protected void runTest()
         throws Exception
     {
-    	
         BigdataSailRepositoryConnection con = getQueryConnection(dataRep);
         // Some SPARQL Tests have non-XSD datatypes that must pass for the test
         // suite to complete successfully
