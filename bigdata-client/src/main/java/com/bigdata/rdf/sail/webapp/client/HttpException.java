@@ -67,15 +67,4 @@ public class HttpException extends IOException {
         
     }
 
-    /**
-     * Variant for wrap and throw provides improved traces.
-     * 
-     * @param cause
-     */
-    public HttpException(final HttpException cause) {
-
-        this(cause.statusCode, cause.getMessage());
-        
-    }
-
 }
