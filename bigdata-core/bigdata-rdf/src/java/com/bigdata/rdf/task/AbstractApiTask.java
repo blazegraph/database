@@ -296,8 +296,18 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
         repo.initialize();
 
-        final BigdataSailRepositoryConnection conn = repo.getConnection();
-        
+        final BigdataSailRepositoryConnection conn;
+        if(isReadOnly()) {
+            if (sail.isIsolatable()) {
+                conn = repo.getConnection();
+            } else {
+                conn = repo.getReadOnlyConnection(timestamp);
+            }
+        }
+        else {
+            conn = repo.getConnection();
+        }
+
         conn.setAutoCommit(false);
         
         // Setup a change listener. It will notice the #of mutations.

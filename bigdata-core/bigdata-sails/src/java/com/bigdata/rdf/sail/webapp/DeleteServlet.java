@@ -1052,7 +1052,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         @Override
         public boolean isReadOnly() {
-            return true;
+            return false;
         }
 
         @Override
