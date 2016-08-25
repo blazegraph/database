@@ -164,11 +164,9 @@ public class TestLexJoinOps extends QuadsTestCase {
                 }
                 
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
-                // Since Sesame 2.8 plain literals are the same as xsd:string, so _2 is actually checks for _1 
-                // @See https://jira.blazegraph.com/browse/BLZG-1845
-//                answer.add(createBindingSet(
-//                        new BindingImpl("o", _1)
-//                        ));
+                answer.add(createBindingSet(
+                        new BindingImpl("o", _1)
+                        ));
                 answer.add(createBindingSet(
                         new BindingImpl("o", _2)
                         ));
@@ -280,11 +278,9 @@ public class TestLexJoinOps extends QuadsTestCase {
               }
               
               final Collection<BindingSet> answer = new LinkedList<BindingSet>();
-              // Since Sesame 2.8 plain literals are the same as xsd:string, so _2 is actually checks for _1 
-              // @See https://jira.blazegraph.com/browse/BLZG-1845
-//              answer.add(createBindingSet(
-//                      new BindingImpl("o", _1)
-//                      ));
+              answer.add(createBindingSet(
+                      new BindingImpl("o", _1)
+                      ));
               answer.add(createBindingSet(
                       new BindingImpl("o", _2)
                       ));
