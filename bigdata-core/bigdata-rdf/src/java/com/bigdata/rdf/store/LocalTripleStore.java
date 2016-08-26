@@ -36,6 +36,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 
 /**
@@ -178,7 +179,27 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
         super(indexManager, namespace, timestamp, properties);
 
+        if (indexManager instanceof IJournal) {
+
         store = (IJournal) indexManager;
+
+        } else {
+
+            /*
+             * Hitting this code path may indicate that a TemporaryStore was
+             * added to the DefaultResourceLocator as a "seeAlso" store to be
+             * checked and a TempTripleStore was created on that TemporaryStore
+             * under the same namespace as the LocalTripleStore. If the
+             * LocalTripleStore is then destroyed or an abort() otherwise clears
+             * it from the DefaultResourceLocator cache, then the
+             * TempTripleStore having the same namespace can be discovered on
+             * the TemporaryStore. This will cause an attempt to instantiate the
+             * LocalTripleStore on the TemporaryStore, which will fail here.
+             */
+            throw new UnsupportedOperationException("Not an IJournal: indexManager=" + indexManager + ", namespace="
+                    + namespace + ", timestamp=" + TimestampUtility.toString(timestamp) + ", properties=" + properties);
+            
+        }
         
     }
 

@@ -237,6 +237,11 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     }
 
     @Override
+    public String toString() {
+        return super.toString()+"{namespace="+namespace+"}";
+    }
+    
+    @Override
     public BNodeContextFactory newBNodeContext() {
 
         return new BNodeContextFactory(this);

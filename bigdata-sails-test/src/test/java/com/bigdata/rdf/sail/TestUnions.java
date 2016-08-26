@@ -159,7 +159,7 @@ public class TestUnions extends QuadsTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(((BigdataSailRepositoryConnection) cxn).getTripleStore().dumpStore());
             }
 
             {
@@ -256,7 +256,7 @@ public class TestUnions extends QuadsTestCase {
 /**/            
             log.info("hello");
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
 
             {

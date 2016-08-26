@@ -472,8 +472,7 @@ public class TestPathConstraints extends TestCase {
                         "  ?from <bigdata:type> <bigdata:Vertex> . " +
                         "}";
                 
-                final BigdataSailRepositoryConnection cxn = graph
-                        .getReadConnection();
+                final BigdataSailRepositoryConnection cxn = graph.cxn();
                 try {
                     final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
                             .prepareQuery(QueryLanguage.SPARQL, queryStr);
@@ -512,7 +511,7 @@ public class TestPathConstraints extends TestCase {
     private void showOptimizedAST(final BigdataGraph graph, 
             final String queryStr) throws Exception {
         
-        final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) graph.getReadConnection();
+        final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) graph.cxn();
         try {
             final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
                     .prepareQuery(QueryLanguage.SPARQL, queryStr);

@@ -58,7 +58,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * This is suitable for moving large blocks of data during query evaluation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/160">
  *      ResourceService should use NIO for file and buffer transfers</a>

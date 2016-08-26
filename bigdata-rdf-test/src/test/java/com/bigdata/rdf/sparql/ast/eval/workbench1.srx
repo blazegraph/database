@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="col1"/>
+    <variable name="col2"/>
+    <variable name="incoming"/>
+  </head>
+  <results>
+    <result>
+      <binding name="col1">
+      	<uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri>
+      </binding>
+      <binding name="col2">
+      	<uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#Property</uri>
+      </binding>
+      <binding name="incoming">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#boolean">false</literal>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="col1">
+      	<uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri>
+      </binding>
+      <binding name="col2">
+      	<uri>http://www.w3.org/2000/01/rdf-schema#Resource</uri>
+      </binding>
+      <binding name="incoming">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#boolean">false</literal>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="col1">
+      	<uri>http://www.w3.org/2000/01/rdf-schema#domain</uri>
+      </binding>
+      <binding name="col2">
+      	<uri>http://www.w3.org/2000/01/rdf-schema#Resource</uri>
+      </binding>
+      <binding name="incoming">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#boolean">false</literal>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="col1">
+      	<uri>http://www.w3.org/2000/01/rdf-schema#range</uri>
+      </binding>
+      <binding name="col2">
+      	<uri>http://www.w3.org/2000/01/rdf-schema#Class</uri>
+      </binding>
+      <binding name="incoming">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#boolean">false</literal>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="col1">
+      	<uri>http://www.w3.org/2000/01/rdf-schema#subPropertyOf</uri>
+      </binding>
+      <binding name="col2">
+      	<uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri>
+      </binding>
+      <binding name="incoming">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#boolean">false</literal>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="col1">
+      	<uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri>
+      </binding>
+      <binding name="col2">
+      	<uri>http://www.w3.org/2000/01/rdf-schema#subPropertyOf</uri>
+      </binding>
+      <binding name="incoming">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#boolean">true</literal>
+      </binding>
+    </result>
+    
+  </results>
+</sparql>

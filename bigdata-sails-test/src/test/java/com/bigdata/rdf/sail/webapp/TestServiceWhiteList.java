@@ -28,10 +28,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-import junit.framework.TestCase2;
-
 import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.TupleQueryResult;
@@ -47,6 +44,8 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
+
+import junit.framework.TestCase2;
 
 /**
  * Unit tests for the {@link NanoSparqlServer} with a focus on the ability to

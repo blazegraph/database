@@ -69,6 +69,7 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
  * 
  * @author mrpersonick
  * @author thompsonbry
+ * @openrdf
  */
 public class BigdataConnectionTest extends RepositoryConnectionTest {
 
@@ -207,7 +208,7 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
     {
 
         final IIndexManager backend = testRepository == null ? null
-                : ((BigdataSailRepository) testRepository).getDatabase()
+                : ((BigdataSailRepository) testRepository).getSail()
                         .getIndexManager();
 
         /*

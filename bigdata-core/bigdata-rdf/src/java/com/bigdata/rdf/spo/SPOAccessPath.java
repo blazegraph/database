@@ -36,7 +36,6 @@ import com.bigdata.striterator.IKeyOrder;
  * {@link IAccessPath} implementation for an {@link SPORelation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class SPOAccessPath extends AccessPath<ISPO> {
 
@@ -61,6 +60,7 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      * <p>
      * {@inheritDoc}
      */
+    @Override
     public SPOAccessPath init() {
 
         super.init();

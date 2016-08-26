@@ -311,7 +311,7 @@ public class MemStore extends AbstractRawStore implements IAllocationManagerStor
      * Overridden to return the #of bytes in the allocation slots rather than
      * the user bytes. This is because the {@link MemoryManager}, like the
      * {@link RWStore}, does not know the #of bytes of user data in each
-     * allocation slot. Therefore it is not able to keep accurrate track of the
+     * allocation slot. Therefore it is not able to keep accurate track of the
      * user bytes as allocation slots are cycled.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/212 (Records must

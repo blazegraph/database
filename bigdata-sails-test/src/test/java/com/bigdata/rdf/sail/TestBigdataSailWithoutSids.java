@@ -85,6 +85,7 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         suite.addTestSuite(TestConcurrentKBCreate.TestWithoutGroupCommit.class);
 
         suite.addTestSuite(TestTxCreate.class);
+        suite.addTestSuite(TestCnxnCreate.class);
 
         suite.addTestSuite(TestChangeSets.class);
 
@@ -120,6 +121,9 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1785.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1788.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1893.class);
+        //suite.addTestSuite(com.bigdata.rdf.sail.TestTicket1939.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket2043.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket2043b.class);
         
         suite.addTestSuite(com.bigdata.rdf.sail.webapp.TestBLZG1943.class);
         
@@ -127,8 +131,21 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         
     }
     
+    private Properties properties = null;
+    
+    @Override
+    protected void tearDown(final ProxyBigdataSailTestCase testCase) throws Exception {
+
+        super.tearDown(testCase);
+        
+        properties = null;
+        
+    }
+    
     @Override
     protected BigdataSail getSail(final Properties properties) {
+        
+        this.properties = properties;
         
         return new BigdataSail(properties);
         
@@ -151,7 +168,7 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
     @Override
     protected BigdataSail reopenSail(final BigdataSail sail) {
 
-        final Properties properties = sail.database.getProperties();
+//        final Properties properties = sail.getProperties();
 
         if (sail.isOpen()) {
 

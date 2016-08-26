@@ -54,7 +54,6 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * against the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestBigdataValueReplacer extends ProxyBigdataSailTestCase {
 

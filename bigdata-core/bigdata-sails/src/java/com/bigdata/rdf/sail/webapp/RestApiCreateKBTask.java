@@ -29,7 +29,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.CreateKBTask;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.NV;
 
 /**
@@ -52,10 +51,11 @@ class RestApiCreateKBTask extends AbstractDelegateRestApiTask<Void> {
       // Pre-condition check while holding locks.
       {
 
-         // resolve the namespace.
-         final AbstractTripleStore tripleStore = getTripleStore();
+         // Resolve the namespace.  See BLZG-2023, BLZG-2041.
+         // Note: We have a lock on the unisolated view of the namespace using the concurrency manager.
+         final boolean exists = getIndexManager().getResourceLocator().locate(namespace, ITx.UNISOLATED) != null;
 
-         if (tripleStore != null) {
+         if (exists) {
             /*
              * The namespace already exists.
              * 

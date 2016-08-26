@@ -59,7 +59,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -71,12 +70,12 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.CreateKBTask;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
@@ -170,33 +169,44 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 	}
 
-   private AbstractTripleStore createTripleStore(
+   private void createTripleStore(
          final IIndexManager indexManager, final String namespace,
          final Properties properties) throws InterruptedException,
-         ExecutionException {
+         ExecutionException, SailException {
 
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
 
-      AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace,
-            properties)).get();
-		
+       boolean ok = false;
+       final BigdataSail sail = new BigdataSail(namespace,indexManager);
+       try {
+           sail.initialize();
+           sail.create(properties);
         if(log.isInfoEnabled())
         	log.info("Created tripleStore: " + namespace);
-
-        /**
-         * Return a view of the new KB to the caller.
-         * 
-         * Note: The caller MUST NOT attempt to modify this KB view outside of
-         * the group commit mechanisms. Therefore I am now returning a read-only
-         * view.
-         */
-      final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-            .getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
-
-      assert tripleStore != null;
-
-      return tripleStore;
+           ok = true;
+           return;
+       } finally {
+           if (!ok)
+               sail.shutDown();
+       }
+       
+//      AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace,
+//            properties)).get();
+//		
+//        /**
+//         * Return a view of the new KB to the caller.
+//         * 
+//         * Note: The caller MUST NOT attempt to modify this KB view outside of
+//         * the group commit mechanisms. Therefore I am now returning a read-only
+//         * view.
+//         */
+//      final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//            .getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
+//
+//      assert tripleStore != null;
+//
+//      return tripleStore;
       
     }
 
@@ -237,9 +247,17 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		final Properties properties = getProperties();
 
 		// Create the triple store instance.
-        final AbstractTripleStore tripleStore = createTripleStore(indexManager,
-        		lnamespace, properties);
+        createTripleStore(indexManager, lnamespace, properties);
         
+        // Open an unisolated connection on that namespace and figure out what
+        // mode the namespace is using.
+        {
+            final BigdataSail sail = new BigdataSail(lnamespace, indexManager);
+            try {
+                sail.initialize();
+                final BigdataSailConnection con = sail.getUnisolatedConnection();
+                try {
+                    final AbstractTripleStore tripleStore = con.getTripleStore();
         if (tripleStore.isStatementIdentifiers()) {
 			testMode = TestMode.sids;
         } else if (tripleStore.isQuads()) {
@@ -247,7 +265,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         } else {
             testMode = TestMode.triples;
         }
-		
+                } finally {
+                    con.close();
+                }
+            } finally {
+                sail.shutDown();
+            }
+        }
+
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
 
@@ -413,20 +438,20 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         }
 	}
 
-    /**
-    * Returns a view of the triple store using the sail interface.
-    * 
-    * FIXME DO NOT CIRCUMVENT! Use the REST API throughout this test suite.
-    */
-    @Deprecated
-    protected BigdataSail getSail() {
-
-		final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-        return new BigdataSail(tripleStore);
-
-    }
+//    /**
+//    * Returns a view of the triple store using the sail interface.
+//    * 
+//    * FIXME DO NOT CIRCUMVENT! Use the REST API throughout this test suite.
+//    */
+//    @Deprecated
+//    protected BigdataSail getSail() {
+//
+//		final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+//				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//        return new BigdataSail(tripleStore);
+//
+//    }
 
 //	protected String getStreamContents(final InputStream inputStream)
 //            throws IOException {
@@ -796,14 +821,13 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     }
 
    /**
-    * @deprecated This is going around REST API. It can be written to that API
-    *             with the added support for ESTCARD exact:=true.
-    *             
     * @see #getExactSize()
     */
    protected long countAll() throws Exception {
     	
-    	return getSail().getDatabase().getExplicitStatementCount(null);
+//    	return getSail().getDatabase().getExplicitStatementCount(null);
+
+       return m_repo.rangeCount(true/*exact*/, null/*s*/, null/*p*/, null/*o*/);
     	
 //    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 //    	
@@ -818,15 +842,17 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
    /**
     * Return the exact number of statements in the repository.
     * 
-    * @deprecated This is going around REST API. It can be written to that API
-    *             with the added support for ESTCARD exact:=true.
-    * 
     * @see #countAll()
     */
    @Deprecated
    protected long getExactSize() {
 
-       return getSail().getDatabase().getStatementCount(true/* true */);
+       try {
+        return countAll();
+    } catch (Exception e) {
+       throw new RuntimeException(e);
+    }
+//       return getSail().getDatabase().getStatementCount(true/* true */);
 
    }
 

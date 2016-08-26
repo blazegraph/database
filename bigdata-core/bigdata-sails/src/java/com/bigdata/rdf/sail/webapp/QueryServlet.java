@@ -118,6 +118,16 @@ public class QueryServlet extends BigdataRDFServlet {
      * a SPARQL DESCRIBE query.
      */
     static final transient String ATTR_QUERY = "query";
+    
+    /**
+     * The name of the parameter/attribute that contains boolean flag to
+     * suppress incremental truth maintenance.
+     * <p>
+     * Note: This can be either a URL query parameter or a servlet request
+     * attribute. The latter is used to support chaining of a linked data GET as
+     * a SPARQL DESCRIBE query.
+     */
+    static final transient String ATTR_TRUTH_MAINTENANCE = "suppressTruthMaintenance";
 
     /**
      * The name of the parameter/attribute that contains boolean flag to include
@@ -493,22 +503,21 @@ public class QueryServlet extends BigdataRDFServlet {
         @Override
         public Void call() throws Exception {
 
-			BigdataSailRepositoryConnection conn = null;
-			boolean success = false;
-			try {
-
-				conn = getConnection();
-
-				{
-
+            /*
+             * Parse the SPARQL UPDATE request before we obtain the connection
+             * object. This let's us overlap the parse of the next SPARQL UPDATE
+             * with the evaluation of the current one when those operations
+             * would otherwise be serialized (non-group commit mode).
+             * 
+             * See BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+             * before obtaining the connection
+             */
+            
 					/*
 					 * Setup the baseURI for this request. It will be set to the
 					 * requestURI.
 					 */
 					final String baseURI = req.getRequestURL().toString();
-
-					final AbstractTripleStore tripleStore = conn
-							.getTripleStore();
 
 					/*
 					 * Parse the query so we can figure out how it will need to
@@ -523,6 +532,14 @@ public class QueryServlet extends BigdataRDFServlet {
 
 					if (log.isDebugEnabled())
 						log.debug(astContainer.toString());
+
+			BigdataSailRepositoryConnection conn = null;
+			boolean success = false;
+			try {
+
+				conn = getConnection();
+
+				{
 
 					/*
 					 * Attempt to construct a task which we can use to evaluate
@@ -684,7 +701,20 @@ public class QueryServlet extends BigdataRDFServlet {
 
         @Override
         public Void call() throws Exception {
+
+            /*
+             * Parse the query before obtaining the connection object.
+             * 
+             * @see BLZG-2039 SPARQL QUERY and SPARQL UPDATE should be parsed
+             * before obtaining the connection
+             */
             
+            // Setup the baseURI for this request. 
+            final String baseURI = BigdataRDFContext.getBaseURI(req, resp);
+
+            // Parse the query.
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser().parseQuery2(queryStr, baseURI);
+
 			BigdataSailRepositoryConnection conn = null;
 			try {
 
@@ -711,7 +741,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final AbstractQueryTask queryTask = context.getQueryTask(
-							conn, namespace, timestamp, queryStr, includeInferred, bindings,
+							conn, namespace, timestamp, queryStr, baseURI, astContainer, includeInferred, bindings,
 							null/* acceptOverride */, req, resp, os);
 
 					// /*
@@ -1451,13 +1481,11 @@ public class QueryServlet extends BigdataRDFServlet {
                 long rangeCount = 0;
                 if (c != null && c.length > 0) {
                     for (Resource r : c) {
-                        rangeCount += conn.getSailConnection().getBigdataSail()
-                                .getDatabase().getAccessPath(s, p, o, r)
+                        rangeCount += conn.getTripleStore().getAccessPath(s, p, o, r)
                                 .rangeCount(exact);
                     }
                 } else {
-                    rangeCount += conn.getSailConnection().getBigdataSail()
-                            .getDatabase()
+                    rangeCount += conn.getTripleStore()
                             .getAccessPath(s, p, o, (Resource) null)
                             .rangeCount(exact);
                 }
@@ -1891,7 +1919,7 @@ public class QueryServlet extends BigdataRDFServlet {
                 conn = getQueryConnection();
 
                 final AccessPath<?> accessPath = (AccessPath<?>) conn
-                        .getSailConnection().getBigdataSail().getDatabase()
+                        .getTripleStore()
                         .getAccessPath(s, p, o, c);
                 
                 final ClientIndexView ndx = (ClientIndexView) accessPath

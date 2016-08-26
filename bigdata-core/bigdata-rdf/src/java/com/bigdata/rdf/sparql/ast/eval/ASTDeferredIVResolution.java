@@ -17,6 +17,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
@@ -31,12 +32,10 @@ import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.impl.AbstractIV;
@@ -45,7 +44,6 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.sparql.ASTDeferredIVResolutionInitializer;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
@@ -60,6 +58,7 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
@@ -225,7 +224,7 @@ public class ASTDeferredIVResolution {
             if (!termsResolver.deferred.isEmpty()) {
                 termsResolver.resolveIVs(store);
             }
-            
+            // fast path for pre-resolved query.
         	return new DeferredResolutionResult(resolvedBindingset, resolvedDataset);
         }
         
@@ -277,6 +276,15 @@ public class ASTDeferredIVResolution {
 
         ast.setProperty(Annotations.RESOLVED, Boolean.TRUE);
 
+        // Note: Full recursive traversal can be used to inspect post-condition of all bops.
+//        if(true) {
+//            final Iterator<BOp> itr = BOpUtility.preOrderIteratorWithAnnotations(ast);
+//            while(itr.hasNext()) {
+//                final BOp bop = itr.next();
+//                log.error("bop="+bop);
+//            }
+//        }
+        
         return new DeferredResolutionResult(resolvedBindingset, resolvedDataset);
     }
 
@@ -665,6 +673,17 @@ public class ASTDeferredIVResolution {
     
             }
             
+            // GROUP BY clause
+            {
+                final GroupByNode groupBy = queryRoot.getGroupBy();
+                
+                if (groupBy != null) {
+                	
+                	fillInIV(store, groupBy);
+                	
+                }
+            
+            }
             // HAVING clause
             {
                 final HavingNode having = queryRoot.getHaving();
@@ -1204,7 +1223,12 @@ public class ASTDeferredIVResolution {
                         	if (label.isEmpty()) {
                         		iv = ivs[i];
                         	} else {
-                        		iv = ASTDeferredIVResolutionInitializer.decode(label, dte.name());
+                        		// @see https://jira.blazegraph.com/browse/BLZG-2043 (xsd:integer IV not properly resolved when inlining disabled)
+                        		// At this point null IV means, that LexiconRelation has not resolved it against triplestore, nor it could be inlined
+                        		// according to inlining configuration, so we should use mockIV, as it was behavior of 1.5.1 version and prior
+                        		// (before BLZG-1176 SPARQL Parsers should not be db mode aware)
+//                      		iv = ASTDeferredIVResolutionInitializer.decode(label, dte.name());
+                                iv = TermId.mockIV(VTE.valueOf(v));
                         	}
                         } else {
                             iv = TermId.mockIV(VTE.valueOf(v));
@@ -1244,7 +1268,7 @@ public class ASTDeferredIVResolution {
         for(final Runnable r: deferredRunnables) {
             r.run();
         }
-        
+
     }
     
 }

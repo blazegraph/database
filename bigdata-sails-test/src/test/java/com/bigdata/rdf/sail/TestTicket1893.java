@@ -35,6 +35,8 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.journal.IJournal;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
@@ -221,7 +223,6 @@ public class TestTicket1893 extends
         
         loadData(cxn);
         
-        
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
         assertEquals(0, searchEngine.count(query("2")));
@@ -283,7 +284,6 @@ public class TestTicket1893 extends
             true /*inlineXSDDatatypeLiterals*/ , true /*textIndexDatatypeLiterals*/);
         
         loadData(cxn);
-        
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -347,7 +347,6 @@ public class TestTicket1893 extends
         
         loadData(cxn);
         
-        
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
         assertEquals(0, searchEngine.count(query("2")));
@@ -408,8 +407,9 @@ public class TestTicket1893 extends
         final BigdataSailRepositoryConnection cxn = prepareTest(namespace, false /*inlineTextLiterals*/ , 
         		false /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
-        loadData(cxn);
+        {
         
+        loadData(cxn);
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -424,6 +424,7 @@ public class TestTicket1893 extends
         
         endTest(cxn);
         
+        }
     }
     
 	/**
@@ -472,7 +473,6 @@ public class TestTicket1893 extends
         		false /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
         loadData(cxn);
-        
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -535,7 +535,6 @@ public class TestTicket1893 extends
             true /*inlineXSDDatatypeLiterals*/ , false /*textIndexDatatypeLiterals*/);
         
         loadData(cxn);
-        
         
         IValueCentricTextIndexer<?> searchEngine = cxn.getTripleStore().getLexiconRelation().getSearchEngine();
         assertEquals(0, searchEngine.count(query("1")));
@@ -600,8 +599,8 @@ public class TestTicket1893 extends
         
         loadData(cxn);
         
-        BigdataValueFactory vf = cxn.getValueFactory();
-		BigdataValue[] values = new BigdataValue[]{
+        final BigdataValueFactory vf = cxn.getValueFactory();
+        final BigdataValue[] values = new BigdataValue[]{
 				vf.createURI("http://s"),
 				vf.createLiteral("1", XMLSchema.INTEGER),
 				vf.createLiteral(2),
@@ -975,7 +974,7 @@ public class TestTicket1893 extends
                 inlineXSDDatatypeLiterals, false /* textIndexDatatypeLiterals */);
     }
     
-    
+
     private BigdataSailRepositoryConnection prepareTest(final String namespace, final boolean inlineTextLiterals, 
             final boolean inlineXSDDatatypeLiterals, final boolean textIndexDatatypeLiterals) throws Exception {
 
@@ -1015,7 +1014,11 @@ public class TestTicket1893 extends
     	
     	cxn.getTripleStore().close();
     	
-    	((LocalTripleStore)cxn.getTripleStore()).getIndexManager().shutdownNow();
+        IJournal store = ((LocalTripleStore)cxn.getTripleStore()).getIndexManager();
+        
+        store.shutdownNow();
+        
+        store.destroy();
         
     }
     

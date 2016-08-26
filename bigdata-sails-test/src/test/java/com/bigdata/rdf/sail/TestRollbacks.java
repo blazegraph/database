@@ -196,7 +196,7 @@ public class TestRollbacks extends QuadsTestCase {
             repo.initialize();
             runConcurrentStuff(repo,maxCounter);
         } finally {
-			final IIndexManager db = sail.getDatabase().getIndexManager();
+			final IIndexManager db = sail.getIndexManager();
 			try {
 				if (sail.isOpen()) {
 					try {

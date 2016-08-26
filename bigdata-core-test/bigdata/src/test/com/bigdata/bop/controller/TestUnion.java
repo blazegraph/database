@@ -48,6 +48,7 @@ import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.StandaloneChunkHandler;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -92,7 +93,8 @@ public class TestUnion extends TestCase2 {
 
     private QueryEngine queryEngine;
 
-    public void setUp() throws Exception {
+    @Override
+    protected void setUp() throws Exception {
 
         jnl = new Journal(getProperties());
 
@@ -132,7 +134,8 @@ public class TestUnion extends TestCase2 {
 
     }
 
-    public void tearDown() throws Exception {
+    @Override
+    protected void tearDown() throws Exception {
 
         if (queryEngine != null) {
             queryEngine.shutdownNow();
@@ -179,6 +182,8 @@ public class TestUnion extends TestCase2 {
                         new NV(Union.Annotations.BOP_ID, unionId),//
                         new NV(Union.Annotations.SUBQUERIES, new BOp[] {
                                 startOp1, startOp2 }),//
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                                StandaloneChunkHandler.TEST_INSTANCE),//
 //                        new NV(Union.Annotations.EVALUATION_CONTEXT,
 //                                BOpEvaluationContext.CONTROLLER),//
 //                        new NV(Union.Annotations.CONTROLLER, true),//
@@ -222,7 +227,9 @@ public class TestUnion extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Union.Annotations.BOP_ID, unionId),//
                         new NV(Union.Annotations.SUBQUERIES, new BOp[] {
-                                startOp1, startOp2 }) //
+                                startOp1, startOp2 }), //
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                                StandaloneChunkHandler.TEST_INSTANCE),//
 //                        new NV(Union.Annotations.EVALUATION_CONTEXT,
 //                                BOpEvaluationContext.CONTROLLER),//
 //                        new NV(Union.Annotations.CONTROLLER, true),//
@@ -310,7 +317,9 @@ public class TestUnion extends TestCase2 {
                 new NV(Union.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false)//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                        StandaloneChunkHandler.TEST_INSTANCE)//
                 ));
         
         final BOp query = sliceOp;

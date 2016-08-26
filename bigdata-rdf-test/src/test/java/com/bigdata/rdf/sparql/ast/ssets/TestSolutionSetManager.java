@@ -184,7 +184,7 @@ public class TestSolutionSetManager extends TestCase2 {
         inlineIV.setValue((BigdataLiteral) valueFactory.createLiteral("100",
                 XSD.INTEGER));
         
-        inlineIV2 = XSDBooleanIV.TRUE;
+        inlineIV2 = XSDBooleanIV.valueOf(true);
     }
 
     @Override

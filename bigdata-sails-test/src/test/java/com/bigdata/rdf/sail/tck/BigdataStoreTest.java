@@ -124,7 +124,7 @@ public class BigdataStoreTest extends RDFStoreTest {
     {
         
         final IIndexManager backend = sail == null ? null
-                : ((BigdataSail) sail).getDatabase().getIndexManager();
+                : ((BigdataSail) sail).getIndexManager();
 
         super.tearDown();
 

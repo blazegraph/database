@@ -38,6 +38,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
@@ -50,6 +51,7 @@ import org.openrdf.sail.SailConnection;
 
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.model.BigdataStatementImpl;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 
@@ -82,187 +84,214 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
         
             sail.initialize();
             
-        if (!((BigdataSail) sail).database.getStatementIdentifiers()) {
+            /*
+             * Load data into the sail.
+             */
+            {
 
-            log.warn("Statement identifiers are not enabled");
+                boolean ok = false;
 
-            return;
-
-        }
-
-        /*
-         * Load data into the sail.
-         */
-        {
- 
-            final DataLoader dataLoader = sail.database.getDataLoader();
-
-            dataLoader.loadData(
-                    "/com/bigdata/rdf/sail/provenance01.ttlx",
-                    ""/*baseURL*/, ServiceProviderHook.TURTLE_RDR);
-            
-        }
-        
-        /*
-         * Serialize as RDF/XML.
-         * 
-         * Note: This is just for debugging.
-         */
-		if (log.isInfoEnabled()) {
-         
-            final BigdataStatementIterator itr = sail.database.getStatements(null, null, null);
-            final String rdfXml;
-            try {
-
-                final Writer w = new StringWriter();
-
-//                final RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
-                final RDFWriterFactory writerFactory = RDFWriterRegistry
-                        .getInstance().get(RDFFormat.RDFXML);
+                final BigdataSailConnection conn = sail.getUnisolatedConnection();
                 
-                assertNotNull(writerFactory);
-                
-                final RDFWriter rdfWriter = writerFactory.getWriter(w);
+                try {
 
-                rdfWriter.startRDF();
+                    if (!conn.getTripleStore().getStatementIdentifiers()) {
 
-                while (itr.hasNext()) {
+                        log.warn("Statement identifiers are not enabled");
 
-                    final BigdataStatementImpl stmt = (BigdataStatementImpl) itr
-                            .next();
+                        return;
 
-                    // only write the explicit statements.
-                    if (!stmt.isExplicit())
-                        continue;
+                    }
 
-                    rdfWriter.handleStatement(stmt);
+                    final DataLoader dataLoader = conn.getTripleStore().getDataLoader();
+
+                    dataLoader.loadData("/com/bigdata/rdf/sail/provenance01.ttlx", ""/* baseURL */,
+                            ServiceProviderHook.TURTLE_RDR);
+
+                    conn.commit();
+
+                    ok = true;
+
+                } finally {
+
+                    if (!ok)
+                        conn.rollback();
+
+                    conn.close();
 
                 }
-
-                rdfWriter.endRDF();
-
-                rdfXml = w.toString();
-
-            } finally {
-
-                itr.close();
-
             }
-
-            // write the rdf/xml
-            log.info(rdfXml);
-
-        }
-        
-        final SailConnection conn = sail.getConnection();
-
-        try {
-
-            final URI y = new URIImpl("http://www.foo.org/y");
-            
-            final URI B = new URIImpl("http://www.foo.org/B");
-
-            final URI dcCreator = new URIImpl("http://purl.org/dc/terms/creator");
-
-            final Literal bryan = new LiteralImpl("bryan");
-            
-            final Literal mike = new LiteralImpl("mike");
-
+    
             /*
-             * This is a hand-coded query.
+             * Serialize as RDF/XML.
              * 
-             * Note: When statement identifiers are enabled, the only way to
-             * bind the context position is to already have a statement on hand -
-             * there is no index which can be used to look up a statement by its
-             * context and the context is always a blank node.
+             * Note: This is just for debugging.
              */
+    		if (log.isInfoEnabled()) {
 
-//            final TupleExpr tupleExpr = 
-//                new Projection(
-//                new Join(//
-//                    new StatementPattern(//
-//                            new Var("X", y),//
-//                            new Var("1", RDF.TYPE),//
-//                            new Var("2", B),//
-//                            new Var("SID")),// unbound.
-//                    new StatementPattern(//
-//                            new Var("SID"),//
-//                            new Var("3", dcCreator),//
-//                            new Var("Y"))),
-//                new ProjectionElemList(new ProjectionElem[] { new ProjectionElem( "Y" )}));
+                    final BigdataSailConnection conn = sail.getReadOnlyConnection();
+                    
+                    try {
 
-//            final String q = "select ?Y where { ?SID <"+dcCreator+"> ?Y . graph ?SID { <"+y+"> <"+RDF.TYPE+"> <"+B+"> . } }";
-            final String q = "select ?Y where { <<<"+y+"> <"+RDF.TYPE+"> <"+B+">>> <"+dcCreator+"> ?Y . }";
+                        final BigdataStatementIterator itr = conn.getTripleStore().getStatements(null, null, null);
+                        final String rdfXml;
+                        try {
             
-            /*
-             * Create a data set consisting of the contexts to be queried.
-             * 
-             * Note: a [null] DataSet will cause context to be ignored when the
-             * query is processed.
-             */
-//            final DatasetImpl dataSet = null; //new DatasetImpl();
-//
-//            final BindingSet bindingSet = new QueryBindingSet();
-//
-//            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
-//                    .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
-
-            final TupleQuery tq = new BigdataSailRepository(sail).getReadOnlyConnection().prepareTupleQuery(QueryLanguage.SPARQL, q);
+                            final Writer w = new StringWriter();
             
-            final TupleQueryResult itr = tq.evaluate();
+            //                final RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+                            final RDFWriterFactory writerFactory = RDFWriterRegistry
+                                    .getInstance().get(RDFFormat.RDFXML);
+                            
+                            assertNotNull(writerFactory);
+                            
+                            final RDFWriter rdfWriter = writerFactory.getWriter(w);
             
-            if (log.isInfoEnabled())
-                log.info("Verifying query.");
-
-            /*
-             * These are the expected results for the query (the bindings for Y).
-             */
-
-            final Set<Value> expected = new HashSet<Value>();
-
-            expected.add(bryan);
+                            rdfWriter.startRDF();
             
-            expected.add(mike);
-
-            /*
-             * Verify that the query results is the correct solutions.
-             */
-
-            final int nresults = expected.size();
+                            while (itr.hasNext()) {
             
+                                final BigdataStatementImpl stmt = (BigdataStatementImpl) itr
+                                        .next();
+            
+                                // only write the explicit statements.
+                                if (!stmt.isExplicit())
+                                    continue;
+            
+                                rdfWriter.handleStatement(stmt);
+            
+                            }
+            
+                            rdfWriter.endRDF();
+            
+                            rdfXml = w.toString();
+            
+                        } finally {
+            
+                            itr.close();
+            
+                        }
+            
+                        // write the rdf/xml
+                        log.info(rdfXml);
+    
+                    } finally {
+
+                        conn.close();
+                        
+                    }
+                
+            }
+            
+            final SailConnection conn = sail.getConnection();
+    
             try {
-
-                int i = 0;
-
-                while (itr.hasNext()) {
-
-                    final BindingSet solution = itr.next();
-
-                    if (log.isInfoEnabled())
-                        log.info("solution[" + i + "] : " + solution);
-
-                    final Value actual = solution.getValue("Y");
-
-                    assertTrue("Not expecting Y=" + actual, expected
-                            .remove(actual));
-
-                    i++;
-
+    
+                final URI y = new URIImpl("http://www.foo.org/y");
+                
+                final URI B = new URIImpl("http://www.foo.org/B");
+    
+                final URI dcCreator = new URIImpl("http://purl.org/dc/terms/creator");
+    
+                final Literal bryan = new LiteralImpl("bryan", XMLSchema.STRING);
+                
+                final Literal mike = new LiteralImpl("mike", XMLSchema.STRING);
+    
+                /*
+                 * This is a hand-coded query.
+                 * 
+                 * Note: When statement identifiers are enabled, the only way to
+                 * bind the context position is to already have a statement on hand -
+                 * there is no index which can be used to look up a statement by its
+                 * context and the context is always a blank node.
+                 */
+    
+    //            final TupleExpr tupleExpr = 
+    //                new Projection(
+    //                new Join(//
+    //                    new StatementPattern(//
+    //                            new Var("X", y),//
+    //                            new Var("1", RDF.TYPE),//
+    //                            new Var("2", B),//
+    //                            new Var("SID")),// unbound.
+    //                    new StatementPattern(//
+    //                            new Var("SID"),//
+    //                            new Var("3", dcCreator),//
+    //                            new Var("Y"))),
+    //                new ProjectionElemList(new ProjectionElem[] { new ProjectionElem( "Y" )}));
+    
+    //            final String q = "select ?Y where { ?SID <"+dcCreator+"> ?Y . graph ?SID { <"+y+"> <"+RDF.TYPE+"> <"+B+"> . } }";
+                final String q = "select ?Y where { <<<"+y+"> <"+RDF.TYPE+"> <"+B+">>> <"+dcCreator+"> ?Y . }";
+                
+                /*
+                 * Create a data set consisting of the contexts to be queried.
+                 * 
+                 * Note: a [null] DataSet will cause context to be ignored when the
+                 * query is processed.
+                 */
+    //            final DatasetImpl dataSet = null; //new DatasetImpl();
+    //
+    //            final BindingSet bindingSet = new QueryBindingSet();
+    //
+    //            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
+    //                    .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
+    
+                final TupleQuery tq = new BigdataSailRepository(sail).getReadOnlyConnection().prepareTupleQuery(QueryLanguage.SPARQL, q);
+                
+                final TupleQueryResult itr = tq.evaluate();
+                
+                if (log.isInfoEnabled())
+                    log.info("Verifying query.");
+    
+                /*
+                 * These are the expected results for the query (the bindings for Y).
+                 */
+    
+                final Set<Value> expected = new HashSet<Value>();
+    
+                expected.add(bryan);
+                
+                expected.add(mike);
+    
+                /*
+                 * Verify that the query results is the correct solutions.
+                 */
+    
+                final int nresults = expected.size();
+                
+                try {
+    
+                    int i = 0;
+    
+                    while (itr.hasNext()) {
+    
+                        final BindingSet solution = itr.next();
+    
+                        if (log.isInfoEnabled())
+                            log.info("solution[" + i + "] : " + solution);
+    
+                        final Value actual = solution.getValue("Y");
+    
+                        assertTrue("Not expecting Y=" + actual, expected
+                                .remove(actual));
+    
+                        i++;
+    
+                    }
+    
+                    assertEquals("#results", nresults, i);
+    
+                } finally {
+    
+                    itr.close();
+    
                 }
-
-                assertEquals("#results", nresults, i);
-
+    
             } finally {
-
-                itr.close();
-
+    
+                conn.close();
+    
             }
-
-        } finally {
-
-            conn.close();
-
-        }
 
         } finally {
             

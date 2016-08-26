@@ -59,7 +59,6 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
  * A literal. Use {@link BigdataValueFactory} to create instances of this class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataLiteralImpl extends BigdataValueImpl implements
         BigdataLiteral {
@@ -97,6 +96,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         
     }
 
+    @Override
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
@@ -127,24 +127,28 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         
     }
     
+    @Override
     public String stringValue() {
        
         return label;
         
     }
 
+    @Override
     final public String getLabel() {
 
         return label;
         
     }
 
+    @Override
     final public String getLanguage() {
 
         return language;
         
     }
 
+    @Override
     final public BigdataURI getDatatype() {
 
         return datatype;
@@ -215,60 +219,70 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
      * XSD stuff.
      */
     
+    @Override
     final public boolean booleanValue() {
 
         return XMLDatatypeUtil.parseBoolean(label);
 
     }
 
+    @Override
     final public byte byteValue() {
 
         return XMLDatatypeUtil.parseByte(label);
 
     }
 
+    @Override
     final public short shortValue() {
 
         return XMLDatatypeUtil.parseShort(label);
 
     }
 
+    @Override
     final public int intValue() {
 
         return XMLDatatypeUtil.parseInt(label);
 
     }
 
+    @Override
     final public long longValue() {
 
         return XMLDatatypeUtil.parseLong(label);
 
     }
 
+    @Override
     final public float floatValue() {
 
         return XMLDatatypeUtil.parseFloat(label);
 
     }
 
+    @Override
     final public double doubleValue() {
 
         return XMLDatatypeUtil.parseDouble(label);
 
     }
 
+    @Override
     final public BigInteger integerValue() {
 
         return XMLDatatypeUtil.parseInteger(label);
 
     }
 
+    @Override
     final public BigDecimal decimalValue() {
 
         return XMLDatatypeUtil.parseDecimal(label);
 
     }
 
+    @Override
     final public XMLGregorianCalendar calendarValue() {
 
         return XMLDatatypeUtil.parseCalendar(label);

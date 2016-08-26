@@ -25,12 +25,12 @@ package com.bigdata.bop;
 
 import java.util.Collections;
 
+import com.bigdata.rdf.sparql.ast.FilterNode;
 
 /**
  * A constant.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
@@ -44,6 +44,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      *  This allows efficient checking if a value is an error value by using 
      *  the reference equality (val == Constant.ERROR_VALUE).
      */
+    @SuppressWarnings("rawtypes")
     private static final Constant ERROR_VALUE = new Constant(); 
     
     /** value == null indicates this == errorValue, representing 
@@ -52,7 +53,6 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      */
     final private E value;
     
-
     public interface Annotations extends ImmutableBOp.Annotations {
 
         /**
@@ -72,12 +72,14 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     }
     
+    @Override
     final public boolean isVar() {
         
         return false;
         
     }
 
+    @Override
     final public boolean isConstant() {
         
         return true;
@@ -107,7 +109,6 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
             throw new IllegalArgumentException();
         
         this.value = op.value;
-        
     }
 
     /**
@@ -153,9 +154,8 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
             // Recursive nesting of Constant is not allowed.
             throw new IllegalArgumentException();
         }
-        
-        this.value = value;
 
+        this.value = value;
     }
 
     /**
@@ -167,11 +167,6 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     public Constant(final E value) {
 
         super(BOp.NOARGS, BOp.NOANNS);
-
-        // TODO: assert value != null
-        // Currently this may potentially break some hacks relying 
-        // on IllegalArgumentException,
-        // e.g., in PipelinedAggregationOp.call()
         
         if (value == null)
             throw new IllegalArgumentException();
@@ -180,9 +175,8 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
             // Recursive nesting of Constant is not allowed.
             throw new IllegalArgumentException();
         }
-
+        
         this.value = value;
-
     }
     
     /** Currently only used to create {@link ERROR_VALUE}. */
@@ -196,20 +190,22 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      *  Copies of this Constant cannot be created,
      *  so comparison of reference is enough for equality checks.
      */
+    @SuppressWarnings("rawtypes")
     public static Constant errorValue() {
         return ERROR_VALUE;
     }
     
-    
     /**
      * Clone is overridden to reduce heap churn.
      */
+    @Override
     final public Constant<E> clone() {
 
         return this;
         
     }
 
+    @Override
     public String toString() {
         
         if (value == null) {
@@ -230,6 +226,8 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         
     }
 
+    @SuppressWarnings("rawtypes")
+    @Override
     final public boolean equals(final IVariableOrConstant<E> o) {
 
         if (!o.isConstant()) {
@@ -244,6 +242,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
                 value.equals(((Constant) o).value);
     }
     
+    @Override
     final public boolean equals(final Object o) {
 
         if (this == o)
@@ -283,6 +282,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         
     }
     
+    @Override
     final public int hashCode() {
         
 //        return (int) (id ^ (id >>> 32));
@@ -297,6 +297,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     /** @return possibly null if this Constant represents an error value 
      *  as in https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
      */
+    @Override
     final public E get() {
         
         return value;
@@ -306,12 +307,14 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     /** @return possibly null if this Constant represents an error value 
      *  as in https://www.w3.org/TR/sparql11-query/#aggregateAlgebra 
      */
+    @Override
     final public E get(final IBindingSet bindingSet) {
         
         return value;
 
     }
 
+    @Override
     final public String getName() {
      
         throw new UnsupportedOperationException();

@@ -30,7 +30,9 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.data.AbstractReadOnlyNodeData;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
@@ -71,7 +73,7 @@ import com.bigdata.util.Bytes;
  * {@link BufferUnderflowException} will be thrown. On write, the data will be
  * written on an internal buffer whose size is automatically extended. The write
  * buffer is reused for each write and quickly achieves a maximum size for any
- * given {@link BTree}.
+ * given {@link HTree}.
  * </p>
  * <p>
  * Note: while the {@link NodeSerializer} is NOT thread-safe for writers, it is
@@ -119,7 +121,7 @@ public class NodeSerializer {
     /**
      * Factory for record-level (de-)compression of nodes and leaves (optional).
      */
-    private final IRecordCompressorFactory<?> recordCompressorFactory;
+    final IRecordCompressorFactory<?> recordCompressorFactory;
     
     /**
      * An object that knows how to (de-)compress a node or leaf (optional).
@@ -155,8 +157,8 @@ public class NodeSerializer {
      * {@link AbstractBTree#close() closed} and then reallocated on demand.
      * <p>
      * Note: It is important that this field NOT be used for a read-only
-     * {@link BTree} since only mutable {@link BTree}s are single threaded -
-     * concurrent readers are allowed for read-only btrees.
+     * {@link HTree} since only mutable {@link HTree}s are single threaded -
+     * concurrent readers are allowed for read-only {@link HTree}s.
      * 
      * @see #allocWriteBuffer()
      * @see #close()
@@ -343,6 +345,27 @@ public class NodeSerializer {
     }
 
     /**
+     * Report the current write buffer capacity -or- the
+     * {@link #initialBufferCapacity} if the write buffer is not allocated.
+     */
+    int getWriteBufferCapacity() {
+
+        if (readOnly) {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        final DataOutputBuffer tmp = _writeBuffer;
+        
+        if (tmp == null)
+            return initialBufferCapacity;
+
+        return tmp.capacity();
+
+    }
+    
+    /**
      * Decode an {@link INodeData} or {@link ILeafData} record, wrapping the
      * underlying data record (thread-safe). The decision to decode as an
      * {@link INodeData} or {@link ILeafData} instance is made based on
@@ -392,9 +415,9 @@ public class NodeSerializer {
     }
 
     /**
-     * Wrap an {@link INodeData} or {@link ILeafData} instance as a {@link Node}
-     * or a {@link Leaf}. This DOES NOT set the parent of the new {@link Node}
-     * or {@link Leaf}.
+     * Wrap an {@link INodeData} or {@link ILeafData} instance as a {@link DirectoryPage}
+     * or a {@link BucketPage}. This DOES NOT set the parent of the new {@link DirectoryPage}
+     * or {@link BucketPage}.
      * 
      * @param btree
      *            The owning B+Tree.

@@ -85,6 +85,24 @@ public class QueryEngineCounters implements ICounterSetAccess {
     protected final CAT blockedWorkQueueRunningTotal = new CAT();
 
     /**
+     * The total number of chunks of solutions currently buffered for the input
+     * queues for operators on the query engine (regardless of whether the
+     * native heap or the managed object heap is being used).
+     * 
+     * @see BLZG-533 (Vector query engine on native heap).
+     */
+    protected final CAT bufferedChunkMessageCount = new CAT();
+    
+    /**
+     * The total number of bytes for solutions currently buffered on the
+     * <strong>native heap</strong> for the input queues for operators on the
+     * query engine.
+     * 
+     * @see BLZG-533 (Vector query engine on native heap).
+     */
+    protected final CAT bufferedChunkMessageBytesOnNativeHeap = new CAT();
+    
+    /**
      * The #of active operator evaluation tasks (chunk tasks).
      */
     protected final CAT operatorActiveCount = new CAT();
@@ -179,6 +197,22 @@ public class QueryEngineCounters implements ICounterSetAccess {
             @Override
             public void sample() {
                 setValue(blockedWorkQueueRunningTotal.get());
+            }
+        });
+
+        // Number of buffered IChunkMessages
+        root.addCounter("bufferedChunkMessageCount", new Instrument<Long>() {
+            @Override
+            public void sample() {
+                setValue(bufferedChunkMessageCount.get());
+            }
+        });
+
+        // The number of bytes on the native (not managed) heap occupied by buffered IChunkMessages.
+        root.addCounter("bufferedChunkMessageBytesOnNativeHeap", new Instrument<Long>() {
+            @Override
+            public void sample() {
+                setValue(bufferedChunkMessageBytesOnNativeHeap.get());
             }
         });
 

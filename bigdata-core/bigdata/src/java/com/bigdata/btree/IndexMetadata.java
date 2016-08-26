@@ -621,6 +621,39 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         String DEFAULT_BTREE_RECORD_COMPRESSOR_FACTORY = null;
         
+        /**
+         * The maximum number of threads that will be used to evict dirty nodes
+         * or leaves in a given level of a persistence capable index (BTree or
+         * HTree). Parallel level set eviction can reduce the latency required
+         * to checkpoint a large index when a large bulk update has been
+         * applied.
+         * <p>
+         * Note: This is currently a System property (set with -D).
+         *
+         * @see https://jira.blazegraph.com/browse/BLZG-1665 (Reduce commit
+         *      latency by parallel checkpoint by level of dirty pages in an
+         *      index)
+         */
+        String MAX_PARALLEL_EVICT_THREADS = BTree.class.getName()+".maxParallelEvictThreads";
+        String DEFAULT_MAX_PARALLEL_EVICT_THREADS = "10";
+        
+        /**
+         * The minimum number of dirty nodes or leaves in a given level of the
+         * index (BTree or HTree) before parallel eviction will be used. You may
+         * set this value to a {@link Integer#MAX_VALUE} to disable parallel
+         * level set eviction.
+         * <p>
+         * Note: This is currently a System property (set with -D).
+         *
+         * @see #MAX_PARALLEL_EVICT_THREADS
+         * @see https://jira.blazegraph.com/browse/BLZG-1665 (Reduce commit
+         *      latency by parallel checkpoint by level of dirty pages in an
+         *      index)
+         */
+        String MIN_DIRTY_LIST_SIZE_FOR_PARALLEL_EVICT = BTree.class.getName()+".minDirtyListSizeForParallelEvict";
+        String DEFAULT_MIN_DIRTY_LIST_SIZE_FOR_PARALLEL_EVICT = "5";
+ 
+        
         /*
          * Options that are specific to IndexSegment.
          * 

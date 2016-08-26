@@ -29,13 +29,11 @@ package com.bigdata.rdf.sail;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Properties;
-import org.apache.log4j.Level;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.LiteralImpl;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.Binding;
@@ -48,8 +46,8 @@ import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.memory.MemoryStore;
+
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -64,7 +62,7 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
     @Override
     public Properties getProperties() {
         
-        Properties props = super.getProperties();
+        final Properties props = super.getProperties();
         
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
@@ -103,10 +101,10 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
             final BigdataSail bdSail = getSail();
             sail = bdSail;
             
-            if (bdSail.getDatabase().isQuads() == false) {
-                bdSail.__tearDownUnitTest();
-                return;
-            }
+//            if (bdSail.getDatabase().isQuads() == false) {
+//                bdSail.__tearDownUnitTest();
+//                return;
+//            }
             
             repo = new BigdataSailRepository(bdSail);
             
@@ -117,23 +115,30 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
         
         repo.initialize();
         cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
-    
+
+            if (cxn instanceof BigdataSailRepositoryConnection
+                    && ((BigdataSailRepositoryConnection) cxn).getTripleStore().isQuads() == false) {
+                ((BigdataSail) sail).__tearDownUnitTest();
+                return;
+            }
+            
+            cxn.setAutoCommit(false);
+
             final ValueFactory vf = sail.getValueFactory();
             
             final String ns = BD.NAMESPACE;
             
-            URI mike = vf.createURI(ns+"Mike");
-            URI bryan = vf.createURI(ns+"Bryan");
-            URI person = vf.createURI(ns+"Person");
-            URI likes = vf.createURI(ns+"likes");
-            URI rdf = vf.createURI(ns+"RDF");
-            Literal l1 = vf.createLiteral("Mike");
-            Literal l2 = vf.createLiteral("Bryan");
-            URI g1 = vf.createURI(ns+"graph1");
-            URI g2 = vf.createURI(ns+"graph2");
+            final URI mike = vf.createURI(ns+"Mike");
+//            URI bryan = vf.createURI(ns+"Bryan");
+            final URI person = vf.createURI(ns+"Person");
+            final URI likes = vf.createURI(ns+"likes");
+            final URI rdf = vf.createURI(ns+"RDF");
+            final Literal l1 = vf.createLiteral("Mike");
+//            Literal l2 = vf.createLiteral("Bryan");
+            final URI g1 = vf.createURI(ns+"graph1");
+            final URI g2 = vf.createURI(ns+"graph2");
 /**/
             cxn.setNamespace("ns", ns);
             
@@ -153,7 +158,7 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
             
             if (log.isInfoEnabled()) {
                 if (sail instanceof BigdataSail)
-                    log.info("\n" + ((BigdataSail)sail).getDatabase().dumpStore());
+                    log.info("\n" + ((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
             }
 
             {
@@ -171,13 +176,13 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("p", RDF.TYPE),
                     new BindingImpl("o", person),
@@ -197,7 +202,7 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
             
             {
                 
-                String query = 
+                final String query = 
                     "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
                     "PREFIX ns: <"+ns+"> " +
@@ -211,13 +216,13 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("p", RDF.TYPE),
                     new BindingImpl("o", person),

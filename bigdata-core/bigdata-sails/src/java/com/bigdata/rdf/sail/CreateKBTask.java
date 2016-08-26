@@ -39,9 +39,9 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.BigdataSail.UnisolatedCallable;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -61,10 +61,8 @@ import com.bigdata.util.InnerCause;
  */
 public class CreateKBTask extends AbstractApiTask<Void> {
 
-    private static final transient Logger log = Logger
-            .getLogger(CreateKBTask.class);
-
-//    private final IIndexManager indexManager;
+    private static final transient Logger log = Logger.getLogger(CreateKBTask.class);
+    private static final transient Logger txLog = Logger.getLogger("com.bigdata.txLog");
     
     /**
      * The effective properties that will be used to create the namespace.
@@ -136,8 +134,10 @@ public class CreateKBTask extends AbstractApiTask<Void> {
      * Note: This process is not robust if the leader is elected and becomes
      * HAReady and then fails over before the KB is created. The task should be
      * re-submitted by the new leader once that leader is elected.
+     * 
+     * @throws Exception 
      */
-    private void doRun() {
+    private void doRun() throws Exception {
     
        final IIndexManager indexManager = getIndexManager();
        
@@ -226,43 +226,67 @@ public class CreateKBTask extends AbstractApiTask<Void> {
 
             if (isSoloOrLeader) {
 
-                // Attempt to resolve the namespace.
-                if (indexManager.getResourceLocator().locate(namespace,
-                        ITx.UNISOLATED) == null) {
-
-                    if(log.isInfoEnabled())
-                    	log.info("Creating KB instance: namespace=" + namespace);
-
+                /*
+                 * Note: createLTS() writes on the GRS. This is an atomic row
+                 * store. The change is automatically committed. The unisolated
+                 * view of the BigdataSailConnection is being used solely to
+                 * have the correct locks.
+                 * 
+                 * @see BLZG-2023, BLZG-2041
+                 */
+                // Wrap with SAIL.
+                final BigdataSail sail = new BigdataSail(namespace, getIndexManager());
+                try {
+                    sail.initialize();
+                    final UnisolatedCallable<Void> task = new UnisolatedCallable<Void>() {
+                        @Override
+                        public Void call() throws Exception {
+                            if (!sail.exists()) {
+ 
                     // create the appropriate as configured triple/quad store.
                     createLTS(jnl, getProperties());
 
-                    if(log.isInfoEnabled())
-                       log.info("Created tripleStore: " + namespace);
-
-                } // if( tripleStore == null )
+                                if (txLog.isInfoEnabled())
+                                    txLog.info("SAIL-CREATE-NAMESPACE: namespace=" + namespace); // FIXME BLZG-2041 document on wiki
+                            }
+                            return null;
+                        }
+                    };
+                    try {
+                        // Do work with appropriate locks are held.
+                        sail.getUnisolatedConnectionLocksAndRunLambda(task);
+                    } finally {
+                        // Release locks.
+                        task.releaseLocks();
+                    }
+                } finally {
+                    sail.shutDown();
+                }
 
             }
 
         } else {
 
          // Attempt to resolve the namespace.
-         if (indexManager.getResourceLocator()
-               .locate(namespace, ITx.UNISOLATED) == null) {
-
+             if (indexManager.getResourceLocator().locate(namespace, ITx.UNISOLATED) == null) {
+    
             /*
              * Register triple store for scale-out.
+                 * 
+                 * Note: Scale-out does not have a global lock.
              */
-
+    
             if (log.isInfoEnabled())
                log.info("Creating KB instance: namespace=" + namespace);
-
+    
             final ScaleOutTripleStore lts = new ScaleOutTripleStore(
                   indexManager, namespace, ITx.UNISOLATED, getProperties());
-
+    
+                // Note: Commit in scale-out is shard-wise acid.
             lts.create();
-
-            if (log.isInfoEnabled())
-               log.info("Created tripleStore: " + namespace);
+    
+                if (txLog.isInfoEnabled())
+                   txLog.info("CREATE: namespace=" + namespace);
 
          } // if( tripleStore == null )
 
@@ -278,13 +302,11 @@ public class CreateKBTask extends AbstractApiTask<Void> {
     * 
     * @param indexManager
     * @param properties
-    * @return
+     * 
+     * @throws IOException
     */
-    private AbstractTripleStore createLTS(final IJournal indexManager, final Properties properties) {
+    private void createLTS(final IJournal indexManager, final Properties properties) throws IOException {
        
-      final ITransactionService txService = indexManager
-            .getLocalTransactionManager().getTransactionService();
-
       final String namespace = properties.getProperty(
             BigdataSail.Options.NAMESPACE,
             BigdataSail.Options.DEFAULT_NAMESPACE);
@@ -292,45 +314,47 @@ public class CreateKBTask extends AbstractApiTask<Void> {
       // throws an exception if there are inconsistent properties
       BigdataSail.checkProperties(properties);
       
-      /**
-       * Note: Unless group commit is enabled, we need to make this operation
-       * mutually exclusive with KB level writers in order to avoid the
-       * possibility of a triggering a commit during the middle of a
-       * BigdataSailConnection level operation (or visa versa).
-       * 
-       * Note: When group commit is not enabled, the indexManager will be a
-       * Journal class. When it is enabled, it will merely implement the
-       * IJournal interface.
-       * 
-       * @see #1143 (Isolation broken in NSS when groupCommit disabled)
-       */
-      final boolean isGroupCommit = indexManager.isGroupCommit();
-      boolean acquiredConnection = false;
-      try {
+//      /**
+//       * Note: Unless group commit is enabled, we need to make this operation
+//       * mutually exclusive with KB level writers in order to avoid the
+//       * possibility of a triggering a commit during the middle of a
+//       * BigdataSailConnection level operation (or visa versa).
+//       * 
+//       * Note: When group commit is not enabled, the indexManager will be a
+//       * Journal class. When it is enabled, it will merely implement the
+//       * IJournal interface.
+//       * 
+//       * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+//       */
+//      final boolean isGroupCommit = indexManager.isGroupCommit();
+//      boolean acquiredConnection = false;
+//      try {
+//
+//         if (!isGroupCommit) {
+//            try {
+//               // acquire the unisolated connection permit.
+//               ((Journal) indexManager).acquireUnisolatedConnection();
+//               acquiredConnection = true;
+//            } catch (InterruptedException e) {
+//               throw new RuntimeException(e);
+//            }
+//         }
 
-         if (!isGroupCommit) {
-            try {
-               // acquire the unisolated connection permit.
-               ((Journal) indexManager).acquireUnisolatedConnection();
-               acquiredConnection = true;
-            } catch (InterruptedException e) {
-               throw new RuntimeException(e);
-            }
-         }
-
-         // Check for pre-existing instance.
-         {
-
-            final LocalTripleStore lts = (LocalTripleStore) indexManager
-                  .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-            if (lts != null) {
-
-               return lts;
-
-            }
-
-         }
+//      Note: Already checked by the caller.
+//      
+//         // Check for pre-existing instance.
+//         {
+//
+//            final LocalTripleStore lts = (LocalTripleStore) indexManager
+//                  .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//            if (lts != null) {
+//
+//               return;
+//
+//            }
+//
+//         }
 
          // Create a new instance.
          {
@@ -342,29 +366,34 @@ public class CreateKBTask extends AbstractApiTask<Void> {
                /*
                 * Isolatable indices: requires the use of a tx to create the KB
                 * instance.
+                * 
+                * FIXME BLZG-2041: Verify test coverage of this code path.
                 */
 
-               final long txCreate = txService.newTx(ITx.UNISOLATED);
+               final ITransactionService txService = indexManager
+                        .getLocalTransactionManager().getTransactionService();
+
+               final long txIdCreate = txService.newTx(ITx.UNISOLATED);
 
                boolean ok = false;
                try {
 
                   final AbstractTripleStore txCreateView = new LocalTripleStore(
-                        indexManager, namespace, Long.valueOf(txCreate),
+                        indexManager, namespace, Long.valueOf(txIdCreate),
                         properties);
 
                   // create the kb instance within the tx.
                   txCreateView.create();
 
                   // commit the tx.
-                  txService.commit(txCreate);
+                  txService.commit(txIdCreate);
 
                   ok = true;
 
                } finally {
 
                   if (!ok)
-                     txService.abort(txCreate);
+                     txService.abort(txIdCreate);
 
                }
 
@@ -383,50 +412,50 @@ public class CreateKBTask extends AbstractApiTask<Void> {
 
          }
 
-         /*
-          * Now that we have created the instance, either using a tx or the
-          * unisolated connection, locate the triple store resource and return
-          * it.
-          */
-         {
+//         /*
+//          * Now that we have created the instance, either using a tx or the
+//          * unisolated connection, locate the triple store resource and return
+//          * it.
+//          */
+//         {
+//
+//            final LocalTripleStore lts = (LocalTripleStore) indexManager
+//                  .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//            if (lts == null) {
+//
+//               /*
+//                * This should only occur if there is a concurrent destroy, which
+//                * is highly unlikely to say the least.
+//                */
+//               throw new RuntimeException("Concurrent create/destroy: "
+//                     + namespace);
+//
+//            }
+//
+//            return;
+//
+//         }
 
-            final LocalTripleStore lts = (LocalTripleStore) indexManager
-                  .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-            if (lts == null) {
-
-               /*
-                * This should only occur if there is a concurrent destroy, which
-                * is highly unlikely to say the least.
-                */
-               throw new RuntimeException("Concurrent create/destroy: "
-                     + namespace);
-
-            }
-
-            return lts;
-
-         }
-
-      } catch (IOException ex) {
-
-         throw new RuntimeException(ex);
-
-      } finally {
-
-         if (!isGroupCommit && acquiredConnection) {
-
-            /**
-             * When group commit is not enabled, we need to release the
-             * unisolated connection.
-             * 
-             * @see #1143 (Isolation broken in NSS when groupCommit disabled)
-             */
-            ((Journal) indexManager).releaseUnisolatedConnection();
-
-         }
-
-      }
+//      } catch (IOException ex) {
+//
+//         throw new RuntimeException(ex);
+//
+//      } finally {
+//
+//         if (!isGroupCommit && acquiredConnection) {
+//
+//            /**
+//             * When group commit is not enabled, we need to release the
+//             * unisolated connection.
+//             * 
+//             * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+//             */
+//            ((Journal) indexManager).releaseUnisolatedConnection();
+//
+//         }
+//
+//      }
 
    }
 

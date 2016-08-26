@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.iteration.CloseableIteration;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -53,17 +51,19 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
-import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.sparse.ITPS;
+
+import info.aduna.iteration.CloseableIteration;
 
 /**
  * Utility class for exporting the configuration properties and data associated
@@ -74,16 +74,20 @@ import com.bigdata.sparse.ITPS;
  *      Migration</a>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ExportKB {
 
     private static final Logger log = Logger.getLogger(ExportKB.class);
 
     /**
-     * The KB to be exported.
+     * The connection that will be used to export the data.
      */
-    private final AbstractTripleStore kb;
+    private final BigdataSailConnection conn;
+    
+//    /**
+//     * The KB to be exported.
+//     */
+//    private final AbstractTripleStore kb;
 
     /**
      * The namespace associated with that KB.
@@ -109,8 +113,8 @@ public class ExportKB {
     
     /**
      * 
-     * @param kb
-     *            The KB instance.
+     * @param conn
+     *            The connection.
      * @param kbdir
      *            The directory into which the exported properties and RDF data
      *            will be written.
@@ -121,10 +125,10 @@ public class ExportKB {
      *            exported. Otherwise just the explicitly given (aka told)
      *            triples/quads will be exported.
      */
-    public ExportKB(final AbstractTripleStore kb, final File kbdir,
+    public ExportKB(final BigdataSailConnection conn, final File kbdir,
             final RDFFormat format, final boolean includeInferred) {
 
-        if (kb == null)
+        if (conn == null)
             throw new IllegalArgumentException("KB not specified.");
         
         if (kbdir == null)
@@ -134,6 +138,8 @@ public class ExportKB {
         if (format == null)
             throw new IllegalArgumentException("RDFFormat not specified.");
 
+        final AbstractTripleStore kb = conn.getTripleStore();
+        
         if (kb.isStatementIdentifiers() && !RDFFormat.RDFXML.equals(format))
             throw new IllegalArgumentException(
                     "SIDs mode requires RDF/XML interchange.");
@@ -142,7 +148,9 @@ public class ExportKB {
             throw new IllegalArgumentException(
                     "RDFFormat does not support quads: " + format);
 
-        this.kb = kb;
+        this.conn = conn;
+        
+//        this.kb = kb;
 
         this.namespace = kb.getNamespace();
         
@@ -205,6 +213,7 @@ public class ExportKB {
      */
     public void exportProperties() throws IOException {
         prepare();
+        final AbstractTripleStore kb = conn.getTripleStore();
         // Prepare a comment block for the properties file.
         final StringBuilder comments = new StringBuilder(
                 "Configuration properties.\n");
@@ -253,11 +262,11 @@ public class ExportKB {
     public void exportData() throws IOException, SailException,
             RDFHandlerException {
         prepare();
-        final BigdataSail sail = new BigdataSail(kb);
-        try {
-            sail.initialize();
-            final SailConnection conn = sail.getReadOnlyConnection();
-            try {
+//        final BigdataSail sail = new BigdataSail(kb);
+//        try {
+//            sail.initialize();
+//            final SailConnection conn = sail.getReadOnlyConnection();
+//            try {
                 final CloseableIteration<? extends Statement, SailException> itr = conn
                         .getStatements(null/* s */, null/* p */, null/* o */,
                                 includeInferred, new Resource[] {}/* contexts */);
@@ -282,12 +291,12 @@ public class ExportKB {
                 } finally {
                     itr.close();
                 }
-            } finally {
-                conn.close();
-            }
-        } finally {
-            sail.shutDown();
-        }
+//            } finally {
+//                conn.close();
+//            }
+//        } finally {
+//            sail.shutDown();
+//        }
 
     }
 
@@ -548,21 +557,30 @@ public class ExportKB {
 
             for (String namespace : namespaces) {
 
-                // Get KB view.
-                final AbstractTripleStore kb = (AbstractTripleStore) indexManager
-                        .getResourceLocator().locate(namespace, commitTime);
+//                // Get KB view.
+//                final AbstractTripleStore kb = (AbstractTripleStore) indexManager
+//                        .getResourceLocator().locate(namespace, commitTime);
+
+                final BigdataSail sail = new BigdataSail(namespace, indexManager);
+                try {
+                    
+                    sail.initialize();
+
+                    final BigdataSailConnection conn = sail.getReadOnlyConnection(commitTime);
+
+                    try {
                 
                 // The name of the subdirectory on which the properties and RDF
                 // data will be written.
                 final File kbdir = new File(outdir, munge(namespace));
-
+        
                 // Choose an appropriate RDFFormat.
                 RDFFormat fmt = format;
                 if (fmt == null) {
                     // Choose an appropriate format.
-                    if (kb.isStatementIdentifiers()) {
+                            if (conn.getTripleStore().isStatementIdentifiers()) {
                         fmt = RDFFormat.RDFXML;
-                    } else if (kb.isQuads()) {
+                            } else if (conn.isQuads()) {
                         fmt = RDFFormat.TRIX;
                     } else {
                         fmt = RDFFormat.RDFXML;
@@ -572,8 +590,18 @@ public class ExportKB {
                         + fmt.getName() + " on " + kbdir);
                 if (!nothing) {
                     // Export KB.
-                    new ExportKB(kb, kbdir, fmt, includeInferred).export();
+                            new ExportKB(conn, kbdir, fmt, includeInferred).export();
                 }
+
+                    } finally {
+                        
+                        conn.close();
+                        
+                    }
+                } finally {
+                    sail.shutDown();
+                }
+                
             }
 
             // Success.

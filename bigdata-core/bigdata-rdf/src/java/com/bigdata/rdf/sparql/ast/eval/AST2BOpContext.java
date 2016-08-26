@@ -33,8 +33,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
@@ -43,6 +41,7 @@ import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.SimpleIdFactory;
+import com.bigdata.bop.engine.IChunkHandler;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.StaticAnalysisStats;
@@ -191,6 +190,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     public boolean nativeDistinctSolutions = QueryHints.DEFAULT_NATIVE_DISTINCT_SOLUTIONS;
 
     /**
+     * Controls whether the intermediate solution chunks on the query engine
+     * operator input queues are stored on the native heap and/or the managed
+     * object heap.
+     * 
+     * @see QueryHints#QUERY_ENGINE_CHUNK_HANDLER
+     * @see BLZG-533 (Vector query engine on native heap)
+     */
+    public IChunkHandler queryEngineChunkHandler = QueryHints.DEFAULT_QUERY_ENGINE_CHUNK_HANDLER;
+
+    /**
      * 
      * When <code>true</code>, use hash index operations based on the
      * {@link HTree}. Otherwise use hash index operations based on the Java
@@ -260,22 +269,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * costs. When we handle materialization outside of the query plan, those
      * materialization costs are not reflected in the query plan statistics.
      * 
-     * FIXME This can not be enabled until we fix a bug where variables in
-     * optional groups (or simple optional statement patterns) are added to the
-     * doneSet when we attempt to materialize them for a filter. The bug is
-     * demonstrated by TestOptionals#test_complex_optional_01() as well as by
-     * some of the TCK optional tests (TestTCK). (This bug is normally masked if
-     * we do materialization outside of the query plan, but a query could be
-     * constructed which would demonstrate the problem even then since the
-     * variable appears within the query plan generator as if it is
-     * "known materialized" when it is only in fact materialized within the
-     * scope of the optional group.)
-     * 
      * @see <a
      *      href="https://sourceforge.net/apps/trac/bigdata/ticket/489">Optimize
      *      RDF Value materialization performance on cluster </a>
      */
-    boolean materializeProjectionInQuery = false;
+    boolean materializeProjectionInQuery = true;
 
     /**
      * Set by the {@link ConstructDistinctSPOHint}. When <code>false</code>, no

@@ -31,12 +31,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
-import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.MalformedQueryException;
@@ -53,7 +52,6 @@ import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -160,6 +158,10 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
         
         props.setProperty(Options.TEXT_INDEX, "true");
         
+        // make sure we are using a unique namespace in every run to avoid 
+        // possible interference of value factories floating around
+        props.setProperty(Options.NAMESPACE, "BigdataSPARQLUpdate-"+UUID.randomUUID());
+        
         return props;
         
     }
@@ -178,7 +180,7 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
         
         final BigdataSail sail = new BigdataSail(props);
         
-        backend = sail.getDatabase().getIndexManager();
+        backend = sail.getIndexManager();
 
         return new BigdataSailRepository(sail);
 
@@ -443,19 +445,22 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
     public void testTicket571() throws RepositoryException,
             MalformedQueryException, UpdateExecutionException,
             QueryEvaluationException {
-
-        final URI graphA = f.createURI("http://example.org/graphA");
-        final URI tempGraph = f.createURI("http://example.org/tmp");
-        final URI s = f.createURI("http://example/s>");
-        final URI p = f.createURI("http://example/p>");
-        final URI x = f.createURI("http://example/x>");
-        final URI foo = f.createURI("http://example/Foo>");
-        final URI rdfType = f.createURI(RDF.TYPE.stringValue());
-        final Literal two = f.createLiteral("2", XSD.INTEGER);
+        
+//        final URI graphA = f.createURI("http://example.org/graphA");
+//        final URI tempGraph = f.createURI("http://example.org/tmp");
+//        final URI s = f.createURI("http://example/s>");
+//        final URI p = f.createURI("http://example/p>");
+//        final URI x = f.createURI("http://example/x>");
+//        final URI foo = f.createURI("http://example/Foo>");
+//        final URI rdfType = f.createURI(RDF.TYPE.stringValue());
+//        final Literal two = f.createLiteral("2", XSD.INTEGER);
 
         // replace the standard dataset with one specific to this case.
         con.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
 
+//        System.err.println("##### INITIAL DATA IN DATABASE");
+//        debugPrintSolutions("SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }");
+        
         /**
          * Load into graphA (note: file is "file:///tmp/junk.ttl" in the
          * ticket).
@@ -482,6 +487,9 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
                 "}}\n"//
 //                "LOAD <file:bigdata-sails/src/test/org/openrdf/query/parser/sparql/ticket571.ttl> INTO GRAPH graphA: ;\n"//
         ).execute();
+        
+//        debugPrintSolutions("SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }");
+
         
         /**
          * Verify that all three triples are in graphA:
@@ -525,6 +533,10 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
                 "    ?s ?p ?v . } }\n"//
         ).execute();
 
+//        System.err.println("##### DATA IN DATABASE AFTER DELETE + INSERT");
+//        debugPrintSolutions("SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }");
+
+        
         /**
          * graphA should have one triple remaining:
          * 
@@ -552,6 +564,139 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
         }
 
     }
+    
+    
+    /**
+     * Variant of test 571 without blank nodes.
+     * 
+     * @throws RepositoryException
+     * @throws MalformedQueryException
+     * @throws UpdateExecutionException
+     * @throws QueryEvaluationException
+     */
+    public void testTicket571b() throws RepositoryException,
+            MalformedQueryException, UpdateExecutionException,
+            QueryEvaluationException {
+
+//        final URI graphA = f.createURI("http://example.org/graphA");
+//        final URI tempGraph = f.createURI("http://example.org/tmp");
+//        final URI s = f.createURI("http://example/s>");
+//        final URI p = f.createURI("http://example/p>");
+//        final URI x = f.createURI("http://example/x>");
+//        final URI foo = f.createURI("http://example/Foo>");
+//        final URI rdfType = f.createURI(RDF.TYPE.stringValue());
+//        final Literal two = f.createLiteral("2", XSD.INTEGER);
+
+        // replace the standard dataset with one specific to this case.
+        con.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
+
+//        System.err.println("##### INITIAL DATA IN DATABASE");
+//        debugPrintSolutions("SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }");
+
+        /**
+         * Load into graphA (note: file is "file:///tmp/junk.ttl" in the
+         * ticket).
+         * 
+         * <pre>
+         * PREFIX graphA:  <http://example/graphA>
+         * // * PREFIX tempGraph:  <http://example/temp>
+         * // * DROP SILENT GRAPH tempGraph: ;
+         * // * DROP SILENT GRAPH graphA: ;
+         * LOAD <file:///tmp/junk.ttl> INTO GRAPH graphA: ;
+         * </pre>
+         */
+        con.prepareUpdate(//
+                QueryLanguage.SPARQL,//
+                "PREFIX graphA:  <http://example/graphA> \n" + //
+                        // "PREFIX tempGraph:  <http://example/temp> \n"+//
+                        // "DROP SILENT GRAPH tempGraph: ;\n"+//
+                        // "DROP SILENT GRAPH graphA: ;\n"+//
+                        "INSERT DATA { \n" + //
+                        " GRAPH graphA: { \n" + //
+                        "   <http://nobnode> <http://example/p> 2 . \n" + //
+                        "   <http://nobnode> a <http://example/Foo> . \n" + //
+                        "   <http://example/s> <http://example/p> 2 . \n" + //
+                        "}}\n"//
+                        // "LOAD <file:bigdata-sails/src/test/org/openrdf/query/parser/sparql/ticket571.ttl> INTO GRAPH graphA: ;\n"//
+        ).execute();
+
+//        System.err.println("##### DATA IN DATABASE AFTER INSERT");
+//        debugPrintSolutions("SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }");
+
+        /**
+         * Verify that all three triples are in graphA:
+         * 
+         * <pre>
+         * SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }
+         * </pre>
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }";
+
+            assertEquals("graphA", 3L, countSolutions(query));
+
+        }
+
+        /**
+         * Now delete some triples from graphA while inserting the deleted
+         * triples into tempGraph:
+         * 
+         * <pre>
+         * PREFIX graphA:  <http://example/graphA>
+         * PREFIX tempGraph:  <http://example/temp>
+         * DROP SILENT GRAPH tempGraph: ;  ### Note: redundant
+         * DELETE { GRAPH graphA:    { ?s ?p ?v . } } 
+         * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
+         * WHERE { GRAPH graphA: { 
+         *     ?s a <http://example/Foo> .
+         *     ?s ?p ?v . } }
+         * </pre>
+         */
+        con.prepareUpdate(//
+                QueryLanguage.SPARQL, //
+                "PREFIX graphA:  <http://example/graphA> \n" + //
+                        "PREFIX tempGraph:  <http://example/temp> \n" + //
+                        // "DROP SILENT GRAPH tempGraph: ;\n"+//
+                        "DELETE { GRAPH graphA:    { ?s ?p ?v . } } \n" + //
+                        "INSERT { GRAPH tempGraph: { ?s ?p ?v . } } \n" + //
+                        "WHERE { GRAPH graphA: { \n" + //
+                        "    ?s a <http://example/Foo> . \n" + //
+                        "    ?s ?p ?v . } }\n"//
+        ).execute();
+
+//        System.err.println("##### DATA IN DATABASE AFTER DELETE + INSERT");
+//        debugPrintSolutions("SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }");
+
+        /**
+         * graphA should have one triple remaining:
+         * 
+         * <pre>
+         * <http://example/s> <http://example/p> 2 .
+         * </pre>
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }";
+
+            assertEquals("graphA", 1L, countSolutions(query));
+
+        }
+
+        /**
+         * The other 2 triples should have been moved into tempGraph.
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/temp> { ?s ?p ?v . } }";
+
+            assertEquals("tempGraph", 2L, countSolutions(query));
+
+        }
+
+    }
+    
+    
     
     /**
      * This test is based on a forum post. This post provided an example of an
@@ -649,6 +794,28 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             result.close();
         }
     }
+    
+//    private long debugPrintSolutions(final String query)
+//            throws QueryEvaluationException, RepositoryException,
+//            MalformedQueryException {
+//        TupleQueryResult result = con.prepareTupleQuery(QueryLanguage.SPARQL,
+//                query).evaluate();
+//        try {
+//            long n = 0;
+//            while (result.hasNext()) {
+//                System.err.println("==> NEXT SOLUTION");
+//                final BindingSet bset = result.next();
+//                for (final String bindingName : bset.getBindingNames()) {
+//                    final Binding b = bset.getBinding(bindingName);
+//                    System.err.println(bindingName + " -> " + b);
+//                }
+//                n++;
+//            }
+//            return n;
+//        } finally {
+//            result.close();
+//        }
+//    }
 
     
     /**

@@ -1,7 +1,6 @@
 package com.bigdata.rdf.sail;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -32,7 +31,6 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
