@@ -24,7 +24,6 @@ Starting points:
     Python Client:  https://github.com/blazegraph/blazegraph-python
 
     DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
-    
 
 Download Blazegraph now:
 
@@ -33,6 +32,10 @@ Download Blazegraph now:
 Checkout the latest source code:
 	
 git clone -b BLAZEGRAPH_RELEASE_2_1_4 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_4
+
+Security Reporting
+
+Blazegraph has an updated security reporting procedure. Please see https://github.com/blazegraph/database/blob/master/Security.md for reporting security related issues. This process is monitored on a daily basis. All security reports are acknowledged within 24 hours. Mitigations for reported security issues are made in a reasonable timeframe, which may be as quickly as 24 hours for high-severity issues.
 
 Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_4
 
