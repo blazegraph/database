@@ -14,7 +14,7 @@ PARENT_POM="${BASE_DIR}"/../pom.xml
 CURRENT_VERSION=`grep "CURRENT_VERSION" ${BASE_DIR}/version.properties | cut -d= -f2`
 #GIT REPOS to push to.  
 #This must be configured as ${GIT_CMD} remote add sourceforge ssh://beebs@git.code.sf.net/p/bigdata/git
-REMOTE_GITS="origin sourceforge blazegraph"
+REMOTE_GITS="origin blazegraph"
 #Uncomment to only push to private GIT
 #REMOTE_GITS="origin"
 
