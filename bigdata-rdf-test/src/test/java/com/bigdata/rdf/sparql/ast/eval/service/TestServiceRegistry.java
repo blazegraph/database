@@ -418,7 +418,7 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
                 final AbstractTripleStore store = getStore(getProperties());
                 try {
 
-                    final BigdataSail sail = new BigdataSail(store);
+                    final BigdataSail sail = new BigdataSail(store.getNamespace(),store.getIndexManager());
                     try {
                         sail.initialize();
                         // Nothing started yet.

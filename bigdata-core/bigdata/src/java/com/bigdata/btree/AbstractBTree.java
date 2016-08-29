@@ -34,14 +34,20 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Level;
@@ -90,6 +96,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Computable;
+import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.Memoizer;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -741,6 +748,33 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     protected int ndistinctOnWriteRetentionQueue;
     
+    /**
+     * The maximum number of threads to apply when evicting a level set of 
+     * nodes or leaves in parallel. When ONE (1), parallel eviction will be
+     * disabled for the index.
+     * 
+     * @see #writeNodeRecursiveConcurrent(AbstractNode)
+     * 
+     * @see BLZG-1665 (Reduce commit latency by parallel checkpoint by level of
+     *      dirty pages in an index)
+     */
+    final private int maxParallelEvictThreads;
+    
+    /**
+     * The minimum number of threads to apply when evicting a level set of nodes
+     * or leaves in parallel (GTE ONE(2)). When TWO (2), parallel eviction will
+     * be used even if there are only two nodes / leaves in a given level set.
+     * A higher value may be used to ensure that parallelism is only applied
+     * when there is a significantly opportunity for concurrent eviction, such
+     * as during a checkpoint against an index with a large dirty write set.
+     * 
+     * @see #writeNodeRecursiveConcurrent(AbstractNode)
+     * 
+     * @see BLZG-1665 (Reduce commit latency by parallel checkpoint by level of
+     *      dirty pages in an index)
+     */
+    final private int minDirtyListSizeForParallelEvict;
+    
 //    /**
 //     * The {@link #readRetentionQueue} reduces reads through to the backing
 //     * store in order to prevent disk reads and reduces de-serialization costs
@@ -1088,6 +1122,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         lockManager = ReadWriteLockManager.getLockManager(this);
         
+        // Use at most this many threads for concurrent eviction.
+        maxParallelEvictThreads = Integer.parseInt(
+                System.getProperty(IndexMetadata.Options.MAX_PARALLEL_EVICT_THREADS,
+                                   IndexMetadata.Options.DEFAULT_MAX_PARALLEL_EVICT_THREADS));
+        
+        // Do not use concurrent eviction unless we have at least this many
+        // dirty nodes / leaves in a given level set.
+        minDirtyListSizeForParallelEvict = Integer.parseInt(
+                System.getProperty(IndexMetadata.Options.MIN_DIRTY_LIST_SIZE_FOR_PARALLEL_EVICT,
+                        IndexMetadata.Options.DEFAULT_MIN_DIRTY_LIST_SIZE_FOR_PARALLEL_EVICT));
+        
     }
 
     /**
@@ -1380,6 +1425,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
         }
         
+        if( error != null )
+            throw new IndexInconsistentError(ERROR_ERROR_STATE + ": " + this.getIndexMetadata().getName() + ", store: " + store, error);
     }
     
     /**
@@ -2164,7 +2211,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //                    filter.disable();
                     recycle(filter.disable());
                     
-                    log.warn("Bloom filter disabled - maximum error rate would be exceeded"
+                    if(INFO) log.info("Bloom filter disabled - maximum error rate would be exceeded"
                                     + ": entryCount="
                                     + getEntryCount()
                                     + ", factory="
@@ -3370,6 +3417,122 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     /**
+     * Return the level of <i>t</i> below the root node or leaf.
+     * 
+     * @param t
+     *            A node or leaf that belongs to this B+Tree.
+     * 
+     * @return ZERO (0) iff <i>t == root</i> and otherwise the number of levels
+     *         that <i>t</i> is below the root.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>t</i> is null.
+     * @throws IllegalArgumentException
+     *             if <i>t</i> does not belong to this B+Tree.
+     */
+    @SuppressWarnings("rawtypes")
+    public int getLevel( final AbstractNode t) {
+
+        return getLevel(t, getRoot());
+
+    }
+
+    /**
+     * Return the level of <i>t</i> below the given node or leaf.
+     * 
+     * @param t
+     *            A node or leaf that belongs to this B+Tree.
+     * 
+     * @param node
+     *            A node or leaf that is either <i>t</i> or (recursively) some
+     *            parent of <i>t</i>.
+     * 
+     * @return ZERO (0) iff <i>t == root</i> and otherwise the number of levels
+     *         that <i>t</i> is below the root.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>t</i> is null.
+     * @throws IllegalArgumentException
+     *             if <i>t</i> does not belong to this B+Tree.
+     * @throws IllegalArgumentException
+     *             if <i>node</i> is null.
+     * @throws IllegalArgumentException
+     *             if <i>node</i> does not belong to this B+Tree.
+     * @throws NotChildException
+     *             if <i>t</i> is neither <i>node</node> nor some descendant of
+     *             <i>node</i>.
+     */
+    @SuppressWarnings("rawtypes")
+    public int getLevel(final AbstractNode t, final AbstractNode node) {
+
+        if (t == null)
+            throw new IllegalArgumentException();
+
+        if (t.btree != this)
+            throw new IllegalArgumentException();
+
+        final int level = _getLevel(t, node, 0);
+
+        if (level == -1) {
+
+            throw new NotChildException("Not a child of the given node: t=" + t.toShortString() + ", node=" + node);
+            
+        }
+        
+        return level;
+        
+    }
+
+    /**
+     * Return the level of [t] beneath [node], ZERO (0) iff t==node, and -1 if
+     * [t] is not dominated by [node].
+     * 
+     * @param t
+     *            Either node or a descendant of node.
+     * @param node
+     *            Some node.
+     * @param level
+     *            Zero on the first invocation.
+     *            
+     * @return The discovered level of [t] beneath [node], ZERO (0) iff t==node,
+     *         and -1 if [t] is not dominated by [node].
+     */
+    @SuppressWarnings("rawtypes")
+    private static int _getLevel(final AbstractNode t, final AbstractNode node, final int level) {
+
+        if (t == node) {
+            
+            /*
+             * Note: if node is root, then t.getParent() would be null but we
+             * will not hit this below because t == node and hence we return the
+             * current level.
+             */
+            
+            return level;
+            
+        }
+
+        final Node p = t.getParent(); // parent (must be non-null t != node so t is not root).
+
+        if (p == null) {
+
+            /*
+             * We have chased parents up to the root. Since we did not find
+             * [node] along the path to the root, [t] must not be dominated by
+             * [node]. This is an illegal request.  We return -1 so the caller
+             * can report the actual (t,node) arguments from the top-level 
+             * invocation.
+             */
+
+            return -1;
+
+        }
+        
+        return _getLevel(p, node, level + 1);
+        
+    }
+
+    /**
      * <p>
      * This method is responsible for putting the node or leaf onto the ring
      * buffer which controls (a) how long we retain a hard reference to the node
@@ -3389,7 +3552,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * </p>
      * <p>
      * In conjunction with {@link DefaultEvictionListener}, this method
-     * guarentees that the reference counter for the node will reflect the #of
+     * guarantees that the reference counter for the node will reflect the #of
      * times that the node is actually present on the
      * {@link #writeRetentionQueue}.
      * </p>
@@ -3563,7 +3726,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //        final long elapsedNanos = System.nanoTime() - beginNanos;
 //        
 //        // See BLZG-1664
-//        btreeCounters.syncTouchNanos.add(elapsedNanos);
+        //btreeCounters.syncTouchNanos.add(elapsedNanos);
         
     }
     
@@ -3572,7 +3735,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //        final long beginNanos = System.nanoTime();
 //        
 //        // See BLZG-1664
-//        btreeCounters.touchCount.increment();
+        //btreeCounters.touchCount.increment();
         
         /*
          * We need to guarantee that touching this node does not cause it to be
@@ -3644,14 +3807,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //        final long elapsedNanos = System.nanoTime() - beginNanos;
 //        
 //        // See BLZG-1664
-//        btreeCounters.touchNanos.add(elapsedNanos);
+        //btreeCounters.touchNanos.add(elapsedNanos);
 
     }
 
     /**
      * Write a dirty node and its children using a post-order traversal that
      * first writes any dirty leaves and then (recursively) their parent nodes.
-     * The parent nodes are guarenteed to be dirty if there is a dirty child so
+     * The parent nodes are guaranteed to be dirty if there is a dirty child so
      * this never triggers copy-on-write. This is used as part of the commit
      * protocol where it is invoked with the root of the tree, but it may also
      * be used to incrementally flush dirty non-root {@link Node}s.
@@ -3662,10 +3825,41 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            The root of the hierarchy of nodes to be written. The node
      *            MUST be dirty. The node this does NOT have to be the root of
      *            the tree and it does NOT have to be a {@link Node}.
+     * 
+     * @see BLZG-1665 (Reduce commit latency by parallel checkpoint by level of
+     *      dirty pages in an index)
      */
     final protected void writeNodeRecursive(final AbstractNode<?> node) {
 
-        final long begin = System.currentTimeMillis();
+        if (node instanceof Node && getStore() instanceof IIndexManager) {
+
+            /*
+             * Requires IIndexManager for ExecutorService, but can write the
+             * nodes and leaves in level sets (one level at a time) with up to
+             * one thread per dirty node/leave in a given level.
+             * 
+             * See BLZG-1665 Enable concurrent dirty node eviction by level.
+             */
+            
+            writeNodeRecursiveConcurrent(node);
+
+        } else {
+
+            writeNodeRecursiveCallersThread(node);
+
+        }
+        
+    }
+
+    /**
+     * This is the historical implementation and runs entirely in the caller's
+     * thread.
+     * 
+     * @param node
+     */
+    final protected void writeNodeRecursiveCallersThread(final AbstractNode<?> node) {
+        
+//        final long beginNanos = System.nanoTime();
         
         assert root != null; // i.e., isOpen().
         assert node != null;
@@ -3731,40 +3925,308 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        final long elapsed = System.currentTimeMillis() - begin;
+//        final long elapsedNanos = System.nanoTime() - beginNanos;
+//        
+//        if (log.isInfoEnabled() || elapsedNanos > TimeUnit.MILLISECONDS.toNanos(5000)) {
+//
+//            /*
+//             * Note: latency here is nearly always a side effect of GC. Unless
+//             * you are running the cms-i or similar GC policy, you can see
+//             * multi-second GC pauses. Those pauses will cause messages to be
+//             * emitted here. This is especially true with multi-GB heaps.
+//             */
+//
+//            final int nnodes = ndirty - nleaves;
+//            
+//            final String s = "wrote: "+(metadata.getName()!=null?"name="+metadata.getName()+", ":"") + ndirty + " records (#nodes=" + nnodes
+//                    + ", #leaves=" + nleaves + ") in " + elapsedNanos
+//                    + "ms : addrRoot=" + node.getIdentity();
+//
+//            if (elapsed > 5000) {
+//
+////            	System.err.println(s);
+////
+////            } else if (elapsed > 500/*ms*/) {
+//
+//                // log at warning level when significant latency results.
+//                log.warn(s);
+//
+//            } else {
+//            
+//                log.info(s);
+//                
+//            }
+//            
+//        }
         
-        if (INFO || elapsed > 5000) {
+    }
+
+    /**
+     * Writes the dirty nodes and leaves in level sets (one level at a time)
+     * with up to one thread per dirty node/leave in a given level. This can
+     * reduce the latency of {@link #writeCheckpoint()} or for a {@link Node}
+     * evicted from the {@link #writeRetentionQueue}. Whether this is driven by
+     * {@link #writeCheckpoint()} or {@link #touch(AbstractNode)}, we have the
+     * same contract with respect to eviction as the single-threaded eviction
+     * logic - we are just doing it in parallel level sets.
+     * 
+     * @param node
+     * 
+     * @see BLZG-1665 (Reduce commit latency by parallel checkpoint by level of
+     *      dirty pages in an index)
+     */
+    @SuppressWarnings("rawtypes")
+    final protected void writeNodeRecursiveConcurrent(final AbstractNode<?> node) {
+
+        final long beginNanos = System.nanoTime();
+        
+        assert root != null; // i.e., isOpen().
+        assert node != null;
+        assert node.dirty;
+        assert !node.deleted;
+        assert !node.isPersistent();
 
             /*
-             * Note: latency here is nearly always a side effect of GC. Unless
-             * you are running the cms-i or similar GC policy, you can see
-             * multi-second GC pauses. Those pauses will cause messages to be
-             * emitted here. This is especially true with multi-GB heaps.
+         * Note we have to permit the reference counter to be positive and not
+         * just zero here since during a commit there will typically still be
+         * references on the hard reference queue but we need to write out the
+         * nodes and leaves anyway. If we were to evict everything from the hard
+         * reference queue before a commit then the counters would be zero but
+         * the queue would no longer be holding our nodes and leaves and they
+         * would be GC'd soon since they would no longer be strongly reachable.
              */
+        assert node.referenceCount >= 0;
 
-            final int nnodes = ndirty - nleaves;
+        // #of dirty nodes written (nodes or leaves)
+        int ndirty = 0;
+
+        // #of dirty leaves written.
+        int nleaves = 0;
+
+        /*
+         * Post-order traversal of children and this node itself. The dirty
+         * nodes are written into the dirtyList. We will then partition the
+         * dirtyList by B+Tree level of the nodes and leaves. Finally, we will
+         * write out all nodes and leaves at a given level with limited
+         * parallelism.
+         * 
+         * Note: This iterator only visits dirty nodes.
+         * 
+         * Note: Each dirty node or leaf is visited at most once and each parent
+         * of a dirty node/leaf is marked as dirty by copy-on-write, therefore
+         * (a) each dirty node/leaf below (and including) [node] should appear
+         * exactly once in the dirtyMap; and (b) each parent of a dirty node or
+         * leaf should appear exactly once in the dirtyMap.
+         * 
+         * Note: The levels assigned are levels *below* the top-level node that
+         * we are evicting. Thus, the level of [node] is always ZERO. The levels
+         * only correspond to the actual depth in the B+Tree when the top-most
+         * [node] is the B+Tree root.
+         */
+        
+//        final long beginDirtyListNanos = System.nanoTime();
             
-            final String s = "wrote: "+(metadata.getName()!=null?"name="+metadata.getName()+", ":"") + ndirty + " records (#nodes=" + nnodes
-                    + ", #leaves=" + nleaves + ") in " + elapsed
-                    + "ms : addrRoot=" + node.getIdentity();
+        // Visit dirty nodes and leaves.
+        final Iterator<AbstractNode> itr = node.postOrderNodeIterator(
+                true/* dirtyNodesOnly */, false/* nodesOnly */);
 
-            if (elapsed > 5000) {
+        // Map with one entry per level. Each entry is a dirtyList for that level.
+        final Map<Integer/* level */, List<AbstractNode>> dirtyMap = new HashMap<Integer, List<AbstractNode>>();
+        
+        while (itr.hasNext()) {
 
-//            	System.err.println(s);
-//
-//            } else if (elapsed > 500/*ms*/) {
+            final AbstractNode<?> t = itr.next();
 
-                // log at warning level when significant latency results.
-                log.warn(s);
+            assert t.dirty;
 
-            } else {
-            
-                log.info(s);
+            if (t != root) {
+
+                /*
+                 * The parent MUST be defined unless this is
+                 * the root node.
+                 */
+
+                assert t.parent != null;
+                assert t.parent.get() != null;
+
+            }
+
+            /*
+             * Find the level of a node or leaf by chasing its parent ref.
+             * 
+             * Note: parent references of dirty nodes/leaves are guaranteed to
+             * be non-null except for the root.
+             */
+            final Integer level = getLevel(t, node);
+
+            // Lookup dirty list for that level.
+            List<AbstractNode> dirtyList = dirtyMap.get(level);
+
+            if (dirtyList == null) {
+
+                // First node or level at this level.
+                dirtyMap.put(level, dirtyList = new LinkedList<AbstractNode>());
                 
             }
             
+//          log.error("Adding to dirty list: t="+t.toShortString()+", level="+level+", decendentOrSelfOf="+node.toShortString());
+            
+            // Add node/leaf to dirtyList for that level in the index.
+            dirtyList.add(t);
+
+            ndirty++;
+            
+            if (t instanceof Leaf)
+                nleaves++;
+                
+            }
+
+//        // Time to generate the dirtyList.
+//        final long beginEvictNodes = System.nanoTime();
+//        final long elapsedDirtyListNanos = beginEvictNodes - beginDirtyListNanos;
+
+        /*
+         * The #of dirty levels from the Node we are evicting and down to the
+         * leaves. If we have only a dirty root leaf, then there will be one
+         * dirty level.  If we are evicting the root node, then there will 
+         * always be one level per level in the B+Tree.  If we are evicting a
+         * non-root node, then there will be one level for each level that the
+         * evicted node is above the leaves.
+         */
+        final int dirtyLevelCount = dirtyMap.size();
+
+        // max would be the B+Tree height+1 (if evicting the root).
+        assert dirtyLevelCount <= getHeight() + 1 : "dirtyLevelCount=" + dirtyLevelCount + ", height=" + getHeight()
+                + ", dirtyMap.keys=" + dirtyMap.keySet();
+
+        /*
+         * Now evict each dirtyList in parallel starting at the deepest, and
+         * then proceeding one by one until we reach the list at level ZERO (the
+         * node that we were asked to evict). Since the parent of a dirty child
+         * is always dirty, all levels from N-1..0 *must* exist in our dirty
+         * list by level map.
+         */
+        for (int i = dirtyLevelCount - 1; i >= 0; i--) {
+
+            // The dirty list for level [i].
+            final List<AbstractNode> dirtyList = dirtyMap.get(i);
+
+            if (dirtyList == null)
+                throw new AssertionError("Dirty list not found: level=" + i + ", #levels=" + dirtyLevelCount);
+
+            // #of dirty nodes / leaves in this level set.
+            final int dirtyListSize = dirtyList.size();
+            
+            // No more parallelism than we have in the dirty list for this level.
+            final int nparallel = Math.min(maxParallelEvictThreads, dirtyListSize);
+
+            if (dirtyListSize < minDirtyListSizeForParallelEvict) {
+
+                /*
+                 * Avoid parallelism when only a few nodes or leaves will be
+                 * evicted.
+                 */
+                for (AbstractNode t : dirtyList) {
+                    
+                    writeNodeOrLeaf(t, nodeSer);
+            
         }
+
+                if (log.isInfoEnabled())
+                    log.info("Evicting " + dirtyListSize + " dirty nodes/leaves using " + nparallel + " threads.");
+
+            } else {
+
+                final ArrayList<Future<Void>> futureList = new ArrayList<Future<Void>>(dirtyListSize);
+
+                // Note: Must have the same level of concurrency in
+                // NodeSerializer instances.
+                final LatchedExecutor executor = new LatchedExecutor(((IIndexManager) getStore()).getExecutorService(),
+                        nparallel);
+
+                try {
+
+                    for (AbstractNode t : dirtyList) {
+
+                        // Need [final] to be visible inside Runnable().
+                        final AbstractNode u = t;
+
+                        final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+
+                            @Override
+                            public void run() {
+
+                                if (u != root) {
+
+                                    /*
+                                     * The parent MUST be defined unless this is
+                                     * the root node.
+                                     */
+
+                                    assert u.parent != null;
+                                    assert u.parent.get() != null;
+
+                                }
+
+                                // An instance just for this thread.
+                                final NodeSerializer myNodeSer = new NodeSerializer(//
+                                        store, // addressManager
+                                        nodeSer.nodeFactory, //
+                                        branchingFactor, //
+                                        nodeSer.getWriteBufferCapacity(),//
+                                        metadata, //
+                                        readOnly, //
+                                        nodeSer.recordCompressorFactory);
+
+                                // write dirty node on store (non-recursive)
+                                writeNodeOrLeaf(u, myNodeSer);
+
+                            }
+
+                        }, null/* Void */);
+
+                        // Add to list of Futures we will check.
+                        futureList.add(ft);
         
+                        // Schedule eviction on
+                        executor.execute(ft);
+
+                    }
+
+                    // Check futures.
+                    for (Future<Void> f : futureList) {
+
+                        try {
+                            f.get();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        } catch (ExecutionException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                    }
+
+                } finally {
+
+                    // Ensure all futures are done.
+                    for (Future<Void> ft : futureList) {
+
+                        ft.cancel(true/* mayInterruptIfRunning */);
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        final long elapsedNanos = System.nanoTime() - beginNanos;
+
+        if (log.isInfoEnabled())
+            log.info("Evicting " + ndirty + " dirty nodes/leaves in " + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+                    + "ms.");
+
     }
 
 //    private void badNode(final AbstractNode<?> node) {
@@ -3795,6 +4257,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @return The persistent identity assigned by the store.
      */
     protected long writeNodeOrLeaf(final AbstractNode<?> node) {
+
+        return writeNodeOrLeaf(node, nodeSer);
+
+    }
+
+    private long writeNodeOrLeaf(final AbstractNode<?> node,final NodeSerializer nodeSer) {
     	
         if (error != null)
             throw new IllegalStateException(ERROR_ERROR_STATE, error);
@@ -3870,7 +4338,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         final AbstractFixedByteArrayBuffer slice;
         {
 
-            final long begin = System.nanoTime();
+            final long beginNanos = System.nanoTime();
 
             /*
              * Code the node or leaf, replacing the data record reference on the
@@ -3897,7 +4365,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 // slice onto the coded data record.
                 slice = ((Leaf) node).data();
 
-                btreeCounters.leavesWritten++;
+                btreeCounters.leavesWritten.increment();;
 
             } else {
 
@@ -3907,11 +4375,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 // slice onto the coded data record.
                 slice = ((Node) node).data();
 
-                btreeCounters.nodesWritten++;
+                btreeCounters.nodesWritten.increment();;
 
             }
             
-            btreeCounters.serializeNanos += System.nanoTime() - begin;
+            btreeCounters.serializeNanos.add(System.nanoTime() - beginNanos);
             
         }
 
@@ -3942,7 +4410,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         final long oldAddr;
         {
 
-            final long begin = System.nanoTime();
+            final long beginNanos = System.nanoTime();
             
             // wrap as ByteBuffer and write on the store.
             addr = store.write(slice.asByteBuffer());
@@ -3956,9 +4424,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             final int nbytes = store.getByteCount(addr);
             
-            btreeCounters.writeNanos += System.nanoTime() - begin;
+            btreeCounters.writeNanos.add(System.nanoTime() - beginNanos);
     
-            btreeCounters.bytesWritten += nbytes;
+            btreeCounters.bytesWritten.add(nbytes);
 
             btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(nbytes);
 
@@ -4369,8 +4837,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		
 		final int nbytes = b.length;
 		
-		btreeCounters.rawRecordsWritten++;
-		btreeCounters.rawRecordsBytesWritten += nbytes;
+		btreeCounters.rawRecordsWritten.increment();;
+		btreeCounters.rawRecordsBytesWritten.add(nbytes);
 		btreeCounters.bytesOnStore_rawRecords.addAndGet(nbytes);
 
 		return addr;
@@ -4449,7 +4917,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
         final int nbytes = store.getByteCount(addr);
         
-        getBtreeCounters().bytesReleased += nbytes;
+        getBtreeCounters().bytesReleased.add(nbytes);
         
         store.delete(addr);
         

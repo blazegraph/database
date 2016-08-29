@@ -87,7 +87,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
     static public Test suite() {
 
        return ProxySuiteHelper.suiteWhenStandalone(TestMultiTenancyAPI.class,
-             "test_create0[13]",
+             "test.*",//"test_create0[13]",
              Collections.singleton(BufferMode.DiskRW),
              TestMode.quads
              );

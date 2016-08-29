@@ -25,6 +25,7 @@ import com.bigdata.rdf.graph.impl.bd.BigdataGraphFixture.BigdataSailGraphLoader;
 import com.bigdata.rdf.graph.impl.util.GASRunnerBase;
 import com.bigdata.rdf.graph.util.GraphLoader;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -281,28 +282,31 @@ public class BigdataGASRunner<VS, ES, ST> extends GASRunnerBase<VS, ES, ST> {
 
             // Locate/create KB.
             {
-                final AbstractTripleStore kb;
+                final BigdataSail sail;
                 if (isTemporary) {
 
-                    kb = BigdataSail.createLTS(jnl, properties);
+                    new BigdataSail(namespace, jnl).create(properties);
                     newKB = true;
 
                 } else {
 
-                    final AbstractTripleStore tmp = (AbstractTripleStore) jnl
-                            .getResourceLocator().locate(namespace,
-                                    ITx.UNISOLATED);
-
-                    if (tmp == null) {
+                    sail = new BigdataSail(namespace, jnl);
+                    
+                    if (!sail.exists()) {
 
                         // create.
-                        kb = BigdataSail.createLTS(jnl, properties);
+                        sail.create(properties);
                         newKB = true;
 
                     } else {
 
-                        kb = tmp;
-                        newKB = kb.getStatementCount() == 0L;
+                        // exists.
+                        final BigdataSailConnection con = sail.getReadOnlyConnection();
+                        try {
+                            newKB = con.getTripleStore().getStatementCount() == 0L;
+                        } finally {
+                            con.close();
+                        }
 
                     }
 

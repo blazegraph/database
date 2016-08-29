@@ -35,19 +35,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.Test;
-
 import org.openrdf.model.Statement;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.QueryEvaluationException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.spo.NoAxiomFilter;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.DaemonThreadFactory;
 
+import junit.framework.Test;
+
 /**
- * Proxied test suite providing a stress test of the multitenancy API.
+ * Proxied test suite providing a stress test of the multi-tenancy API.
  * 
  * @param <S>
  * 
@@ -101,19 +106,120 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
     */
 	public void test_multiTenancy_967() throws Exception {
 
-	   doMultiTenancyStressTest(TimeUnit.SECONDS.toMillis(20));
+//	   doMultiTenancyStressTest(TimeUnit.SECONDS.toMillis(20));
 	   
 	}
 
    /**
+     * We are seeing a problem where multiple namespaces are used and an aborted
+     * operation on one namespace causes problems with another.
+     * 
+     * @throws Exception
+     * 
+     * @see BLZG-2023
+     */
+    public void test_multiTenancy_2023() throws Exception {
+        final String ns1 = "namespace1";
+        final String ns2 = "namespace2";
+        final String ns3 = "namespace3";
+
+        // Create 2 namespaces
+        createNamespace(ns1);
+        createNamespace(ns2);
+        createNamespace(ns3);
+
+        // Load them up
+        loadStatements(ns1, 10000);
+        loadStatements(ns2, 10000);
+        loadStatements(ns3, 10000);
+
+        // Run simple queries
+        simpleQuery(ns1);
+        simpleQuery(ns2);
+        simpleQuery(ns3);
+
+        // Update first with abort
+        try {
+            forceAbort(ns1);
+        } catch (Throwable t) {
+            // ignore
+            t.printStackTrace();
+        }
+
+        // Update second
+        loadStatements(ns2, 1000);
+
+        // Update second with abort
+        try {
+            forceAbort(ns2);
+        } catch (Throwable t) {
+            // ignore
+            t.printStackTrace();
+        }
+
+        // Drop Graph
+        dropGraph(ns2);
+        dropGraph(ns1);
+
+        // Re-run simple queries
+        simpleQuery(ns1);
+        simpleQuery(ns2);
+        simpleQuery(ns3);
+
+        // Update second
+        loadStatements(ns2, 1000);
+    }
+
+    private void createNamespace(final String namespace) throws Exception {
+//        final Properties properties = new Properties();
+//        final Properties properties = getTestMode().getProperties(); // FIXME BLZG-2023: Use the indicated test mode, but also test for triplesPlusTM.
+        final Properties properties = TestMode.triplesPlusTruthMaintenance.getProperties();
+        properties.put(BigdataSail.Options.NAMESPACE, namespace);
+        log.warn(String.format("Create namespace %s...", namespace));
+        m_mgr.createRepository(namespace, properties);
+        log.warn(String.format("Create namespace %s done", namespace));
+    }
+
+    private void loadStatements(final String namespace, final int nstatements) throws Exception {
+        final Collection<Statement> stmts = new ArrayList<>(nstatements);
+        for (int i = 0; i < nstatements; i++) {
+            stmts.add(generateTriple());
+        }
+        log.warn(String.format("Loading package into %s namespace...", namespace));
+        m_mgr.getRepositoryForNamespace(namespace).add(new RemoteRepository.AddOp(stmts));
+        log.warn(String.format("Loading package into %s namespace done", namespace));
+    }
+
+    private void forceAbort(final String namespace) throws Exception {
+        final RemoteRepository rr = m_mgr.getRepositoryForNamespace(namespace);
+
+        // force an abort by preparing an invalid update
+        rr.prepareUpdate("FORCE ABORT").evaluate();
+    }
+
+    private void dropGraph(final String namespace) throws Exception {
+        final RemoteRepository rr = m_mgr.getRepositoryForNamespace(namespace);
+
+        // force an abort by preparing an invalid update
+        rr.prepareUpdate("DROP GRAPH <" + namespace + ">").evaluate();
+    }
+
+    private void simpleQuery(final String namespace) throws QueryEvaluationException, Exception {
+        log.warn(String.format("Execute SPARQL on %s namespace...", namespace));
+        m_mgr.getRepositoryForNamespace(namespace).prepareTupleQuery("SELECT * {?s ?p ?o} LIMIT 100").evaluate()
+                .close();
+        log.warn(String.format("Execute SPARQL on %s namespace done", namespace));
+    }
+
+    /**
     * Runs the stress test for an hour. This is the minimum required to have
     * confidence that the problem is not demonstrated. Multiple hour runs are
     * better.
     * 
     * @throws Exception
     * 
-    * @see {@link StressTestConcurrentRestApiRequests} which provides full coverage of
-    *      the REST API within a parameterized workload.
+     * @see {@link StressTestConcurrentRestApiRequests} which provides full
+     *      coverage of the REST API within a parameterized workload.
     */
    public void stressTest_multiTenancy_967() throws Exception {
 

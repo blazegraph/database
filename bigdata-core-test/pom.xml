@@ -29,12 +29,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>2.1.2</version>
+    <version>2.1.4</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-core-test</artifactId>
-  <version>2.1.2</version>
+  <version>2.1.4</version>
   <packaging>jar</packaging>
   <name>Blazegraph Core Tests</name>
   <description>Blazegraph Core Platform Test Suites</description>
@@ -269,7 +269,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <version>${highscalelib.version}</version>
     </dependency>
     <dependency>
-      <groupId>colt</groupId>
+      <groupId>com.blazegraph</groupId>
       <artifactId>colt</artifactId>
       <version>${colt.version}</version>
     </dependency>

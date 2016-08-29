@@ -91,6 +91,7 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataBaseContext;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailQuery;
@@ -116,6 +117,8 @@ import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
+
+import info.aduna.xml.XMLWriter;
 
 /**
  * Class encapsulates state shared by {@link QueryServlet}(s) for the same
@@ -365,7 +368,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
  		 * 
  		 * There is a current difference between the embedded and the REST model in that
  		 * the embedded model uses an arbitrary string as an External ID, but the 
- 		 * REST version uses a timestamp.  The timestap is tightly coupled to the current
+ 		 * REST version uses a timestamp.  The timestamp is tightly coupled to the current
  		 * workbench.
  		 * 
  		 * TODO:  This needs to be refactored into unified model between the embedded and REST clients for tasks.
@@ -384,6 +387,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
  			
  			return modelQuery;
  		}
+ 		
+ 		public long getMutationCount() {
+ 			return task.getMutationCount();
+ 		}	
 
     }
 
@@ -607,6 +614,32 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	public ThreadPoolExecutorBaseStatisticsTask getSampleTask() {
 
 	    return m_queueSampleTask;
+	    
+	}
+	
+    /**
+     * Return the effective baseURI for the request. This may be set using the
+     * {@value #BASE_URI} URL query parameter. If it is not set, it defaults to
+     * the request URL.
+     * 
+     * @param req
+     *            The request.
+     * @param resp
+     *            The response.
+     * 
+     * @return The effective baseURI and never null.
+     */
+    static public String getBaseURI(final HttpServletRequest req, final HttpServletResponse resp) {
+
+        String baseURI = req.getParameter(BASE_URI);
+
+        if (baseURI == null) {
+
+            baseURI = req.getRequestURL().toString();
+
+        }
+
+        return baseURI;
 	    
 	}
 
@@ -1646,6 +1679,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final TupleQueryResultWriter w;
 
+
             if (xhtml) {
             
                 /*
@@ -2319,16 +2353,25 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 *            The timestamp associated with the {@link AbstractTripleStore}
 	 *            view.
 	 * @param queryStr
-	 *            The query.
-     * @param includeInferred 
+     *            The query (for log messages).
+     * @param baseURI
+     *            The baseURI (since BLZG-2039).
+     * @param astContainer
+     *            The ASTContainer for the already parsed query (since BLZG-2039).
+     * @param includeInferred
 	 * @param acceptOverride
 	 *            Override the Accept header (optional). This is used by UPDATE
 	 *            and DELETE so they can control the {@link RDFFormat} of the
 	 *            materialized query results.
 	 * @param req
 	 *            The request.
-    * @param resp The response.
-	 * @param os  Where to write the results. Note: This is NOT always the OutputStream associated with the response!  For DELETE-WITH-QUERY and UPDATE-WITH-QUERY this is a PipedOutputStream.
+     * @param resp
+     *            The response.
+     * @param os
+     *            Where to write the results. Note: This is NOT always the
+     *            OutputStream associated with the response! For
+     *            DELETE-WITH-QUERY and UPDATE-WITH-QUERY this is a
+     *            PipedOutputStream.
 	 * 
 	 * @return The task.
 	 * 
@@ -2339,6 +2382,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final String namespace,//
             final long timestamp,//
             final String queryStr,//
+            final String baseURI,// See BLZG-2039
+            final ASTContainer astContainer,// See BLZG-2039
             final boolean includeInferred, //
             final Map<String, Value> bindings, //
             final String acceptOverride,//
@@ -2348,25 +2393,21 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //            final boolean update//
             ) throws MalformedQueryException, IOException {
 
-        /*
-         * Setup the baseURI for this request. It will be set to request parameter "baseURI" or defaults to requestURI if parameter was not specified.
-         */
-        String baseURI = req.getParameter(BASE_URI);
-        if (baseURI==null) {
-        	baseURI = req.getRequestURL().toString();
-        }
+        if (cxn == null)
+            throw new IllegalArgumentException();
 
-        /*
-         * Parse the query so we can figure out how it will need to be executed.
-         * 
-         * Note: This goes through some pains to make sure that we parse the
-         * query exactly once in order to minimize the resources associated with
-         * the query parser.
-         */
-//        final AbstractTripleStore tripleStore = cxn.getTripleStore();
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser()
-                .parseQuery2(queryStr, baseURI);
-
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        
+        if (queryStr == null)
+            throw new IllegalArgumentException();
+        
+        if (baseURI == null)
+            throw new IllegalArgumentException();
+        
+        if (astContainer == null)
+            throw new IllegalArgumentException();
+        
         if (log.isDebugEnabled())
             log.debug(astContainer.toString());
 

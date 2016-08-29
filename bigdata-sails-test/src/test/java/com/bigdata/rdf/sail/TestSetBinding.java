@@ -139,7 +139,7 @@ public class TestSetBinding extends ProxyBigdataSailTestCase {
                 final BigdataLiteral snowball = vf.createLiteral("Snowball");
                 final BigdataLiteral w1 = vf.createLiteral("8");
                 final BigdataLiteral w2 = vf.createLiteral("10");
-                sail.getDatabase().addTerms(new BigdataValue[]{
+                cxn.getTripleStore().addTerms(new BigdataValue[]{
                         buffy,
                         snowball,
                         w1,

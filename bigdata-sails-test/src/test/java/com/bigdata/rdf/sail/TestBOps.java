@@ -38,6 +38,7 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
@@ -127,7 +128,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -224,7 +225,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -313,7 +314,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -407,7 +408,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             cxn.commit();//
             
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info("\n" + cxn.getTripleStore().dumpStore());
             }
 
             {
@@ -446,6 +447,100 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 
                 compare(result, solution);
                 
+            }
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testConcat() throws Exception {
+
+        final BigdataSail sail = getSail();
+        try {
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final String ns = BD.NAMESPACE;            
+          
+            final URI foo = new URIImpl(ns+"foo");
+            final URI bar = new URIImpl(ns+"bar");
+            final URI plain = new URIImpl(ns+"plain");
+            final URI language = new URIImpl(ns+"language");
+            final URI string = new URIImpl(ns+"string");
+            
+            final Literal fooPlain = new LiteralImpl("foo");
+            final Literal fooLanguage = new LiteralImpl("foo", "en");
+            final Literal fooString = new LiteralImpl("foo", XMLSchema.STRING);
+            final Literal barPlain = new LiteralImpl("bar");
+            final Literal barLanguage = new LiteralImpl("bar", "en");
+            final Literal barString = new LiteralImpl("bar", XMLSchema.STRING);
+            final Literal foobarPlain = new LiteralImpl("foobar");
+            final Literal foobarLanguage = new LiteralImpl("foobar", "en");
+            final Literal foobarString = new LiteralImpl("foobar", XMLSchema.STRING);
+            
+/**/
+            cxn.setNamespace("ns", ns);
+            
+            cxn.add(foo, plain, fooPlain);
+            cxn.add(bar, plain, barPlain);
+            cxn.add(foo, language, fooLanguage);
+            cxn.add(bar, language, barLanguage);
+            cxn.add(foo, string, fooString);
+            cxn.add(bar, string, barString);
+            cxn.add(plain, plain, foobarPlain);
+            cxn.add(language, language, foobarLanguage);
+            cxn.add(string, string, foobarString);
+            cxn.add(plain, string, foobarPlain);
+            cxn.add(language, plain, foobarPlain);
+            cxn.add(language, string, foobarPlain);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            cxn.commit();//
+            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + cxn.getTripleStore().dumpStore());
+            }
+
+            {
+                 
+                String query = 
+                    "select ?o1 ?o2 ?o3 " +
+                    "WHERE { " +
+                    "  ?s1 ?p1 ?o1 . " +
+                    "  ?s2 ?p2 ?o2 . " +
+                    "  ?p1 ?p2 ?o3 . " +
+                    "  FILTER(concat(?o1, ?o2) = ?o3)"+
+                    "}";
+                
+               final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                final TupleQueryResult result = tupleQuery.evaluate();
+                
+                int cnt = 0;
+                try {
+                	while(result.hasNext()) {
+                		cnt++;
+                	}
+                } finally {
+                	result.close();
+                }
+                
+                assertEquals(6, cnt);
+
             }
         } finally {
             cxn.close();

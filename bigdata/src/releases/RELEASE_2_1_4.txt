@@ -1,0 +1,58 @@
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture and, now, GPU Acceleration. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a major release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
+
+Blazegraph Features (http://www.blazegraph.com/product/)
+
+2.1.4 is a maintenance release for 2.1.2 release.  It is recommended that all users upgrade to 2.1.4.   See https://blog.blazegraph.com/?p=1026
+
+Sign up to stay in touch with Blazegraph: http://eepurl.com/VLpUj
+
+Starting points:
+
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+    Blazegraph Support:  https://www.blazegraph.com/support/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TDF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BLAZEGRAPH_RELEASE_2_1_4 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_4
+
+Security Reporting
+
+Blazegraph has an updated security reporting procedure. Please see https://github.com/blazegraph/database/blob/master/Security.md for reporting security related issues. This process is monitored on a daily basis. All security reports are acknowledged within 24 hours. Mitigations for reported security issues are made in a reasonable timeframe, which may be as quickly as 24 hours for high-severity issues.
+
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_4
+
+** Bug
+    * [BLZG-533] - Vector the query engine on the native heap
+    * [BLZG-2041] - BigdataSail should not locate the AbstractTripleStore until a connection is requested
+
+
+** Improvement
+    * [BLZG-2053] - Blazegraph Security Reporting Instructions
+
+
+** Task
+    * [BLZG-2050] - Fork Colt Libraries to remove hep.aida
+    * [BLZG-2065] - Remove Autojar and Unused Ant Scripts
+    * [BLZG-2074] - Benchmark 2.1.4 Release
+
+** Sub-task
+    * [BLZG-2023] - com.bigdata.btree.IndexInconsistentError: Index is in error state
+    * [BLZG-2042] - Using constant BIND slows down query 10x

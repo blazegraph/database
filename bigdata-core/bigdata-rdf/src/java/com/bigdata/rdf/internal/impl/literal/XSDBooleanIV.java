@@ -39,19 +39,51 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
      * 
      */
     private static final long serialVersionUID = 1L;
-
-    static public transient final XSDBooleanIV<BigdataLiteral> TRUE = 
+    
+    /**
+     * DO NOT ALLOW THIS REFERENCE TO ESCAPE.  SIDE EFFECTS ON ITS [cache] CAUSE PROBLEMS!
+     * 
+     * @see BLZG-2052 XSDBooleanIV MUST NOT share the (true|false) instances as
+     *      constants
+     */
+    static private transient final XSDBooleanIV<BigdataLiteral> TRUE = 
     	new XSDBooleanIV<BigdataLiteral>(true);
 
-    static public transient final XSDBooleanIV<BigdataLiteral> FALSE = 
+    /**
+     * DO NOT ALLOW THIS REFERENCE TO ESCAPE.  SIDE EFFECTS ON ITS [cache] CAUSE PROBLEMS!
+     * 
+     * @see BLZG-2052 XSDBooleanIV MUST NOT share the (true|false) instances as
+     *      constants
+     */
+    static private transient final XSDBooleanIV<BigdataLiteral> FALSE = 
     	new XSDBooleanIV<BigdataLiteral>(false);
     
+    /**
+     * Return a <strong>strong</strong> new instance of an {@link XSDBooleanIV}
+     * whose <code>cache</code> is not set. This prevents the cache reference
+     * from being passed through a side-effect on instances associate with
+     * different namespaces or with the headless namespace.
+     * 
+     * @param b
+     *            The truth value.
+     * 
+     * @return A new {@link XSDBooleanIV} for that truth value with NO cache
+     *         value.
+     * 
+     * @see BLZG-2052 XSDBooleanIV MUST NOT share the (true|false) instances as
+     *      constants
+     */
     static public final XSDBooleanIV<BigdataLiteral> valueOf(final boolean b) {
-    	return b ? TRUE : FALSE;
+    	return (XSDBooleanIV<BigdataLiteral>) (b ? TRUE : FALSE).clone(true/*clearCache*/);
     }
     
     private final boolean value;
-
+    
+    @Override
+    public String toString() {
+     return super.toString()+" "+(hasValue()?getValue().getValueFactory():"");//",cache="+(hasValue()?""+getValue().toString():"n/a");
+    }
+    
     @Override
     public IV<V, Boolean> clone(final boolean clearCache) {
 

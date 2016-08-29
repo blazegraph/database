@@ -453,9 +453,7 @@ public class SubqueryOp extends PipelineOp {
                              * in whether or not at least one solution exists.
                              */
                             
-                            final IV<BigdataLiteral, Boolean> success = subquerySolutionItr
-                                    .hasNext() ? XSDBooleanIV.TRUE
-                                    : XSDBooleanIV.FALSE;
+                            final IV<BigdataLiteral, Boolean> success = XSDBooleanIV.valueOf(subquerySolutionItr.hasNext());
                             
 //                            System.err
 //                                    .println("in="

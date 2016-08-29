@@ -1,0 +1,127 @@
+<HTML>
+<BODY>
+<p>A Java port of <a href="http://wwwinfo.cern.ch/asd/lhc++/clhep">CLHEP 1.4.0</a> 
+  (C++) - A Class Library for High Energy Physics; still quite incomplete - should 
+  probably find a way to take cern.clhep out of this distribution and merge cern.clhep 
+  with <a href="http://www-sldnt.slac.stanford.edu/jas/documentation/lcd/api/lcd/index.html">hep.lcd</a> 
+  (SLAC).</p>
+<p>Here are the CLHEP/C++ packages and their Java counterparts</p>
+<table border="1" cellpadding="0" cellspacing="0">
+  <tr> 
+    <td width="109"><b>C++ Package</b></td>
+    <td width="333"><b>Description</b></td>
+    <td width="280"><b>Java Counterpart</b></td>
+  </tr>
+  <tr> 
+    <td width="109">config</td>
+    <td width="333">global #defines</td>
+    <td width="280">not needed in Java</td>
+  </tr>
+  <tr> 
+    <td width="109">Alist</td>
+    <td width="333">Templated list classes for storing pointers to objects.</td>
+    <td width="280">{@link cern.colt.list}<br>
+      {@link java.util} </td>
+  </tr>
+  <tr> 
+    <td width="109">Combination</td>
+    <td width="333">Combinatoric engine which, given lists of objects, successively 
+      generates a list of objects which form a unique combinations + Related things<br>
+      HepChooser <br>
+      HepCombiner <br>
+      HepLock <br>
+      HepLockable </td>
+    <td width="280">
+      <p>{@link cern.colt.GenericPermuting}<br>
+        + ?</p>
+      </td>
+  </tr>
+  <tr> 
+    <td width="109">Geometry</td>
+    <td width="333">HepPoint3D <br>
+      HepNormal3D <br>
+      HepVector3D <br>
+      HepPlane3D <br>
+      HepTransform3D </td>
+    <td width="280"> 
+      <p>todo<br>
+        <a href="http://java.sun.com/products/java-media/3D/1_2_api/j3dguide/AppendixMath.doc.html#47281">javax.vecmath 
+        - spec</a> (Sun - Java 3D 1.2)<br>
+        <a href="http://java.sun.com/products/java-media/3D/1_2_api/j3dapi/javax/vecmath/package-summary.html">javax.vecmath 
+        javadoc </a>(Sun - Java 3D 1.2) <br>
+        <a href="http://www-sldnt.slac.stanford.edu/jas/documentation/lcd/api/lcd/index.html">hep.lcd</a> 
+        (SLAC) </p>
+      </td>
+  </tr>
+  <tr> 
+    <td width="109">Hist</td>
+    <td width="333">HepTuple <br>
+      HBookTuple <br>
+      HepTupleManager <br>
+      HBookFile <br>
+      HepHistogram <br>
+      HBookHistogram </td>
+    <td width="280"><br>
+      <a href="http://www-sldnt.slac.stanford.edu/jas/">Java Analysis Studio</a> 
+      - SLAC<br>
+      <a href="http://www-sldnt.slac.stanford.edu/jas/help/2.0/apihelp/hep/packages.html">hep.analysis</a> 
+      (SLAC) <br>
+      {@link hep.aida} <br>
+      {@link hep.aida.ref} <br>
+      {@link hep.aida.bin} </td>
+  </tr>
+  <tr> 
+    <td width="109">Matrix</td>
+    <td width="333">HepGenMatrix <br>
+      HepMatrix <br>
+      HepSymMatrix <br>
+      HepDiagMatrix <br>
+      HepVector </td>
+    <td width="280">{@link cern.colt.matrix} <br>
+      {@link cern.colt.matrix.linalg}<br>
+      for small fixed matrices see &quot;Geometry&quot; above </td>
+  </tr>
+  <tr> 
+    <td width="109">Random</td>
+    <td width="333">12 different random engines and 10 different random distributions</td>
+    <td width="280"> 
+      <p>{@link cern.jet.random}<br>
+        {@link cern.jet.random.engine}<br>
+        {@link edu.cornell.lassp.houle.RngPack }</p>
+    </td>
+  </tr>
+  <tr> 
+    <td width="109">String</td>
+    <td width="333">HepStrings <br>
+      Command Line Argument Parsing<br>
+    </td>
+    <td width="280">{@link java.lang.String}<br>
+      {@link java.lang.StringBuffer} <br>
+      GNU cmd line parsing package ?</td>
+  </tr>
+  <tr> 
+    <td width="109">Units</td>
+    <td width="333"> 
+      <p>Definitions of some frequently used physical constants and units<br>
+        SystemOfUnits.h<br>
+        PhysicalConstants.h </p>
+    </td>
+    <td width="280">{@link cern.clhep.Units}<br>
+      {@link cern.clhep.PhysicalConstants} </td>
+  </tr>
+  <tr> 
+    <td width="109">Vector</td>
+    <td width="333"> 
+      <p>Hep3Vector<br>
+        HepRotation<br>
+        HepLorentzVector<br>
+        HepLorentzRotation</p>
+    </td>
+    <td width="280">todo<a href="http://www-sldnt.slac.stanford.edu/jas/documentation/lcd/api/lcd/index.html"><br>
+      hep.lcd</a> (SLAC)</td>
+  </tr>
+</table>
+<p><i> Contact <a href="mailto:wolfgang.hoschek@cern.ch">wolfgang.hoschek@cern.ch</a> 
+  for more info.</i> </p>
+</BODY>
+</HTML>

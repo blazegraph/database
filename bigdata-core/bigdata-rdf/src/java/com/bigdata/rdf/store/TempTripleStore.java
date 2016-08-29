@@ -42,9 +42,11 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.PropertyUtil;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data
@@ -255,7 +257,7 @@ public class TempTripleStore extends AbstractLocalTripleStore {
     public TempTripleStore(final TemporaryStore store,
             final Properties properties, final AbstractTripleStore db) {
 
-        this(store, db == null ? properties : stackProperties(properties, db));
+        this(store, db == null ? properties : stackProperties(properties, store, db));
 
         if (log.isInfoEnabled()) {
 
@@ -298,8 +300,8 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      * @param timestamp
      * @param properties
      */
-    public TempTripleStore(IIndexManager indexManager, String namespace,
-            Long timestamp, Properties properties) {
+    public TempTripleStore(final IIndexManager indexManager, final String namespace,
+            final Long timestamp, final Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
 
@@ -314,9 +316,17 @@ public class TempTripleStore extends AbstractLocalTripleStore {
     }
     
     /**
-     * Stacks the <i>properties</i> on top of the <i>db</i>'s properties so
-     * that the databases properties will be treated as defaults and anything in
+     * Stacks the <i>properties</i> on top of the <i>db</i>'s properties so that
+     * the databases properties will be treated as defaults and anything in
      * <i>properties</i> will override anything in database's properties.
+     * <p>
+     * Note: This also ensures that the {@link TempTripleStore} has a unique
+     * namespace name based on the namespace of the main triple store instance
+     * plus the {@link UUID} of the {@link TemporaryStore}. This addresses a
+     * problem where the {@link TempTripleStore} could otherwise be located by
+     * the DefaultResourceLocator after an abort() had cleared the
+     * DefaultResourceLocator cache of the unisolated view of the main triple
+     * store. See BLZG-2023, BLZG-2041.
      * 
      * @param properties
      *            The properties for the {@link TempTripleStore}.
@@ -326,11 +336,14 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      * @return The stacked properties.
      */
     private static Properties stackProperties(final Properties properties,
+            final TemporaryStore tempStore,
             final AbstractTripleStore db) {
 
-        final Properties tmp = db.getProperties();
+        final Properties out = new Properties();
         
-        final Enumeration<Object> e = properties.keys();
+        final Properties in = PropertyUtil.flatCopy(properties);
+
+        final Enumeration<Object> e = in.keys();
 
         while (e.hasMoreElements()) {
 
@@ -344,11 +357,24 @@ public class TempTripleStore extends AbstractLocalTripleStore {
 
             final String key = (String) ekey;
 
-            tmp.setProperty(key, properties.getProperty(key));
+            final String val = in.getProperty(key);
+
+            // FIXME BLZG-2023, BLZG-2041
+            if (BigdataSail.Options.NAMESPACE.equals(key)) {
+
+                // Ensure that the TempTripleStore has a unique namespace.
+                out.setProperty(key, val + "_temporaryStore=" + tempStore.getUUID());
+                
+            } else {
+
+                out.setProperty(key, val);
+
+            }
+            
 
         }
 
-        return tmp;
+        return out;
 
     }
 

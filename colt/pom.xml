@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<!--
+Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC DBA Blazegraph
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@blazegraph.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; version 2.1 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>2.1.4</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+  <groupId>com.blazegraph</groupId>
+  <artifactId>colt</artifactId>
+  <version>2.1.4</version>
+  <name>Blazegraph Colt</name>
+  <description>Blazegraph Modifications to the Colt libraries to remove hep.aida.  Forked under LGPL 2.1 from the original license: Copyright (c) 1999 CERN - European Organization for Nuclear Research.  Permission to use, copy, modify, distribute and sell this software and its documentation for any purpose is hereby granted without fee, provided that the above copyright notice appear in all copies and that both that copyright notice and this permission notice appear in supporting documentation. CERN makes no representations about the suitability of this software for any purpose. It is provided "as is" without expressed or implied warranty.</description>
+  <packaging>jar</packaging>
+  <licenses>
+    <license>
+      <name>GNU LESSER GENERAL PUBLIC LICENSE Version 2.1</name>
+      <url>http://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt</url>
+    </license>
+  </licenses>
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/java</directory>
+        <includes>
+          <include>**/*.in.*</include>
+          <include>**/*.out.*</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>src/test/java</directory>
+        <includes>
+          <include>**/test.html</include>
+        </includes>
+      </resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+          <includes>
+            <include>**/TestAll.java</include>
+            <include>**/*Test.java</include>
+          </includes>
+          <excludes>
+            <exclude>com/bigdata/TestAll.java</exclude>
+          </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+          <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx4g</argLine>
+          <rerunFailingTestsCount>2</rerunFailingTestsCount>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <stylesheetfile>${basedir}/src/main/javadoc/stylesheet.css</stylesheetfile>
+          <show>public</show>
+          <maxmemory>1000m</maxmemory>
+          <author>true</author>
+          <version>true</version>
+          <doctitle><![CDATA[<h1>Blazegraph Colt Fork</h1>]]></doctitle>
+          <bottom><![CDATA[ <i> 
+                           Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.<p>
+
+                           Licensed under the GNU LESSER GENERAL PUBLIC LICENSE Version 2.1 (the "License");
+                           you may not use this file except in compliance with the License.
+                           You may obtain a copy of the License at<p>
+
+                               http://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+
+                           Unless required by applicable law or agreed to in writing, software
+                           distributed under the License is distributed on an 'AS IS' BASIS,
+                           WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                           See the License for the specific language governing permissions and
+                           limitations under the License.<p>
+
+                                                        <hr>
+                            This product includes software developed by the dsiutils project (http://dsiutils.dsi.unimi.it/).  
+                            Copyright (C) 2002-2009 Sebastiano Vigna</i>]]></bottom>
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit4.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>concurrent</groupId>
+      <artifactId>concurrent</artifactId>
+      <version>1.3.4</version>
+    </dependency>
+  </dependencies>
+</project>

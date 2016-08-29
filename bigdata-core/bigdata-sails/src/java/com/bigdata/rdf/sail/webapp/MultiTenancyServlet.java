@@ -56,14 +56,15 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.PropertyUtil;
-import com.bigdata.rdf.sail.BigdataSailHelper;
 
 /**
  * Mult-tenancy Administration Servlet (management for bigdata namespaces). A
@@ -638,8 +639,12 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
 		final long timestamp = getTimestamp(req);
 
-		// TODO Why is it necessary to protect this operation with a transaction?
-		final long tx = getBigdataRDFContext().newTx(timestamp);
+//		// TODO Why is it necessary to protect this operation with a transaction?
+//		
+//		// TODO This might no longer be necessary with BLZG-2041 since the code 
+//		// now uses correct locking patterns when locating a resource.
+//		
+//		final long tx = getBigdataRDFContext().newTx(timestamp);
 		
 		try {
 		   
@@ -654,10 +659,24 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                   @Override
                   public Void call() throws Exception {
 
-                     final AbstractTripleStore tripleStore = getTripleStore(
-                           namespace, tx);
+                     try {
+                          
+                     final BigdataSailRepositoryConnection conn = getQueryConnection();
+                     try {
 
-                     if (tripleStore == null) {
+                         final Properties properties = PropertyUtil
+                             .flatCopy(conn.getTripleStore().getProperties());
+
+                         sendProperties(req, resp, properties);
+
+                         return null;
+
+                     } finally {
+                         conn.close();
+                     }
+
+                     } catch(Throwable t) {
+                         if(InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
                         /*
                          * There is no such triple/quad store instance.
                          */
@@ -666,13 +685,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                               BigdataServlet.MIME_TEXT_PLAIN,
                               "Not found: namespace=" + namespace);
                      }
-
-                     final Properties properties = PropertyUtil
-                           .flatCopy(tripleStore.getProperties());
-
-                     sendProperties(req, resp, properties);
-
-                     return null;
+                         throw new RuntimeException(t);
+                     }
 
                   }
 
@@ -682,9 +696,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 			
 			launderThrowable(t, resp, "namespace=" + namespace);
 			
-		} finally {
-
-		    getBigdataRDFContext().abortTx(tx);
+//		} finally {
+//
+//		    getBigdataRDFContext().abortTx(tx);
 		    
 		}
 

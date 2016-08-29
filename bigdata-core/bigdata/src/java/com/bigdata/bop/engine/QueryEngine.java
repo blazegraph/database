@@ -60,6 +60,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
@@ -256,6 +257,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 //        String DEFAULT_RUNNING_QUERY_CLASS = StandaloneChainedRunningQuery.class.getName();
         String DEFAULT_RUNNING_QUERY_CLASS = ChunkedRunningQuery.class.getName();
 
+        /**
+         * The class used to map binding sets across the federation or transition
+         * them from IBindingSet[]s to {@link IChunkMessage}s stored on the native
+         * heap.
+         * 
+         * @see BLZG-533 Vector query engine on native heap.
+         */
+        String CHUNK_HANDLER = QueryEngine.class.getName() + ".chunkHandler";
+        
     }
 
     /**

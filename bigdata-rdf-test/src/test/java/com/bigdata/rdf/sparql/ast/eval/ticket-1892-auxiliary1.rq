@@ -1,0 +1,9 @@
+# Here the two occurences of ?o are, essentially, two different variables 
+# with the same name, because of the variable scoping rules.
+
+ 
+select ?o 
+{
+ select ?x 
+   {?x ?p ?o}
+}

@@ -807,16 +807,19 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 				 * retrieve components and assign to ByteBuffer[].
 				 */
 
-				final ByteBuffer hdrbuf = getBlobHdr(addr);
-
-				final int nblocks = hdrbuf.getInt();
+				final ByteBuffer[] hdrbuf = getBlobHdr(addr);
+				int hdrIndex = 0;
+				final int nblocks = hdrbuf[hdrIndex].getInt();
 
 				final ByteBuffer[] blobbufs = new ByteBuffer[nblocks];
 				int remaining = size;
 				for (int i = 0; i < nblocks; i++) {
+					if (hdrbuf[hdrIndex].remaining() == 0) {
+						hdrIndex++;
+					}
 					int blockSize = remaining <= SectorAllocator.BLOB_SIZE ? remaining
 							: SectorAllocator.BLOB_SIZE;
-					blobbufs[i] = getBuffer(hdrbuf.getInt(), blockSize);
+					blobbufs[i] = getBuffer(hdrbuf[hdrIndex].getInt(), blockSize);
 
 					remaining -= blockSize;
 				}
@@ -878,7 +881,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 * @param addr of blob header
 	 * @return the ByteBuffer containing the header
 	 */
-	private ByteBuffer getBlobHdr(final long addr) {
+	private ByteBuffer[] getBlobHdr(final long addr) {
 		int size = getAllocationSize(addr);
 		
 		final int nblocks = SectorAllocator.getBlobBlockCount(size);
@@ -887,7 +890,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		// Mockup hdraddr with header size to retrieve the ByteBuffer
 		final long hdraddr = (addr & 0xFFFFFFFF00000000L) | hdrsize;
 		
-		return get(hdraddr)[0];
+		return get(hdraddr);
 	}
 	
 	String debugInfo(int rwaddr) {
@@ -1081,20 +1084,27 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 			} else {
 
 	            // free of a blob.
-				final ByteBuffer hdrbuf = getBlobHdr(addr);
-				final int spos = hdrbuf.position();
-				final int hdrsize = hdrbuf.limit() - spos;
-				final int nblocks = hdrbuf.getInt(); // read # of blocks
+				final ByteBuffer[] hdrbuf = getBlobHdr(addr);
+				int hdrIndex = 0;
+				final int spos = hdrbuf[hdrIndex].position();
+				int hdrsize = hdrbuf[hdrIndex].limit() - spos;
+				final int nblocks = hdrbuf[hdrIndex].getInt(); // read # of blocks
 				
 				// free each block
 				int remaining = size;
 				
 				for (int i = 0; i < nblocks; i++) {
+					
+					// check for blob of blobs header
+					if (hdrbuf[hdrIndex].remaining() == 0) {
+						hdrIndex++;
+						hdrsize += hdrbuf[hdrIndex].limit();
+					}
 
 					final int blockSize = remaining <= SectorAllocator.BLOB_SIZE ? remaining
 							: SectorAllocator.BLOB_SIZE;
 				
-					final long mkaddr = makeAddr(hdrbuf.getInt(), blockSize);
+					final long mkaddr = makeAddr(hdrbuf[hdrIndex].getInt(), blockSize);
 					
 					/*
 					 * BLOB RECURSION
@@ -1104,8 +1114,6 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 					
 				}
 				
-//				hdrbuf.position(spos);
-
 				// now free the header
 				immediateFree(makeAddr(rwaddr, hdrsize));
 				

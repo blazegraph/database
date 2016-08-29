@@ -58,6 +58,7 @@ import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.StandaloneChunkHandler;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -107,6 +108,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
     private Journal jnl;
     private QueryEngine queryEngine;
     
+    @Override
     public void setUp() throws Exception {
         
         jnl = new Journal(getProperties());
@@ -150,6 +152,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
 
     }
 
+    @Override
     public void tearDown() throws Exception {
 
         if (queryEngine != null) {
@@ -199,7 +202,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                 new BOp[] {},//
                 new NV(Predicate.Annotations.BOP_ID, subqueryId),//
                 new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-                new NV(SubqueryOp.Annotations.JOIN_TYPE,JoinTypeEnum.Normal)//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE,JoinTypeEnum.Normal),//
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                        StandaloneChunkHandler.TEST_INSTANCE)//
                 );
 
         final PipelineOp query = subqueryOp;
@@ -311,7 +316,10 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                 new NV(SubqueryOp.Annotations.CONSTRAINTS,
                         new IConstraint[] { Constraint
                                 .wrap(new EQConstant(x, new Constant<String>("Brad"))),//
-                        }));
+                        }),
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                        StandaloneChunkHandler.TEST_INSTANCE)//
+                        );
 
         final PipelineOp query = subqueryOp;
         
@@ -418,7 +426,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                 new NV(Predicate.Annotations.BOP_ID, subqueryId),//
                 new NV(SubqueryOp.Annotations.SELECT, new IVariable[]{x}),//
                 new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                        StandaloneChunkHandler.TEST_INSTANCE)//
                 );
 
         final PipelineOp query = subqueryOp;
@@ -604,7 +614,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                 new BOp[] { join2Op },//
                 new NV(Predicate.Annotations.BOP_ID, joinId3),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(PipelineJoin.Annotations.PREDICATE, pred3Op)//
+                new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                        StandaloneChunkHandler.TEST_INSTANCE)//
 //                // join is optional.
 //                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
 //                // optional target is the same as the default target.
@@ -633,7 +645,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false)//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                                StandaloneChunkHandler.TEST_INSTANCE),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -871,7 +885,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
 				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
 				// constraint d != Leon
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { Constraint.wrap(new NEConstant(d, new Constant<String>("Leon"))) })
+						new IConstraint[] { Constraint.wrap(new NEConstant(d, new Constant<String>("Leon"))) }),
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                        StandaloneChunkHandler.TEST_INSTANCE)//
 //				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
 //				// optional target is the same as the default target.
@@ -901,7 +917,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false)//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                                StandaloneChunkHandler.TEST_INSTANCE),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -1136,7 +1154,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
 				new BOp[] { join2Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId3),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op)//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
+                new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                        StandaloneChunkHandler.TEST_INSTANCE)//
 //				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
 //				// optional target is the same as the default target.
@@ -1165,7 +1185,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false)//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
+                        new NV(QueryEngine.Annotations.CHUNK_HANDLER,
+                                StandaloneChunkHandler.TEST_INSTANCE),//
                         }));
 
         final PipelineOp query = sliceOp;

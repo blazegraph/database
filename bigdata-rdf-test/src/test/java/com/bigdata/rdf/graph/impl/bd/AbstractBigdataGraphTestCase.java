@@ -37,6 +37,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 
 public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
 
@@ -116,35 +117,43 @@ public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
         public SmallGraphProblem() throws Exception {
 
             getGraphFixture().loadGraph(smallGraph);
-
-            final BigdataSail sail = getGraphFixture().getSail();
-
-            final ValueFactory vf = sail.getValueFactory();
-
+            
+            final BigdataSailConnection conn = getGraphFixture().getSail().getReadOnlyConnection();
+            
+            try {
+                    
+                final ValueFactory vf = conn.getBigdataSail().getValueFactory();
+    
             rdfType = (BigdataURI) vf.createURI(RDF.TYPE.stringValue());
-
+    
             foafKnows = (BigdataURI) vf
                     .createURI("http://xmlns.com/foaf/0.1/knows");
-
+    
             foafPerson = (BigdataURI) vf
                     .createURI("http://xmlns.com/foaf/0.1/Person");
-
+    
             mike = (BigdataURI) vf.createURI("http://www.bigdata.com/Mike");
-
+    
             bryan = (BigdataURI) vf.createURI("http://www.bigdata.com/Bryan");
-
+    
             martyn = (BigdataURI) vf.createURI("http://www.bigdata.com/Martyn");
-
+    
             final BigdataValue[] terms = new BigdataValue[] { rdfType,
                     foafKnows, foafPerson, mike, bryan, martyn };
-
+    
             // batch resolve existing IVs.
-            ((BigdataSail) sail).getDatabase().getLexiconRelation()
+                conn.getTripleStore().getLexiconRelation()
                     .addTerms(terms, terms.length, true/* readOnly */);
-
+    
             for (BigdataValue v : terms) {
                 if (v.getIV() == null)
                     fail("Did not resolve: " + v);
+            }
+
+            } finally {
+                
+                conn.close();
+                
             }
 
         }
@@ -210,32 +219,40 @@ public class AbstractBigdataGraphTestCase extends AbstractGraphTestCase {
 
             getGraphFixture().loadGraph(smallWeightedGraph);
 
-            final BigdataSail sail = getGraphFixture().getSail();
-
-            final ValueFactory vf = sail.getValueFactory();
-
+            final BigdataSailConnection conn = getGraphFixture().getSail().getReadOnlyConnection();
+            
+            try {
+                    
+                final ValueFactory vf = conn.getBigdataSail().getValueFactory();
+    
             foafKnows = (BigdataURI) vf
                     .createURI("http://xmlns.com/foaf/0.1/knows");
             
             linkWeight = (BigdataURI) vf
                     .createURI("http://www.bigdata.com/weight");
-
+    
             v1 = (BigdataURI) vf.createURI("http://www.bigdata.com/1");
             v2 = (BigdataURI) vf.createURI("http://www.bigdata.com/2");
             v3 = (BigdataURI) vf.createURI("http://www.bigdata.com/3");
             v4 = (BigdataURI) vf.createURI("http://www.bigdata.com/4");
             v5 = (BigdataURI) vf.createURI("http://www.bigdata.com/5");
-
+    
             final BigdataValue[] terms = new BigdataValue[] { foafKnows,
                     linkWeight, v1, v2, v3, v4, v5 };
-
+    
             // batch resolve existing IVs.
-            ((BigdataSail) sail).getDatabase().getLexiconRelation()
+                conn.getTripleStore().getLexiconRelation()
                     .addTerms(terms, terms.length, true/* readOnly */);
-
+    
             for (BigdataValue v : terms) {
                 if (v.getIV() == null)
                     fail("Did not resolve: " + v);
+            }
+                
+            } finally {
+                
+                conn.close();
+                
             }
 
         }

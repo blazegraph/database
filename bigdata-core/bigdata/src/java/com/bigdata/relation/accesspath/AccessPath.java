@@ -100,7 +100,6 @@ import cutthecrap.utils.striterators.Striterator;
  * filter as a constraint on the predicate when specifying the access path.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @param R
  *            The generic type of the elements of the {@link IRelation}.
  * 

@@ -978,15 +978,28 @@ abstract public class AbstractTripleStore extends
 		 * Boolean option enables support for a full text index that may be used
 		 * to lookup datatype literals by tokens found in the text of those
 		 * literals (default {@value #DEFAULT_TEXT_INDEX_DATATYPE_LITERALS}).
-		 * This option will cause ALL datatype literals to be presented to the
-		 * full text indexer, including <code>xsd:string</code>,
-		 * <code>xsd:int</code>, etc.
+		 * Enabling of this option will cause ALL datatype literals to be presented
+		 * to the full text indexer, including <code>xsd:string</code>,
+		 * <code>xsd:int</code>, etc. If disabled, only plain, <code>xsd:string</code>
+		 * and <code>rdf:langString</code> (language tagged literals), will be indexed.<br>
+		 * Note: literals are text indexed not depending on inlining configuration
+		 * since <a href="https://jira.blazegraph.com/browse/BLZG-1928"> BLZG-1928 </a>
 		 */
         String TEXT_INDEX_DATATYPE_LITERALS = AbstractTripleStore.class
                 .getName() + ".textIndex.datatypeLiterals";
 
         String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
         
+        /**
+		 * List of datatypes, which will be put into full text index even if
+		 * {@link #TEXT_INDEX_DATATYPE_LITERALS} is not enabled
+		 * (default {@value #DEFAULT_DATATYPES_TO_TEXT_INDEX}).
+		 */
+        String DATATYPES_TO_TEXT_INDEX = AbstractTripleStore.class
+                .getName() + ".textIndex.datatypes";
+
+        String DEFAULT_DATATYPES_TO_TEXT_INDEX = "";
+
         /**
          * The name of the {@link IValueCentricTextIndexer} class. The implementation MUST
          * declare a method with the following signature which will be used to
@@ -1632,7 +1645,7 @@ abstract public class AbstractTripleStore extends
      * deletes the KB instance and destroys the backing database instance. It is
      * used to help tear down unit tests.
      */
-    public void __tearDownUnitTest() {
+    final public void __tearDownUnitTest() {
 
         if(isOpen())
             destroy();
@@ -4492,9 +4505,9 @@ abstract public class AbstractTripleStore extends
             while (itr.hasNext()) {
 
                 final ISPO[] stmts = itr.nextChunk();
-
                 // The #of statements that will be removed.
                 final int numStmts = stmts.length;
+                
 
                 mutationCount += getSPORelation().delete(stmts, numStmts);
                 

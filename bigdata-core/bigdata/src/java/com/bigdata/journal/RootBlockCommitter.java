@@ -26,18 +26,22 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
+import com.bigdata.btree.IndexInconsistentError;
+
 /**
  * Provides the callback to save the previous root block and store the address
  * with the current CommitRecord.  This enables access to historical root blocks
  * since the next CommitRecord is accessible from the CommitRecordIndex.  This
- * is effective if slightly circuitious.
+ * is effective if slightly circuitous.
  *  
  * @author Martyn Cutcher
  *
  */
 public class RootBlockCommitter implements ICommitter {
-	final AbstractJournal journal;
-	
+    
+	final private AbstractJournal journal;
+	private volatile Throwable error = null;
+
 	public RootBlockCommitter(final AbstractJournal journal) {
 		this.journal = journal;
 	}
@@ -46,8 +50,13 @@ public class RootBlockCommitter implements ICommitter {
 	 * Write the current root block to the Journal and return its address
 	 * to be stored in the CommitRecord.
 	 */
+	@Override
 	public long handleCommit(final long commitTime) {
-		final IRootBlockView view = journal.getRootBlockView();
+		
+        if (error != null)
+            throw new IndexInconsistentError(error);
+
+	    final IRootBlockView view = journal.getRootBlockView();
 		
 		final ByteBuffer rbv = view.asReadOnlyBuffer();
 		/*
@@ -67,4 +76,15 @@ public class RootBlockCommitter implements ICommitter {
 		return journal.write(bb);
 	}
 
+    @Override
+    public void invalidate(final Throwable t) {
+
+        if (t == null)
+            throw new IllegalArgumentException();
+
+        if (error == null)
+            error = t;
+
+    }
+    
 }

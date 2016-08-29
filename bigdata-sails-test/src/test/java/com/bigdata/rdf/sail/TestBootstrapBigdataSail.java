@@ -59,12 +59,13 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.util.InnerCause;
+import com.bigdata.concurrent.AccessSemaphore.AccessSemaphoreNotReentrantException;
 
 /**
  * Bootstrap test case for bringing up the {@link BigdataSail}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestBootstrapBigdataSail extends TestCase2 {
 
@@ -117,7 +118,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
             
 		} finally {
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
         }
 
@@ -198,7 +199,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 		} finally {
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -296,7 +297,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 			
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -334,10 +335,10 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			final ReentrantLock lock = new ReentrantLock();
 			final AtomicBoolean haveFirst = new AtomicBoolean(false);
 			final AtomicBoolean releaseFirst = new AtomicBoolean(false);
-			final AtomicBoolean haveSecond = new AtomicBoolean(false);
+//			final AtomicBoolean haveSecond = new AtomicBoolean(false);
 			final Condition haveFirstConnection = lock.newCondition();
 			final Condition releaseFirstConnection = lock.newCondition();
-			final Condition haveSecondConnection = lock.newCondition();
+//			final Condition haveSecondConnection = lock.newCondition();
 			try {
 
 				final Callable<Void> task1 = new Callable<Void>() {
@@ -425,7 +426,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -454,8 +455,8 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 			sail.initialize();
 			service = Executors.newSingleThreadExecutor();
 
-			// wrap a 2nd sail around the same tripleStore.
-			final BigdataSail sail2 = new BigdataSail(sail.getDatabase());
+			// wrap a 2nd sail around the same namespace.
+			final BigdataSail sail2 = new BigdataSail(sail.getNamespace(), sail.getIndexManager());
 			sail2.initialize();
 
 			Future<Void> f = null;
@@ -464,6 +465,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 				final Callable<Void> task = new Callable<Void>() {
 
+				    @Override
 					public Void call() throws Exception {
 
 						SailConnection conn1 = null;
@@ -500,16 +502,21 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				// connection.
 				f = service.submit(task);
 
-				// wait up to a timeout to verify that the task blocked rather
-				// than acquiring the 2nd connection.
-				f.get(250, TimeUnit.MILLISECONDS);
+//				// wait up to a timeout to verify that the task blocked rather
+//				// than acquiring the 2nd connection.
+//				f.get(250, TimeUnit.MILLISECONDS);
+				f.get();
 
-			} catch (TimeoutException e) {
+			} catch (ExecutionException e) {
 
-				/*
-				 * This is the expected outcome.
-				 */
-				log.info("timeout");
+                if (InnerCause.isInnerCause(e, AccessSemaphoreNotReentrantException.class)) {
+                    /*
+                     * This is the expected outcome.
+                     */
+                    log.info(e);
+                } else {
+                    throw e;
+			    }
 
 			} finally {
 
@@ -531,7 +538,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -562,15 +569,14 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 		try {
 
 			sail.initialize();
-			service = Executors.newSingleThreadExecutor();
+			service = Executors.newFixedThreadPool(3/*threads*/);
 
 			// wrap a 2nd sail around a different tripleStore.
 			final BigdataSail sail2;
 			{
 
 				// tunnel through to the Journal.
-				final Journal jnl = (Journal) sail.getDatabase()
-						.getIndexManager();
+				final Journal jnl = (Journal) sail.getIndexManager();
 
 				// describe another tripleStore with a distinct namespace.
 				final AbstractTripleStore tripleStore = new LocalTripleStore(
@@ -585,65 +591,50 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 			}
 
-			Future<Void> f = null;
 
 			try {
 
-				final Callable<Void> task = new Callable<Void>() {
+				final Callable<SailConnection> task = new Callable<SailConnection>() {
 
-					public Void call() throws Exception {
+					public SailConnection call() throws Exception {
 
 						SailConnection conn1 = null;
-						SailConnection conn2 = null;
-
-						try {
 
 							log.info("Requesting 1st unisolated connection.");
 
 							conn1 = sail.getUnisolatedConnection();
-
-							log.info("Requesting 2nd unisolated connection.");
-
-							conn2 = sail2.getUnisolatedConnection();
-
-							fail("Not expecting a 2nd unisolated connection");
-
-							return (Void) null;
-
-						} finally {
-
-							if (conn1 != null)
-								conn1.close();
-
-							if (conn2 != null)
-								conn2.close();
-
-						}
+							
+							return conn1;
 					}
 
 				};
 
 				// run task. it should block when attempting to get the 2nd
-				// connection.
-				f = service.submit(task);
+				// connection (on a different thread)
+				Future<SailConnection> f1 = service.submit(task);
+				Future<SailConnection> f2 = service.submit(task);
 
 				// wait up to a timeout to verify that the task blocked rather
 				// than acquiring the 2nd connection.
-				f.get(250, TimeUnit.MILLISECONDS);
-
+				try {
+					f2.get(250, TimeUnit.MILLISECONDS);	
 			} catch (TimeoutException e) {
-
 				/*
 				 * This is the expected outcome.
 				 */
 				log.info("timeout");
+				}
+				
+				f1.get().close();
+				
+				// Now we can get the second connection
+				try {
+					f2.get(250, TimeUnit.MILLISECONDS).close();	
+				} catch (TimeoutException e) {
+					fail("Should have been able to get second connection");
+				}
 
 			} finally {
-
-				if (f != null) {
-					// Cancel task.
-					f.cancel(true/* mayInterruptIfRunning */);
-				}
 
 				if (sail2 != null)
 					sail2.shutDown();
@@ -658,7 +649,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
 		}
 
@@ -747,15 +738,23 @@ public class TestBootstrapBigdataSail extends TestCase2 {
                 
                 int n = 0;
 
-                CloseableIteration<? extends Statement, SailException> itr = readConn
+                final CloseableIteration<? extends Statement, SailException> itr = readConn
                         .getStatements(s, p, o, false/* includeInferred */);
 
+                try {
+                
                 while (itr.hasNext()) {
 
                     itr.next();
                     
                     n++;
 
+                }
+                
+                } finally {
+                    
+                    itr.close();
+                    
                 }
 
                 assertEquals("#statements visited", 0, n);
@@ -807,7 +806,7 @@ public class TestBootstrapBigdataSail extends TestCase2 {
             if (readConn != null)
                 readConn.close();
             
-			sail.getDatabase().getIndexManager().destroy();
+			sail.getIndexManager().destroy();
 
         }
 

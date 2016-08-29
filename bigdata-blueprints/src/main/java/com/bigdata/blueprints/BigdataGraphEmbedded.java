@@ -31,10 +31,10 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
-import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -76,7 +76,17 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	
     private final transient static Logger log = Logger.getLogger(BigdataGraphEmbedded.class);
     
-	final BigdataSailRepository repo;
+    public static interface Options {
+        
+        String AUTO_COMMIT_ON_SHUTDOWN = BigdataGraphEmbedded.class.getName()+".autoCommitOnShutdown";
+        
+        boolean DEFAULT_AUTO_COMMIT_ON_SHUTDOWN = false;
+        
+    }
+    
+    protected final BigdataSailRepository repo;
+    
+    protected final boolean autocommitOnShutdown;
 	
 //	transient BigdataSailRepositoryConnection cxn;
 
@@ -125,115 +135,151 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	    super(factory, props);
 	    
 	    this.repo = (BigdataSailRepository) repo;
+        this.autocommitOnShutdown = Boolean.valueOf(
+                props.getProperty(Options.AUTO_COMMIT_ON_SHUTDOWN, 
+                    Boolean.toString(Options.DEFAULT_AUTO_COMMIT_ON_SHUTDOWN)));
 	}
 	
 	public BigdataSailRepository getRepository() {
 	    return repo;
 	}
+
+//    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    private final ReentrantLock lock = new ReentrantLock();
 	
-    protected final BigdataThreadLocal cxn = new BigdataThreadLocal();
+    private transient BigdataSailRepositoryConnection cxn = null;
     
-    protected class BigdataThreadLocal extends ThreadLocal<BigdataSailRepositoryConnection> {
+    private transient String heldBy = null;
 
-        protected BigdataSailRepositoryConnection initialValue() {
-            try {
-                return _initialValue();
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
+    public BigdataSailRepositoryConnection cxn() throws Exception {
+        /*
+         * Asking for the connection locks the graph to the current thread
+         * until released by commit() or rollback().
+         */
+        if (!lock.isHeldByCurrentThread()) {
+            lock.lock();
             }
+        if (cxn == null) {
+            cxn = repo.getUnisolatedConnection();
+            cxn.addChangeLog(BigdataGraphEmbedded.this);
         }
-        
-        private boolean create = true;
-        
-        private BigdataSailRepositoryConnection _initialValue() throws Exception {
-            if (!create) {
-                return null;
-            }
-            
-            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo.getUnisolatedConnection();
-            try {
-                cxn.setAutoCommit(false);
-                cxn.addChangeLog(BigdataGraphEmbedded.this);
                 return cxn;
-            } catch (Exception ex) {
-                cxn.close();
-                throw ex;
-            }
         }
         
-        /**
-         * Normal semantics - get or create.
-         */
-        @Override
-        public BigdataSailRepositoryConnection get() {
-            return get(true);
-        }
+    public BigdataReadOnlyGraph getReadOnlyView() throws Exception {
+        if (log.isDebugEnabled()) 
+            log.debug("get read-only view: " + Thread.currentThread().getName());
         
-        /**
-         * Modified semantics - only create if create is true.
-         */
-        public BigdataSailRepositoryConnection get(final boolean create) {
-            BigdataThreadLocal.this.create = create;
-            return super.get();
-        }
-
-        /**
-         * Test for existence of thread local object without creating.
-         */
-        public boolean exists() {
-            return get(false) != null;
-        }
-
-    }
-
-	public BigdataSailRepositoryConnection getWriteConnection() throws Exception {
-	    return cxn.get();
-	}
-	
-	public BigdataSailRepositoryConnection getReadConnection() throws Exception {
-	    return ((BigdataSailRepository)repo).getReadOnlyConnection();
+        return new BigdataReadOnlyGraph(
+                repo.getReadOnlyConnection(), factory, maxQueryTime);
 	}
 	
 	@Override
 	public void commit() {
+        /*
+         * Asking for the connection locks the graph to the current thread
+         * until released by commit() or rollback().
+         */
+        if (!lock.isHeldByCurrentThread()) {
+            lock.lock();
+        }
+        try {
 		try {
-            final RepositoryConnection cxn = this.cxn.get(false);
             if (cxn != null) {
+                    try {
                 cxn.commit();
+                    } finally {
                 cxn.close();
-                this.cxn.remove();
             }
+                }
+            } finally {
+                cxn = null;
+            }
+        } catch (RuntimeException e) {
+            throw e;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
+        } finally {
+            /*
+             * Release the lock for the next writer thread.
+             */
+            lock.unlock();
 		}
 	}
 
 	@Override
 	public void rollback() {
+        /*
+         * Asking for the connection locks the graph to the current thread
+         * until released by commit() or rollback().
+         */
+        if (!lock.isHeldByCurrentThread()) {
+            lock.lock();
+        }
+        try {
 		try {
-            final RepositoryConnection cxn = this.cxn.get(false);
             if (cxn != null) {
+                    try {
                 cxn.rollback();
+                    } finally {
                 cxn.close();
-                this.cxn.remove();
             }
+                }
+            } finally {
+                cxn = null;
+            }
+        } catch (RuntimeException e) {
+            throw e;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
+        } finally {
+            /*
+             * Release the lock for the next writer thread.
+             */
+            lock.unlock();
 		}
 	}
 
 	@Override
 	public void shutdown() {
 		try {
-		    // if there is a connection open, commit and close
-		    if (cxn.exists()) {
+            try {
+                if (autocommitOnShutdown) {
+                    /*
+                     * Auto-commit on close.
+                     */
 		        commit();
 		    }
+            } finally {
 			repo.shutDown();
+            }
+        } catch (RuntimeException e) {
+            throw e;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}
+    
+//    private synchronized void lock(final String method) {
+//        if (log.isDebugEnabled()) 
+//            log.debug("waiting for lock from: " + method + ", thread: " + Thread.currentThread().getName() + ", held by: " + heldBy);
+//        
+//        if (!lock.isHeldByCurrentThread()) {
+//            lock.lock();
+//        }
+//        heldBy = Thread.currentThread().getName();
+//        
+//        if (log.isDebugEnabled()) 
+//            log.debug("lock is held: " + Thread.currentThread().getName() + ", holdCount: " + lock.getHoldCount());
+//    }
+//
+//    private synchronized void unlock(final String method) {
+//        heldBy = null;
+//        lock.unlock();
+//        
+//        if (log.isDebugEnabled()) 
+//            log.debug("lock is released by: " + method + ", thread: " + Thread.currentThread().getName());
+//    }
 
 	@Override
 	@Deprecated
@@ -241,22 +287,10 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 	
 	public StringBuilder dumpStore() throws Exception {
-	    final BigdataSailRepositoryConnection cxn =
-	            super.readFromWriteConnection ? 
-	                    getWriteConnection() : getReadConnection();
-	                    
-        try {
-            if (super.readFromWriteConnection) {
+        final BigdataSailRepositoryConnection cxn = cxn();
                 cxn.flush();
-            }
             return cxn.getTripleStore().dumpStore();
-        } finally {
-            if (!super.readFromWriteConnection) {
-                cxn.close();
-            }
         }
-	}
-	
 	
     protected static final Features FEATURES = new Features();
 
@@ -395,10 +429,11 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     protected List<IChangeRecord> materialize(final List<IChangeRecord> records) {
         
         try {
-            final AbstractTripleStore db = cxn.get().getTripleStore();
-
+            
             final List<IChangeRecord> materialized = new LinkedList<IChangeRecord>();
 
+            final AbstractTripleStore db = cxn().getTripleStore();
+            
             // collect up the ISPOs out of the unresolved change records
             final ISPO[] spos = new ISPO[records.size()];
             int i = 0;
@@ -444,6 +479,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionPrepare() {
+        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionPrepare();
         }
@@ -454,7 +490,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionCommited(final long commitTime) {
-        notifyRemoves();
+//        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionCommited(commitTime);
         }
@@ -465,7 +501,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void transactionAborted() {
-        notifyRemoves();
+//        notifyRemoves();
         for (BigdataGraphListener listener : listeners) {
             listener.transactionAborted();
         }
@@ -507,7 +543,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	
 		final BigdataSailRepository repo = (BigdataSailRepository) this.getRepository();
 		
-		final IIndexManager indexMgr = repo.getDatabase().getIndexManager();
+        final IIndexManager indexMgr = repo.getSail().getIndexManager();
 		
 		return indexMgr;
 		
@@ -887,6 +923,101 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 		}
 
 	}
+    
+    private static Properties properties(final int maxQueryTime) {
+        final Properties props = new Properties();
+        props.setProperty(BigdataGraph.Options.MAX_QUERY_TIME, Integer.toString(maxQueryTime));
+        return props;
+    }
+    
+    public class BigdataReadOnlyGraph extends BigdataGraph {
+        
+        private final BigdataSailRepositoryConnection cxn;
+        
+        private BigdataReadOnlyGraph(final BigdataSailRepositoryConnection cxn,
+                final BlueprintsValueFactory factory, final int maxQueryTime) {
+            super(factory, properties(maxQueryTime));
+            
+            this.cxn = cxn;
+        }
+
+        @Override
+        public void shutdown() {
+            try {
+                cxn.close();
+            } catch (Exception ex) {
+                log.warn("Error closing connection: " + ex);
+            }
+        }
+
+        @Override
+        public BigdataSailRepositoryConnection cxn() throws Exception {
+            return cxn;
+        }
+
+        @Override
+        public Collection<RunningQuery> getRunningQueries() {
+            return BigdataGraphEmbedded.this.getRunningQueries();
+        }
+
+        @Override
+        public void cancel(final UUID queryId) {
+            BigdataGraphEmbedded.this.cancel(queryId);
+        }
+
+        @Override
+        public void cancel(final String uuid) {
+            BigdataGraphEmbedded.this.cancel(uuid);
+        }
+
+        @Override
+        public void cancel(final RunningQuery r) {
+            BigdataGraphEmbedded.this.cancel(r);
+        }
+
+        @Override
+        public RunningQuery getQueryById(final UUID queryId2) {
+            return BigdataGraphEmbedded.this.getQueryById(queryId2);
+        }
+
+        @Override
+        public RunningQuery getQueryByExternalId(final String extQueryId) {
+            return BigdataGraphEmbedded.this.getQueryByExternalId(extQueryId);
+        }
+
+        @Override
+        protected UUID setupQuery(final BigdataSailRepositoryConnection cxn, 
+                final ASTContainer astContainer, final QueryType queryType,
+                final String extQueryId) {
+            return BigdataGraphEmbedded.this.setupQuery(
+                    cxn, astContainer, queryType, extQueryId);
+        }
+
+        @Override
+        protected void tearDownQuery(final UUID queryId) {
+            BigdataGraphEmbedded.this.tearDownQuery(queryId);
+        }
+
+        @Override
+        protected boolean isQueryCancelled(final UUID queryId) {
+            return BigdataGraphEmbedded.this.isQueryCancelled(queryId);
+        }
+
+        public StringBuilder dumpStore() throws Exception {
+            return cxn.getTripleStore().dumpStore();
+        }
+        
+        @Override
+        public boolean isReadOnly() {
+            return true;
+        }
+        
+    }
+
+    @Override
+    public boolean isReadOnly() {
+        return false;
+    }
 
 
 }

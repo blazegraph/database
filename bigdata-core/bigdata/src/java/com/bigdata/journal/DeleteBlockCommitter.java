@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import com.bigdata.btree.IndexInconsistentError;
 import com.bigdata.rwstore.IRWStrategy;
 
 /**
@@ -36,6 +37,7 @@ import com.bigdata.rwstore.IRWStrategy;
 public class DeleteBlockCommitter implements ICommitter {
 
 	private final IRWStrategy m_strategy;
+	private volatile Throwable error = null;
 	
 	public DeleteBlockCommitter(final IRWStrategy strategy) {
 	
@@ -43,10 +45,25 @@ public class DeleteBlockCommitter implements ICommitter {
 	    
 	}
 
-	public long handleCommit(final long commitTime) {
-		
+    @Override
+    public long handleCommit(final long commitTime) {
+
+        if (error != null)
+            throw new IndexInconsistentError(error);
+
 	    return m_strategy.saveDeferrals();
 	    
 	}
+
+    @Override
+    public void invalidate(final Throwable t) {
+
+        if (t == null)
+            throw new IllegalArgumentException();
+
+        if (error == null)
+            error = t;
+
+    }
 
 }

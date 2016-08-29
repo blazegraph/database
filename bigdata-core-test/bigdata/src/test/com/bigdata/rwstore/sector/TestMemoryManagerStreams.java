@@ -24,25 +24,19 @@ import junit.framework.TestCase;
 
 public class TestMemoryManagerStreams extends TestCase {
 
-	final int sectorSize = 10 * 1024 * 1024; // 10M
-	
 	private MemoryManager manager;
-	
-	private String c_testData;
 	
 	private Random r;
 
 	protected void setUp() throws Exception {
 		r = new Random();
-		manager = new MemoryManager(DirectBufferPool.INSTANCE, 10);
-		c_testData = genTestData();
+		manager = new MemoryManager(DirectBufferPool.INSTANCE, 30); // 30 * 1M buffers
 	}
 
 	protected void tearDown() throws Exception {
 		manager.clear();
 		r = null;
 		manager = null;
-		c_testData = null;
 		super.tearDown();
 	}
 	
@@ -166,6 +160,50 @@ public class TestMemoryManagerStreams extends TestCase {
 		
 		// confirm that the stream address can be freed
 		manager.free(addr);
+		
+		assert manager.getSlotBytes() == 0;
+	}
+
+	public void testBlobStreamScale() throws IOException, ClassNotFoundException {
+		
+		final int largeBlob = 25 * 1024 * 1024; // requires blob of blobs
+		final byte[] data = new byte[largeBlob];
+		r.nextBytes(data);
+		
+		{
+			final IPSOutputStream out = manager.getOutputStream();
+			out.write(data);
+			out.close();
+			long addr1 = out.getAddr();
+			InputStream instr = manager.getInputStream(addr1);
+			instr.read(data);
+			instr.close();
+			
+			manager.free(addr1);			
+		}
+		
+		assert manager.getSlotBytes() == 0;
+	}
+
+	public void testBlobStreamBoundaries() throws IOException, ClassNotFoundException {
+		int start = SectorAllocator.BLOB_SIZE-1;
+		int end = SectorAllocator.BLOB_SIZE*4 + 1;
+		
+		final byte[] data = new byte[end];
+		r.nextBytes(data);
+		
+		for (int n = start; n < end; n++) {
+			final IPSOutputStream out = manager.getOutputStream();
+			out.write(data, 0, n);
+			out.close();
+			long addr1 = out.getAddr();
+			InputStream instr = manager.getInputStream(addr1);
+			final byte[] indat = new byte[n];
+			instr.read(indat);
+			instr.close();
+			
+			manager.free(addr1);			
+		}
 		
 		assert manager.getSlotBytes() == 0;
 	}

@@ -63,7 +63,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.BDS;
@@ -90,7 +89,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
     }
     
     /**
-     * Overriden to allow the subject-centric full text index.
+     * Overridden to allow the subject-centric full text index.
      */
     @Override
     public Properties getProperties() {
@@ -403,6 +402,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 repo.initialize();
 
                 { // load ontology and optionally the entity data.
+                    boolean ok = false;
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         cxn.setAutoCommit(false);
@@ -414,26 +414,27 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             cxn.add(test_restart_2);
                         }
                         cxn.commit();
-                    } catch (Exception ex) {
-                        cxn.rollback();
-                        throw ex;
+                        ok = true;
                     } finally {
+                        if(!ok)
+                            cxn.rollback();
                         cxn.close();
                     }
                 }
 
                 if (doYouWantMeToBreak) {
                     // load the entity data.
+                    boolean ok = false;
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         cxn.setAutoCommit(false);
                         log.info("loading entity data");
                         cxn.add(test_restart_2);
                         cxn.commit();
-                    } catch (Exception ex) {
-                        cxn.rollback();
-                        throw ex;
+                        ok = true;
                     } finally {
+                        if (!ok)
+                            cxn.rollback();
                         cxn.close();
                     }
                 }
@@ -755,7 +756,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
             { 
@@ -775,22 +776,24 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 7, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 7, i);
-                
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -802,8 +805,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -839,22 +842,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 5, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 5, i);
                 
                 result = tupleQuery.evaluate();
-
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -872,8 +878,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -912,22 +918,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 2, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 2, i);
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -945,8 +954,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -989,22 +998,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results: " + i, 2, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results: " + i, 2, i);
                 
                 result = tupleQuery.evaluate();
 
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1022,8 +1034,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1068,22 +1080,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results: " + i, 3, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results: " + i, 3, i);
                 
                 result = tupleQuery.evaluate();
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1101,8 +1116,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1145,22 +1160,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results: " + i, 1, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results: " + i, 1, i);
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1178,8 +1196,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1218,22 +1236,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
-                }
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
 //                assertTrue("wrong # of results: " + i, i == 1);
+                } finally {
+                    result.close();
+                }
                 
                 result = tupleQuery.evaluate();
 
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1251,8 +1272,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
                     final BindingSet bs = createBindingSet(
@@ -1290,22 +1311,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertTrue("wrong # of results: " + i, i == (maxRank-minRank+1));
+                } finally {
+                    result.close();
                 }
-                assertTrue("wrong # of results: " + i, i == (maxRank-minRank+1));
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -1323,8 +1347,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV) hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1346,7 +1370,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	final String searchQuery = "how now brown cow";
                 
                 final IValueCentricTextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 
                 final int i = search.count(new FullTextQuery(
                 			searchQuery, 
@@ -2152,7 +2176,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
             { 
@@ -2174,22 +2198,25 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 tupleQuery.setBinding("searchQuery", new LiteralImpl(searchQuery));
                 
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 7, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 7, i);
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -2207,8 +2234,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -2539,7 +2566,7 @@ LIMIT 10 OFFSET 0
             
 /**/            
             if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
+                log.info(cxn.getTripleStore().dumpStore());
             }
             
             { 
@@ -2560,20 +2587,23 @@ LIMIT 10 OFFSET 0
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 TupleQueryResult result = tupleQuery.evaluate();
-
-                int i = 0;
-                while (result.hasNext()) {
-                    final BindingSet tmp = result.next();
-                    if (log.isInfoEnabled())
-                        log.info(i + ": " + tmp.toString());
-                    i++;
+                try {
+                    int i = 0;
+                    while (result.hasNext()) {
+                        final BindingSet tmp = result.next();
+                        if (log.isInfoEnabled())
+                            log.info(i + ": " + tmp.toString());
+                        i++;
+                    }
+                    assertEquals("wrong # of results", 2, i);
+                } finally {
+                    result.close();
                 }
-                assertEquals("wrong # of results", 2, i);
                 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
-                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                	cxn.getTripleStore().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(new FullTextQuery(
                 			searchQuery, 
@@ -2591,8 +2621,8 @@ LIMIT 10 OFFSET 0
                             ));
                 
                 while (hits.hasNext()) {
-                	final IHit hit = hits.next();
-                	final IV id = (IV)hit.getDocId();
+                	final IHit<?> hit = hits.next();
+                	final IV id = (IV<?, ?>)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);

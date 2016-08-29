@@ -197,12 +197,15 @@ public class TestJournalAbort extends TestCase2 {
        btree.close();
         
         // 5) More data and bad commit (after bad abort)
+        final BTree btree2 = jnl.getIndex(btreeName); // Note: BTree was marked as invalid. Must be reloaded.
+        assertTrue(btree != btree2); // Must be different references.
+        btree = btree2;
         try {
 	        addSomeData(btree);
 	        btree.writeCheckpoint();
 	        jnl.commit();
 	        fail();
-        } catch (Exception e) {
+        } catch (Throwable e) {
         	
         	if(log.isInfoEnabled()) log.info("Expected exception", e);
         	

@@ -45,7 +45,6 @@ import junit.framework.TestCase2;
  * Test suite for {@link LocalChunkMessage}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestLocalChunkMessage extends TestCase2 {
 
@@ -201,32 +200,40 @@ public class TestLocalChunkMessage extends TestCase2 {
      */
     private static class MockQueryController implements IQueryClient {
 
+        @Override
         public void haltOp(IHaltOpMessage msg) throws RemoteException {
         }
 
+        @Override
         public void startOp(IStartOpMessage msg) throws RemoteException {
         }
 
+        @Override
         public void bufferReady(IChunkMessage<IBindingSet> msg)
                 throws RemoteException {
         }
 
+        @Override
         public void declareQuery(IQueryDecl queryDecl) {
         }
 
+        @Override
         public UUID getServiceUUID() throws RemoteException {
             return null;
         }
 
+        @Override
         public PipelineOp getQuery(UUID queryId)
                 throws RemoteException {
             return null;
         }
 
+        @Override
         public void cancelQuery(UUID queryId, Throwable cause)
                 throws RemoteException {
         }
 
+        @Override
         public UUID[] getRunningQueries() {
             return null;
         }

@@ -30,13 +30,14 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.UUID;
 
 import com.bigdata.bop.BufferAnnotations;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
+import com.bigdata.bop.engine.IChunkHandler;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
@@ -50,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.ClassPathUtil;
 
 /**
  * Query hints are directives understood by the SPARQL end point. A query hint
@@ -245,6 +247,30 @@ public interface QueryHints {
     long DEFAULT_ANALYTIC_MAX_MEMORY_PER_QUERY = Long.valueOf(System
             .getProperty(QueryHints.class.getName() + "."
                     + ANALYTIC_MAX_MEMORY_PER_QUERY, "0"));
+    
+    /**
+     * Controls where the intermediate solutions output by operators will be
+     * stored. Options include the managed object heap, the native heap, or
+     * potentially some policy which stores things dynamically depending on the
+     * size of the chunk or the total memory burden on the query engine.
+     * <p>
+     * The effective value of this property is determined by effective value of
+     * the system property {@value #QUERY_ENGINE_CHUNK_HANDLER}.
+     * 
+     * @see BLZG-533 Vector query engine on native heap.
+     */
+    String QUERY_ENGINE_CHUNK_HANDLER = "queryEngineChunkHandler";
+
+    IChunkHandler DEFAULT_QUERY_ENGINE_CHUNK_HANDLER = 
+            ClassPathUtil.classForName(//
+                    System.getProperty(QueryHints.class.getName() + "."+QUERY_ENGINE_CHUNK_HANDLER,
+                          com.bigdata.bop.engine.ManagedHeapStandloneChunkHandler.class.getName()
+//                            com.bigdata.bop.engine.NativeHeapStandloneChunkHandler.class.getName()
+                            ), // preferredClassName,
+                    null, // defaultClass,
+                    IChunkHandler.class, // sharedInterface,
+                    IChunkHandler.class.getClassLoader() // classLoader
+              );
     
     /**
      * When <code>true</code>, will use the version of DISTINCT SOLUTIONS based
@@ -613,7 +639,7 @@ public interface QueryHints {
      * elements (maximum) should be read from its access path.  This
      * effectively limits the input into the join.
      * 
-     * @see Annotations#CUTOFF_LIMIT
+     * @see JoinAnnotations#LIMIT
      */
     String CUTOFF_LIMIT = "cutoffLimit";
  

@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-artifacts</artifactId>
-    <version>2.1.2</version>
+    <version>2.1.4</version>
     <relativePath>../blazegraph-artifacts/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>blazegraph-war</artifactId>
-  <version>2.1.2</version>
+  <version>2.1.4</version>
   <name>Blazegraph WAR</name>
   <description>Blazegraph Web Application Archive</description>
   <packaging>war</packaging>
@@ -194,7 +194,7 @@ ga('send', 'pageview');
       <version>${highscalelib.version}</version>
     </dependency>
     <dependency>
-      <groupId>colt</groupId>
+      <groupId>com.blazegraph</groupId>
       <artifactId>colt</artifactId>
       <version>${colt.version}</version>
     </dependency>

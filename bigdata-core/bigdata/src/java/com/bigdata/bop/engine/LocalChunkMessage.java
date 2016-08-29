@@ -206,6 +206,7 @@ public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
             source = newBindingSetIterator(bindingSetChunks);
         }
 
+        @Override
         public ICloseableIterator<IBindingSet[]> iterator() {
             return source;
         }

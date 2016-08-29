@@ -41,6 +41,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -63,7 +64,6 @@ import com.bigdata.rdf.model.StatementEnum;
  * {@link IKeyBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
@@ -249,7 +249,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         final byte[] key = tuple.getKeyBuffer().array();
 
         final SPO spo = keyOrder.decodeKey(key);
-    
+
         if ((tuple.flags() & IRangeQuery.VALS) == 0) {
 
             // Note: No type or statement identifier information.

@@ -67,6 +67,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -81,6 +82,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *      SPARQL Update Extensions (Wiki) </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  * @version $Id: BigdataSPARQLUpdateTest.java 6204 2012-03-28 20:17:06Z
  *          thompsonbry $
  */
@@ -389,7 +391,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
         
         final BigdataSail sail = new BigdataSail(props);
         
-        backend = sail.getDatabase().getIndexManager();
+        backend = sail.getIndexManager();
 
         return new BigdataSailRepository(sail);
 
@@ -434,8 +436,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      */
     protected boolean isSolutionSetUpdateEnabled() {
 
-        final AbstractTripleStore tripleStore = ((BigdataSailRepository) con
-                .getRepository()).getDatabase();
+        final AbstractTripleStore tripleStore = ((BigdataSailRepositoryConnection) con).getTripleStore();
         
         final boolean isolatable = Boolean.parseBoolean(tripleStore.getProperty(
                         BigdataSail.Options.ISOLATABLE_INDICES,

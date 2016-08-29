@@ -199,9 +199,13 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends
         
     }
     
+    private Properties properties = null;
+        
     @Override
     protected BigdataSail getSail(final Properties properties) {
 
+        this.properties = properties;
+        
 		return new BigdataSail(openTripleStore(NAMESPACE, properties));
 
     }
@@ -209,7 +213,7 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends
     @Override
     protected BigdataSail reopenSail(final BigdataSail sail) {
 
-        final Properties properties = sail.database.getProperties();
+//        final Properties properties = sail.getProperties();
 
         if (sail.isOpen()) {
 
@@ -278,6 +282,10 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends
             client = null;
 
         }
+        
+        properties = null;
+        
+        super.tearDown(testCase);
 
     }
     

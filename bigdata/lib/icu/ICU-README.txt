@@ -1,1 +1,0 @@
-Please see http://site.icu-project.org/ for more information.

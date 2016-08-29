@@ -129,7 +129,7 @@ public class TestLexJoinOps extends QuadsTestCase {
             cxn.commit();
             
             if (log.isInfoEnabled()) {
-            	log.info(sail.getDatabase().dumpStore());
+                log.info(((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
             }
             
             {
@@ -242,7 +242,7 @@ public class TestLexJoinOps extends QuadsTestCase {
           cxn.commit();
           
           if (log.isInfoEnabled()) {
-          	log.info(sail.getDatabase().dumpStore());
+              log.info(((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
           }
           
           {
@@ -366,7 +366,7 @@ SELECT ?s WHERE {
           cxn.commit();
           
           if (log.isInfoEnabled()) {
-          	log.info(sail.getDatabase().dumpStore());
+          	log.info(((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
           }
           
           {
@@ -469,7 +469,7 @@ SELECT ?s WHERE {
           cxn.commit();
           
           if (log.isInfoEnabled()) {
-          	log.info(sail.getDatabase().dumpStore());
+              log.info(((BigdataSailRepositoryConnection)cxn).getTripleStore().dumpStore());
           }
           
           {

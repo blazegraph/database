@@ -33,7 +33,6 @@ import junit.framework.TestCase;
  * Test suite for {@link VTE}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestVTE extends TestCase {
 
@@ -81,5 +80,5 @@ public class TestVTE extends TestCase {
         }
         
     }
-
+    
 }

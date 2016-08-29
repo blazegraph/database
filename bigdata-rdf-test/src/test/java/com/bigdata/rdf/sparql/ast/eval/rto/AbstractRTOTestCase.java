@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval.rto;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -197,6 +199,20 @@ public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
     protected void assertSameJoinOrder(final int[] expected,
         final TestHelper helper) throws Exception {
         
+        assertSameJoinOrder(Collections.singletonList(expected), helper);
+        
+    }
+    
+    /**
+     * Helper to run the test and examine the RTO determined solution.
+     * 
+     * @param expectedOrders
+     *            The expected join ordering(s)
+     * @param helper
+     */
+    protected void assertSameJoinOrder(final List<int[]> expectedOrders,
+        final TestHelper helper) throws Exception {
+        
         /*
          * Assign a UUID to this query so we can get at its outcome.
          */
@@ -264,12 +280,28 @@ public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
         if (log.isInfoEnabled())
             log.info("path=" + path);
 
-        if (!Arrays.equals(expected, path.getVertexIds()))
-            fail("RTO JOIN ORDER" //
-                    + ": expected=" + Arrays.toString(expected)//
-                    + ", actual=" + Arrays.toString(path.getVertexIds()));
+        for(int[] expected : expectedOrders) {
+            if (Arrays.equals(expected, path.getVertexIds())) {
+                return;
+            }
+        }
 
+        {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("RTO JOIN ORDER");
+            sb.append("expectedOrders=(");
+            boolean first = true;
+            for (int[] expected : expectedOrders) {
+                if (!first) {
+                    sb.append(", ");
+                    first = false;
+                }
+                sb.append(" " + Arrays.toString(expected));
+            }
+            sb.append(", actual=" + Arrays.toString(path.getVertexIds()));
         // joinGraph.getQueryPlan(q)
+            fail(sb.toString());
+        }
 
     }
 

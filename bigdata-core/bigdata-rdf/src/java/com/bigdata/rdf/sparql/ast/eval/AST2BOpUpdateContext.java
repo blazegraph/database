@@ -108,8 +108,7 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
     public AST2BOpUpdateContext(final ASTContainer astContainer,
             final BigdataSailRepositoryConnection conn) throws SailException {
 
-        super(astContainer, conn.getSailConnection().getBigdataSail()
-                .getDatabase());
+        super(astContainer, conn.getTripleStore());
 
         this.conn = conn;
         

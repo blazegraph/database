@@ -86,5 +86,12 @@ public interface IResourceLocator<T extends ILocatableResource> {
      *            <i>instance</i>.
      */
     public void discard(final ILocatableResource<T> instance,boolean destroyed);
+
+    /**
+     * Discard unisolated resource views from the locator cache.
+     *         
+     * @see BLZG-2023, BLZG-2041.
+     */
+    public void clearUnisolatedCache();
     
 }
