@@ -295,7 +295,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
           * compliant client).
           */
          suite.addTestSuite(TestBigdataSailRemoteRepository.class); // without isolatable indices.
-         suite.addTestSuite(TestBigdataSailRemoteRepository.ReadWriteTx.class); // with isolatable indices.
+         suite.addTestSuite(TestBigdataSailRemoteRepository_ReadWriteTx.class); // with isolatable indices.
 
          // Insert tests from Trac/Jira issues
          suite.addTestSuite(TestInsertFilterFalse727.class);

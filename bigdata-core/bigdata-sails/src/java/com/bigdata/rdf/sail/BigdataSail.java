@@ -1127,45 +1127,10 @@ public class BigdataSail extends SailBase implements Sail {
         final BigdataSailConnection conn;
         try {
 
-            if ( knownIsolatable.get() == KnownIsolatableEnum.Unknown ) {
-
-                /*
-                 * Resolve whether or not the namespace supports isolatation.
-                 * 
-                 * Note: This pattern is eventually consistent.  At most one
-                 * thread will resolve the data race in the case where the 
-                 * isolation property is not known on entry.
-                 */
-                
-                final AbstractTripleStore readOnlyTripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
-    
-                if(readOnlyTripleStore == null) {
-                    
-                    throw new DatasetNotFoundException("namespace="+namespace);
-                    
-                }
-                
-                final Properties properties = readOnlyTripleStore.getProperties();
-                
-                final boolean isolatable = Boolean.parseBoolean(properties.getProperty(
-                                BigdataSail.Options.ISOLATABLE_INDICES,
-                                BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
-    
-                // Set the flag.
-                knownIsolatable.compareAndSet(KnownIsolatableEnum.Unknown/*expect*/, isolatable?KnownIsolatableEnum.Isolated:KnownIsolatableEnum.Unisolated);
-            
-            }
-
-            switch(knownIsolatable.get()) {
-            case Isolated:
+            if(isIsolatable()) {
                 conn = getReadWriteConnection();
-                break;
-            case Unisolated:
+            } else {
                 conn = getUnisolatedConnection();
-                break;
-            case Unknown:
-            default:
-                throw new UnsupportedOperationException();
             }
 
             return conn;
@@ -5433,5 +5398,49 @@ public class BigdataSail extends SailBase implements Sail {
 	public IsolationLevel getDefaultIsolationLevel() {
 		return IsolationLevels.READ_UNCOMMITTED;
 	}
+
+	/**
+	 * Lazily resolve whether or not the Sail supports isolatable indices.
+	 * 
+	 * @return true iff the sail supports isolatable indices.
+	 * 
+	 * @throws DatasetNotFoundException if the namespace for the sail does not
+	 * exist.
+	 */
+    public boolean isIsolatable() throws DatasetNotFoundException {
+
+        if ( knownIsolatable.get() == KnownIsolatableEnum.Unknown ) {
+
+            /*
+             * Resolve whether or not the namespace supports isolatation.
+             * 
+             * Note: This pattern is eventually consistent.  At most one
+             * thread will resolve the data race in the case where the 
+             * isolation property is not known on entry.
+             */
+            
+            final AbstractTripleStore readOnlyTripleStore = (AbstractTripleStore) getIndexManager().getResourceLocator()
+                    .locate(namespace, ITx.READ_COMMITTED);
+
+            if ( readOnlyTripleStore == null ) {
+                
+                throw new DatasetNotFoundException("namespace=" + namespace);
+                
+            }
+            
+            final Properties properties = readOnlyTripleStore.getProperties();
+            
+            final boolean isolatable = Boolean.parseBoolean(properties.getProperty(
+                            BigdataSail.Options.ISOLATABLE_INDICES,
+                            BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES));
+
+            // Set the flag (data race).
+            knownIsolatable.compareAndSet(KnownIsolatableEnum.Unknown/*expect*/, isolatable?KnownIsolatableEnum.Isolated:KnownIsolatableEnum.Unisolated);
+        
+        }
+
+        return knownIsolatable.get() == KnownIsolatableEnum.Isolated;
+
+    }
     
 }
