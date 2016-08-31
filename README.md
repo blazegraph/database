@@ -68,7 +68,7 @@ Tinkerpop3 supports requires Java 1.8 and is now in a separate repository.  See 
 ```
 
 ###Triple Pattern Fragment (TPF) Server
-There is a [Blazegraph Triple Pattern Fragment TPF](https://github.com/blazegraph/BlazegraphBasedTPFServer) server that supports [Linked Data Fragments](http://linkeddatafragments.org/).
+There is a [Triple Pattern Fragment (TPF) for Blazegraph](https://github.com/TPF4Blazegraph/TPF4Blazegraph) server that supports [Linked Data Fragments](http://linkeddatafragments.org/).
 
 ```
     <dependency>
