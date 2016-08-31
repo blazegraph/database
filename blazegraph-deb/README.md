@@ -3,7 +3,7 @@ Blazegraph Debian Deployer
 
 To build a version, use `mvn package`.  
 
-```
+```sh
 apt-get update #Update to the latest
 #Steps for Oracle JDK on Ubuntu
 apt-get install python-software-properties
@@ -17,7 +17,7 @@ apt-get install -f -y #force install of dependencies without prompting for updat
 
 This will start a Blazegraph instance running on port 9999 on localhost host.
 
-http://localhost:9999/
+`http://localhost:9999/`
 
 
 Changing the configuration
