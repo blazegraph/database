@@ -440,4 +440,11 @@ public interface FTS {
     */
    final URI SCORE_FIELD = new URIImpl(NAMESPACE + "scoreField");   
 
+   /**
+    * Configuration property starting with FTS_CUSTOM_TYPE can be used to specify
+    * the class that will be handling this type. For example:
+    * com.bigdata.service.fts.FTS.enpointType.Elastic=com.example.ElasticSearchImpl
+    * The class should be instance of {@link IFulltextSearch}.
+    */
+   final String FTS_CUSTOM_TYPE = FTS.class.getName() + ".endpointType.";
 }
