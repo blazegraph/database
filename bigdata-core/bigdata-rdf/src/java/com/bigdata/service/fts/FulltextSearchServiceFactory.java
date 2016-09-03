@@ -120,12 +120,8 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          throw new IllegalArgumentException();
 
       final AbstractTripleStore store = params.getTripleStore();
-      
-      final Properties props =
-         store.getIndexManager()!=null && 
-         store.getIndexManager() instanceof AbstractJournal  ?
-         ((AbstractJournal)store.getIndexManager()).getProperties() : null;
-      
+
+	  final Properties props = getStoreProps(params);
       final FulltextSearchDefaults deflts = new FulltextSearchDefaults(props);
 
       final ServiceNode serviceNode = params.getServiceNode();
@@ -162,6 +158,14 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
       return new FulltextSearchServiceCall(store, searchVar, statementPatterns,
             getServiceOptions(), deflts, params);
 
+   }
+
+   public static Properties getStoreProps(final ServiceCallCreateParams params) {
+      final AbstractTripleStore store = params.getTripleStore();
+
+      return store.getIndexManager()!=null &&
+         store.getIndexManager() instanceof AbstractJournal  ?
+         ((AbstractJournal)store.getIndexManager()).getProperties() : null;
    }
 
    /**
@@ -774,7 +778,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          final IBindingSet bs = bindingSet[nextBindingSetItr++];
          final String query = resolveQuery(bs);
          final String endpoint = resolveEndpoint(bs);
-         final EndpointType endpointType = resolveEndpointType(bs);
+         final String endpointType = resolveEndpointType(bs);
          final String params = resolveParams(bs);
          final SearchResultType searchResultType = resolveSearchResultType(bs);
          final Integer searchTimeout = resolveSearchTimeout(bs);
@@ -787,14 +791,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
           * Though we currently, we only support Solr, here we might easily hook
           * in other implementations based on the magic predicate
           */
-         final IFulltextSearch ftSearch;
-         switch (endpointType) {
-
-         case SOLR:
-         default:
-            ftSearch = new SolrFulltextSearchImpl();
-            break;
-         }
+         final IFulltextSearch ftSearch = getSearchClass(endpointType);
 
          FulltextSearchQuery sq = new FulltextSearchQuery(
                query, params, endpoint, searchTimeout, searchField,
@@ -803,6 +800,44 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
                ftSearch.search(sq, serviceCallParams.getClientConnectionManager());
 
          return true;
+      }
+
+      private IFulltextSearch getDefaultSearchImpl() {
+          return new SolrFulltextSearchImpl();
+      }
+
+      /**
+       * Resolve search class to implementation.
+       * If no suitable one is found, return SolrFulltextSearchImpl
+       * @param className
+       * @return
+       */
+      private IFulltextSearch getSearchClass(String className) {
+          final Class endpointClass;
+
+          if(className == null) {
+              return getDefaultSearchImpl();
+          }
+          try {
+              endpointClass = Class.forName(className);
+              if (!(endpointClass.isInstance(IFulltextSearch.class))) {
+                 if (log.isDebugEnabled()) {
+                      log.warn("Endpoint class: " + endpointType +
+                           " does not implement IFulltextSearch ->" +
+                           " will be ignored, using default.");
+                 }
+                 return getDefaultSearchImpl();
+              } else {
+                 return (IFulltextSearch)endpointClass.newInstance();
+              }
+          } catch (Exception e) {
+              if (log.isDebugEnabled()) {
+                  log.warn("Illegal endpoint class: " + endpointType +
+                       " -> will be ignored, using default.");
+              }
+          }
+          // Default search implementation
+          return getDefaultSearchImpl();
       }
 
       private void init() {
@@ -866,7 +901,6 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          }
          
          if (searchTimeoutStr != null && !searchTimeoutStr.isEmpty()) {
-
             try {
 
                return Integer.valueOf(searchTimeoutStr);
@@ -903,8 +937,9 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
       /**
        * Resolves the endpoint type, which is either a constant or a variable to
        * be looked up in the binding set.
+       * @return Class name for the endpoint type or null if none found
        */
-      private EndpointType resolveEndpointType(IBindingSet bs) {
+      private String resolveEndpointType(IBindingSet bs) {
 
          String endpointTypeStr = resolveAsString(endpointType, bs);
 
@@ -914,11 +949,16 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
          }
          
          if (endpointTypeStr != null && !endpointTypeStr.isEmpty()) {
-
-            try {
-
-               return EndpointType.valueOf(endpointTypeStr);
-
+              final String endpointName = FTS.FTS_CUSTOM_TYPE + endpointTypeStr;
+              final Properties props = getStoreProps(serviceCallParams);
+              try {
+                  if (props.contains(endpointName)) {
+                     return props.getProperty(endpointName);
+                  }
+                  switch(EndpointType.valueOf(endpointTypeStr)) {
+                      case SOLR:
+                          return SolrFulltextSearchImpl.class.getName();
+                  }
             } catch (Exception e) {
 
                // illegal, ignore and proceed
@@ -930,8 +970,7 @@ public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
             }
          }
 
-         return FTS.Options.DEFAULT_ENDPOINT_TYPE; // fallback
-
+         return null; // fallback to default
       }
 
       /**
