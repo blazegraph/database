@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
 
 Copyright (C) SYSTAP, LLC DBA Blazegraph 2006-2016.  All rights reserved.
@@ -2651,6 +2652,37 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "workbench1.srx"   // result file
            ).runTest();
    }
+
+   /**
+    * Tickets: https://jira.blazegraph.com/browse/BLZG-2079
+    * (duplicate of https://jira.blazegraph.com/browse/BLZG-2085)
+    * => property path pred+ always delivering results even though there is no matching data
+    */
+   public void testTicketBlzg2079() throws Exception {
+       
+       new TestHelper( 
+           "ticket_bg2079",      // test name
+           "ticket_bg2079.rq",   // query file
+           "ticket_bg2079.ttl",   // data file
+           "ticket_bg2079.srx"   // result file
+           ).runTest();
+   }
+   
+   /**
+    * Tickets: https://jira.blazegraph.com/browse/BLZG-2086
+    * (duplicate of https://jira.blazegraph.com/browse/BLZG-2085)
+    * => property path pred+ always delivering results even though there is no matching data
+    */
+   public void testTicketBlzg2086() throws Exception {
+       
+       new TestHelper( 
+           "ticket_bg2086",      // test name
+           "ticket_bg2086.rq",   // query file
+           "ticket_bg2086.ttl",   // data file
+           "ticket_bg2086.srx"   // result file
+           ).runTest();
+   }
+   
    
   /**
     * https://jira.blazegraph.com/browse/BLZG-2082:
@@ -2667,4 +2699,6 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "ticket_bg2082.srx"   // result file
            ).runTest();
    }
+
+
 }

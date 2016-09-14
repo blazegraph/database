@@ -1,0 +1,1 @@
+<http://C1> rdfs:subClassOf <http://C2> .
