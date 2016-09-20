@@ -34,10 +34,14 @@ public abstract class SailBase implements Sail {
 	 * Constants *
 	 *-----------*/
 
+    public final static String CONNECTION_TIMEOUT = 
+            SailBase.class.getName() + ".connectionTimeout";
+    
 	/**
 	 * Default connection timeout on shutdown: 20,000 milliseconds.
 	 */
-	protected final static long DEFAULT_CONNECTION_TIMEOUT = 20000L;
+	protected final static long DEFAULT_CONNECTION_TIMEOUT = 
+	        Long.valueOf(System.getProperty(CONNECTION_TIMEOUT, "20000"));
 
 	// Note: the following variable and method are package protected so that they
 	// can be removed when open connections no longer block other connections and
