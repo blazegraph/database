@@ -310,7 +310,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
          // Tests for deferred IV resolution
          suite.addTestSuite(Test_Ticket_2091.class);
-         
+
          if (testMode == TestMode.sids) {
             // Tests that require sids mode.
             suite.addTestSuite(TestRDROperations.class);
