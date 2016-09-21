@@ -307,6 +307,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          // Tests for procedure of rebuild text index
          suite.addTestSuite(TestRebuildTextIndex.class);
          suite.addTestSuite(Test_Ticket_1893.class);
+
+         // Tests for deferred IV resolution
+         suite.addTestSuite(Test_Ticket_2091.class);
          
          if (testMode == TestMode.sids) {
             // Tests that require sids mode.

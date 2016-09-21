@@ -17,7 +17,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
@@ -978,8 +977,8 @@ public class ASTDeferredIVResolution {
             if (fve instanceof IVValueExpression) {
         		for (int k = 0; k < fve.arity(); k++) {
         		    final BOp veBop = fve.get(k);
-        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
-        		        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
+        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof IV) {
+        		        final BigdataValue v = ((IV) ((Constant)veBop).get()).getValue();
         		        final int fk = k;
         		        defer(v, new Handler(){
         		            @Override
