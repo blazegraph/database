@@ -359,8 +359,8 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                 childSolutionIn.set(gearing.tVarIn, seed);
                 
                 /** 
-                 * BLZG-2079 / BLZG-2086: if the out constant is set (i.e., we have something
-                 * like uri1 pp uri2), then we also need to set the out constant
+                 * BLZG-2079 / BLZG-2086: if the out constant is set in the gearing (i.e., we have something
+                 * like uri1 pp uri2), then we also need to set the out constant in the child solution
                  */
                 if (gearing.outConst != null) {
                 	childSolutionIn.set(gearing.tVarOut, gearing.outConst);
