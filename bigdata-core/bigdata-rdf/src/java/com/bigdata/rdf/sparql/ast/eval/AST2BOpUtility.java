@@ -1394,8 +1394,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
 				 * partly materialized).
 				 */
 				
-				doneSet.addAll(nsrDoneSet);
-
+				/**
+				 * BLZG-2098: avoid adding variables to done set if we use a native hash join;
+				 * which will not maintain materializations.
+				 */
+				if (!(ctx.nativeHashJoins)) {
+					doneSet.addAll(nsrDoneSet);
+				}
+				
 		        final VarNode[] joinvars = nsi.getJoinVars();
 
 		        if (joinvars == null) {
@@ -1473,8 +1479,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  * partly materialized).
                  */
 
-                doneSet.addAll(stats.getMaterialized());
-
+				/**
+				 * BLZG-2098: avoid adding variables to done set if we use a native hash join;
+				 * which will not maintain materializations.
+				 */
+				if (!(ctx.nativeHashJoins)) {
+					doneSet.addAll(stats.getMaterialized());
+				}
+				
                 if (isNamedSolutionSetScan(ctx, nsi)) {
 
                     /*
@@ -1550,6 +1562,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     joinUtilFactory = JVMHashJoinUtility.factory;
                 }
 
+                // TODO: this code path should be consolidated, to use the addHashIndexOp method
                 left = applyQueryHints(new HashIndexOp(
                             leftOrEmpty(left),//
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
