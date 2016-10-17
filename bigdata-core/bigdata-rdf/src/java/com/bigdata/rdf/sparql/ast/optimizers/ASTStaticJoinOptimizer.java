@@ -369,7 +369,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 			 */
 			// TODO: imho, both assumptions are not valid anymore with the given refactoring
 			//       -> we should compute the ancestry the same way we do in ASTJoinGroupOrderOptimizer
-			addToAncestry(joinGroup.getServiceNodes(),"service node");
+//			addToAncestry(joinGroup.getServiceNodes(),"service node");
 			addToAncestry(joinGroup.getNamedSubqueryIncludes(),"named subquery include");
 		}
 
