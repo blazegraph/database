@@ -1672,6 +1672,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
         }
         
+        /**
+         * BLZG-2098: follow a conservative approach: upon including a named
+         * subquery, we don't have any guarantees about materialized variables when
+         * using a native hash join (which destroys materialization). Note that
+         * there's a ticket to get rid of doneSet anyways.
+         */
+        if (ctx.nativeHashJoins) {
+        	doneSet.clear();
+        }
+        
         /*
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
