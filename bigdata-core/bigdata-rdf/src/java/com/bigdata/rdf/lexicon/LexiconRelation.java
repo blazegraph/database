@@ -587,6 +587,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
                     AbstractTripleStore.Options.DEFAULT_REJECT_INVALID_XSD_VALUES));
             
+            enableRawRecordsSupport = Boolean.parseBoolean(getProperty(
+            		AbstractTripleStore.Options.ENABLE_RAW_RECORDS_SUPPORT,
+            		AbstractTripleStore.Options.DEFAULT_ENABLE_RAW_RECORDS_SUPPORT));
 
             // Resolve the vocabulary.
             vocab = getContainer().getVocabulary();
@@ -649,8 +652,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     inlineLiterals, inlineTextLiterals,
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
-                    rejectInvalidXSDValues, xFactory, vocab, valueFactory,
-                    uriFactory, geoSpatial, geoSpatialConfig);
+                    rejectInvalidXSDValues, enableRawRecordsSupport, xFactory, 
+                    vocab, valueFactory, uriFactory, geoSpatial, geoSpatialConfig);
 
         }
         
@@ -930,6 +933,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link AbstractTripleStore.Options#REJECT_INVALID_XSD_VALUES}
      */
     final private boolean rejectInvalidXSDValues;
+    
+    /**
+     * When <code>false</code>, raw records will not be used to store 
+     * the lexical forms of the RDF Values
+     * {@link AbstractTripleStore.Options#ENABLE_RAW_RECORDS_SUPPORT}.
+     */
+    final private boolean enableRawRecordsSupport;
     
 	/**
 	 * The default time zone to be used for decoding inline xsd:datetime
@@ -1338,7 +1348,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/506 (Load,
          * closure and query performance in 1.1.x versus 1.0.x)
          */
-        if(true) {
+        if (enableRawRecordsSupport) {
 
             // enable raw record support.
             metadata.setRawRecords(true);
