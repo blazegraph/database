@@ -1326,6 +1326,16 @@ abstract public class AbstractTripleStore extends
                 .getName() + ".computeClosureForSids";
 
         public static String DEFAULT_COMPUTE_CLOSURE_FOR_SIDS = "true";
+        
+        /**
+         * If this option is set to false, turn off using raw records 
+         * to store the lexical forms of the RDF Values.
+         */
+        public static String ENABLE_RAW_RECORDS_SUPPORT = AbstractTripleStore.class
+                .getName() + ".enableRawRecordsSupport";
+
+        public static String DEFAULT_ENABLE_RAW_RECORDS_SUPPORT = "true";
+        
 
     }
 
