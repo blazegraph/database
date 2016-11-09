@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -1996,7 +1997,25 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     public static INeedsMaterialization.Requirement gatherVarsToMaterialize(
         final BOp c, final Set<IVariable<IV>> terms) {
         
-        return gatherVarsToMaterialize(c, terms, false /* includeVarsInAnnotations */);
+        return gatherVarsToMaterialize(c, terms, null /*varMap*/, false /* includeVarsInAnnotations */);
+    }
+    
+    /**
+     * Static helper used to determine materialization requirements.
+     */
+    public static INeedsMaterialization.Requirement gatherVarsToMaterialize(
+        final BOp c, final Set<IVariable<IV>> terms, final Map<IVariable<?>, IValueExpression<?>> varMap) {
+        
+        return gatherVarsToMaterialize(c, terms, varMap, false /* includeVarsInAnnotations */);
+    }
+    
+    /**
+     * Static helper used to determine materialization requirements.
+     */
+    public static INeedsMaterialization.Requirement gatherVarsToMaterialize(
+        final BOp c, final Set<IVariable<IV>> terms, final boolean includeVarsInAnnotations) {
+        
+        return gatherVarsToMaterialize(c, terms, null /*varMap*/, includeVarsInAnnotations);
     }
     
     /**
@@ -2011,7 +2030,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
     @SuppressWarnings("rawtypes")
     public static INeedsMaterialization.Requirement gatherVarsToMaterialize(
-            final BOp c, final Set<IVariable<IV>> terms, final boolean includeVarsInAnnotations) {
+            final BOp c, final Set<IVariable<IV>> terms, final Map<IVariable<?>, IValueExpression<?>> varMap, final boolean includeVarsInAnnotations) {
     
         boolean materialize = false;
         boolean always = false;
@@ -2027,8 +2046,30 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             if (bop instanceof INeedsMaterialization) {
                 
                 final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
-                
+                               
                 final Set<IVariable<IV>> t = getVarsFromArguments(bop);
+                
+                // https://jira.blazegraph.com/browse/BLZG-2083 (str() produces NotMaterializedException when using group by/sample)
+                // NotMaterializedException can be thrown by a function referenced in group by, to avoid that all variables referenced
+                // in group by expressions should be materialized, as MemoryGroupByOp needs real IVs. To avoid excessive adding of
+                // unneeded variables, varMap is provided as a reference of variables which might need materialization.
+                if (varMap != null) {
+                    
+                    for (IVariable<IV> key : t) {
+                        
+                        IValueExpression expr = varMap.get(key);
+                        
+                        if (expr != null) {
+                            
+                            Set<IVariable<IV>> vars = getVarsFromArguments(expr);
+                            
+                            t.addAll(vars);
+                            
+                        }
+                        
+                     }
+                    
+                 }
                 
                 if (t.size() > 0) {
                     
