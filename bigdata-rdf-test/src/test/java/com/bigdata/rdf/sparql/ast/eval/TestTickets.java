@@ -2651,4 +2651,20 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
            "workbench1.srx"   // result file
            ).runTest();
    }
+   
+  /**
+    * https://jira.blazegraph.com/browse/BLZG-2082:
+    * one-argument substr produces NPE when combined with GROUP By
+    * 
+    * @throws Exception
+    */
+   public void testTicketBlzg2082() throws Exception {
+        
+       new TestHelper( 
+           "ticket_bg2082",      // test name
+           "ticket_bg2082.rq",   // query file
+           "ticket_bg2082.ttl",   // data file
+           "ticket_bg2082.srx"   // result file
+           ).runTest();
+   }
 }
