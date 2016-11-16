@@ -55,6 +55,7 @@ import com.bigdata.bop.join.IDistinctFilter;
 import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp.Annotations;
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -125,6 +126,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
     private final IVariableOrConstant<?> middleTerm;
     private final IVariable<?> edgeVar;
     private final List<IVariable<?>> dropVars;
+    private final String userDefinedGearing;
 
     public ArbitraryLengthPathTask(
             final ArbitraryLengthPathOp controllerOp,
@@ -180,6 +182,10 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
         this.projectInVars.addAll(Arrays
                 .asList((IVariable<?>[]) controllerOp
                         .getProperty(Annotations.PROJECT_IN_VARS)));
+        
+        // may be null if not explicitly set via query hint
+        this.userDefinedGearing = 
+        	(String)controllerOp.getProperty(QueryHints.GEARING);
 
         if (log.isDebugEnabled()) {
             log.debug("project in vars: " + projectInVars);
@@ -839,6 +845,16 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
         final IBindingSet bs = (bsets != null && bsets.length > 0) ? 
                 bsets[0] : EmptyBindingSet.INSTANCE;
         
+        /*
+         * BLZG-2083: prefer user-defined gearing if specified and applicable.
+         */
+        if (QueryHints.GEARING_FORWARD.equals(userDefinedGearing)) {
+        	return forwardGearing;
+        } else if (QueryHints.GEARING_REVERSE.equals(userDefinedGearing) && forwardGearing.outConst!=null) {
+        	return reverseGearing;
+        }
+                
+        // otherwise, make a best effort choice based on what's available and what's not
         if (forwardGearing.inConst != null) {
             
             if (log.isDebugEnabled())

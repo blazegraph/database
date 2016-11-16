@@ -790,4 +790,18 @@ public interface QueryHints {
    boolean DEFAULT_REGEX_MATCH_NON_STRING = Boolean.valueOf(System.getProperty(
            QueryHints.class.getName() + "." + REGEX_MATCH_NON_STRING, "false"));
 
+   /**
+    * {@link https://jira.blazegraph.com/browse/BLZG-2089}
+    * 
+    * Hint that allows to choose the gearing that is used for evaluating
+    * property paths. Possible values are:
+    * 
+    * - auto: let the optimizer choose (this is the default)
+    * - forward: choose forward gearing, i.e. start out with the subject
+    * - reverse: choose backward gearing, i.e. start out with the object
+    */
+   final String GEARING = "gearing";
+   final static String GEARING_FORWARD = "forward";
+   final static String GEARING_REVERSE = "reverse";
+   
 }

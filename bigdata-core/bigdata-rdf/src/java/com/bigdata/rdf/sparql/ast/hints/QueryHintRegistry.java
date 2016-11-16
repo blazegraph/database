@@ -197,6 +197,13 @@ public class QueryHintRegistry {
          */
         add(new RegexMatchNonStringHint());
         
+        /*
+         * Drive gearing for property path nodes
+         * 
+         * {@see BLZG-2089}
+         */
+        add(new GearingHint());
+        
     }
 
 }
