@@ -10,7 +10,7 @@ fi
 
 LOAD_PROP_FILE=/tmp/$$.properties
 
-export NSS_DATALOAD_PROPERTIES=/usr/local/blazegraph/conf/RWStore.properties
+[ -z "${NSS_PROPERTIES}" ] && export NSS_PROPERTIES=/usr/local/blazegraph/conf/RWStore.properties
 
 #Probably some unused properties below, but copied all to be safe.
 
@@ -29,7 +29,7 @@ namespace=kb
 #Files to load
 fileOrDirs=$1
 #Property file (if creating a new namespace)
-propertyFile=$NSS_DATALOAD_PROPERTIES
+propertyFile=$NSS_PROPERTIES
 EOT
 
 echo "Loading with properties..."
