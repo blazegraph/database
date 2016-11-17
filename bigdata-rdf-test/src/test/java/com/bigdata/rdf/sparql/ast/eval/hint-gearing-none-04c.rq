@@ -1,0 +1,3 @@
+SELECT * WHERE {
+  <http://s1> <http://p>* <http://s1> .
+}
