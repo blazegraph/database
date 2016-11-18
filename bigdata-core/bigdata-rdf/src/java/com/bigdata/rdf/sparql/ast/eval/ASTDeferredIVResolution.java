@@ -978,8 +978,8 @@ public class ASTDeferredIVResolution {
             if (fve instanceof IVValueExpression) {
         		for (int k = 0; k < fve.arity(); k++) {
         		    final BOp veBop = fve.get(k);
-        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
-        		        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
+        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof IV) {
+        		        final BigdataValue v = ((IV) ((Constant)veBop).get()).getValue();
         		        final int fk = k;
         		        defer(v, new Handler(){
         		            @Override
