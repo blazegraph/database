@@ -972,6 +972,7 @@ public class HashCollisionUtility {
 				false, // inlineDateTimes
 				TimeZone.getDefault(), // inlineDateTimesTimeZone
 				false, // rejectInvalidXSDValues
+				false, // rawRecordSupport
 				xFactory, // extension factory
 				vocab,    // predefined vocabulary
 				vf,
