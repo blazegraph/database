@@ -17,7 +17,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
@@ -978,8 +977,14 @@ public class ASTDeferredIVResolution {
             if (fve instanceof IVValueExpression) {
         		for (int k = 0; k < fve.arity(); k++) {
         		    final BOp veBop = fve.get(k);
-        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof TermId) {
-        		        final BigdataValue v = ((TermId) ((Constant)veBop).get()).getValue();
+        		    // https://jira.blazegraph.com/browse/BLZG-2091 (Regression: IF + BOUND produce exception in 2.1.4)
+        		    // any constant IV with set value should be resolved against target store,
+        		    // but those IVs, which do not have materialized value, do not require resolution 
+        		    // https://github.com/blazegraph/database/pull/23#issuecomment-261355901
+        		    // fix failing TestTicket1747: not materialized IVs do not require resolution
+        		    if (veBop instanceof Constant && ((Constant)veBop).get() instanceof IV &&
+        		            ((IV) ((Constant)veBop).get()).hasValue()) {
+        		        final BigdataValue v = ((IV) ((Constant)veBop).get()).getValue();
         		        final int fk = k;
         		        defer(v, new Handler(){
         		            @Override
