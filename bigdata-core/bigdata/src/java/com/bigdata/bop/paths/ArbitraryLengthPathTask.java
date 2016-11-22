@@ -364,14 +364,6 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
 
                 childSolutionIn.set(gearing.tVarIn, seed);
                 
-//                /** 
-//                 * BLZG-2079 / BLZG-2086: if the out constant is set in the gearing (i.e., we have something
-//                 * like uri1 pp uri2), then we also need to set the out constant in the child solution
-//                 */
-//                if (gearing.outConst != null) {
-//                	childSolutionIn.set(gearing.tVarOut, gearing.outConst);
-//                }
-
                 /*
                  * Add a zero length path from the seed to itself. By
                  * handling this here (instead of in a separate operator) we
@@ -921,7 +913,6 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                     if (log.isDebugEnabled())
                         log.debug("forward gear as per query hint");
                     
-                	// this is a random choice
 	                return forwardGearing;
 
                 } else if (QueryHints.GEARING_REVERSE.equals(userDefinedGearing)) {
@@ -929,7 +920,6 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                     if (log.isDebugEnabled())
                         log.debug("reverse gear as per query hint");
                     
-                	// this is a random choice
 	                return reverseGearing;
 
                 } else {
@@ -957,14 +947,14 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
      */
     private boolean varAlwaysBound(IVariable<?> inVar, IBindingSet[] bsets) {
     	
-    	boolean alwaysBound = true; // unless proven otherwise
+        boolean alwaysBound = true; // unless proven otherwise
     	
-    	for (int i=0; i<bsets.length && alwaysBound; i++) {
-    		alwaysBound &= bsets[i].isBound(inVar);
-    	}
+        for (int i=0; i<bsets.length && alwaysBound; i++) {
+            alwaysBound &= bsets[i].isBound(inVar);
+        }
     	
-    	return alwaysBound;
-	}
+        return alwaysBound;
+    }
 
 	/**
      * Need to filter the duplicates per the spec:

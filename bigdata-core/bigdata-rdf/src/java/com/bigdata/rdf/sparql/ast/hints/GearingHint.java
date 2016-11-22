@@ -39,8 +39,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * property path queries is that it is inherently hard to choose the gearing.
  * This hint allows the user to take control over the gearing.
  * 
- * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
- * @version $Id$ 
+ * @author <a href="mailto:ms@blazegraph.com">Michael Schmidt</a>
  */
 final class GearingHint extends AbstractStringQueryHint {
 
