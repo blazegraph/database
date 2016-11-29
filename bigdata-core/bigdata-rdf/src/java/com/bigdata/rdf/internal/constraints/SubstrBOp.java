@@ -90,21 +90,28 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
         
         final Literal lit = getAndCheckLiteralValue(0, bs);
 
+        String label = lit.getLabel();
+
         /* 
          * The starting offset for the substring.
          */
 
         final IV startArg = get(1).get(bs);
 
-        // Negative values and zero are treated as ONE.
-        final int start = Math.max(1,
-                (int) Math.round(asLiteral(startArg).doubleValue()));
+        // Start and length set to follow SPARQL 1.1 https://www.w3.org/TR/sparql11-query/#func-substr
+        // see also https://jira.blazegraph.com/browse/BLZG-4249 (SUBSTR with starting location less than 1)
+        double startDoubleValue = asLiteral(startArg).doubleValue();
+        if (Double.isNaN(startDoubleValue)) {
+            label = "";
+        }
+        
+        final double start = Math.round(startDoubleValue);
+
+        final double offset = start <= 0 ? -start : -1;
 
         /*
          * The length of the substring (optional argument).
          */
-
-        String label = lit.getLabel();
 
         if (arity() > 2 && get(2) != null) {
 
@@ -114,17 +121,14 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
 
             final IV lengthArg = get(2).get(bs);
 
-            final int length = Math.min(label.length(),
-                    (int) Math.round(asLiteral(lengthArg).doubleValue()));
+            final double length = Math.round(asLiteral(lengthArg).doubleValue());
 
-//            final int length = (int) Math.round(literalValue(lengthArg).doubleValue());
-            
             label = label
-                    .substring(start-1, Math.min(label.length(), start-1+length));
+                   .substring(Math.min(label.length(), (int)(start+offset)), Math.min(label.length(), Math.max(0, (int)(start+length)-1)));
 
         } else {
 
-            label = label.substring(start-1);
+            label = label.substring(Math.max(0, (int)(start-1)));
 
         }
 
