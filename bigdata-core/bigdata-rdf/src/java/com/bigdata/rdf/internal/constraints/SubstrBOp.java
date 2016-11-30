@@ -100,7 +100,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
 
         // Start and length set to follow SPARQL 1.1 https://www.w3.org/TR/sparql11-query/#func-substr
         // see also https://jira.blazegraph.com/browse/BLZG-4249 (SUBSTR with starting location less than 1)
-        double startDoubleValue = asLiteral(startArg).doubleValue();
+        final double startDoubleValue = asLiteral(startArg).doubleValue();
         if (Double.isNaN(startDoubleValue)) {
             label = "";
         }
