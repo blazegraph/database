@@ -112,7 +112,7 @@ var NAMESPACE_SHORTCUTS = {
 // data export
 var EXPORT_EXTENSIONS = {
    'application/rdf+xml': ['RDF/XML', 'rdf', true],
-   'application/n-triples': ['N-Triples', 'nt', true],
+   'text/plain': ['N-Triples', 'nt', true],
    'application/x-n-triples-RDR': ['N-Triples-RDR', 'ntx', true],
    'application/x-turtle': ['Turtle', 'ttl', true],
    'application/x-turtle-RDR': ['Turtle-RDR', 'ttlx', true],
@@ -1225,7 +1225,7 @@ function queryExport() {
          data: JSON.stringify(QUERY_RESULTS),
          contentType: 'application/sparql-results+json',
          headers: { 'Accept': dataType },
-         success: function() { downloadFile(data, dataType, filename); },
+         success: function(data) { downloadFile(data, dataType, filename); },
          error: downloadRDFError
       };
       $.ajax(RO_URL_PREFIX + 'sparql?workbench&convert', settings);
@@ -1243,7 +1243,7 @@ function downloadRDFError(jqXHR, textStatus, errorThrown) {
 function exportXML(filename) {
    var xml = '<?xml version="1.0"?>\n<sparql xmlns="http://www.w3.org/2005/sparql-results#">\n\t<head>\n';
    var bindings = [];
-   $('#query-response thead tr td').each(function(i, td) {
+   $('#query-response thead tr th').each(function(i, td) {
       xml += '\t\t<variable name="' + td.textContent + '"/>\n';
       bindings.push(td.textContent);
    });
@@ -1301,7 +1301,13 @@ function exportCSV(filename) {
 }
 
 function downloadFile(data, type, filename) {
-   var uri = 'data:' + type + ';charset=utf-8,' + encodeURIComponent(data);
+   var dataStr;
+   if (data instanceof XMLDocument) {
+         dataStr = new XMLSerializer().serializeToString(data);
+   } else {
+         dataStr = data;
+   }
+   var uri = 'data:' + type + ';charset=utf-8,' + encodeURIComponent(dataStr);
    $('<a id="download-link" download="' + filename + '" href="' + uri + '">').appendTo('body')[0].click();
    $('#download-link').remove();
 }
@@ -1377,18 +1383,20 @@ function showQueryResults(data) {
 
       // see if we have RDF data
       var isRDF = false;
-      if(data.head.vars.length == 3 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o') {
+      if(data.head.vars.length == 3 && data.head.vars[0] == 'subject' && data.head.vars[1] == 'predicate' && data.head.vars[2] == 'object') {
          isRDF = true;
-      } else if(data.head.vars.length == 4 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o' && data.head.vars[3] == 'c') {
+      } else if(data.head.vars.length == 4 && data.head.vars[0] == 'subject' && data.head.vars[1] == 'predicate' && data.head.vars[2] == 'object' && data.head.vars[3] == 'context') {
+          isRDF = true;
          // see if c is used or not
+         var isContextUsed = false;
          for(i=0; i<data.results.bindings.length; i++) {
-            if('c' in data.results.bindings[i]) {
-               isRDF = false;
+            if('context' in data.results.bindings[i]) {
+               isContextUsed = true;
                break;
             }
          }
 
-         if(isRDF) {
+         if(!isContextUsed) {
             // remove (unused) c variable from JSON
             data.head.vars.pop();
          }
