@@ -16,6 +16,11 @@ Reporting a security issue: [Security Reporting](Security.md).
 ###Quick Start with the Executable Jar
 Up and running with Blazegraph in under 30 seconds:  [Quick Start](https://wiki.blazegraph.com/wiki/index.php/Quick_Start).
 
+###Building the code
+As a quick start, run `mvn install -DskipTests` or the utility script `./scripts/mavenInstall.sh `.
+
+For more detailed maven information see the [wiki](https://wiki.blazegraph.com/wiki/index.php/MavenNotes). 
+
 ###Samples and Examples
 There are code samples and examples to get started with the Blazegraph Database [here] (https://github.com/blazegraph/blazegraph-samples).  Tinkerpop3 examples are included directly within the Tinkerpop3 repository per below.
 
