@@ -55,6 +55,7 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_5
     * [BLZG-4246] - Debian README.md formatting
     * [BLZG-4247] - Wiki Data -> Wikidata
     * [BLZG-4248] - Configuration option enableRawRecordsSupport
+    * [BLZG-4249] - SUBSTR with starting location less than 1
     * [BLZG-4323] - hint:runFirst not considered for Subqueries and Named Subquery Includes
     * [BLZG-4403] - Blazegraph Export Option in UI
 
