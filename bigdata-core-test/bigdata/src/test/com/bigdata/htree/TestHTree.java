@@ -27,14 +27,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree;
 
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.htree.data.MockBucketData;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Unit tests for {@link HTree}.
@@ -857,5 +867,97 @@ public class TestHTree extends AbstractHTreeTestCase {
         }
         
     }
-    
+	
+	
+	/**
+	 * Insert data into the BTRee, making sure that data previously
+	 * inserted is found in later stages when looking it up.
+	 */
+	public void testInsertAndLookupDups() {
+
+        final int addressBits = 2;
+        final IRawStore store = new SimpleMemoryRawStore();
+		final HTree htree = getHTree(store, addressBits, true, true);
+		
+		final Random rand = new Random(0);
+		final List<Pair<byte[],byte[]>> keyValuePairs = new LinkedList<>();
+		
+		final Set<Integer> insertedKeys = new HashSet<Integer>();
+		for (int i=0; i<100000; i++) {
+			
+			final int idx = nextKeyValuePair(keyValuePairs, rand);
+			final Pair<byte[],byte[]> keyValuePair = keyValuePairs.get(idx);
+
+			// did we see this one before?
+			final boolean isDuplicate = insertedKeys.contains(idx);
+
+			final byte[] key = keyValuePair.getLeft();
+			final byte[] val = keyValuePair.getRight();
+
+
+			if (isDuplicate) {
+
+				// validate that the key value pair is found in the HTree
+				boolean confirmed = false;
+				
+				
+				final ITupleIterator<?> titr = htree.lookupAll(key);
+				
+	            while (titr.hasNext()) {
+
+					final ITuple<?> t = titr.next();
+
+					final ByteArrayBuffer tb = t.getValueBuffer();
+
+					if (0 == BytesUtil.compareBytesWithLenAndOffset(
+							0/* aoff */, val.length/* alen */, val, //
+							0/* boff */, tb.limit()/* blen */, tb.array()/* b */
+					)) {
+
+						confirmed = true;
+						break;
+
+					}
+				}
+
+	            if (!confirmed) {
+	            	throw new RuntimeException("Expected to find, but did not succeed");
+	            }
+
+			} else {
+				
+				htree.insert(key, val); // insert into HTree
+				insertedKeys.add(idx);	// remember as duplicate for next encounter
+				
+			}			
+		}
+	}	
+	
+	
+	/**
+	 * Randomly either expends the keyValuePairs list by an element and
+	 * returns the index of the last list position OR returns an index
+	 * of a known position (i.e., a duplicate). Duplicates will be returned
+	 * about every 10th call.
+	 */
+	private int nextKeyValuePair(final List<Pair<byte[],byte[]>> keyValuePairs, final Random rand) {
+		
+		// usually we generate a new key-value pair and append it to the index
+		if (keyValuePairs.isEmpty() || rand.nextInt(10) != 0) {
+			final byte[] key = new byte[4];
+			final byte[] value = new byte[18];
+			
+			rand.nextBytes(key);
+			rand.nextBytes(value);
+			
+			keyValuePairs.add(Pair.of(key, value));
+			
+			return keyValuePairs.size()-1; // idx of generated value
+			
+		} else { // !keyValuePairs.isEmpty() && rand.nextInt()==10
+			
+			// return a tripe from before
+			return rand.nextInt(keyValuePairs.size());
+		}
+	}
 }
