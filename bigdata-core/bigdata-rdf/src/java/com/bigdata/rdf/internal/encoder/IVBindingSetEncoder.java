@@ -60,6 +60,10 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * A utility class for generating and processing compact representations of
  * {@link IBindingSet}s whose {@link IConstant}s are bound to {@link IV}s.
  * Individual {@link IV}s may be associated with a cached RDF {@link Value}.
+ * 
+ * As a contract, the class provides guarantees that the representation of a
+ * given binding set is always the same. This makes it possible to use an
+ * HTree based DistinctFilter over encoded binding sets.
  * <p>
  * Note: This implementation does NOT maintain the {@link IVCache} associations.
  * 
