@@ -30,6 +30,7 @@ package com.bigdata.rdf.sail.webapp.client;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -37,7 +38,7 @@ import org.openrdf.model.Value;
 
 /**
  * Utility class for externalizing SPARQL prefix declaration management.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -55,60 +56,60 @@ public class AST2SPARQLUtil {
     public AST2SPARQLUtil(final Map<String, String> prefixDecls) {
 
         this.prefixDecls = prefixDecls;
-        
+
         if (prefixDecls != null) {
 
             /*
              * Build up a reverse map from namespace to prefix.
              */
-            
+
             namespaces = new HashMap<String, String>();
 
             for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
-   
+
                 namespaces.put(e.getValue(), e.getKey());
-                
+
             }
-            
+
         } else {
-            
+
             namespaces = null;
-            
+
         }
 
     }
-    
+
     /**
      * Return an external form for the {@link Value} suitable for direct
      * embedding into a SPARQL query.
-     * 
+     *
      * @param val
      *            The value.
-     * 
+     *
      * @return The external form.
      */
     public String toExternal(final Value val) {
-        
+
         if (val instanceof URI) {
 
             return toExternal((URI) val);
-        
+
         } else if (val instanceof Literal) {
-        
+
             return toExternal((Literal)val);
-            
+
         } else if (val instanceof BNode) {
 
             return toExternal((BNode)val);
-            
+
         } else {
-            
+
             throw new AssertionError();
-            
+
         }
 
     }
-    
+
     public String toExternal(final BNode bnd) {
 
         final String id = bnd.stringValue();
@@ -119,7 +120,7 @@ public class AST2SPARQLUtil {
         return "_:B" + id;
 
     }
-    
+
     public String toExternal(final URI uri) {
 
         if (prefixDecls != null) {
@@ -137,13 +138,13 @@ public class AST2SPARQLUtil {
         return "<" + uri.stringValue() + ">";
 
     }
-    
+
     public String toExternal(final Literal lit) {
 
         final String label = lit.getLabel();
-        
+
         final String languageCode = lit.getLanguage();
-        
+
         final URI datatypeURI = lit.getDatatype();
 
         final String datatypeStr = datatypeURI == null ? null
@@ -154,7 +155,11 @@ public class AST2SPARQLUtil {
                 + (datatypeURI != null ? datatypeStr.length() + 2 : 0));
 
         sb.append('"');
-        sb.append(label);
+        // BLZG-5736: encode special chars
+        sb.append(StringUtils.replaceEach(label,
+                new String[] {"\"", "\n", "\r", "\\"},
+                new String[] {"\\\"", "\\n", "\\r", "\\\\"}
+                ));
         sb.append('"');
 
         if (languageCode != null) {
