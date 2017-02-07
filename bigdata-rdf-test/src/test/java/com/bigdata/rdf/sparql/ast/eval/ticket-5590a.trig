@@ -1,0 +1,21 @@
+<http://test/item1> <http://test/p1> <http://test/item11> .
+<http://test/item11> <http://test/p2> <http://test/item12> .
+<http://test/item12> <http://test/p3> <http://test/item13> .
+<http://test/item13> <http://test/p4> <http://test/target> .
+
+<http://test/item2> <http://test/p1> <http://test/item21> .
+<http://test/item21> <http://test/p2> <http://test/item22> .
+<http://test/item22> <http://test/p3> <http://test/item23> .
+<http://test/item23> <http://test/p4> <http://test/item24> .
+<http://test/item24> <http://test/p4> <http://test/target> .
+
+<http://test/item3> <http://test/p1> <http://test/item31> .
+<http://test/item31> <http://test/p2> <http://test/item32> .
+<http://test/item32> <http://test/p3> <http://test/item33> .
+<http://test/item33> <http://test/p5> <http://test/target> .
+
+<http://test/item4> <http://test/p1> <http://test/item41> .
+<http://test/item41> <http://test/p2> <http://test/item42> .
+<http://test/item42> <http://test/p3> <http://test/item43> .
+<http://test/item43> <http://test/p5> <http://test/item44> .
+<http://test/item44> <http://test/p5> <http://test/target> .
