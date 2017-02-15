@@ -117,6 +117,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     protected static final transient String PUT = "PUT";
     protected static final transient String DELETE = "DELETE";
     
+    /**
+     * HTTP header may be used to specify that the request is for read only.
+     */
+    static public final String HTTP_HEADER_BIGDATA_READ_ONLY = "X-BIGDATA-READ-ONLY";
+
 	/**
 	 * Some HTTP response status codes
 	 */
@@ -340,9 +345,9 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     static boolean isWritable(final ServletContext servletContext,
             final HttpServletRequest req, final HttpServletResponse resp)
             throws IOException {
-        
-        if (getConfig(servletContext).readOnly) {
-            
+
+        if (req.getHeader(HTTP_HEADER_BIGDATA_READ_ONLY) != null || getConfig(servletContext).readOnly) {
+
             buildAndCommitResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                     "Not writable.");
 
