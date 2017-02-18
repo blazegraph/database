@@ -37,10 +37,10 @@ Security Reporting
 
 Blazegraph has an updated security reporting procedure. Please see https://github.com/blazegraph/database/blob/master/Security.md for reporting security related issues. This process is monitored on a daily basis. All security reports are acknowledged within 24 hours. Mitigations for reported security issues are made in a reasonable timeframe, which may be as quickly as 24 hours for high-severity issues.
 
-
 Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_5
 
 ** Bug
+    * [BLZG-2066] - AssertionError in path query with MINUS
     * [BLZG-2079] - Wrong results for fully constrained "+" property path 
     * [BLZG-2082] - one-argument substr produces NPE when combined with GROUP By
     * [BLZG-2083] - str() produces NotMaterializedException when using group by/sample
@@ -58,8 +58,13 @@ Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_5
     * [BLZG-4249] - SUBSTR with starting location less than 1
     * [BLZG-4323] - hint:runFirst not considered for Subqueries and Named Subquery Includes
     * [BLZG-4403] - Blazegraph Export Option in UI
+    * [BLZG-4476] - DISTINCT does not eliminate duplicate rows
+    * [BLZG-5590] - Negated path produces exception
+    * [BLZG-5736] - Strings with quotes are not properly encoded in federated queries
+    * [BLZG-7794] - Need a way to ensure POST request is read-only
 
 
 ** Improvement
+    * [BLZG-2078] - Make search endpoint type customizable
     * [BLZG-2092] - Make SailBase connection timeout configurable
-
+    * [BLZG-7825] - Remove dependency to obsolete concurrent library
