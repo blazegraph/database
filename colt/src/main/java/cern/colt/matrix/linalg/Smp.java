@@ -9,12 +9,12 @@ It is provided "as is" without expressed or implied warranty.
 package cern.colt.matrix.linalg;
 
 import cern.colt.matrix.DoubleMatrix2D;
-import EDU.oswego.cs.dl.util.concurrent.FJTask;
-import EDU.oswego.cs.dl.util.concurrent.FJTaskRunnerGroup;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 /*
 */
 class Smp {
-	protected FJTaskRunnerGroup taskGroup; // a very efficient and light weight thread pool
+	protected ForkJoinPool taskGroup; // a very efficient and light weight thread pool
 
 	protected int maxThreads;	
 /**
@@ -24,24 +24,19 @@ protected Smp(int maxThreads) {
 	maxThreads = Math.max(1,maxThreads);
 	this.maxThreads = maxThreads;
 	if (maxThreads>1) {
-		this.taskGroup = new FJTaskRunnerGroup(maxThreads);
+		this.taskGroup = new ForkJoinPool(maxThreads);
 	}
 	else { // avoid parallel overhead
 		this.taskGroup = null;
 	}
 }
-/**
- * Clean up deamon threads, if necessary.
- */
-public void finalize() {
-	if (this.taskGroup!=null) this.taskGroup.interruptAll();
-}
 protected void run(final DoubleMatrix2D[] blocksA, final DoubleMatrix2D[] blocksB, final double[] results, final Matrix2DMatrix2DFunction function) {
-	final FJTask[] subTasks = new FJTask[blocksA.length];
+	final RecursiveAction[] subTasks = new RecursiveAction[blocksA.length];
 	for (int i=0; i<blocksA.length; i++) {
 		final int k = i;
-		subTasks[i] = new FJTask() { 
-			public void run() {
+		subTasks[i] = new RecursiveAction() { 
+			@Override
+			protected void compute() {
 				double result = function.apply(blocksA[k],blocksB != null ? blocksB[k] : null);
 				if (results!=null) results[k] = result; 
 				//System.out.print("."); 
@@ -50,15 +45,14 @@ protected void run(final DoubleMatrix2D[] blocksA, final DoubleMatrix2D[] blocks
 	}
 
 	// run tasks and wait for completion
-	try { 
 		this.taskGroup.invoke(
-			new FJTask() {
-				public void run() {	
-					coInvoke(subTasks);	
+			new RecursiveAction() {
+				@Override
+				protected void compute() {
+					invokeAll(subTasks);	
 				}
 			}
-		);
-	} catch (InterruptedException exc) {}
+                 );
 }
 protected DoubleMatrix2D[] splitBlockedNN(DoubleMatrix2D A, int threshold, long flops) {
 	/*
@@ -185,11 +179,5 @@ protected DoubleMatrix2D[] splitStridedNN(DoubleMatrix2D A, int threshold, long 
 		}
 	}
 	return blocks;
-}
-/**
- * Prints various snapshot statistics to System.out; Simply delegates to {@link EDU.oswego.cs.dl.util.concurrent.FJTaskRunnerGroup#stats}.
- */
-public void stats() {
-	if (this.taskGroup!=null) this.taskGroup.stats();
 }
 }

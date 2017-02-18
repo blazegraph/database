@@ -10,7 +10,7 @@ package cern.colt.matrix.linalg;
 
 import cern.colt.matrix.DoubleMatrix1D;
 import cern.colt.matrix.DoubleMatrix2D;
-import EDU.oswego.cs.dl.util.concurrent.FJTask;
+import java.util.concurrent.RecursiveAction;
 /**
 Parallel implementation of the Basic Linear Algebra System for symmetric multi processing boxes.
 Currently only a few algorithms are parallelised; the others are fully functional, but run in sequential mode.
@@ -51,8 +51,8 @@ number of CPUs on a JVM, so there is no good way to automate defaults.</li>
 <li>Implemented using Doug Lea's fast lightweight task framework ({@link EDU.oswego.cs.dl.util.concurrent}) built upon Java threads, and geared for parallel computation.</li>
 </ul>
 
-@see EDU.oswego.cs.dl.util.concurrent.FJTaskRunnerGroup
-@see EDU.oswego.cs.dl.util.concurrent.FJTask
+@see EDU.oswego.cs.dl.util.concurrent.RecursiveActionRunnerGroup
+@see EDU.oswego.cs.dl.util.concurrent.RecursiveAction
 @author wolfgang.hoschek@cern.ch
 @version 0.9, 16/04/2000
 */
@@ -198,7 +198,7 @@ public void dgemm(final boolean transposeA, final boolean transposeB, final doub
 	
 	// set up concurrent tasks
 	int span = width/noOfTasks;
-	final FJTask[] subTasks = new FJTask[noOfTasks];
+	final RecursiveAction[] subTasks = new RecursiveAction[noOfTasks];
 	for (int i=0; i<noOfTasks; i++) {
 		final int offset = i*span;
 		if (i==noOfTasks-1) span = width - span*i; // last span may be a bit larger
@@ -217,8 +217,9 @@ public void dgemm(final boolean transposeA, final boolean transposeB, final doub
 			CC = C.viewPart(offset,0,span,p);
 		}
 				
-		subTasks[i] = new FJTask() { 
-			public void run() { 
+		subTasks[i] = new RecursiveAction() { 
+			@Override
+			protected void compute() { 
 				seqBlas.dgemm(transposeA,transposeB,alpha,AA,BB,beta,CC); 
 				//System.out.println("Hello "+offset); 
 			}
@@ -226,15 +227,14 @@ public void dgemm(final boolean transposeA, final boolean transposeB, final doub
 	}
 	
 	// run tasks and wait for completion
-	try { 
 		this.smp.taskGroup.invoke(
-			new FJTask() {
-				public void run() {	
-					coInvoke(subTasks);	
+			new RecursiveAction() {
+ 				@Override
+				protected void compute() {	
+					invokeAll(subTasks);	
 				}
 			}
 		);
-	} catch (InterruptedException exc) {}
 }
 public void dgemv(final boolean transposeA, final double alpha, DoubleMatrix2D A, final DoubleMatrix1D x, final double beta, DoubleMatrix1D y) {
 	/*
@@ -271,7 +271,7 @@ public void dgemv(final boolean transposeA, final double alpha, DoubleMatrix2D A
 	
 	// set up concurrent tasks
 	int span = width/noOfTasks;
-	final FJTask[] subTasks = new FJTask[noOfTasks];
+	final RecursiveAction[] subTasks = new RecursiveAction[noOfTasks];
 	for (int i=0; i<noOfTasks; i++) {
 		final int offset = i*span;
 		if (i==noOfTasks-1) span = width - span*i; // last span may be a bit larger
@@ -280,8 +280,9 @@ public void dgemv(final boolean transposeA, final double alpha, DoubleMatrix2D A
 		final DoubleMatrix2D AA = A.viewPart(offset,0,span,n);
 		final DoubleMatrix1D yy = y.viewPart(offset,span);
 				
-		subTasks[i] = new FJTask() { 
-			public void run() { 
+		subTasks[i] = new RecursiveAction() { 
+			@Override
+			protected void compute() { 
 				seqBlas.dgemv(transposeA,alpha,AA,x,beta,yy); 
 				//System.out.println("Hello "+offset); 
 			}
@@ -289,15 +290,14 @@ public void dgemv(final boolean transposeA, final double alpha, DoubleMatrix2D A
 	}
 	
 	// run tasks and wait for completion
-	try { 
 		this.smp.taskGroup.invoke(
-			new FJTask() {
-				public void run() {	
-					coInvoke(subTasks);	
+			new RecursiveAction() {
+				@Override
+				public void compute() {	
+					invokeAll(subTasks);	
 				}
 			}
 		);
-	} catch (InterruptedException exc) {}
 }
 public void dger(double alpha, DoubleMatrix1D x, DoubleMatrix1D y, DoubleMatrix2D A) {
 	seqBlas.dger(alpha,x,y,A);
@@ -365,12 +365,6 @@ protected double[] run(DoubleMatrix2D A, boolean collectResults, Matrix2DMatrix2
 		this.smp.run(blocks,null,results,fun);
 	}
 	return results;
-}
-/**
- * Prints various snapshot statistics to System.out; Simply delegates to {@link EDU.oswego.cs.dl.util.concurrent.FJTaskRunnerGroup#stats}.
- */
-public void stats() {
-	if (this.smp!=null) this.smp.stats();
 }
 private double xsum(DoubleMatrix2D A) {
 	double[] sums = run(A,true,
