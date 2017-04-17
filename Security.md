@@ -1,10 +1,10 @@
-##Reporting a Blazegraph Security Issue##
+## Reporting a Blazegraph Security Issue ##
 
 For customers and Blazegraph users, please send an email to security [at] blazegraph.com to report a security issue. You may send an encrypted message using the public key below.
 
 This alias is monitored on a daily basis.   All security reports are acknowledged within 24 hours.   Mitigations for reported security issues are made in a reasonable timeframe, which may be as quickly as 24 hours for high-severity issues.
 
-###Public Key###
+### Public Key ###
 Please use the public key below for transmitting any sensitive information to the security alias.
 
 ```
