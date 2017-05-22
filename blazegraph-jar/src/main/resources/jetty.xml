@@ -117,6 +117,7 @@
        </Arg>
      </Call>
 
+
     <!-- =========================================================== -->
     <!-- Set handler Collection Structure                            --> 
     <!-- =========================================================== -->
@@ -126,6 +127,15 @@
          <Array type="org.eclipse.jetty.server.Handler">
            <Item>
              <New id="Contexts" class="org.eclipse.jetty.server.handler.ContextHandlerCollection">
+                   <Call name="addHandler">
+                       <Arg>
+                        <New id="Rewrite" class="org.eclipse.jetty.rewrite.handler.RewriteHandler">
+                   	  <Set name="rewriteRequestURI"><Property name="jetty.rewrite.rewriteRequestURI" deprecated="rewrite.rewriteRequestURI" default="true"/></Set>
+                   	  <Set name="rewritePathInfo"><Property name="jetty.rewrite.rewritePathInfo" deprecated="rewrite.rewritePathInfo" default="false"/></Set>
+                   	  <Set name="originalPathAttribute"><Property name="jetty.rewrite.originalPathAttribute" deprecated="rewrite.originalPathAttribute" default="requestedPath"/></Set>
+                       </New>
+                     </Arg>
+                   </Call>
                    <Call name="addHandler">
                       <Arg>
                         <New id="moved" class="org.eclipse.jetty.server.handler.MovedContextHandler">
@@ -171,6 +181,28 @@
         </Set>
       </New>
     </Set>
+
+    <!-- Add Header for X-Frame-Options. See https://jira.blazegraph.com/browse/BLZG-8865 -->
+
+    <Ref refid="Rewrite">
+      <!-- Add rule to protect against IE ssl bug -->
+      <Call name="addRule">
+        <Arg>
+          <New class="org.eclipse.jetty.rewrite.handler.MsieSslRule"/>
+        </Arg>
+      </Call>
+
+      <!-- protect favicon handling -->
+      <Call name="addRule">
+        <Arg>
+          <New class="org.eclipse.jetty.rewrite.handler.HeaderPatternRule">
+            <Set name="pattern">/blazegraph/*</Set>
+            <Set name="name">X-Frame-Options</Set>
+            <Set name="value">SAMEORIGIN</Set>
+          </New>
+        </Arg>
+      </Call>
+    </Ref>
       
     <!-- =========================================================== -->
     <!-- extra server options                                        -->
