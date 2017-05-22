@@ -208,7 +208,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <jsonld.version>0.5.1</jsonld.version>
     <semargl.version>0.6.1</semargl.version>
     <slf4j.version>1.6.1</slf4j.version>
-    <jetty.version>9.2.3.v20140905</jetty.version>
+    <jetty.version>9.2.9.v20150224</jetty.version>
     <servlet.version>3.1.0</servlet.version>
     <lucene.version>5.5.0</lucene.version>
     <apache.commons_codec.version>1.4</apache.commons_codec.version>
