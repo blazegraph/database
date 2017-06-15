@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 
 /**
  * The solutions declared by a BINDINGS clause.
@@ -46,7 +48,7 @@ import com.bigdata.bop.IVariable;
  * @version $Id$
  */
 public class BindingsClause extends GroupMemberNodeBase<BindingsClause> 
-        implements IBindingProducerNode, IJoinNode {
+        implements IBindingProducerNode, IJoinNode, IReorderableNode {
 
     /**
      * 
@@ -61,6 +63,12 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
          * binding in any given solution.
          */
         String DECLARED_VARS = "declaredVars";
+        
+        /**
+         * A subset of declared vars for which no NULL bindings exist in the
+         * supplied binding sets.
+         */
+        String DEFINITELY_PRODUCED_VARS = "definitelyProducedVars";
 
         /**
          * The binding sets.
@@ -138,6 +146,17 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
     }
 
     /**
+     * Return the ordered set of variables that will definitely be bound by
+     * this bindings/values clause.
+     */
+    @SuppressWarnings("unchecked")
+    public final LinkedHashSet<IVariable<?>> getDefinitelyProducedBindings() {
+
+        return (LinkedHashSet<IVariable<?>>) getProperty(Annotations.DEFINITELY_PRODUCED_VARS);
+
+    }
+
+    /**
      * Return the #of binding sets.
      */
     public final int getBindingSetsCount() {
@@ -164,6 +183,32 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
     public final void setBindingSets(final List<IBindingSet> bindingSets) {
 
         setProperty(Annotations.BINDING_SETS, bindingSets);
+        
+        /*
+         * Look for any binding sets with NULL values for variables and remove
+         * those variables from the definitely produced bindings.
+         */
+        final Set<IVariable<?>> definitelyProducedVars = new LinkedHashSet<>();
+        if (!bindingSets.isEmpty()) {
+            /*
+             * Start with all declared variables.
+             */
+            definitelyProducedVars.addAll(getDeclaredVariables());
+            for (IBindingSet bs : bindingSets) {
+                if (definitelyProducedVars.isEmpty()) {
+                    break;
+                }
+                final Iterator<IVariable<?>> it = definitelyProducedVars.iterator();
+                while (it.hasNext()) {
+                    final IVariable<?> var = it.next();
+                    if (!bs.isBound(var)) {
+                        it.remove();
+                    }
+                }
+            }
+        }
+        
+        setProperty(Annotations.DEFINITELY_PRODUCED_VARS, definitelyProducedVars);
 
     }
 
@@ -273,5 +318,16 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
     @Override
     public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
        return new HashSet<IVariable<?>>();
-    }    
+    }
+
+    @Override
+    public boolean isReorderable() {
+        return true;
+    }
+
+    @Override
+    public long getEstimatedCardinality(StaticOptimizer opt) {
+        return getBindingSetsCount();
+    }
+    
 }

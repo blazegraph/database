@@ -989,7 +989,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final BindingsClause bc = (BindingsClause) node;
             
-            vars.addAll(bc.getDeclaredVariables());
+            vars.addAll(bc.getDefinitelyProducedBindings());
             
         } else {
 
