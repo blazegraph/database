@@ -86,7 +86,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>colt</artifactId>
+      <artifactId>blazegraph-colt</artifactId>
       <version>${colt.version}</version>
     </dependency>
     <dependency>

@@ -348,7 +348,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </activation>
       <modules>
         <module>junit-ext</module>
-        <module>colt</module>
+        <module>blazegraph-colt</module>
         <module>ctc-striterators</module>
         <module>lgpl-utils</module>
         <module>dsi-utils</module>
@@ -380,7 +380,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       </activation>
       <modules>
         <module>junit-ext</module>
-        <module>colt</module>
+        <module>blazegraph-colt</module>
         <module>ctc-striterators</module>
         <module>lgpl-utils</module>
         <module>dsi-utils</module>

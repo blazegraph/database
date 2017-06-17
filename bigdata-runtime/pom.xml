@@ -131,6 +131,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                   <exclude>commons-fileupload:*</exclude>
                   <exclude>org.openrdf.sesame:*</exclude>
                   <exclude>com.github.stephenc.high-scale-lib:*</exclude>
+                  <exclude>blazegraph-colt:*</exclude>
                   <exclude>colt:*</exclude>
                   <exclude>org.apache.lucene:*</exclude>
                   <exclude>com.ibm.icu:*</exclude>

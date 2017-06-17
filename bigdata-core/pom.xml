@@ -189,7 +189,7 @@ public class BuildInfo {
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>colt</artifactId>
+      <artifactId>blazegraph-colt</artifactId>
       <version>${colt.version}</version>
     </dependency>
     <dependency>
