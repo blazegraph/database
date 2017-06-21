@@ -40,6 +40,8 @@ import java.util.UUID;
 
 import javax.servlet.http.HttpServletResponse;
 
+import static org.apache.commons.lang.StringEscapeUtils.escapeHtml;
+
 import junit.framework.Test;
 
 import org.eclipse.jetty.util.IO;
@@ -505,7 +507,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         m_mgr.createRepository(namespace2, properties);
 
         { // verify exists.
-            final Properties p = m_mgr.getRepositoryProperties(namespace2);
+            //BLZG-8864: Namespaces are html-escaped.
+            final Properties p = m_mgr.getRepositoryProperties(escapeHtml(namespace2));
             assertNotNull(p);
             
             log.warn("Found properties for namespace " + namespace2);
@@ -537,7 +540,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         assertNotNull(defaultKb);
         assertFalse(defaultKb.sparqlEndpoint.isEmpty());
 
-        final VoidSummary otherKb = summaries.get(namespace2);
+        //BLZG-8864: Namespaces are HTML-escaped to prevent code attacks.
+        final VoidSummary otherKb = summaries.get(escapeHtml(namespace2)); 
         assertNotNull(otherKb);
         assertFalse(otherKb.sparqlEndpoint.isEmpty());
 
@@ -550,8 +554,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 
 			while(itr.hasNext()) {
 				final Map.Entry<String,VoidSummary> e = itr.next();
-				
-				if(e.getKey().equals(namespace)||e.getKey().equals(namespace2)) 
+				//BLZG-8864: Namespaces are HTML-escaped to prevent code attacks.
+				if(e.getKey().equals(namespace)||e.getKey().equals(escapeHtml(namespace2))) 
 					continue;
 				
 				itr.remove();
@@ -572,6 +576,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         for(VoidSummary summary : summaries.values()) {
 
             // The namespace for that data set.
+			//BLZG-8864: Namespaces are HTML-escaped to prevent code attacks.
             final String ns = summary.namespace.stringValue();
             
             // GET the properties for that data set.
