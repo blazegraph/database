@@ -260,6 +260,21 @@
                     <Set name="overrideDescriptor">
                       <SystemProperty name="jetty.overrideWebXml" default="./override-web.xml"/>
                     </Set>
+                    <!-- Uncomment the section below to add
+	                 Digest authentication per http://www.eclipse.org/jetty/documentation/9.2.22.v20170531/configuring-security-authentication.html
+			 You must update the path to the realm.properties file to be a location on your machine.
+			 There is an example in blazegraph-jar/src/main/resources/realm.properties
+
+                    <Get name="securityHandler">
+                      <Set name="loginService">
+                        <New class="org.eclipse.jetty.security.HashLoginService">
+                          <Set name="name">Blazegraph Authentication</Set>
+                          <Set name="config">/path/to/your/realm.properties</Set>
+                          <Set name="refreshInterval">0</Set>
+                        </New>
+                      </Set>
+                    </Get>
+	            -->
                   </New>
                 </Arg>
               </Call>

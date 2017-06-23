@@ -16,7 +16,24 @@ Reporting a security issue: [Security Reporting](Security.md).
 ###Quick Start with the Executable Jar
 Up and running with Blazegraph in under 30 seconds:  [Quick Start](https://wiki.blazegraph.com/wiki/index.php/Quick_Start).
 
-###Building the code
+### Deploying in Production ###
+Blazegraph is designed to be easy to use and get started. It ships without SSL or authentication by default for this reason. For production deployments, we _strongly_ recommend you enable SSL, authentication, and appropriate network configurations. There are some helpful links below to enable you to do this. 
+
+#### Enabling SSL support ####
+To enable SSL support, uncomment the example [jetty.xml](blazegraph-jar/src/main/resources/jetty.xml#L141) and configure it for your local keystore.
+
+#### Configuration Authentication ####
+By default, Blazegraph ships without authentication enabled. This is great for developing, getting started, and doing research with Blazegraph. However, it's not recommended for any production deployment. To configuration authentication, you must configure it either within the web app container or via a reverse-proxy configuration.
+
+Note that the Blazegraph namespace feature for [multi-tenancy](https://wiki.blazegraph.com/wiki/index.php/REST_API#Multi-Tenancy_API) does not provide security isolation. Users that can access the base URI of the server can access any of the available namespaces. You can further restrict this through a combination of authentication configuration and restricting access to specific namespace URIs, i.e. `/blazegraph/namespace/NAMESPACE/sparql`.
+
+There are three basic options:
+
+1. **Configuring Jetty Authentication for a standalone Jetty deployment**:  Follow the [jetty](http://www.eclipse.org/jetty/documentation/9.2.22.v20170531/configuring-security-authentication.html) guide to configure authentication for the [jetty.xml](blazegraph-jar/src/main/resources/jetty.xml) you use to deploy the server by uncommenting the `<Get name="securityHandler">` section. You'll need to create a [realm.properties](blazegraph-jar/src/main/resources/realm.properties) and update the jetty.xml to point to its location on the filesystem.  Then configure the [web.xml](bigdata-war-html/src/main/webapp/WEB-INF/web.xml) to uncomment the security-constraint.
+1. **Configuring Tomcat Authentication for a standalone Tomcat deployment**:  First configure a Tomcat [Realm](https://tomcat.apache.org/tomcat-7.0-doc/realm-howto.html) with your choice of authentication method (JDBC, JNDI, etc.). Then configure the [web.xml](bigdata-war-html/src/main/webapp/WEB-INF/web.xml) to uncomment the security-constraint.
+1. **Setup a reverse-proxy configuration with authentication**:  You can setup an http or https reverse proxy configuration that has authentication and forward requests to the local Blazegraph instance (typically running on localhost:9999). This is a good option with [Nginx](https://community.openhab.org/t/using-nginx-reverse-proxy-authentication-and-https/14542) and [Apache](https://stackoverflow.com/questions/5011102/apache-reverse-proxy-with-basic-authentication). 
+
+### Building the code
 As a quick start, run `mvn install -DskipTests` or the utility script `./scripts/mavenInstall.sh `.
 
 For more detailed maven information see the [wiki](https://wiki.blazegraph.com/wiki/index.php/MavenNotes). 
