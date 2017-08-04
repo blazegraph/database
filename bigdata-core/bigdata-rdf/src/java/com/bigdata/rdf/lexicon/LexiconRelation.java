@@ -2364,7 +2364,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * Batch resolution of internal values to {@link BigdataValue}s.
      * 
      * @param ivs
-     *            An collection of internal values
+     *            An collection of internal values. This may be an unmodifiable collection.
      * 
      * @return A map from internal value to the {@link BigdataValue}. If an
      *         internal value was not resolved then the map will not contain an
@@ -2906,7 +2906,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          */
         for (IV<?,?> iv : unrequestedSidTerms) {
 
-        	ivs.remove(iv);
+        	//Removed in 2.1.5 per BLZG-9000
+        	//See https://github.com/blazegraph/database/issues/67
+        	//ivs.remove(iv);
         	
         	ret.remove(iv);
             
