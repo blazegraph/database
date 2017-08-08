@@ -649,10 +649,11 @@ public class QueryServlet extends BigdataRDFServlet {
          final String namespace = getNamespace(req);
 
          final long timestamp = getTimestamp(req);
-
+         final BigdataRDFContext context = getBigdataRDFContext();
+         final long timeout = BigdataRDFContext.getQueryTimeout(req, context.getConfig().queryTimeout);
          submitApiTask(
                new SparqlQueryTask(req, resp, namespace, timestamp, queryStr, includeInferred, bindings,
-                     getBigdataRDFContext())).get();
+                     context), timeout).get();
 
       } catch (Throwable t) {
 

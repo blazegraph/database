@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -44,7 +46,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
-import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.store.BD;
@@ -236,6 +237,8 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * 
     * @param task
     *           The task.
+    * @param timeoutMillis
+    *           Optional timeout for the whole task.
     * 
     * @return The {@link Future} for that task.
     * 
@@ -243,6 +246,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * @throws ExecutionException
     * @throws InterruptedException
     * @throws IOException
+    * @throws TimeoutException
     * 
     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
@@ -252,9 +256,9 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     *      operations should be cancelable from both REST API and workbench
     *      </a>
     */
-   protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
+   protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task, long timeoutMillis)
          throws DatasetNotFoundException, InterruptedException,
-         ExecutionException, IOException {
+         ExecutionException, IOException, TimeoutException {
 
         if (task == null)
             throw new IllegalArgumentException();
@@ -283,7 +287,13 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             context.addTask(task, ft);
             
             // Await Future.
+            // The semantics of FutureTask are such that a timeout "Waits if necessary for at most the given time".
+            // In Blazegraph, a time out of zero means unlimited.
+            if (timeoutMillis > 0) {
+                ft.get(timeoutMillis, TimeUnit.MILLISECONDS);
+            } else {
             ft.get();
+            }
 
             /*
              * IFF successful, flush and close the response.
@@ -310,6 +320,22 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     }
    
+    /**
+    * @see submitApiTask(AbstractRestApiTask, long)
+    * @param task
+    * @return
+    * @throws DatasetNotFoundException
+    * @throws InterruptedException
+    * @throws ExecutionException
+    * @throws IOException
+    * @throws TimeoutException
+    */
+    protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
+           throws DatasetNotFoundException, InterruptedException,
+           ExecutionException, IOException, TimeoutException {
+        return submitApiTask(task, 0);
+    }
+
     /**
      * Return the {@link HAStatusEnum} -or- <code>null</code> if the
      * {@link IIndexManager} is not an {@link AbstractQuorum} or is not HA
