@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -243,6 +245,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * @throws ExecutionException
     * @throws InterruptedException
     * @throws IOException
+    * @throws TimeoutException
     * 
     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
@@ -254,7 +257,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     */
    protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
          throws DatasetNotFoundException, InterruptedException,
-         ExecutionException, IOException {
+         ExecutionException, IOException, TimeoutException {
 
         if (task == null)
             throw new IllegalArgumentException();
@@ -283,7 +286,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             context.addTask(task, ft);
             
             // Await Future.
-            ft.get();
+            ft.get(BigdataRDFContext.getQueryTimeout(task.req, context.getConfig().queryTimeout), TimeUnit.MILLISECONDS);
 
             /*
              * IFF successful, flush and close the response.
