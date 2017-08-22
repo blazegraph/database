@@ -286,8 +286,14 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             context.addTask(task, ft);
             
             // Await Future.
-            ft.get(BigdataRDFContext.getQueryTimeout(task.req, context.getConfig().queryTimeout), TimeUnit.MILLISECONDS);
-
+            //The semantics of FutureTask are such that a timeout "Waits if necessary for at most the given time".
+            //In Blazegraph, a time out of zero means unlimited.
+            final long queryTimeout = BigdataRDFContext.getQueryTimeout(task.req, context.getConfig().queryTimeout);
+            if(queryTimeout > 0) { //If the query timeout is not unlimited, pass it to the FutureTask.
+               ft.get(queryTimeout , TimeUnit.MILLISECONDS);
+            } else {
+            	ft.get();
+            }
             /*
              * IFF successful, flush and close the response.
              * 
