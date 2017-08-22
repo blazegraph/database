@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -44,7 +46,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
-import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.store.BD;
@@ -243,6 +244,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * @throws ExecutionException
     * @throws InterruptedException
     * @throws IOException
+    * @throws TimeoutException 
     * 
     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
@@ -254,7 +256,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     */
    protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
          throws DatasetNotFoundException, InterruptedException,
-         ExecutionException, IOException {
+         ExecutionException, IOException, TimeoutException {
 
         if (task == null)
             throw new IllegalArgumentException();
@@ -283,8 +285,14 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             context.addTask(task, ft);
             
             // Await Future.
-            ft.get();
-
+            //The semantics of FutureTask are such that a timeout "Waits if necessary for at most the given time".
+            //In Blazegraph, a time out of zero means unlimited.
+            final long queryTimeout = BigdataRDFContext.getQueryTimeout(task.req, context.getConfig().queryTimeout);
+            if(queryTimeout > 0) { //If the query timeout is not unlimited, pass it to the FutureTask.
+               ft.get(queryTimeout , TimeUnit.MILLISECONDS);
+            } else {
+            	ft.get();
+            }
             /*
              * IFF successful, flush and close the response.
              * 
