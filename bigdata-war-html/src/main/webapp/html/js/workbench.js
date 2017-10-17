@@ -322,7 +322,7 @@ function deleteNamespace(namespace) {
 function getNamespaceProperties(namespace, download) {
    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/properties';
       if(!download) {
-         $('#namespace-properties h1').html(namespace);
+         $('#namespace-properties h1').text(namespace);
          $('#namespace-properties table').empty();
          $('#namespace-properties').show();
          $('#namespace-rebuild-text-index').hide();
@@ -345,7 +345,7 @@ function getNamespaceProperties(namespace, download) {
 function rebuildTextIndex(namespace) {
     var url = RO_URL_PREFIX + 'namespace/' + namespace + '/textIndex';
 
-    $('#namespace-rebuild-text-index h1').html(namespace);
+    $('#namespace-rebuild-text-index h1').text(namespace);
     $('#namespace-rebuild-text-index p').empty();
     $('#namespace-properties table').empty();
     $('#namespace-properties').hide();
@@ -354,7 +354,7 @@ function rebuildTextIndex(namespace) {
     var settings = {
               type: 'POST',
               success: function(data) { 
-                            $('#namespace-rebuild-text-index h1').html(namespace); 
+                            $('#namespace-rebuild-text-index h1').text(namespace); 
                             $('#namespace-rebuild-text-index p').html(data); 
                             },
               error: function(jqXHR, textStatus, errorThrown) {
@@ -365,7 +365,7 @@ function rebuildTextIndex(namespace) {
                                 var settings = {
                                           type: 'POST',
                                           success: function(data) { 
-                                                        $('#namespace-rebuild-text-index h1').html(namespace); 
+                                                        $('#namespace-rebuild-text-index h1').text(namespace); 
                                                         $('#namespace-rebuild-text-index p').html(data); 
                                                         },
                                           error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
@@ -378,6 +378,70 @@ function rebuildTextIndex(namespace) {
     $.ajax(url, settings);
 }
 
+function dropEntailments(namespace) {
+
+	if(confirm('Are you sure you want to drop all the entailments from the namespace ' + namespace + '?')) {
+	
+		$('#namespace-drop-entailments h1').text(namespace);
+	    $('#namespace-drop-entailments p').empty();
+	    $('#namespace-drop-entailments p').html("Operation 'Drop entailments' is running, you could check its status on <a href=\"#status\">status page</a>"); 
+	    $('#namespace-properties table').empty();
+	    $('#namespace-properties').hide();
+	    $('#namespace-rebuild-text-index').hide();
+	    $('#namespace-create-entailments').hide();
+	    $('#namespace-drop-entailments').show();
+	
+	    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+	
+	    var settings = {
+	              type: 'POST',
+	              data: {'update' : 'DROP ENTAILMENTS'},
+	              error: function(jqXHR, textStatus, errorThrown) { 
+	              				$('#namespace-drop-entailments p').empty();
+	           					$('#namespace-drop-entailments').hide(); 
+	              				alert(jqXHR.responseText);              				
+	              				},
+	              success: function(data) { 
+	                            $('#namespace-drop-entailments h1').text(namespace); 
+	                            $('#namespace-drop-entailments p').html(data); 
+	                            }
+	              
+	           };
+    } else {
+           $('#namespace-drop-entailments p').empty();
+           $('#namespace-drop-entailments').hide();
+    }
+    $.ajax(url, settings);
+}
+
+function createEntailments(namespace) {
+
+    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+    
+    $('#namespace-create-entailments h1').text(namespace);
+    $('#namespace-create-entailments p').empty();
+    $('#namespace-create-entailments p').html("Operation 'Create entailments' is running, you could check its status on <a href=\"#status\">status page</a>"); 
+    $('#namespace-properties table').empty();
+    $('#namespace-properties').hide();
+    $('#namespace-rebuild-text-index').hide();
+    $('#namespace-drop-entailments').hide();
+    $('#namespace-create-entailments').show();
+
+    var settings = {
+              type: 'POST',
+              data: {'update' : 'CREATE ENTAILMENTS'},
+              error: function(jqXHR, textStatus, errorThrown) { 
+	              				$('#namespace-create-entailments p').empty();
+	           					$('#namespace-create-entailments').hide(); 
+	              				alert(jqXHR.responseText);              				
+	              				},
+              success: function(data) { 
+                            $('#namespace-create-entailments h1').text(namespace); 
+                            $('#namespace-create-entailments p').html(data); 
+                            }
+            };
+    $.ajax(url, settings);
+}
 
 function getPreparedProperties(elem) {
 
