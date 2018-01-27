@@ -33,6 +33,9 @@ There are three basic options:
 1. **Configuring Tomcat Authentication for a standalone Tomcat deployment**:  First configure a Tomcat [Realm](https://tomcat.apache.org/tomcat-7.0-doc/realm-howto.html) with your choice of authentication method (JDBC, JNDI, etc.). Then configure the [web.xml](bigdata-war-html/src/main/webapp/WEB-INF/web.xml) to uncomment the security-constraint.
 1. **Setup a reverse-proxy configuration with authentication**:  You can setup an http or https reverse proxy configuration that has authentication and forward requests to the local Blazegraph instance (typically running on localhost:9999). This is a good option with [Nginx](https://community.openhab.org/t/using-nginx-reverse-proxy-authentication-and-https/14542) and [Apache](https://stackoverflow.com/questions/5011102/apache-reverse-proxy-with-basic-authentication). 
 
+#####Mitigating Cross-Site Request Forgery (CSRF)#####
+If you enable authentication and expose the Blazegraph workbench, you should also take steps to protect against CSRF. Tomcat8 provides a (CSRF filter)[https://tomcat.apache.org/tomcat-8.0-doc/config/filter.html#CSRF_Prevention_Filter_for_REST_APIs] that can be configured. For Jetty, if you configure authentication the default value for `SecurityHandler.setSessionRenewedOnAuthentication(true)` can also be used. CSRF protection may require REST clients to implement HTTP headers to be used to interact with the service.
+
 ### Building the code
 As a quick start, run `mvn install -DskipTests` or the utility script `./scripts/mavenInstall.sh `.
 
