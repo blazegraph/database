@@ -301,6 +301,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
             }
             int f = 0;
             for (char c : flags.toCharArray()) {
+                // See https://www.w3.org/TR/xpath-functions/#flags
                 switch (c) {
                     case 's':
                         f |= Pattern.DOTALL;
@@ -332,6 +333,9 @@ public class RegexBOp extends XSDBooleanIVValueExpression
                         break;
                     case 'u': // Implicit with 'i' flag.
 //                      f |= Pattern.UNICODE_CASE;
+                        break;
+                    case 'q':
+                        f |= Pattern.LITERAL;
                         break;
                     default:
                         throw new IllegalArgumentException();
