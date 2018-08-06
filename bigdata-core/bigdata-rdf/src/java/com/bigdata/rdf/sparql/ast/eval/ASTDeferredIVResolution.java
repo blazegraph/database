@@ -856,7 +856,6 @@ public class ASTDeferredIVResolution {
                 defer(value, new Handler(){
                     @Override
                     public void handle(final IV newIV) {
-                        newIV.setValue(value);  // Fix for Git Issue 100
                         ((ConstantNode) bop).setArg(0, new Constant(newIV));
                     }
                 });
