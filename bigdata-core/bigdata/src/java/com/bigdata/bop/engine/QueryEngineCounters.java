@@ -125,6 +125,11 @@ public class QueryEngineCounters implements ICounterSetAccess {
      */
     protected final CAT deadlineQueueSize = new CAT();
 
+    /**
+     * Running queries count.
+     */
+    protected final CAT runningQueriesCount = new CAT();
+
     @Override
     public CounterSet getCounters() {
 
@@ -245,6 +250,14 @@ public class QueryEngineCounters implements ICounterSetAccess {
             @Override
             public void sample() {
                 setValue(deadlineQueueSize.get());
+            }
+        });
+
+        // The size of the deadlineQueue.
+        root.addCounter("runningQueriesCount", new Instrument<Long>() {
+            @Override
+            public void sample() {
+                setValue(runningQueriesCount.get());
             }
         });
 

@@ -279,7 +279,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
         // Note: This counter is not otherwise tracked.
         counters.deadlineQueueSize.set(deadlineQueue.size());
-        
+	// Running queries
+	counters.runningQueriesCount.set(runningQueries.size());
         // global counters.
         root.attach(counters.getCounters());
 
