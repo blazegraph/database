@@ -975,7 +975,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @see #doRewriteURI(HttpServletRequest)
      */
     @Override
-    final protected URI rewriteURI(final HttpServletRequest request) {
+    final protected String rewriteTarget(final HttpServletRequest request) {
 
         try {
 
@@ -988,7 +988,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
                 
             }
             
-            return rewritten;
+            return rewritten.toString();
             
         } catch (Throwable t) {
 
@@ -1135,7 +1135,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * response.
      */
     @Override
-    protected void onRewriteFailed(final HttpServletRequest request,
+    protected void onProxyRewriteFailed(final HttpServletRequest request,
             final HttpServletResponse response) throws IOException {
 
         if (log.isInfoEnabled())
@@ -1186,7 +1186,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      *      a durable problem with the target host.
      */
     @Override
-    protected void onResponseFailure(//
+    protected void onProxyResponseFailure(//
             final HttpServletRequest request,//
             final HttpServletResponse response,//
             final Response proxyResponse,//
