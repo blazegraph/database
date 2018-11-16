@@ -1136,7 +1136,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      */
     @Override
     protected void onProxyRewriteFailed(final HttpServletRequest request,
-            final HttpServletResponse response) throws IOException {
+            final HttpServletResponse response) {
 
         if (log.isInfoEnabled())
             log.info("Could not rewrite: request=" + request,
@@ -1145,18 +1145,21 @@ public class HALoadBalancerServlet extends ProxyServlet {
         // Figure out if request is to leader or reader.
         final Boolean isLeaderRequest = isLeaderRequest(request);
         
-        if (isLeaderRequest == null) {
+        try {
+            if (isLeaderRequest == null) {
          
-            // Could not identify request based on known prefixes (leader|read).
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Unknown prefix: requestURL=" + request.getRequestURL());
-            return;
+                // Could not identify request based on known prefixes (leader|read).
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        "Unknown prefix: requestURL=" + request.getRequestURL());
+                return;
             
+            }
+        
+            // Forward to this service (let it generate an error message).
+            forwardToLocalService(isLeaderRequest, request, response);
+        } catch(IOException e) {
+            log.error("Was not able to handle proxy rewrite failure: request=" + request, new StackInfoReport());
         }
-        
-        // Forward to this service (let it generate an error message).
-        forwardToLocalService(isLeaderRequest, request, response);
-        
 //        response.sendError(HttpServletResponse.SC_FORBIDDEN);
         
     }
