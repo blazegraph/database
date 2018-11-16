@@ -36,7 +36,9 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -611,6 +613,23 @@ public class QueryServlet extends BigdataRDFServlet {
 	}
 
     /**
+     * Check whether the service is overloaded.
+     * @see ConfigParams#EXECUTOR_SERVICE_MAX_THREADS
+     */
+    private boolean overloaded(final BigdataRDFContext context) {
+        final ExecutorService executorService = getIndexManager().getExecutorService();
+        if (!(executorService instanceof ThreadPoolExecutor)) {
+            return false;
+        }
+        long limit = context.getConfig().executorMaxThreads;
+        if (limit <= 0) {
+            return false;
+        }
+        final ThreadPoolExecutor tpExecutor = (ThreadPoolExecutor)executorService;
+        return (tpExecutor.getActiveCount() > limit);
+    }
+
+    /**
      * Run a SPARQL query.
      */
     void doSparqlQuery(final HttpServletRequest req, final HttpServletResponse resp)
@@ -630,6 +649,12 @@ public class QueryServlet extends BigdataRDFServlet {
 
             return;
 
+      }
+
+      if (overloaded(getBigdataRDFContext())) {
+          buildAndCommitResponse(resp, HttpServletResponse.SC_SERVICE_UNAVAILABLE, MIME_TEXT_PLAIN,
+                  "Service load too high, please come back later");
+          return;
       }
 
       final Map<String, Value> bindings = parseBindings(req, resp);

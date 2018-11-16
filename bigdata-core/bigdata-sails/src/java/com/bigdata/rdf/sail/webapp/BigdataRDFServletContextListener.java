@@ -441,9 +441,20 @@ public class BigdataRDFServletContextListener implements
 
         }
 
+        final long executorMaxThreads;
+        {
+            final String s = getInitParameter( ConfigParams.EXECUTOR_SERVICE_MAX_THREADS);
+
+            executorMaxThreads = (s == null) ? 0 : Long.valueOf(s);
+
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.EXECUTOR_SERVICE_MAX_THREADS + "=" + executorMaxThreads);
+
+        }
+
         final SparqlEndpointConfig config = new SparqlEndpointConfig(namespace,
                 timestamp, queryThreadPoolSize, describeEachNamedGraph,
-                readOnly, queryTimeout);
+                readOnly, queryTimeout, executorMaxThreads);
 
         rdfContext = new BigdataRDFContext(config, indexManager);
 
