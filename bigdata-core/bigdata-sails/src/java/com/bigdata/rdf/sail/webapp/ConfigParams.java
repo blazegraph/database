@@ -187,4 +187,11 @@ public interface ConfigParams {
      * List of the services this instance is allowed to call out to.
      */
     String SERVICE_WHITELIST = "serviceWhitelist";
+
+    /**
+     * Executor service thread limit.
+     * This is a soft boundary - actual pool will be unlimited, but
+     * new queries would not be launched if the pool has more active threads than this.
+     */
+    String EXECUTOR_SERVICE_MAX_THREADS = "executorMaxThreads";
 }

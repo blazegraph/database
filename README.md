@@ -1,3 +1,5 @@
+:information_source: This repository is a fork of https://github.com/blazegraph/database, maintained by the Wikimedia Foundation.
+
 ## Welcome to the Blazegraph Database
 Blazegraph™ DB is a ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a enterprise features for High Availability, Scale-out architecture, and [GPU Acceleration](https://www.blazegraph.com/product/gpu-accelerated/). It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.  It is supporting key [Precision Medicine](http://www.syapse.com) applications and has wide-spread usage for life science applications.  It is used extensively to support Cyber anaytics in commercial and government applications.  It powers the Wikimedia Foundation's [Wikidata Query Service](https://query.wikidata.org/).  See the latest [Feature Matrix](http://www.blazegraph.com/product/).
 
