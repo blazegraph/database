@@ -264,6 +264,19 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                         if (joinsCache.containsKey(bsetDistinct)) {
                             bSetDistinctJoins = joinsCache.get(bsetDistinct);
                         } else {
+                            /**
+                             * Note: this "optimization" might not be an optimization. It depends on how selective the
+                             * bucket identified by the key is on the one hand and the complexity of the subquery.
+                             * We wind up needing to scan that bucket along this code path rather than just testing the
+                             * joinsCache for membership (as above). If the bucket becomes rather large, then that
+                             * bucket scan might be more expensive than re-evaluating the subquery for this solution
+                             * -- if the subquery is relatively cheap to evaluate for a given solution.
+                             *
+                             * The same decisions are faced by the JVM variant of the operator, but it (currently)
+                             * only performs the simpler test on bsetDistinct (checking for identity rather than
+                             * subsumption, and thus skipping subquery result use case in some cases where it may
+                             * be possible).
+                             */
                             bSetDistinctJoins = 
                                 joinsWith(a[i], keyBuilder, rightSolutions, rightSolutionsWithoutSubqueryResult);
                             joinsCache.put(bsetDistinct, bSetDistinctJoins); // cache
@@ -385,7 +398,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                          * processed later on); This is how we discover the set
                          * of distinct projections that did not join.
                          */
-                        distinctProjectionBuffer.remove(solution.copy(getJoinVars()));
+                        distinctProjectionBuffer.remove(solution.copy(projectInVars));
 
                         nResultsFromSubqueries.increment();
                     }
@@ -704,7 +717,12 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                     }
                     
                 } else {
-                    
+
+                    for (int i = fromIndex; i < toIndex; i++) {
+                        final IBindingSet leftSolution = a[i].bset;
+                        leftSolutionsWithoutMatch.add(leftSolution); // unless proven otherwise
+                    }
+
                     while (titr.hasNext()) {
     
                         sameHashCodeCount++;
@@ -724,12 +742,12 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                         final IBindingSet rightSolution = decodeSolution(t);
     
                         nrightConsidered.increment();
-    
+
                         for (int i = fromIndex; i < toIndex; i++) {
-                            
+
                             final IBindingSet leftSolution = a[i].bset;
-                            leftSolutionsWithoutMatch.add(leftSolution); // unless proven otherwise
-                            
+//                            leftSolutionsWithoutMatch.add(leftSolution); // unless proven otherwise
+
                             // Join.
                             final IBindingSet outSolution = BOpContext
                                     .bind(leftSolution, rightSolution,
