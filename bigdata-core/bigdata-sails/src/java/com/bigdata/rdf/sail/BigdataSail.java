@@ -77,9 +77,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
-//FIXME:  Sesame 2.8 not used for 2.1.4 Release
-//import org.openrdf.IsolationLevel;
-//import org.openrdf.IsolationLevels;
+import org.openrdf.IsolationLevel;
+import org.openrdf.IsolationLevels;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -4854,12 +4853,11 @@ public class BigdataSail extends SailBase implements Sail {
          * <p>
          * {@inheritDoc}
          */
-//FIXME:  Sesame 2.8 not used for 2.1.4 Release
-//		@Override
-//		public void begin(IsolationLevel level)
-//				throws UnknownSailTransactionStateException, SailException {
-//
-//		}
+		@Override
+		public void begin(IsolationLevel level)
+				throws UnknownSailTransactionStateException, SailException {
+
+		}
 
         /**
 		 * Always returns <code>true</code>.
@@ -5426,15 +5424,14 @@ public class BigdataSail extends SailBase implements Sail {
 
     } // class BigdataSailReadOnlyConnection
 
-//FIXME:  Sesame 2.8 not used for 2.1.4 Release
-//	@Override
-//	public List<IsolationLevel> getSupportedIsolationLevels() {
-//		return Arrays.<IsolationLevel>asList(IsolationLevels.READ_UNCOMMITTED, IsolationLevels.SNAPSHOT_READ);
-//	}
+	@Override
+	public List<IsolationLevel> getSupportedIsolationLevels() {
+		return Arrays.<IsolationLevel>asList(IsolationLevels.READ_UNCOMMITTED, IsolationLevels.SNAPSHOT_READ);
+	}
 
-//	@Override
-//	public IsolationLevel getDefaultIsolationLevel() {
-//		return IsolationLevels.READ_UNCOMMITTED;
-//	}
+	@Override
+	public IsolationLevel getDefaultIsolationLevel() {
+		return IsolationLevels.READ_UNCOMMITTED;
+	}
     
 }
