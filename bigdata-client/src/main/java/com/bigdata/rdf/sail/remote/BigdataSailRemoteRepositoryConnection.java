@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
+import org.openrdf.IsolationLevel;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -753,7 +754,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 			 * Only execute() is currently supported.
 			 */
 			return new Update() {
-
+				private int maxExecutionTime;
 				@Override
 				public void execute() throws UpdateExecutionException {
 					try {
@@ -797,7 +798,17 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             public boolean getIncludeInferred() {
                throw new UnsupportedOperationException();
             }
-   
+
+				@Override
+				public void setMaxExecutionTime(int i) {
+					this.maxExecutionTime = i;
+				}
+
+				@Override
+				public int getMaxExecutionTime() {
+					return maxExecutionTime;
+				}
+
 				@Override
 				public void setIncludeInferred(boolean arg0) {
 					throw new UnsupportedOperationException();
@@ -1015,6 +1026,16 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
    }
 
    @Override
+   public void setIsolationLevel(IsolationLevel isolationLevel) throws IllegalStateException {
+   	  // TODO: what do we do here?
+   }
+
+   @Override
+   public IsolationLevel getIsolationLevel() {
+   	  return null;
+   }
+
+   @Override
    public void begin() throws RepositoryException {
       assertOpen(); // non-blocking.
       synchronized (remoteTx) {
@@ -1031,7 +1052,13 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
       }
    }
 
-   /**
+	@Override
+	public void begin(IsolationLevel isolationLevel) throws RepositoryException {
+   		// There's only one isolation level supported - snapshot isolation
+		begin();
+	}
+
+	/**
     * Begin a read-only transaction. Since all read operations have snapshot
     * isolation, this is only necessary when multiple read operations need to
     * read on the same commit point.

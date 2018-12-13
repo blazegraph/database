@@ -43,6 +43,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.BooleanLiteralImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
@@ -316,7 +317,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     @Override
     public BigdataLiteralImpl createLiteral(final String label) {
 
-        return new BigdataLiteralImpl(this, label, null, null);
+        return new BigdataLiteralImpl(this, label, null, xsd_string);
         
     }
 
@@ -374,6 +375,8 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 //
 //    private final BigdataLiteralImpl FALSE = new BigdataLiteralImpl(this, "false", null,
 //            xsd_boolean);
+
+    private final BigdataURIImpl rdf_langstring = new BigdataURIImpl(this, RDF.NAMESPACE + "langString");
 
 	/**
 	 * Map for fast resolution of XSD URIs. The keys are the string values of
@@ -549,7 +552,11 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
          * 
          * See https://sourceforge.net/apps/trac/bigdata/ticket/226
          */
-        if (datatype != null && !(datatype instanceof BigdataURIImpl)) {
+        if (datatype == null) {
+
+            datatype = language == null ? xsd_string : rdf_langstring;
+
+        } else if (datatype != null && !(datatype instanceof BigdataURIImpl)) {
 
             datatype = createURI(datatype.stringValue());
             
@@ -707,6 +714,16 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
         return valueSer;
 
+    }
+
+    @Override
+    public BigdataURI getLangStringURI() {
+        return rdf_langstring;
+    }
+
+    @Override
+    public BigdataURI getXSDStringURI() {
+        return xsd_string;
     }
 
     @Override

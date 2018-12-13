@@ -88,27 +88,37 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
                 label = lit.getLabel();
                 if (lit.getDatatype() != null) {
                     if (lang != null) {
-                        allSame = false;
-                    } else if (datatype == null) {
+                        allSame = lit.getDatatype().equals(datatype) && lang.equals(lit.getLanguage());
+                    } else {
                         if (i == 0) {
-                            datatype = lit.getDatatype();
-                        } else {
-                            allSame = false;
+                            lang = lit.getLanguage();
                         }
-                    } else if (!datatype.equals(lit.getDatatype())) {
-                        allSame = false;
+                        if (datatype == null) {
+	                        if (i == 0) {
+	                            datatype = lit.getDatatype();
+	                        } else {
+	                            allSame = false;
+	                        }
+	                    } else if (!datatype.equals(lit.getDatatype())) {
+	                        allSame = false;
+	                    }
                     }
                 } else if (lit.getLanguage() != null) {
                     if (datatype != null) {
-                        allSame = false;
-                    } else if (lang == null) {
+                        allSame = lit.getLanguage().equals(lang) && datatype.equals(lit.getDatatype());
+                    } else {
                         if (i == 0) {
-                            lang = lit.getLanguage();
-                        } else {
-                            allSame = false;
+                            datatype = lit.getDatatype();
                         }
-                    } else if (!lang.equals(lit.getLanguage())) {
-                        allSame = false;
+                        if (lang == null) {
+	                        if (i == 0) {
+	                            lang = lit.getLanguage();
+	                        } else {
+	                            allSame = false;
+	                        }
+	                    } else if (!lang.equals(lit.getLanguage())) {
+	                        allSame = false;
+	                    }
                     }
                 } else {
                     allSame = false;
@@ -119,10 +129,10 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
             sb.append(label);
         }
         if (allSame) {
-            if (datatype != null) {
-                return super.asIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
-            } else if (lang != null) {
+            if (lang != null) {
                 return super.asIV(getValueFactory().createLiteral(sb.toString(),lang), bs);
+            } else if (datatype != null) {
+                return super.asIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
             }
         }
         return super.asIV(getValueFactory().createLiteral(sb.toString()), bs);

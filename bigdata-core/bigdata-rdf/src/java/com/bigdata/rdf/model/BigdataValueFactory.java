@@ -240,4 +240,13 @@ public interface BigdataValueFactory extends ValueFactory {
      */
     BigdataValueSerializer<BigdataValue> getValueSerializer();
 
+    /**
+     * Get this factory's implementation of rdf:langString
+     */
+    BigdataURI getLangStringURI();
+
+    /**
+     * Get this factory's implementation of xsd:string
+     */
+    BigdataURI getXSDStringURI();
 }

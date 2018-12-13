@@ -110,6 +110,10 @@ public class COUNT extends AggregateBase<IV> {
         final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 
         if (expr instanceof IVariable<?> && ((IVariable<?>) expr).isWildcard()) {
+            // Do not count empty binding sets
+            if (bindingSet.isEmpty()) {
+                return null;
+            }
             // Do not attempt to evaluate "*".
             aggregated++;
             return null;

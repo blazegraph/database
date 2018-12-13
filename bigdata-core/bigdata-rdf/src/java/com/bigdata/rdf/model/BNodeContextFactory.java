@@ -220,6 +220,16 @@ public class BNodeContextFactory implements BigdataValueFactory {
         return valueFactory.getValueSerializer();
     }
 
+    @Override
+    public BigdataURI getLangStringURI() {
+        return valueFactory.getLangStringURI();
+    }
+
+    @Override
+    public BigdataURI getXSDStringURI() {
+        return valueFactory.getXSDStringURI();
+    }
+
     /**
 	 * Recursive contexts are not available (should not be necessary, right?)
      */

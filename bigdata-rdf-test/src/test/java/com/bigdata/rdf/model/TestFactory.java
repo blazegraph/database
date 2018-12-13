@@ -36,6 +36,7 @@ import junit.framework.TestCase2;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -112,6 +113,7 @@ public class TestFactory extends TestCase2 {
     /**
      * Unit test for {@link ValueFactory#createLiteral(String, URI)} when the
      * datatype URI is <code>null</code>.
+     * In RDF 1.1, literals always have type, which is XSD.STRING by default.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/226
      */
@@ -119,7 +121,7 @@ public class TestFactory extends TestCase2 {
         
         final BigdataLiteral l1 = vf.createLiteral("12", (URI) null);
         
-        assertEquals(null, l1.getDatatype());
+        assertEquals(XSD.STRING, l1.getDatatype());
 
         assertEquals(12, l1.intValue());
         

@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal.impl.literal;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IInlineUnicode;
@@ -155,16 +156,18 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
         if (label == null)
             throw new IllegalArgumentException();
 
-        if (languageCode != null && datatypeURI != null)
+        boolean isLangString = RDF.LANGSTRING.equals(datatypeURI);
+
+        if (languageCode != null && datatypeURI != null && !isLangString)
             throw new IllegalArgumentException();
 
         this.label = label;
 
         this.language = languageCode;
 
-        this.datatype = datatypeURI;
+        this.datatype = isLangString ? null : datatypeURI;
 
-        if (datatypeURI != null) {
+        if (this.datatype != null) {
             this.termCode = ITermIndexCodes.TERM_CODE_DTL;
         } else if (languageCode != null) {
             this.termCode = ITermIndexCodes.TERM_CODE_LCL;
