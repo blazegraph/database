@@ -109,6 +109,11 @@ public class ServiceRegistry {
      */
     private boolean whitelistEnabled = false;
 
+   /**
+    * Service factory that always produces empty result.
+    */
+   private ServiceFactory nullServiceFactory = new NullServiceFactory();
+
     protected ServiceRegistry() {
 
         services = new ConcurrentHashMap<URI, ServiceFactory>();
@@ -122,7 +127,7 @@ public class ServiceRegistry {
 
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
-        
+
         // Add the Geospatial search service.
         add(GeoSpatial.SEARCH, new GeoSpatialServiceFactory());
 
@@ -131,7 +136,7 @@ public class ServiceRegistry {
 
         // Add the Bigdata search in search service.
         add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());
-        
+
         // Add the sample index service.
         add(SampleServiceFactory.SERVICE_KEY, new SampleServiceFactory());
 
@@ -157,7 +162,7 @@ public class ServiceRegistry {
              */
             add(new URIImpl(BD.NAMESPACE + "history"),
                     new HistoryServiceFactory());
-            
+
             /**
              * Replacing with a history service using RDR instead of a custom
              * index.
@@ -169,7 +174,7 @@ public class ServiceRegistry {
 
         // The Gather-Apply-Scatter RDF Graph Mining service.
         add(GASService.Options.SERVICE_KEY, new GASService());
-        
+
     }
 
     /**
@@ -200,7 +205,11 @@ public class ServiceRegistry {
 
     }
 
-    /**
+	public ServiceFactory getNullServiceFactory() {
+		return nullServiceFactory;
+	}
+
+	/**
      * Register a service.
      *
      * @param serviceURI
@@ -407,7 +416,7 @@ public class ServiceRegistry {
         if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
             throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
         }
-        
+
         final URI alias = aliases.get(serviceURI);
 
         if (alias != null) {
@@ -456,23 +465,28 @@ public class ServiceRegistry {
 
         }
 
+        ServiceFactory f;
         if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
-            throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
-        }
-
-        ServiceFactory f = services.get(serviceURI);
-
-        if (f == null) {
-
-            f = getDefaultServiceFactory();
+            if (serviceNode.isSilent()) {
+                f = nullServiceFactory;
+            } else {
+                throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
+            }
+        } else {
+            f = services.get(serviceURI);
 
             if (f == null) {
 
-                // Should never be null at this point.
-                throw new AssertionError();
+                f = getDefaultServiceFactory();
+
+                if (f == null) {
+
+                    // Should never be null at this point.
+                    throw new AssertionError();
+
+                }
 
             }
-
         }
 
         final ServiceCallCreateParams params = new ServiceCallCreateParamsImpl(

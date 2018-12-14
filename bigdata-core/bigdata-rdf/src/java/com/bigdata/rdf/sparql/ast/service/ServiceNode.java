@@ -198,7 +198,7 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
     @Override
     public void setGraphPattern(
-            final GraphPatternGroup<IGroupMemberNode> graphPattern) {
+            final GraphPatternGroup<IGroupMemberNode> graphPattern){
 
         if (graphPattern == null)
             throw new IllegalArgumentException();
@@ -456,7 +456,16 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
              }
           }
        }
-       
+
+       if (isSilent()) {
+            try {
+                return serviceRegistry.getServiceFactoryByServiceURI(serviceUri);
+            } catch (IllegalArgumentException ex) {
+                // We've hit a whitelist restriction probably, just return empty factory.
+                return serviceRegistry.getNullServiceFactory();
+            }
+       }
+
        return serviceRegistry.getServiceFactoryByServiceURI(serviceUri);
     }
     
