@@ -203,14 +203,14 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements P
                 // Take a distinct projection of the join variables.
                 final IBindingSet bsetDistinct = chunk[i].copy(projectInVars);
 
-                /**
+                /*
                  *  Find bucket in hash index for that distinct projection
                  * (bucket of solutions with the same join vars from the
                  *  subquery - basically a JOIN).
                  */
                 final Bucket b = rightSolutions.getBucket(bsetDistinct);
 
-                if (b != null || 
+                if (b != null &&
                     distinctProjectionsWithoutSubqueryResult.contains(bsetDistinct)) {
                     /*
                      * Either a match in the bucket or subquery was already
@@ -303,7 +303,7 @@ public class JVMPipelinedHashJoinUtility extends JVMHashJoinUtility implements P
                          * processed later on); This is how we discover the set
                          * of distinct projections that did not join.
                          */
-                        distinctProjectionBuffer.remove(solution.copy(getJoinVars()));
+                        distinctProjectionBuffer.remove(solution.copy(projectInVars));
 
                         nResultsFromSubqueries.increment();
                     }

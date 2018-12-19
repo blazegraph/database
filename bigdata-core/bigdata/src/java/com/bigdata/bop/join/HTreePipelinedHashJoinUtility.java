@@ -385,7 +385,7 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                          * processed later on); This is how we discover the set
                          * of distinct projections that did not join.
                          */
-                        distinctProjectionBuffer.remove(solution.copy(getJoinVars()));
+                        distinctProjectionBuffer.remove(solution.copy(projectInVars));
 
                         nResultsFromSubqueries.increment();
                     }
@@ -695,16 +695,14 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                  */
                 final Set<IBindingSet> existsSolutions = 
                     new LinkedHashSet<IBindingSet>();
-                
-                if (!titr.hasNext()) {
-                    for (int i = fromIndex; i < toIndex; i++) {
-                        
-                        final IBindingSet leftSolution = a[i].bset;
-                        leftSolutionsWithoutMatch.add(leftSolution);
-                    }
-                    
-                } else {
-                    
+
+                for (int i = fromIndex; i < toIndex; i++) {
+                    final IBindingSet leftSolution = a[i].bset;
+                    leftSolutionsWithoutMatch.add(leftSolution);
+                }
+
+                if (titr.hasNext()) {
+
                     while (titr.hasNext()) {
     
                         sameHashCodeCount++;
@@ -724,12 +722,11 @@ public class HTreePipelinedHashJoinUtility extends HTreeHashJoinUtility implemen
                         final IBindingSet rightSolution = decodeSolution(t);
     
                         nrightConsidered.increment();
-    
+
                         for (int i = fromIndex; i < toIndex; i++) {
                             
                             final IBindingSet leftSolution = a[i].bset;
-                            leftSolutionsWithoutMatch.add(leftSolution); // unless proven otherwise
-                            
+
                             // Join.
                             final IBindingSet outSolution = BOpContext
                                     .bind(leftSolution, rightSolution,
