@@ -30,6 +30,7 @@ package com.bigdata.rdf.lexicon;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -2364,7 +2365,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * Batch resolution of internal values to {@link BigdataValue}s.
      * 
      * @param ivs
-     *            An collection of internal values
+     *            An collection of internal values. This may be an unmodifiable collection.
      * 
      * @return A map from internal value to the {@link BigdataValue}. If an
      *         internal value was not resolved then the map will not contain an
@@ -2686,7 +2687,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     /**
      * Batch resolution of internal values to {@link BigdataValue}s.
      * 
-     * @param ivs
+     * @param ivsUnmodifiable
      *            An collection of internal values
      * 
      * @return A map from internal value to the {@link BigdataValue}. If an
@@ -2696,20 +2697,28 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @see #getTerms(Collection)
      */
     final public Map<IV<?, ?>, BigdataValue> getTerms(
-            final Collection<IV<?, ?>> ivs, final int termsChunksSize,
+            final Collection<IV<?, ?>> ivsUnmodifiable, final int termsChunksSize,
             final int blobsChunkSize) {
 
-        if (ivs == null)
+        if (ivsUnmodifiable == null)
             throw new IllegalArgumentException();
 
         // Maximum #of IVs (assuming all are distinct).
-        final int n = ivs.size();
+        final int n = ivsUnmodifiable.size();
         
         if (n == 0) {
 
             return Collections.emptyMap();
             
         }
+        
+        /**
+        * BLZG-1989: few lines below, we're collecting SIDs and adding them to the collection.
+        * What we pass in, however, might actually be an unmodifiable set (e.g. obtained by a
+        * call to a hash maps keySet() method). We therefore create a mutable copy of the map
+        * for internal processing.
+        */
+        final Collection<IV<?, ?>> ivs = new ArrayList<IV<?, ?>>(ivsUnmodifiable);
 
         final long begin = System.currentTimeMillis();
 
@@ -2720,8 +2729,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          * Note: The also needs to be concurrent since the request can be split
          * across the ID2TERM and BLOBS indices.
          */
-        final ConcurrentHashMap<IV<?,?>/* iv */, BigdataValue/* term */> ret = new ConcurrentHashMap<IV<?,?>, BigdataValue>(
-                n/* initialCapacity */);
+        final ConcurrentHashMap<IV<?,?>/* iv */, BigdataValue/* term */> ret = 
+        		new ConcurrentHashMap<IV<?,?>, BigdataValue>(n/* initialCapacity */);
 
         // TermIVs which must be resolved against an index.
         final Collection<TermId<?>> termIVs = new LinkedList<TermId<?>>();
@@ -2906,7 +2915,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          */
         for (IV<?,?> iv : unrequestedSidTerms) {
 
-        	ivs.remove(iv);
+        	//Removed in 2.1.5 per BLZG-9000
+        	//See https://github.com/blazegraph/database/issues/67
+        	//ivs.remove(iv);
         	
         	ret.remove(iv);
             

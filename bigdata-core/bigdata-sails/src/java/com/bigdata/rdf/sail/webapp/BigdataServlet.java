@@ -46,7 +46,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
-import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.store.BD;
@@ -245,7 +244,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * @throws ExecutionException
     * @throws InterruptedException
     * @throws IOException
-    * @throws TimeoutException
+    * @throws TimeoutException 
     * 
     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
