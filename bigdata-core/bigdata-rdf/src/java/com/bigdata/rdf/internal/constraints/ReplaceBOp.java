@@ -268,6 +268,7 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
 		int f = 0;
 		if (flagString != null) {
 			for (char c : flagString.toCharArray()) {
+                // See https://www.w3.org/TR/xpath-functions/#flags
 				switch (c) {
 				case 's':
 					f |= Pattern.DOTALL;
@@ -286,6 +287,9 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
 					break;
 				case 'u':
 					f |= Pattern.UNICODE_CASE;
+					break;
+				case 'q':
+					f |= Pattern.LITERAL;
 					break;
 				default:
 					throw new IllegalArgumentException(flagString);
