@@ -47,7 +47,7 @@ public class TestPostNotURLEncoded extends AbstractProtocolTest {
 	public void testSelectPostXML() throws IOException {
 		setMethodisPost("application/sparql-query",AbstractProtocolTest.SELECT);
 		assertTrue(serviceRequest().contains("</sparql>"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML);
 	}
 	
 
@@ -55,13 +55,13 @@ public class TestPostNotURLEncoded extends AbstractProtocolTest {
 		setAccept(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 		setMethodisPost("application/sparql-query",AbstractProtocolTest.SELECT);
 		assertTrue(serviceRequest().contains("results"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 	}
 
 	public void testAskPostXML() throws IOException {
 		setMethodisPost("application/sparql-query",AbstractProtocolTest.ASK);
 		assertTrue(serviceRequest().contains("</sparql>"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML);
 	}
 	
 
@@ -70,7 +70,7 @@ public class TestPostNotURLEncoded extends AbstractProtocolTest {
 		setMethodisPost("application/sparql-query",AbstractProtocolTest.ASK);
 		String response = serviceRequest("query",AbstractProtocolTest.ASK);
 		assertTrue("Bad response: "+response,response.contains("boolean"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 	}
 	
 
