@@ -43,7 +43,7 @@ public class ExampleProtocolTest extends AbstractProtocolTest {
 	
 	public void test101() throws  IOException {
 		assertTrue(serviceRequest("query","SELECT ( true AS ?t ) {}").contains("</sparql>"));
-		assertEquals("application/sparql-results+xml", getResponseContentType());
+		matchResponseContentType("application/sparql-results+xml");
 	}
 	
 

@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.activation.MimeType;
+import javax.activation.MimeTypeParseException;
 import javax.servlet.http.HttpServlet;
 
 import org.apache.http.Header;
@@ -163,6 +165,24 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	 */
 	protected String getResponseContentType() {
 		return responseContentType;
+	}
+
+	/**
+	 * Match content type against expected type
+	 */
+	protected void matchResponseContentType(String expectedType) {
+		String fullType = getResponseContentType();
+		if (fullType == null) {
+			assertNull(expectedType);
+		} else {
+			try {
+				MimeType ctype = new MimeType(fullType);
+				assertTrue("Types "+fullType+" and "+expectedType+" do not match", ctype.match(expectedType));
+			} catch (MimeTypeParseException e) {
+				assertEquals(expectedType, fullType);
+			}
+
+		}
 	}
 
 	/**

@@ -46,7 +46,7 @@ public class TestAskJsonTrac704 extends AbstractProtocolTest {
 		this.setAccept(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 		final String response = serviceRequest("query",AbstractProtocolTest.ASK);
 		assertTrue("Bad response: "+response,response.contains("boolean"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 	}
 
 	/**
