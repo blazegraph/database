@@ -3362,7 +3362,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     @SuppressWarnings("rawtypes")
     final public IV getInlineIV(final Value value) {
-        
+        if (value instanceof BigdataValue) {
+            BigdataValue bv = (BigdataValue)value;
+            if(bv.isRealIV()) {
+                return bv.getIV();
+            }
+        }
         return getLexiconConfiguration().createInlineIV(value);
 
     }
