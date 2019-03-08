@@ -258,7 +258,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
                 
                 }
 
-                final boolean result = pattern.matcher(text).find();
+                final boolean result = pattern.matcher(new InterruptibleCharSequence(text)).find();
 
                 return result;
 
