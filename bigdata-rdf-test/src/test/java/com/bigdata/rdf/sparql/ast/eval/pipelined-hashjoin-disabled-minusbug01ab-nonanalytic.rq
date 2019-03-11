@@ -1,0 +1,10 @@
+PREFIX hint: <http://www.bigdata.com/queryHints#>
+SELECT DISTINCT ?item WHERE {
+  hint:Query hint:optimizer "None".
+  hint:Query hint:analytic "false" .
+  ?x <http://label> ?title .
+  BIND(IRI(CONCAT("http://www.wikidata.org/entity/", ?title)) AS ?item)
+  MINUS {
+    ?item <http://is> <http://bad>
+  }
+}

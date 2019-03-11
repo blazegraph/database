@@ -1010,8 +1010,267 @@ public class TestPipelinedHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
 
-    }    
-    
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, test case for analytic mode.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinMinusBug01aAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-minusbug01a-analytic",// testURI
+                "pipelined-hashjoin-minusbug01ab-analytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01a.nt", // dataUiI
+                "pipelined-hashjoin-minusbug01a.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, test case for non-analytic mode.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinMinusBug01aNonAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-minusbug01a-nonanalytic",// testURI
+                "pipelined-hashjoin-minusbug01ab-nonanalytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01a.nt", // dataURI
+                "pipelined-hashjoin-minusbug01a.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, just making sure that the non-pipelined version
+     * for the test case (i.e., query without LIMIT) is working as expected in analytic mode.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinDisabledMinusBug01aAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-disabled-minusbug01ab-analytic",// testURI
+                "pipelined-hashjoin-disabled-minusbug01ab-analytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01a.nt", // dataURI
+                "pipelined-hashjoin-minusbug01a.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, true);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, just making sure that the non-pipelined version
+     * for the test case (i.e., query without LIMIT) is working as expected in non-analytic mode.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinDisabledMinusBug01aNonAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-disabled-minusbug01a-nonanalytic",// testURI
+                "pipelined-hashjoin-disabled-minusbug01ab-nonanalytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01a.nt", // dataURI
+                "pipelined-hashjoin-minusbug01a.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
+
+    }
+
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, test case for analytic mode.
+     * Variant of 01a that is a little more challenging, as it contains more solutions and duplicates.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinMinusBug01bAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-minusbug01b-analytic",// testURI
+                "pipelined-hashjoin-minusbug01ab-analytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01b.nt", // dataUiI
+                "pipelined-hashjoin-minusbug01b.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, test case for non-analytic mode.
+     * Variant of 01a that is a little more challenging, as it contains more solutions and duplicates.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinMinusBug01bNonAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-minusbug01b-nonanalytic",// testURI
+                "pipelined-hashjoin-minusbug01ab-nonanalytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01b.nt", // dataURI
+                "pipelined-hashjoin-minusbug01b.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, just making sure that the non-pipelined version
+     * for the test case (i.e., query without LIMIT) is working as expected in analytic mode.
+     *
+     * Variant of 01a that is a little more challenging, as it contains more solutions and duplicates.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinDisabledMinusBug01bAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-disabled-minusbug01b-analytic",// testURI
+                "pipelined-hashjoin-disabled-minusbug01ab-analytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01b.nt", // dataURI
+                "pipelined-hashjoin-minusbug01b.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, true);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, just making sure that the non-pipelined version
+     * for the test case (i.e., query without LIMIT) is working as expected in non-analytic mode.
+     *
+     * Variant of 01a that is a little more challenging, as it contains more solutions and duplicates.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinDisabledMinusBug01bNonAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-disabled-minusbug01b-nonanalytic",// testURI
+                "pipelined-hashjoin-disabled-minusbug01ab-nonanalytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug01b.nt", // dataURI
+                "pipelined-hashjoin-minusbug01b.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
+
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, test case for analytic mode.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinMinusBug02AnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-minusbug02-analytic",// testURI
+                "pipelined-hashjoin-minusbug02-analytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug02.nt", // dataUiI
+                "pipelined-hashjoin-minusbug02.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, true);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, test case for non-analytic mode.
+     *
+     * Variant of the 01* test cases, where we have a join inducing duplicates across chunks. This aims at
+     * testing code paths that skip subquery re-evaluation for binding sets that have been evaluated in
+     * previous passes.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinMinusBug02NonAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-minusbug02-nonanalytic",// testURI
+                "pipelined-hashjoin-minusbug02-nonanalytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug02.nt", // dataURI
+                "pipelined-hashjoin-minusbug02.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, true, false);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, just making sure that the non-pipelined version
+     * for the test case (i.e., query without LIMIT) is working as expected in analytic mode.
+     *
+     * Variant of the 01* test cases, where we have a join inducing duplicates across chunks. This aims at
+     * testing code paths that skip subquery re-evaluation for binding sets that have been evaluated in
+     * previous passes.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinDisabledMinusBug02AnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-disabled-minusbug02-analytic",// testURI
+                "pipelined-hashjoin-disabled-minusbug02-analytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug02.nt", // dataURI
+                "pipelined-hashjoin-minusbug02.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, true);
+    }
+
+    /**
+     * Bug reporting MINUS pipelined hash join being broken, just making sure that the non-pipelined version
+     * for the test case (i.e., query without LIMIT) is working as expected in non-analytic mode.
+     *
+     * Variant of the 01* test cases, where we have a join inducing duplicates across chunks. This aims at
+     * testing code paths that skip subquery re-evaluation for binding sets that have been evaluated in
+     * previous passes.
+     *
+     * See https://github.com/blazegraph/database/issues/107
+     */
+    public void testPipelinedHashJoinDisabledMinusBug02NonAnalyticMode() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "pipelined-hashjoin-disabled-minusbug02-nonanalytic",// testURI
+                "pipelined-hashjoin-disabled-minusbug02-nonanalytic.rq", // queryURI
+                "pipelined-hashjoin-minusbug02.nt", // dataURI
+                "pipelined-hashjoin-minusbug02.srx" // resultURI
+        ).runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        assertPipelinedPlanOrNot(queryPlan, astContainer, false, false);
+
+    }
+
+
+
+
     /**
      * Asserts that a PipelinedHashIndexAndSolutionSetOp is contained in the
      * query plan if contains equals <code>true</code>, otherwise that it is

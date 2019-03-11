@@ -359,6 +359,32 @@ public class JVMHashIndex {
 
         }
 
+        /**
+         * @param bs the binding set to check
+         * @return if the bucket contains the binding set, false otherwise
+         */
+        public boolean contains(final IBindingSet bs) {
+
+            if (solutions.isEmpty()) {
+                return false;
+            }
+
+            final Iterator<SolutionHit> itr = solutions.iterator();
+
+            while (itr.hasNext()) {
+
+                final SolutionHit aSolution = itr.next();
+
+                if (aSolution.solution.equals(bs)) {
+                    return true;
+                }
+
+            }
+
+            return false; // not found
+
+        }
+
         @Override
         final public Iterator<SolutionHit> iterator() {
 
