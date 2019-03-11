@@ -161,7 +161,9 @@ public class TestAll extends TestCase {
         // an early exception when accessing named graphs in triples mode
         suite.addTest(TestTicket1105.suite());
 
-		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
+        suite.addTestSuite(TestBrokenDatetimeParsing.class);
+
+        if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
 
 			/*
 			 * Test suite for the SPARQL extension for "reification done right".
