@@ -1,0 +1,6 @@
+<http://s1> <http://p> <http://o> .
+<http://s2> <http://p> <http://o> .
+<http://s3> <http://p> <http://o> .
+<http://url1> <http://about> <http://s1> .
+<http://url1> <http://about> <http://s2> .
+<http://url3> <http://about> <http://s3> .

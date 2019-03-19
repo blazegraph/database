@@ -1,0 +1,13 @@
+<http://g> {
+  <http://sa> <http://p1> <http://o1a> .
+  <http://sa> <http://p2> <http://o2a> .
+  <http://sa> <http://p3> <http://o3a> .
+
+  <http://sb> <http://p1> <http://o1b> .
+  <http://sb> <http://p2> <http://o2b> .
+  <http://sb> <http://p3> <http://o3b> .
+
+  <http://sc> <http://p1> <http://o1c> .
+  <http://sc> <http://p2> <http://o2c> .
+  <http://sc> <http://p3> <http://o3c> .
+}

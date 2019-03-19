@@ -1365,7 +1365,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 m_bufferedWrite = null;
             }
             m_writeCacheService.close();
-            m_reopener.raf.close();
+            m_reopener.close();
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
@@ -5036,6 +5036,18 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
             }
 
+        }
+        
+        public void close() throws IOException {
+            try {
+                if (asyncChannel != null) {
+                    asyncChannel.close();
+                }
+            } finally {
+                if (raf != null) {
+                    raf.close();
+                }
+            }
         }
 
     }

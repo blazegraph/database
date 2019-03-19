@@ -12,6 +12,7 @@ import org.eclipse.jetty.client.HttpResponse;
 import org.eclipse.jetty.client.api.Response.ResponseListener;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.util.Callback;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
@@ -34,7 +35,7 @@ public class MockRemoteRepository extends RemoteRepository {
 		// pojo to retrieve values from mock service
 		final Data data = new Data();
 
-		String serviceURL = "localhost";
+		String serviceURL = "http://localhost";
 		HttpClient httpClient = new HttpClient() {
 			@Override
 			protected void send(HttpRequest request,
@@ -67,7 +68,7 @@ public class MockRemoteRepository extends RemoteRepository {
 						java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(responseContent.length());
 						buf.put(responseContent.getBytes(Charset.forName(StandardCharsets.UTF_8.name())));
 						buf.flip();
-						((JettyResponseListener)listener).onContent(response, buf);
+						((JettyResponseListener)listener).onContent(response, buf, Callback.NOOP);
 						((JettyResponseListener)listener).onSuccess(response);
 						((JettyResponseListener)listener).onComplete(new Result(request, response));
 					}

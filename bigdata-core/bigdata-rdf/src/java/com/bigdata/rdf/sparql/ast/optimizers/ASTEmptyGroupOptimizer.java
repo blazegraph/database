@@ -28,11 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Enumeration;
+import java.util.Map;
 import java.util.Properties;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
@@ -44,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -329,7 +330,7 @@ This case 4 appears to be misconceived: Jeremy Carroll.
              */
            
             // inherit query hints
-            copyQueryHints(op.get(0),op.getQueryHints());
+            copyQueryHintsAndRequiredAnnotations(op.get(0),op.getQueryHints(),op.annotations());
             
             ((GroupNodeBase<?>) op.getParent())
                     .replaceWith(op, (BOp) op.get(0));
@@ -416,7 +417,7 @@ This case 4 appears to be misconceived: Jeremy Carroll.
                     .getParent();
 
          // inherit query hints
-         copyQueryHints(child,parent.getQueryHints());
+         copyQueryHintsAndRequiredAnnotations(child,parent.getQueryHints(),parent.annotations());
 
     		grandparent.replaceWith(parent, child);
     		
@@ -430,34 +431,75 @@ This case 4 appears to be misconceived: Jeremy Carroll.
     /**
      * Copies the query hints to the given node, if not specified there. 
      * If the given node already has the query hint, it is left unmodified.
+     * Also propagates runFirst and runLast annotations according to the
+     * same principle, see https://jira.blazegraph.com/browse/BLZG-4323.
      * 
      * @param node
      * @param queryHints
      */
-    private static void copyQueryHints(BOp node, final Properties queryHints) {
+    private static void copyQueryHintsAndRequiredAnnotations(
+       final BOp node, final Properties queryHints, final Map<String,Object> annotations) {
 
+       copyQueryHints(node, queryHints);
+       copyRequiredAnnotations(node, annotations);
+    }
+    
+   /**
+    * Copies the query hints to the given node, if not specified there. 
+    * If the given node already has the query hint, it is left unmodified.
+    * 
+    * @param node
+    * @param queryHints
+    */
+    private static void copyQueryHints(final BOp node, final Properties queryHints) {
+    	
        if (queryHints == null)
           return;
 
        if (!(node instanceof QueryNodeBase))
            return;
 
-       final QueryNodeBase nodeAsQN = (QueryNodeBase)node;
-       final Enumeration<?> pnames = queryHints.propertyNames();
+        final QueryNodeBase nodeAsQN = (QueryNodeBase)node;
+        final Enumeration<?> pnames = queryHints.propertyNames();
 
-       while (pnames.hasMoreElements()) {
+        while (pnames.hasMoreElements()) {
 
-          final String name = (String) pnames.nextElement();
+           final String name = (String) pnames.nextElement();
 
-          final String value = queryHints.getProperty(name);
+           final String value = queryHints.getProperty(name);
 
-          // copy over query hint, ignoring conflicting ones
-          final String curHint = nodeAsQN.getQueryHint(name);
-          if (curHint==null) {
-             nodeAsQN.setQueryHint(name, value);
-          }
+           // copy over query hint, ignoring conflicting ones
+           final String curHint = nodeAsQN.getQueryHint(name);
+           if (curHint==null) {
+              nodeAsQN.setQueryHint(name, value);
+           }
+        }
+    }
+    
+    /**
+     * Copies selected annotations to given node, if not specified there. 
+     * If the given node already has the annotation, it is left unmodified.
+     * 
+     * @param node
+     * @param queryHints
+     */
+    private static void copyRequiredAnnotations(
+       final BOp node, final Map<String,Object> annotations) {
+    
+    	if (annotations!=null) {
+    		
+    		if (annotations.containsKey(QueryHints.RUN_FIRST)) {
+    			if (!node.annotations().containsKey(QueryHints.RUN_FIRST)) {
+    				node.annotations().put(QueryHints.RUN_FIRST, annotations.get(QueryHints.RUN_FIRST));
+    			}
+    		}
 
-       }
+	      	if (annotations.containsKey(QueryHints.RUN_LAST)) {
+	      		if (!node.annotations().containsKey(QueryHints.RUN_LAST)) {
+	      			node.annotations().put(QueryHints.RUN_LAST, annotations.get(QueryHints.RUN_LAST));
+	      		}
+	    	}
+    	}
     }
     
 }

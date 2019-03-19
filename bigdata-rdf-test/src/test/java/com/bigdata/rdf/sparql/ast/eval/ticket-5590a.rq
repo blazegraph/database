@@ -1,0 +1,4 @@
+SELECT * WHERE {
+    ?item <http://test/p1>/<http://test/p2>/<http://test/p3> ?x .
+    ?x (!<http://test/p4>)* <http://test/target> .
+} LIMIT 10

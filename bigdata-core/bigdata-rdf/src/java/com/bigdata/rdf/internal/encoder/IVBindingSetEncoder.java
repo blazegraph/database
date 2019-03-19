@@ -60,6 +60,10 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * A utility class for generating and processing compact representations of
  * {@link IBindingSet}s whose {@link IConstant}s are bound to {@link IV}s.
  * Individual {@link IV}s may be associated with a cached RDF {@link Value}.
+ * 
+ * As a contract, the class provides guarantees that the representation of a
+ * given binding set is always the same. This makes it possible to use an
+ * HTree based DistinctFilter over encoded binding sets.
  * <p>
  * Note: This implementation does NOT maintain the {@link IVCache} associations.
  * 
@@ -182,14 +186,71 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
          * NullIV.
          */
         keyBuilder.reset();
+        
+        
+        /**
+         * https://jira.blazegraph.com/browse/BLZG-4476:
+         * DISTINCT does not eliminate duplicate rows
+         * 
+         * Given that the schema is extended over time, we always encode
+         * up to the position of the last variable in the schema. This is required
+         * because we need *exactly the same syntactical representation* when
+         * encoding the same mapping at a later point (which is required because we
+         * need to do equality lookups on the values when storing encoded binding
+         * sets in the HTree). As an example, assume we encounter (and encode) the
+         * following sequence of mapping sets:
+         * 
+         * 1.) { ?a -> 1 }
+         * 2.) { ?a -> 2, ?b -> 1 }
+         * 3.) { ?b -> 1 }
+         * 4.) { ?a -> 1 }
+         * 5.) { ?c -> 1 }
+         * 6.) { ?a-> 2, ?c -> 1 }
+         * 
+         * Here's how it works:
+         * 
+         * 1.) When processing the first binding set, we do not yet know the full extend
+         * of the schema, all that is known at this point is that ?a belongs to the
+         * schema. So our encoding will be enc(1) and the first schema variable is
+         * recorded to be ?a:
+         * => schema:=[?a] / encoded value:=enc(1)
+         * 
+         * 2.) We extend the schema to schema:=[?a,?b] and encode value:=enc(2).enc(1).
+         * Note that both positions are present.
+         * 
+         * 3.) The schema remains schema:=[?a,?b]. In order to account for the fact that
+         * we now encode ?b, we must pad an "empty" encoded binding, i.e. we encode
+         * enc(null).enc(1).
+         * 
+         * 4.) The interesting part comes now (and this is what was failing in the bug),
+         * when we see our initial mapping again. The schema remains unchanged, but we 
+         * must not encode two values in that case, i.e. the result *must* be the same
+         * as in step 1.). We can do that by encoding *up to the latest position for which
+         * there is a variable in the binding set. By following this rule, we will always
+         * obtain the same result that we computed at the time when we encoded the mapping
+         * for the first time, just because that's what we did last time. In our case,
+         * the only variable in the binding set is ?a, so we only iterate up to the first
+         * position and get encoded value:=enc(1), just like in step 1.).
+         * 
+         * 5.) ?c is a new variable, so we set schema:=[?a,?b,?c] and encode the value
+         * as enc(null).enc(null).enc(1).
+         * 
+         * 6.) Following our rules, we keep the schema and get enc(2).enc(null).enc(1).
+         * 
+         * The key observation here is that this strategy gives us a bidirectional and
+         * unique mapping scheme.
+         */
+        int numBoundInBSet = bset.size();
+        
         final Iterator<IVariable<?>> vitr = schema.iterator();
-        while (vitr.hasNext()) {
+        while (vitr.hasNext() && numBoundInBSet>0) {
             final IVariable<?> v = vitr.next();
             @SuppressWarnings("unchecked")
             final IConstant<IV<?, ?>> c = bset.get(v);
             if (c == null) {
                 IVUtility.encode(keyBuilder, TermId.NullIV);
             } else {
+                
                 final IV<?, ?> iv = c.get();
                 
                 if (iv.isNullIV()) {
@@ -242,6 +303,10 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
                     cacheSchemaAndValue(v, iv, updateCache); // caching hook
                     
                 }
+
+                // the following will become zero iff we processed the latest 
+                // position in which a variable was bound
+                numBoundInBSet--;
 
             }
         }

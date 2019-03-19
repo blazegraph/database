@@ -152,6 +152,11 @@ import com.bigdata.util.BytesUtil;
  * objects will be very short unless they are propagated into new solutions.
  * Short life cycle objects entail very little heap burden.
  * 
+ * NOTE: the IVSolutionSetEncode may give us *DIFFERENT* representations for
+ *       the same binding set, depending on its internal state. This is relevant
+ *       insofar as we cannot perform safe equality checks over encoded values
+ *       (the IVBindingSetEncoder provides this guarantee).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: IVSolutionSetEncoder.java 6032 2012-02-16 12:48:04Z thompsonbry
  *          $

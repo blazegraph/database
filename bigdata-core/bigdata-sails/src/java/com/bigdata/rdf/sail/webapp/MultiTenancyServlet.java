@@ -40,6 +40,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import static org.apache.commons.lang.StringEscapeUtils.escapeHtml;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
@@ -574,9 +576,11 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
          }
 
         // The effective namespace for the new KB.
-        final String namespace = props.getProperty(
+        // Escape the value to make sure that Javascript or 
+        // HTML is not rendered through the UI
+        final String namespace = escapeHtml(props.getProperty(
                 BigdataSail.Options.NAMESPACE,
-                BigdataSail.Options.DEFAULT_NAMESPACE);
+                BigdataSail.Options.DEFAULT_NAMESPACE));
 
       try {
     	  

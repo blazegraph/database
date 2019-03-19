@@ -1,0 +1,4 @@
+SELECT * WHERE {
+  <http://C1> rdfs:subClassOf+  <http://C3> . 
+  BIND(5 AS ?y)
+} 

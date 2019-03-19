@@ -410,9 +410,6 @@ public class TestRemoteSparql11QueryBuilder extends
             {
                 final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
                 final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
                 
                 {
                     vars.add(Var.var("s"));
@@ -436,6 +433,9 @@ public class TestRemoteSparql11QueryBuilder extends
                     solutionsIn.add(bset);
                 }
 
+                final BindingsClause bindingsClause = new BindingsClause(vars,
+                        solutionsIn);
+                expected.setBindingsClause(bindingsClause);
             }
 
         }
@@ -558,9 +558,6 @@ public class TestRemoteSparql11QueryBuilder extends
             {
                 final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
                 final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
                 
                 {
                     vars.add(Var.var("book"));
@@ -597,6 +594,9 @@ public class TestRemoteSparql11QueryBuilder extends
                     solutionsIn.add(bset);
                 }
 
+                final BindingsClause bindingsClause = new BindingsClause(vars,
+                        solutionsIn);
+                expected.setBindingsClause(bindingsClause);
             }
 
         }

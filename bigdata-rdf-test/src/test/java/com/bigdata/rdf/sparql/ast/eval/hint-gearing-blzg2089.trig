@@ -1,0 +1,12 @@
+<http://some.graph> {
+
+  <http://item> <http://P225> "Rivasmartinezia" .
+  <http://item> <http://P105> <http://Q34740> .
+  <http://item> <http://P171> <http://nameHelper> .
+  <http://nameHelper> <http://P225> <http://parentName> .
+  
+  <http://item> <http://P171> <http://P171Helper> . 
+  <http://P171Helper> <http://P105> <http://parentRank> .
+  <http://P171Helper> <http://P171> <http://P171Helper2> .
+  <http://P171Helper2> <http://P171> <http://Q756> .  
+}

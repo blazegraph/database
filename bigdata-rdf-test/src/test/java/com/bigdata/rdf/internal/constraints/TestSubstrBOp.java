@@ -129,7 +129,7 @@ public class TestSubstrBOp extends ProxyTestCase {
             // substr("plain text",0,3)
             {
                 final IV expected = DummyConstantNode.toDummyIV(vf
-                        .createLiteral("pla"));
+                        .createLiteral("pl"));
 
                 // Cache the value on the IV.
                 plain_text.getIV().setValue(plain_text);

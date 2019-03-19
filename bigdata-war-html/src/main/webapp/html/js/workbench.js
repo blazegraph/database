@@ -112,7 +112,7 @@ var NAMESPACE_SHORTCUTS = {
 // data export
 var EXPORT_EXTENSIONS = {
    'application/rdf+xml': ['RDF/XML', 'rdf', true],
-   'application/n-triples': ['N-Triples', 'nt', true],
+   'text/plain': ['N-Triples', 'nt', true],
    'application/x-n-triples-RDR': ['N-Triples-RDR', 'ntx', true],
    'application/x-turtle': ['Turtle', 'ttl', true],
    'application/x-turtle-RDR': ['Turtle-RDR', 'ttlx', true],
@@ -322,7 +322,7 @@ function deleteNamespace(namespace) {
 function getNamespaceProperties(namespace, download) {
    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/properties';
       if(!download) {
-         $('#namespace-properties h1').html(namespace);
+         $('#namespace-properties h1').text(namespace);
          $('#namespace-properties table').empty();
          $('#namespace-properties').show();
          $('#namespace-rebuild-text-index').hide();
@@ -345,7 +345,7 @@ function getNamespaceProperties(namespace, download) {
 function rebuildTextIndex(namespace) {
     var url = RO_URL_PREFIX + 'namespace/' + namespace + '/textIndex';
 
-    $('#namespace-rebuild-text-index h1').html(namespace);
+    $('#namespace-rebuild-text-index h1').text(namespace);
     $('#namespace-rebuild-text-index p').empty();
     $('#namespace-properties table').empty();
     $('#namespace-properties').hide();
@@ -354,7 +354,7 @@ function rebuildTextIndex(namespace) {
     var settings = {
               type: 'POST',
               success: function(data) { 
-                            $('#namespace-rebuild-text-index h1').html(namespace); 
+                            $('#namespace-rebuild-text-index h1').text(namespace); 
                             $('#namespace-rebuild-text-index p').html(data); 
                             },
               error: function(jqXHR, textStatus, errorThrown) {
@@ -365,7 +365,7 @@ function rebuildTextIndex(namespace) {
                                 var settings = {
                                           type: 'POST',
                                           success: function(data) { 
-                                                        $('#namespace-rebuild-text-index h1').html(namespace); 
+                                                        $('#namespace-rebuild-text-index h1').text(namespace); 
                                                         $('#namespace-rebuild-text-index p').html(data); 
                                                         },
                                           error: function(jqXHR, textStatus, errorThrown) { alert(jqXHR.responseText); }
@@ -378,6 +378,70 @@ function rebuildTextIndex(namespace) {
     $.ajax(url, settings);
 }
 
+function dropEntailments(namespace) {
+
+	if(confirm('Are you sure you want to drop all the entailments from the namespace ' + namespace + '?')) {
+	
+		$('#namespace-drop-entailments h1').text(namespace);
+	    $('#namespace-drop-entailments p').empty();
+	    $('#namespace-drop-entailments p').html("Operation 'Drop entailments' is running, you could check its status on <a href=\"#status\">status page</a>"); 
+	    $('#namespace-properties table').empty();
+	    $('#namespace-properties').hide();
+	    $('#namespace-rebuild-text-index').hide();
+	    $('#namespace-create-entailments').hide();
+	    $('#namespace-drop-entailments').show();
+	
+	    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+	
+	    var settings = {
+	              type: 'POST',
+	              data: {'update' : 'DROP ENTAILMENTS'},
+	              error: function(jqXHR, textStatus, errorThrown) { 
+	              				$('#namespace-drop-entailments p').empty();
+	           					$('#namespace-drop-entailments').hide(); 
+	              				alert(jqXHR.responseText);              				
+	              				},
+	              success: function(data) { 
+	                            $('#namespace-drop-entailments h1').text(namespace); 
+	                            $('#namespace-drop-entailments p').html(data); 
+	                            }
+	              
+	           };
+    } else {
+           $('#namespace-drop-entailments p').empty();
+           $('#namespace-drop-entailments').hide();
+    }
+    $.ajax(url, settings);
+}
+
+function createEntailments(namespace) {
+
+    var url = RO_URL_PREFIX + 'namespace/' + namespace + '/sparql';
+    
+    $('#namespace-create-entailments h1').text(namespace);
+    $('#namespace-create-entailments p').empty();
+    $('#namespace-create-entailments p').html("Operation 'Create entailments' is running, you could check its status on <a href=\"#status\">status page</a>"); 
+    $('#namespace-properties table').empty();
+    $('#namespace-properties').hide();
+    $('#namespace-rebuild-text-index').hide();
+    $('#namespace-drop-entailments').hide();
+    $('#namespace-create-entailments').show();
+
+    var settings = {
+              type: 'POST',
+              data: {'update' : 'CREATE ENTAILMENTS'},
+              error: function(jqXHR, textStatus, errorThrown) { 
+	              				$('#namespace-create-entailments p').empty();
+	           					$('#namespace-create-entailments').hide(); 
+	              				alert(jqXHR.responseText);              				
+	              				},
+              success: function(data) { 
+                            $('#namespace-create-entailments h1').text(namespace); 
+                            $('#namespace-create-entailments p').html(data); 
+                            }
+            };
+    $.ajax(url, settings);
+}
 
 function getPreparedProperties(elem) {
 
@@ -1225,7 +1289,7 @@ function queryExport() {
          data: JSON.stringify(QUERY_RESULTS),
          contentType: 'application/sparql-results+json',
          headers: { 'Accept': dataType },
-         success: function() { downloadFile(data, dataType, filename); },
+         success: function(data) { downloadFile(data, dataType, filename); },
          error: downloadRDFError
       };
       $.ajax(RO_URL_PREFIX + 'sparql?workbench&convert', settings);
@@ -1243,7 +1307,7 @@ function downloadRDFError(jqXHR, textStatus, errorThrown) {
 function exportXML(filename) {
    var xml = '<?xml version="1.0"?>\n<sparql xmlns="http://www.w3.org/2005/sparql-results#">\n\t<head>\n';
    var bindings = [];
-   $('#query-response thead tr td').each(function(i, td) {
+   $('#query-response thead tr th').each(function(i, td) {
       xml += '\t\t<variable name="' + td.textContent + '"/>\n';
       bindings.push(td.textContent);
    });
@@ -1301,7 +1365,13 @@ function exportCSV(filename) {
 }
 
 function downloadFile(data, type, filename) {
-   var uri = 'data:' + type + ';charset=utf-8,' + encodeURIComponent(data);
+   var dataStr;
+   if (data instanceof XMLDocument) {
+         dataStr = new XMLSerializer().serializeToString(data);
+   } else {
+         dataStr = data;
+   }
+   var uri = 'data:' + type + ';charset=utf-8,' + encodeURIComponent(dataStr);
    $('<a id="download-link" download="' + filename + '" href="' + uri + '">').appendTo('body')[0].click();
    $('#download-link').remove();
 }
@@ -1377,18 +1447,20 @@ function showQueryResults(data) {
 
       // see if we have RDF data
       var isRDF = false;
-      if(data.head.vars.length == 3 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o') {
+      if(data.head.vars.length == 3 && data.head.vars[0] == 'subject' && data.head.vars[1] == 'predicate' && data.head.vars[2] == 'object') {
          isRDF = true;
-      } else if(data.head.vars.length == 4 && data.head.vars[0] == 's' && data.head.vars[1] == 'p' && data.head.vars[2] == 'o' && data.head.vars[3] == 'c') {
+      } else if(data.head.vars.length == 4 && data.head.vars[0] == 'subject' && data.head.vars[1] == 'predicate' && data.head.vars[2] == 'object' && data.head.vars[3] == 'context') {
+          isRDF = true;
          // see if c is used or not
+         var isContextUsed = false;
          for(i=0; i<data.results.bindings.length; i++) {
-            if('c' in data.results.bindings[i]) {
-               isRDF = false;
+            if('context' in data.results.bindings[i]) {
+               isContextUsed = true;
                break;
             }
          }
 
-         if(isRDF) {
+         if(!isContextUsed) {
             // remove (unused) c variable from JSON
             data.head.vars.pop();
          }

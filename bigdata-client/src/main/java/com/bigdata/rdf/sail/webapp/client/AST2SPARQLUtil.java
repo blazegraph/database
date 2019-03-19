@@ -34,6 +34,8 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.query.parser.sparql.SPARQLUtil;
 
 /**
  * Utility class for externalizing SPARQL prefix declaration management.
@@ -154,7 +156,7 @@ public class AST2SPARQLUtil {
                 + (datatypeURI != null ? datatypeStr.length() + 2 : 0));
 
         sb.append('"');
-        sb.append(label);
+        sb.append(SPARQLUtil.encodeString(label));
         sb.append('"');
 
         if (languageCode != null) {

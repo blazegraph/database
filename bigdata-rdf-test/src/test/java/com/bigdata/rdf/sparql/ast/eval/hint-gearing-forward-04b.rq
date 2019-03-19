@@ -1,0 +1,4 @@
+SELECT * WHERE {
+  <http://s4a> <http://p>* <http://s4b> .
+  hint:Prior hint:gearing "forward" .
+}

@@ -1,0 +1,91 @@
+Blazegraph™ Database is an ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.
+
+This is a major release of Blazegraph™.  The official release is now made into the Git repository:  https://github.com/blazegraph/database/.
+
+Blazegraph Features (http://www.blazegraph.com/product/)
+
+2.1.5 is a maintenance release for 2.1.4 release.  It is recommended that all users upgrade to 2.1.5.   
+
+
+Starting points:
+
+    Blazegraph Wiki:  https://wiki.blazegraph.com/
+    Blazegraph Blog:  https://blog.blazegraph.com/
+    Blazegraph JIRA:  https://jira.blazegraph.com/
+
+    Public Code Samples:  https://github.com/blazegraph/blazegraph-samples
+
+    Tinkerpop3:  https://github.com/blazegraph/tinkerpop3
+
+    Blazegraph TPF Server:  https://github.com/blazegraph/BlazegraphBasedTPFServer
+
+    Python Client:  https://github.com/blazegraph/blazegraph-python
+
+    DotNetRDF Client:  https://github.com/blazegraph/blazegraph-dotnetrdf
+
+Download Blazegraph now:
+
+	http://www.blazegraph.com/download
+
+Checkout the latest source code:
+	
+git clone -b BLAZEGRAPH_RELEASE_2_1_5 --single-branch https://github.com/blazegraph/database.git BLAZEGRAPH_RELEASE_2_1_5
+
+Security Reporting
+
+Blazegraph has an updated security reporting procedure. Please see https://github.com/blazegraph/database/blob/master/Security.md for reporting security related issues. This process is monitored on a daily basis. All security reports are acknowledged within 24 hours. Mitigations for reported security issues are made in a reasonable timeframe, which may be as quickly as 24 hours for high-severity issues.
+
+Release Notes - Blazegraph (by SYSTAP) - Version BLAZEGRAPH_2_1_5
+
+** Bug
+    * [BLZG-2066] - AssertionError in path query with MINUS
+    * [BLZG-2079] - Wrong results for fully constrained "+" property path 
+    * [BLZG-2082] - one-argument substr produces NPE when combined with GROUP By
+    * [BLZG-2083] - str() produces NotMaterializedException when using group by/sample
+    * [BLZG-2084] - Bad join ordering with nested values clause
+    * [BLZG-2089] - Bad performance with path queries in 2.1.4
+    * [BLZG-2090] - NPE in com.bigdata.rdf.graph.analytics.SSSP service
+    * [BLZG-2091] - Regression: IF + BOUND produce exception in 2.1.4
+    * [BLZG-2097] - Service clause breaks query performance
+    * [BLZG-2098] - Using query as subquery leads to NotMaterializedException
+    * [BLZG-3644] - StackOverflowError in 2.1.4
+    * [BLZG-4244] - fix NSS_PROPERTIES handling in the debian version of loadRestAPI.sh
+    * [BLZG-4245] - Add code to allow customization of search endpoint types.
+    * [BLZG-4246] - Debian README.md formatting
+    * [BLZG-4247] - Wiki Data -> Wikidata
+    * [BLZG-4248] - Configuration option enableRawRecordsSupport
+    * [BLZG-4249] - SUBSTR with starting location less than 1
+    * [BLZG-4323] - hint:runFirst not considered for Subqueries and Named Subquery Includes
+    * [BLZG-4403] - Blazegraph Export Option in UI
+    * [BLZG-4476] - DISTINCT does not eliminate duplicate rows
+    * [BLZG-5590] - Negated path produces exception
+    * [BLZG-5736] - Strings with quotes are not properly encoded in federated queries
+    * [BLZG-7794] - Need a way to ensure POST request is read-only
+    * [BLZG-8852] - Blazegraph colt component has same jar name as another library
+    * [BLZG-8864] - Namespace creation vulnerable to XSS injection
+    * [BLZG-8865] - Sitewide Lack of Clickjacking Protection
+    * [BLZG-8937] - Reordering Values Clauses
+    * [BLZG-8963] - Async Channel Used for Blobs is not closed
+    * [BLZG-8986] - Provide Jetty SSL Configuration Example
+    * [BLZG-8999] - REGEX() is not affected by timeout
+    * [BLZG-9000] - Unsupported Operation Exception When Forwarding Key Set
+    * [BLZG-9153] - Add Aduna BSD-Style License to LEGAL
+    * [BLZG-9154] - Surefire plugin needs fix for Java8
+    * [BLZG-9155] - SERVICE SILENT still produces an error 
+    * [BLZG-9157] - SPARQL Update produces "BigdataValue not available" exception on integers
+    * [BLZG-9159] - PipelinedHashIndexAndSolutionSetJoinOp messes up SERVICE + MINUS
+
+
+** Improvement
+    * [BLZG-2078] - Make search endpoint type customizable
+    * [BLZG-2092] - Make SailBase connection timeout configurable
+    * [BLZG-7825] - Remove dependency to obsolete concurrent library
+    * [BLZG-8850] - Please upgrade Jetty version to 9.2.9+ to avoid HttpParse Memory Error 
+    * [BLZG-9001] - Provide Jetty Authentication Configuration Example
+    * [BLZG-9003] - Add timeout for query parsing phase
+    * [BLZG-9087] - Document CSRF Mitigation
+    * [BLZG-9156] - Add support for regex q option
+    * [BLZG-9158] - Upgrade jetty to 9.4.x
+    * [BLZG-9161] - Add counter for running queries
+    * [BLZG-9162] - Add capability to refuse new requests if executor service is overloaded.
+

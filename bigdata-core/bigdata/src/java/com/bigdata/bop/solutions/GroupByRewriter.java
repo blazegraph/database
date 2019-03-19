@@ -409,15 +409,24 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
 
             final IValueExpression<?> c = (IValueExpression<?>) itr.next();
 
-            // rewrite child.
-            final IValueExpression<?> newC = rewrite(c, f, aggExpr);
-
-            if (newC != c) {
-
-                // copy-on-write for parent iff child was rewritten.
-                expr = (IValueExpression<?>) ((BOpBase) expr).setArg(index,
-                        newC);
-
+            // BLZG-2082: one-argument substr produces NPE when combined with GROUP By
+            // => in some cases we have encounter null arguments (e.g., there is a binary
+            //    version of the substring operator, where arguments may be unbound). It
+            //    is probably not a good idea to list all such cases here, since we might
+            //    miss some cases; anyways, it is safe to ignore such null arguments, since
+            //    rewriting in such cases wouldn't have any effect (null remains null)
+            if (c!=null) {
+            	
+	            // rewrite child.
+	            final IValueExpression<?> newC = rewrite(c, f, aggExpr);
+	
+	            if (newC != c) {
+	
+	                // copy-on-write for parent iff child was rewritten.
+	                expr = (IValueExpression<?>) ((BOpBase) expr).setArg(index,
+	                        newC);
+	
+	            }
             }
 
             index++;

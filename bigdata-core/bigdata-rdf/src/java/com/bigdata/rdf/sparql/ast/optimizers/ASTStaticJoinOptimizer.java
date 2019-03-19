@@ -54,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
@@ -357,11 +358,15 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     private class JoinGroupNodeOptimizer extends GroupNodeOptimizer<JoinGroupNode> {
 
 		final List<IBindingProducerNode> ancestry;
+		
+		final StaticAnalysis sa;
+		
 		public JoinGroupNodeOptimizer(AST2BOpContext ctx,
 				IBindingSet exogenousBindings, QueryRoot queryRoot,
 				IBindingProducerNode[] ancestry, JoinGroupNode joinGroup) {
 			super(ctx,exogenousBindings,queryRoot,ancestry,joinGroup);
 			this.ancestry = new LinkedList<IBindingProducerNode>(Arrays.asList(ancestry));
+			this.sa = new StaticAnalysis(queryRoot, ctx);
 			/*
 			 * Look for service calls and named subquery includes, since they 
 			 * will get run before the statement pattern nodes. Add them into 
@@ -369,7 +374,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 			 */
 			// TODO: imho, both assumptions are not valid anymore with the given refactoring
 			//       -> we should compute the ancestry the same way we do in ASTJoinGroupOrderOptimizer
-			addToAncestry(joinGroup.getServiceNodes(),"service node");
+//			addToAncestry(joinGroup.getServiceNodes(),"service node");
 			addToAncestry(joinGroup.getNamedSubqueryIncludes(),"named subquery include");
 		}
 
@@ -413,7 +418,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
             if (isStaticOptimizer(ctx, op)) {
 
-	    		optimizeJoinGroup(ctx, queryRoot, getAncestry(), op); 
+	    		optimizeJoinGroup(ctx, queryRoot, ancestry, op, sa); 
 	        }
 		}
     	
@@ -478,8 +483,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
 
 	private void optimizeJoinGroup(final AST2BOpContext ctx,
-			final QueryRoot queryRoot, IBindingProducerNode[] ancestry,
-			final JoinGroupNode joinGroup) {
+			final QueryRoot queryRoot, List<IBindingProducerNode> ancestry,
+			final JoinGroupNode joinGroup, final StaticAnalysis sa) {
 		/*
 		 * Let the optimizer handle the simple optionals too.
 		 */
@@ -493,6 +498,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 		     * slots with the same nodes, but in a
 		     * different (optimized) ordering.
 		     */
+            boolean reorderableNodeFound = false;
+            int idxOfLastNonReorderableNode = -1;
 		    final int[] slots = new int[nodes.size()];
 		    {
 		        int j = 0;
@@ -501,11 +508,31 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 		            if (joinGroup.get(i) == nodes.get(j)) {
 
 		                slots[j++] = i;
+                        reorderableNodeFound = true;
 
-		            }
+                   } else if (!reorderableNodeFound) {
+
+                        idxOfLastNonReorderableNode = i;
+
+                   }
 
 		        }
+		        
+                /**
+			     * BLZG-2097: if we have preceding non-reorderable nodes,
+			     * we add the definitely bound variables to the ancestry.
+			     * This means, we replace the (buggy) ancestry computation
+			     * mechanism from before through dynamic ancestry computation.
+			     */
+                for (int i=0; i<=idxOfLastNonReorderableNode; i++) {
+			    	final BOp bop = joinGroup.get(i);
+			    	if (bop instanceof IBindingProducerNode) {
+                        ancestry.add((IBindingProducerNode)bop);
+			    	}
+			    }
+
 		    }
+		    
 
 
 		    final double optimistic = joinGroup.getProperty(
@@ -537,7 +564,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 		     * tails.
 		     */
 		    final StaticOptimizer opt = new StaticOptimizer(queryRoot,
-		            ctx, ancestry, required, optimistic);
+		            ctx, ancestry.toArray(new IBindingProducerNode[ancestry.size()]), required, optimistic);
 
 		    final int[] order = opt.getOrder();
 

@@ -1,0 +1,6 @@
+@prefix wd: <http://wd/> .
+@prefix wdt: <http://wdt/> .
+
+wd:1 wdt:P31 wd:Q35657 .
+wd:1 wdt:P6 wd:head .
+wd:head wdt:P18 <http://site/img.png> .

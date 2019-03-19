@@ -1,0 +1,183 @@
+/*
+Copyright (c) 1999 CERN - European Organization for Nuclear Research.
+Permission to use, copy, modify, distribute and sell this software and its documentation for any purpose 
+is hereby granted without fee, provided that the above copyright notice appear in all copies and 
+that both that copyright notice and this permission notice appear in supporting documentation. 
+CERN makes no representations about the suitability of this software for any purpose. 
+It is provided "as is" without expressed or implied warranty.
+*/
+package cern.colt.matrix.linalg;
+
+import cern.colt.matrix.DoubleMatrix2D;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
+/*
+*/
+class Smp {
+	protected ForkJoinPool taskGroup; // a very efficient and light weight thread pool
+
+	protected int maxThreads;	
+/**
+Constructs a new Smp using a maximum of <tt>maxThreads<tt> threads.
+*/
+protected Smp(int maxThreads) {
+	maxThreads = Math.max(1,maxThreads);
+	this.maxThreads = maxThreads;
+	if (maxThreads>1) {
+		this.taskGroup = new ForkJoinPool(maxThreads);
+	}
+	else { // avoid parallel overhead
+		this.taskGroup = null;
+	}
+}
+protected void run(final DoubleMatrix2D[] blocksA, final DoubleMatrix2D[] blocksB, final double[] results, final Matrix2DMatrix2DFunction function) {
+	final RecursiveAction[] subTasks = new RecursiveAction[blocksA.length];
+	for (int i=0; i<blocksA.length; i++) {
+		final int k = i;
+		subTasks[i] = new RecursiveAction() { 
+			@Override
+			protected void compute() {
+				double result = function.apply(blocksA[k],blocksB != null ? blocksB[k] : null);
+				if (results!=null) results[k] = result; 
+				//System.out.print("."); 
+			}
+		};
+	}
+
+	// run tasks and wait for completion
+		this.taskGroup.invoke(
+			new RecursiveAction() {
+				@Override
+				protected void compute() {
+					invokeAll(subTasks);	
+				}
+			}
+                 );
+}
+protected DoubleMatrix2D[] splitBlockedNN(DoubleMatrix2D A, int threshold, long flops) {
+	/*
+	determine how to split and parallelize best into blocks
+	if more B.columns than tasks --> split B.columns, as follows:
+	
+			xx|xx|xxx B
+			xx|xx|xxx
+			xx|xx|xxx
+	A
+	xxx     xx|xx|xxx C 
+	xxx		xx|xx|xxx
+	xxx		xx|xx|xxx
+	xxx		xx|xx|xxx
+	xxx		xx|xx|xxx
+
+	if less B.columns than tasks --> split A.rows, as follows:
+	
+			xxxxxxx B
+			xxxxxxx
+			xxxxxxx
+	A
+	xxx     xxxxxxx C
+	xxx     xxxxxxx
+	---     -------
+	xxx     xxxxxxx
+	xxx     xxxxxxx
+	---     -------
+	xxx     xxxxxxx
+
+	*/
+	//long flops = 2L*A.rows()*A.columns()*A.columns();
+	int noOfTasks = (int) Math.min(flops / threshold, this.maxThreads); // each thread should process at least 30000 flops
+	boolean splitHoriz = (A.columns() < noOfTasks);
+	//boolean splitHoriz = (A.columns() >= noOfTasks);
+	int p = splitHoriz ? A.rows() : A.columns();
+	noOfTasks = Math.min(p,noOfTasks);
+	
+	if (noOfTasks < 2) { // parallelization doesn't pay off (too much start up overhead)
+		return null;
+	}
+
+	// set up concurrent tasks
+	int span = p/noOfTasks;
+	final DoubleMatrix2D[] blocks = new DoubleMatrix2D[noOfTasks];
+	for (int i=0; i<noOfTasks; i++) {
+		final int offset = i*span;
+		if (i==noOfTasks-1) span = p - span*i; // last span may be a bit larger
+
+		final DoubleMatrix2D AA,BB,CC; 
+		if (!splitHoriz) { 	// split B along columns into blocks
+			blocks[i] = A.viewPart(0,offset, A.rows(), span);
+		}
+		else { // split A along rows into blocks
+			blocks[i] = A.viewPart(offset,0,span,A.columns());
+		}
+	}
+	return blocks;
+}
+protected DoubleMatrix2D[][] splitBlockedNN(DoubleMatrix2D A, DoubleMatrix2D B, int threshold, long flops) {
+	DoubleMatrix2D[] blocksA = splitBlockedNN(A,threshold, flops);
+	if (blocksA==null) return null;
+	DoubleMatrix2D[] blocksB = splitBlockedNN(B,threshold, flops);
+	if (blocksB==null) return null;
+	DoubleMatrix2D[][] blocks = {blocksA,blocksB};
+	return blocks;
+}
+protected DoubleMatrix2D[] splitStridedNN(DoubleMatrix2D A, int threshold, long flops) {
+	/*
+	determine how to split and parallelize best into blocks
+	if more B.columns than tasks --> split B.columns, as follows:
+	
+			xx|xx|xxx B
+			xx|xx|xxx
+			xx|xx|xxx
+	A
+	xxx     xx|xx|xxx C 
+	xxx		xx|xx|xxx
+	xxx		xx|xx|xxx
+	xxx		xx|xx|xxx
+	xxx		xx|xx|xxx
+
+	if less B.columns than tasks --> split A.rows, as follows:
+	
+			xxxxxxx B
+			xxxxxxx
+			xxxxxxx
+	A
+	xxx     xxxxxxx C
+	xxx     xxxxxxx
+	---     -------
+	xxx     xxxxxxx
+	xxx     xxxxxxx
+	---     -------
+	xxx     xxxxxxx
+
+	*/
+	//long flops = 2L*A.rows()*A.columns()*A.columns();
+	int noOfTasks = (int) Math.min(flops / threshold, this.maxThreads); // each thread should process at least 30000 flops
+	boolean splitHoriz = (A.columns() < noOfTasks);
+	//boolean splitHoriz = (A.columns() >= noOfTasks);
+	int p = splitHoriz ? A.rows() : A.columns();
+	noOfTasks = Math.min(p,noOfTasks);
+	
+	if (noOfTasks < 2) { // parallelization doesn't pay off (too much start up overhead)
+		return null;
+	}
+
+	// set up concurrent tasks
+	int span = p/noOfTasks;
+	final DoubleMatrix2D[] blocks = new DoubleMatrix2D[noOfTasks];
+	for (int i=0; i<noOfTasks; i++) {
+		final int offset = i*span;
+		if (i==noOfTasks-1) span = p - span*i; // last span may be a bit larger
+
+		final DoubleMatrix2D AA,BB,CC; 
+		if (!splitHoriz) { 
+			// split B along columns into blocks
+			blocks[i] = A.viewPart(0,i,A.rows(),A.columns()-i).viewStrides(1,noOfTasks);
+		}
+		else { 
+			// split A along rows into blocks
+			blocks[i] = A.viewPart(i,0,A.rows()-i,A.columns()).viewStrides(noOfTasks,1);
+		}
+	}
+	return blocks;
+}
+}

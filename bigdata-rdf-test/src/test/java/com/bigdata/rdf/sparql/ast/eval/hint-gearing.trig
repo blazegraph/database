@@ -1,0 +1,8 @@
+<http://some.graph> {
+    <http://s1> <http://p> <http://s2> .
+    <http://s2> <http://p> <http://s3a> .
+    <http://s3a> <http://p> <http://s4a> .
+
+    <http://s2> <http://p> <http://s3b> .
+    <http://s3b> <http://p> <http://s4b> .
+}

@@ -26,8 +26,6 @@ import java.io.IOException;
 
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
-import org.eclipse.jetty.http.MimeTypes;
-import org.openrdf.rio.RDFFormat;
 
 import junit.framework.Test;
 
@@ -50,18 +48,18 @@ public class TestRelease123Protocol extends AbstractProtocolTest{
 	
 	public void testSelectGetXML() throws IOException {
 		assertTrue(serviceRequest("query",SELECT).contains("</sparql>"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML);
 	}
 
 	public void testSelectGetJSON() throws IOException {
 		this.setAccept(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 		assertTrue(serviceRequest("query",SELECT).contains("results"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 		
 	}
 	public void testAskGetXML() throws IOException {
 		assertTrue(serviceRequest("query",ASK).contains("</sparql>"));
-		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML, getResponseContentType());
+		matchResponseContentType(BigdataRDFServlet.MIME_SPARQL_RESULTS_XML);
 	}
 	
 	public void testEchoBackHeader() throws IOException {

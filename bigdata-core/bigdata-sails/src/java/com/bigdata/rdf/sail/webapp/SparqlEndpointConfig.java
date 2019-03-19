@@ -85,11 +85,21 @@ public class SparqlEndpointConfig {
      * @see ConfigParams#QUERY_TIMEOUT
      */
     final public long queryTimeout;
-    
+
+     /**
+      * Executor service thread limit.
+      * This is a soft boundary - actual pool will be unlimited, but
+      * new queries would not be launched if the pool has more active threads than this.
+      * If zero, there is no limit.
+      *
+      * @see ConfigParams#EXECUTOR_SERVICE_MAX_THREADS
+      */
+    final public long executorMaxThreads;
+
     public SparqlEndpointConfig(final String namespace, final long timestamp,
             final int queryThreadPoolSize,
             final boolean describeEachNamedGraph, final boolean readOnly,
-            final long queryTimeout) {
+            final long queryTimeout, final long executorMaxThreads) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -104,11 +114,12 @@ public class SparqlEndpointConfig {
         this.queryThreadPoolSize = queryThreadPoolSize;
 
         this.describeEachNamedGraph = describeEachNamedGraph;
-        
+
         this.readOnly = readOnly;
-        
+
         this.queryTimeout = queryTimeout;
-        
+
+        this.executorMaxThreads = executorMaxThreads;
     }
 
 }

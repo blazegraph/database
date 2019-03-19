@@ -1,0 +1,8 @@
+SELECT ?item ?parentName ?parentRank WHERE {
+  ?item <http://P225> "Rivasmartinezia" .
+  ?item <http://P105> <http://Q34740> .
+  ?item <http://P171>/<http://P225> ?parentName .
+  ?item <http://P171>/<http://P105> ?parentRank .
+  ?item <http://P171>+ <http://Q756> .
+  hint:Prior hint:gearing "forward" .  
+}

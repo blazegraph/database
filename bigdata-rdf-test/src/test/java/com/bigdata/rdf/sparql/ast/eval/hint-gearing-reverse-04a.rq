@@ -1,0 +1,4 @@
+SELECT * WHERE {
+  <http://s1> <http://p>* <http://s4a> .
+  hint:Prior hint:gearing "reverse" .
+}

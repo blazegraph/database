@@ -158,6 +158,39 @@
         </Set>
       </New>
     </Set>
+  <Get id="oldhandler" name="handler"/>
+  <Set name="handler">
+    <New id="Rewrite" class="org.eclipse.jetty.rewrite.handler.RewriteHandler">
+      <Set name="handler">
+        <Ref refid="oldhandler"/>
+      </Set>
+      <Set name="rewriteRequestURI">
+        <Property name="jetty.rewrite.rewriteRequestURI" deprecated="rewrite.rewriteRequestURI" default="true"/>
+      </Set>
+      <Set name="rewritePathInfo">
+        <Property name="jetty.rewrite.rewritePathInfo" deprecated="rewrite.rewritePathInfo" default="false"/>
+      </Set>
+      <Set name="originalPathAttribute">
+        <Property name="jetty.rewrite.originalPathAttribute" deprecated="rewrite.originalPathAttribute" default="requestedPath"/>
+      </Set>
+      <!-- Add rule to protect against IE ssl bug -->
+      <Call name="addRule">
+        <Arg>
+          <New class="org.eclipse.jetty.rewrite.handler.MsieSslRule"/>
+        </Arg>
+      </Call>
+      <!-- Add Header for X-Frame-Options. See https://jira.blazegraph.com/browse/BLZG-8865 -->
+      <Call name="addRule">
+        <Arg>
+          <New class="org.eclipse.jetty.rewrite.handler.HeaderPatternRule">
+            <Set name="pattern">/*</Set>
+            <Set name="name">X-Frame-Options</Set>
+            <Set name="value">SAMEORIGIN</Set>
+          </New>
+        </Arg>
+      </Call>
+    </New>
+  </Set>
       
     <!-- =========================================================== -->
     <!-- extra server options                                        -->

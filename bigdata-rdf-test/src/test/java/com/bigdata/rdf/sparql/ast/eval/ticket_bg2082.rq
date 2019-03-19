@@ -1,0 +1,5 @@
+SELECT (substr(str(?url), 3) as ?n2) WHERE {
+  ?x <http://p> <http://o> .
+  ?url <http://about> ?x .
+} GROUP BY ?url
+LIMIT 10

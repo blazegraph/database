@@ -2,6 +2,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -1393,8 +1394,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
 				 * partly materialized).
 				 */
 				
-				doneSet.addAll(nsrDoneSet);
-
+				/**
+				 * BLZG-2098: avoid adding variables to done set if we use a native hash join;
+				 * which will not maintain materializations.
+				 */
+				if (!(ctx.nativeHashJoins)) {
+					doneSet.addAll(nsrDoneSet);
+				}
+				
 		        final VarNode[] joinvars = nsi.getJoinVars();
 
 		        if (joinvars == null) {
@@ -1472,8 +1479,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
                  * partly materialized).
                  */
 
-                doneSet.addAll(stats.getMaterialized());
-
+				/**
+				 * BLZG-2098: avoid adding variables to done set if we use a native hash join;
+				 * which will not maintain materializations.
+				 */
+				if (!(ctx.nativeHashJoins)) {
+					doneSet.addAll(stats.getMaterialized());
+				}
+				
                 if (isNamedSolutionSetScan(ctx, nsi)) {
 
                     /*
@@ -1549,6 +1562,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     joinUtilFactory = JVMHashJoinUtility.factory;
                 }
 
+                // TODO: this code path should be consolidated, to use the addHashIndexOp method
                 left = applyQueryHints(new HashIndexOp(
                             leftOrEmpty(left),//
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -1656,6 +1670,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //    							isLastPassRequested)//
                 ), nsi, ctx);
             
+        }
+        
+        /**
+         * BLZG-2098: follow a conservative approach: upon including a named
+         * subquery, we don't have any guarantees about materialized variables when
+         * using a native hash join (which destroys materialization). Note that
+         * there's a ticket to get rid of doneSet anyways.
+         */
+        if (ctx.nativeHashJoins) {
+        	doneSet.clear();
         }
         
         /*
@@ -4597,6 +4621,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final IGroupByRewriteState groupByRewrite = new GroupByRewriter(
                 groupByState);
 
+        // https://jira.blazegraph.com/browse/BLZG-2083 (str() produces NotMaterializedException when using group by/sample)
+        // NotMaterializedException can be thrown by a function referenced in group by, in this case MemoryGroupByOp needs IV,
+        // but IVs is not materialized yet. So we need to collect real bindingset variables
+        // from referenced expressions and pass them out to addMaterializationSteps2.
+
+        final Map<IVariable<?>, IValueExpression<?>> varsToExprMap = getVarsToExprMap(projection);
+
         // The query hints are taken from the PROJECTION.
         final Properties queryHints = projection.getQueryHints();
         
@@ -4645,7 +4676,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
                 } else {
 
-                    StaticAnalysis.gatherVarsToMaterialize(expr, vars);
+                    StaticAnalysis.gatherVarsToMaterialize(expr, vars, varsToExprMap);
 
                 }
 
@@ -4675,7 +4706,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
                 } else {
 
-                    StaticAnalysis.gatherVarsToMaterialize(expr, vars);
+                    StaticAnalysis.gatherVarsToMaterialize(expr, vars, varsToExprMap);
 
                 }
 
@@ -4752,7 +4783,31 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
     }
 
-    /**
+   /**
+    * Collect all variables defined in projection node 
+    */
+   private static Map<IVariable<?>, IValueExpression<?>> getVarsToExprMap(final ProjectionNode projection) {
+
+    final Map<IVariable<?>, IValueExpression<?>> map = new HashMap<>();
+
+       for ( IValueExpression<?> expr : projection.getValueExpressions()) {
+
+           if (expr instanceof Bind) {
+
+               final IVariable<?> var = ((Bind<?>) expr).getVar();
+               final IValueExpression<?> val = ((Bind<?>) expr).getExpr();
+
+               map.put(var, val);
+
+           }
+
+       }
+
+       return map;
+
+   }
+
+	/**
      * Add an ORDER BY operator.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })

@@ -55,6 +55,7 @@ import com.bigdata.bop.join.IDistinctFilter;
 import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp.Annotations;
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -125,6 +126,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
     private final IVariableOrConstant<?> middleTerm;
     private final IVariable<?> edgeVar;
     private final List<IVariable<?>> dropVars;
+    private final String userDefinedGearing;
 
     public ArbitraryLengthPathTask(
             final ArbitraryLengthPathOp controllerOp,
@@ -180,6 +182,10 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
         this.projectInVars.addAll(Arrays
                 .asList((IVariable<?>[]) controllerOp
                         .getProperty(Annotations.PROJECT_IN_VARS)));
+        
+        // may be null if not explicitly set via query hint
+        this.userDefinedGearing = 
+        	(String)controllerOp.getProperty(QueryHints.GEARING);
 
         if (log.isDebugEnabled()) {
             log.debug("project in vars: " + projectInVars);
@@ -357,7 +363,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
             if (seed != null) {
 
                 childSolutionIn.set(gearing.tVarIn, seed);
-
+                
                 /*
                  * Add a zero length path from the seed to itself. By
                  * handling this here (instead of in a separate operator) we
@@ -830,6 +836,40 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
         final IBindingSet bs = (bsets != null && bsets.length > 0) ? 
                 bsets[0] : EmptyBindingSet.INSTANCE;
         
+        /*
+         * BLZG-2083: prefer user-defined gearing if specified and applicable.
+         * 
+         * We only use the forward (reverse) query hint if we have respective bindings
+         * for the LHS (RHS). Otherwise, without any bindings, (a) it would definitely most
+         * likely not be a good and (b) there are some semantics problems, i.e. the ALP
+         * algorithm as specified right now does not always succeed. I did not trace that
+         * down to the end, but it looks like a problem with the seed / initialization of
+         * the trivial solution in that case. 
+         * 
+         * Note that in the case where we have neither forward nor backward gearing constant
+         * set nor any certain information in the binding set, we will also consult the query
+         * hint (see code at the end of this method). In that case, we do not run into the
+         * problematic case discussed above.
+         */
+        if (QueryHints.GEARING_FORWARD.equals(userDefinedGearing) &&
+        		(forwardGearing.inConst!=null || varAlwaysBound(forwardGearing.inVar, bsets))) {
+        	
+            if (log.isDebugEnabled())
+                log.debug("forward gear as per query hint");
+        	
+        	return forwardGearing;
+        	
+        } else if (QueryHints.GEARING_REVERSE.equals(userDefinedGearing) &&
+        		(reverseGearing.inConst!=null || varAlwaysBound(reverseGearing.inVar, bsets))) {
+        	
+            if (log.isDebugEnabled())
+                log.debug("reverse gear as per query hint");
+            
+        	return reverseGearing;
+        	
+        }
+                
+        // otherwise, make a best effort choice based on what's available and what's not
         if (forwardGearing.inConst != null) {
             
             if (log.isDebugEnabled())
@@ -865,21 +905,58 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                 return reverseGearing;
                 
             } else {
-                
-                if (log.isDebugEnabled())
-                    log.debug("forward gear");
-                
+
                 // ?s (p/p)* ?o and neither ?s nor ?o are bound in incoming binding set
-                return forwardGearing;
-                
+
+                if (QueryHints.GEARING_FORWARD.equals(userDefinedGearing)) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("forward gear as per query hint");
+                    
+	                return forwardGearing;
+
+                } else if (QueryHints.GEARING_REVERSE.equals(userDefinedGearing)) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("reverse gear as per query hint");
+                    
+	                return reverseGearing;
+
+                } else {
+                	
+                    if (log.isDebugEnabled())
+                        log.debug("forward gear");
+                    
+                	// this is a random choice
+	                return forwardGearing;
+
+                }
             }
             
         }
         
     }
         
-   
     /**
+     * Returns true if and only if the variable inVar is bound in all binding sets.
+     * 
+     * @param inVar the variable that needs to be bound
+     * @param bsets a list of binding sets to check
+     * 
+     * @return true if the variable is bound in all binding sets
+     */
+    private boolean varAlwaysBound(IVariable<?> inVar, IBindingSet[] bsets) {
+    	
+        boolean alwaysBound = true; // unless proven otherwise
+    	
+        for (int i=0; i<bsets.length && alwaysBound; i++) {
+            alwaysBound &= bsets[i].isBound(inVar);
+        }
+    	
+        return alwaysBound;
+    }
+
+	/**
      * Need to filter the duplicates per the spec:
      * 
      * "Such connectivity matching does not introduce duplicates (it does
@@ -939,11 +1016,14 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
     }
 
     /**
-     * Generates a new solution key from the binding set and the gearing and
-     * adds this combination to the solutions map. Once this has been done,
-     * the solution is emitted (it will still run through a distinct filter,
-     * taking care that we don't emit solutions that have been emited before
-     * already).
+     * Stores the given solution key, binding set, and associated gearing
+     * and adds this combination to the solutions map. Once this has been
+     * done, it is checked whether the solution satisfies a potential constraint
+     * w.r.t. to the outConst (i.e., if there is an outConst in the gearing,
+     * it must match the binding in the binding set). If that condition is true,
+     * the solution is emitted (it will still run through a distinct
+     * filter, taking care that we don't emit solutions that have been
+     * emitted before already).
      * 
      * @param bs
      *            the binding set representing the solution
@@ -959,6 +1039,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
         if (log.isDebugEnabled()) {
             log.debug("solution key: " + solutionKey);
         }
+
         storeAndEmit(solutionKey, bs, gearing, solutions);
 
     }
@@ -966,7 +1047,10 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
     /**
      * Stores the given solution key, binding set, and associated gearing
      * and adds this combination to the solutions map. Once this has been
-     * done, the solution is emitted (it will still run through a distinct
+     * done, it is checked whether the solution satisfies a potential constraint
+     * w.r.t. to the outConst (i.e., if there is an outConst in the gearing,
+     * it must match the binding in the binding set). If that condition is true,
+     * the solution is emitted (it will still run through a distinct
      * filter, taking care that we don't emit solutions that have been
      * emitted before already).
      * 
@@ -979,12 +1063,24 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
      * @param solutions
      *            the solutions map where to store bindings
      */
-    private void storeAndEmit(SolutionKey solutionKey, IBindingSet bs,
+	@SuppressWarnings("unchecked")
+	private void storeAndEmit(SolutionKey solutionKey, IBindingSet bs,
             final Gearing gearing,
             final Map<SolutionKey, IBindingSet> solutions) {
 
         solutions.put(solutionKey, bs);
-        emitSolutions(bs, gearing);
+        
+        /**
+         * BLZG-2079 / BLZG-2086:  if the out constant is set in the gearing (i.e., we have something
+         * like uri1 pp uri2, or cases where the out const is dynamically bound through the solution set), 
+         * then the bs only constitutes a solution in case the out constant is bound in the pattern. Otherwise, 
+         * it needs to be stored as a temporary solution (through the previous call) as we need to continue
+         * iterating, but it is not yet a confirmed solution.
+         */
+        if (gearing.outConst==null ||
+            gearing.outConst.equals(bs.get(gearing.tVarOut))) {
+        	emitSolutions(bs, gearing);
+        }
 
     }
 

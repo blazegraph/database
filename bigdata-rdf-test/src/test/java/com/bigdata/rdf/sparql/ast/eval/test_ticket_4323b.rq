@@ -1,0 +1,11 @@
+SELECT *
+WHERE { 
+  {
+    SELECT ?s WHERE {
+      ?s <http://p1> <http://o1a> .
+    } LIMIT 1
+  }
+  hint:Prior hint:runFirst "true" .
+  ?s <http://p2> ?p2 .
+  ?s <http://p3> ?p3 .  
+}

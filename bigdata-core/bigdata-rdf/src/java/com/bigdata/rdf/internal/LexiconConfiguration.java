@@ -174,6 +174,11 @@ public class LexiconConfiguration<V extends BigdataValue>
     final boolean rejectInvalidXSDValues;
 
     /**
+     * @see AbstractTripleStore.Options#ENABLE_RAW_RECORDS_SUPPORT
+     */
+    final boolean enableRawRecordsSupport;
+
+    /**
      * @see AbstractTripleStore.Options#EXTENSION_FACTORY_CLASS
      */
     private final IExtensionFactory xFactory;
@@ -320,6 +325,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 
 		sb.append(", " + AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES + "="
 				+ rejectInvalidXSDValues);
+		
+		sb.append(", " + AbstractTripleStore.Options.ENABLE_RAW_RECORDS_SUPPORT + "="
+				+ enableRawRecordsSupport);
 
 		sb.append(", " + AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS+ "="
 				+ xFactory.getClass().getName());
@@ -349,6 +357,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             final boolean inlineDateTimes,//
             final TimeZone inlineDateTimesTimeZone,
             final boolean rejectInvalidXSDValues,
+            final boolean enableRawRecordsSupport,//
             final IExtensionFactory xFactory,//
             final Vocabulary vocab,
             final BigdataValueFactory valueFactory,//
@@ -376,6 +385,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.inlineDateTimes = inlineDateTimes;
         this.inlineDateTimesTimeZone = inlineDateTimesTimeZone;
         this.rejectInvalidXSDValues = rejectInvalidXSDValues;
+        this.enableRawRecordsSupport = enableRawRecordsSupport;
         this.xFactory = xFactory;
         this.vocab = vocab;
         this.valueFactory = valueFactory;

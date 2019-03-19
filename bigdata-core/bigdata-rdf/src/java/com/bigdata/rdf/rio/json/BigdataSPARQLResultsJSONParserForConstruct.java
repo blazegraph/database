@@ -132,7 +132,7 @@ public class BigdataSPARQLResultsJSONParserForConstruct extends RDFParserBase
         final URI p = (URI) bs.getValue("predicate");
         final Value o = (Value) bs.getValue("object");
         final Resource c = bs.hasBinding("context") ? 
-                (Resource) bs.getBinding("context") : null;
+                (Resource) bs.getValue("context") : null;
         
         final Statement stmt = valueFactory.createStatement(s, p, o, c);
         

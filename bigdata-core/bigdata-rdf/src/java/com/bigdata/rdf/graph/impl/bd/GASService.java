@@ -71,6 +71,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.CustomServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
@@ -683,7 +684,15 @@ public class GASService extends CustomServiceFactoryBase {
                     tmp = new LinkedList<Value>();
 
                 // found an o.
-                tmp.add(sp.o().getValue());
+                final TermNode o = sp.o();
+                if (o instanceof VarNode) {
+                	// BLZG-2090: variable injection not supported in GAS service
+                	throw new RuntimeException("Variable injection not supported in GAS service. "
+                			+ "You can only use constants within the GAS service. "
+                			+ "The predicate p=" + sp.p() + ", however, points to a variable " + sp.o() +". "
+                			+ "Please replace your variable through a constant node.");
+                }
+                tmp.add(o.getValue());
 
             }
 

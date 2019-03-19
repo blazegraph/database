@@ -390,6 +390,13 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 			final VarNode tVarRight = new VarNode(anonVar("-tVarRight-"));
 			
 			alpNode = new ArbitraryLengthPathNode(ppInfo.s, ppInfo.o, tVarLeft, tVarRight, mod);
+			
+			// inherit gearing query hints to new ALP node
+			final String userDefinedGearing = ppNode.getQueryHint(QueryHints.GEARING);
+			if (userDefinedGearing != null) {
+				alpNode.setQueryHint(QueryHints.GEARING, userDefinedGearing);
+			}
+			
          final String pipelinedHashJoinHint = queryHints==null ? 
              null : queryHints.getProperty(QueryHints.PIPELINED_HASH_JOIN);
          if (pipelinedHashJoinHint!=null) {

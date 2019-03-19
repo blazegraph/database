@@ -1,0 +1,3 @@
+SELECT * WHERE {
+  <http://C1> rdfs:subClassOf+  <http://C3> . 
+} 
