@@ -338,11 +338,11 @@ public class DeleteServlet extends BigdataRDFServlet {
                   final FutureTask<Void> ft = new FutureTask<Void>(
                         queryTask);
 
-                  // Submit query for evaluation.
-                  context.queryService.execute(ft);
-
                   // Reads on the statements produced by the query.
                   final InputStream is = newPipedInputStream(os);
+
+                  // Submit query for evaluation.
+                  context.queryService.execute(ft);
 
                   // Run parser : visited statements will be deleted.
                   rdfParser.parse(is, baseURI);
