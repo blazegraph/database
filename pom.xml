@@ -203,7 +203,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   </contributors>
   <properties>
     <icu.version>4.8</icu.version>
-    <zookeeper.version>3.4.5</zookeeper.version>
+    <zookeeper.version>3.4.14</zookeeper.version>
     <sesame.version>2.7.12</sesame.version>
     <jsonld.version>0.5.1</jsonld.version>
     <semargl.version>0.6.1</semargl.version>
