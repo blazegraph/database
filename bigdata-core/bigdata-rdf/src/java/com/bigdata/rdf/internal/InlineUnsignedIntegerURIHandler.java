@@ -90,6 +90,9 @@ public class InlineUnsignedIntegerURIHandler extends InlineURIHandler {
      */
     @SuppressWarnings("rawtypes")
 	public static AbstractLiteralIV createInlineIV(final long value) {
+    	if (value < 0L) {
+			return new XSDUnsignedLongIV(value + Long.MIN_VALUE);
+		}
 		if (value < 256L) {
 			return new XSDUnsignedByteIV((byte) (value + Byte.MIN_VALUE));
 		}
