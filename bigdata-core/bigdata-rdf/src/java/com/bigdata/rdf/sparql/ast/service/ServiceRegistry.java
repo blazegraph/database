@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.service;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
@@ -410,13 +412,10 @@ public class ServiceRegistry {
      */
     public ServiceFactory get(final URI serviceURI) {
 
-        if (serviceURI == null)
-            throw new IllegalArgumentException();
-
-        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
-            throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
+        if (serviceURI == null) {
+            throw new IllegalArgumentException("Null service URI");
         }
-
+        checkServiceUri(serviceURI);
         final URI alias = aliases.get(serviceURI);
 
         if (alias != null) {
@@ -465,14 +464,17 @@ public class ServiceRegistry {
 
         }
 
-        ServiceFactory f;
-        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI.stringValue())) {
+        ServiceFactory f = null;
+        try {
+            checkServiceUri(serviceURI);
+        } catch(IllegalArgumentException e) {
             if (serviceNode.isSilent()) {
                 f = nullServiceFactory;
             } else {
-                throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
+                throw e;
             }
-        } else {
+        }
+        if (f == null) {
             f = services.get(serviceURI);
 
             if (f == null) {
@@ -507,17 +509,40 @@ public class ServiceRegistry {
      *         as fallback
      */
     public ServiceFactory getServiceFactoryByServiceURI(URI serviceUri) {
-       
-       if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceUri.stringValue())) {
-          throw new IllegalArgumentException("Service URI " + serviceUri + " is not allowed");
-       }
-       
+       checkServiceUri(serviceUri);
+
        final ServiceFactory serviceFactory = 
           serviceUri==null ? 
           getDefaultServiceFactory() : services.get(serviceUri);
        
        return serviceFactory==null ? getDefaultServiceFactory() : serviceFactory;
        
+    }
+
+    private void checkServiceUri(final URI serviceUri) {
+        if (!isWhitelistEnabled()) {
+            return;
+        }
+        if (serviceWhitelist.contains(serviceUri.stringValue())) {
+            return;
+        }
+        try {
+            URL url = new URL(serviceUri.toString());
+            URL serverWildcard = new URL(url.getProtocol(), url.getHost(), url.getPort(), "/");
+            if (serviceWhitelist.contains(serverWildcard.toString() + "*")) {
+                // Allow mask http://server.com/*
+                return;
+            }
+            URL pathWildcard = new URL(url.getProtocol(), url.getHost(), url.getPort(), url.getPath());
+            if (serviceWhitelist.contains(pathWildcard.toString() + '*')) {
+                // Allow mask http://server.com/path*
+                return;
+            }
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Service URI " + serviceUri + " is not well-formed");
+        }
+
+        throw new IllegalArgumentException("Service URI " + serviceUri + " is not allowed");
     }
 
     private static class ServiceCallCreateParamsImpl implements ServiceCallCreateParams {
