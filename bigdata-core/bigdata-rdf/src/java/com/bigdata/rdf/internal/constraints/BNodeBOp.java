@@ -26,14 +26,13 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
@@ -82,9 +81,7 @@ public class BNodeBOp extends IVValueExpression<IV> implements INeedsMaterializa
     	
         final Literal lit = getAndCheckLiteralValue(0, bs);
 
-        final URI dt = lit.getDatatype();
-
-        if (dt != null && !dt.stringValue().equals(XSD.STRING.stringValue()))
+        if (!QueryEvaluationUtil.isStringLiteral(lit))
             throw new SparqlTypeErrorException();
 
         final BigdataBNode bnode = getValueFactory().createBNode(

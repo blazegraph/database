@@ -39,12 +39,15 @@ import java.util.Comparator;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
+import org.openrdf.model.util.Literals;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
 import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -199,16 +202,12 @@ public class IVComparator implements Comparator<IV>, Serializable {
     	return compareLiterals((Literal) left, (Literal) right);
 		
 	}
-	
-	/**
-	 * Taken directly from Sesame's ValueComparator, no modification.  Handles
-	 * inlines nicely since they now implement the Literal interface.
-	 */
-	private int compareLiterals(final Literal leftLit, final Literal rightLit) {
-		// Additional constraint for ORDER BY: "A plain literal is lower
-		// than an RDF literal with type xsd:string of the same lexical
-		// form."
 
+	/**
+     * Taken directly from Sesame's ValueComparator, no modification.  Handles
+     * inlines nicely since they now implement the Literal interface.
+     */
+	private int compareLiterals(final Literal leftLit, final Literal rightLit) {
 		if (!QueryEvaluationUtil.isStringLiteral(leftLit) || !QueryEvaluationUtil.isStringLiteral(rightLit)) {
 			try {
 				boolean isSmaller = QueryEvaluationUtil.compareLiterals(leftLit, rightLit, CompareOp.LT);
@@ -226,42 +225,46 @@ public class IVComparator implements Comparator<IV>, Serializable {
 			}
 		}
 
+		boolean leftIsString = QueryEvaluationUtil.isSimpleLiteral(leftLit);
+		boolean rightIsString = QueryEvaluationUtil.isSimpleLiteral(rightLit);
+
+		// If we're here, we have either string literals or types unsupported by Sesame
+		// Simple string literals go before non-string ones
+		if (leftIsString) {
+			if (rightIsString) {
+				return leftLit.getLabel().compareTo(rightLit.getLabel());
+			}
+			return -1;
+		} else if (rightIsString) {
+			return 1;
+		}
+
+		// From here, one of the literals is not a simple string
 		int result = 0;
 
-		// Sort by datatype first, plain literals come before datatyped literals
-		URI leftDatatype = leftLit.getDatatype();
-		URI rightDatatype = rightLit.getDatatype();
+		// If we have language tags, sort by language
+		// tags. Language string goes before non-language literals.
+		String leftLanguage = leftLit.getLanguage();
+		String rightLanguage = rightLit.getLanguage();
 
-		if (leftDatatype != null) {
-			if (rightDatatype != null) {
-				// Both literals have datatypes
-				result = compareDatatypes(leftDatatype, rightDatatype);
+		if (leftLanguage != null) {
+			if (rightLanguage != null) {
+				result = leftLanguage.compareTo(rightLanguage);
+				if (result == 0) {
+					// If the languages are equal, we can just compare labels
+					return leftLit.getLabel().compareTo(rightLit.getLabel());
+				}
+			} else {
+				// Language string before non-language types
+				result = -1;
 			}
-			else {
-				result = 1;
-			}
-		}
-		else if (rightDatatype != null) {
-			result = -1;
+		} else if (rightLanguage != null) {
+			result = 1;
 		}
 
 		if (result == 0) {
-			// datatypes are equal or both literals are untyped; sort by language
-			// tags, simple literals come before literals with language tags
-			String leftLanguage = leftLit.getLanguage();
-			String rightLanguage = rightLit.getLanguage();
-
-			if (leftLanguage != null) {
-				if (rightLanguage != null) {
-					result = leftLanguage.compareTo(rightLanguage);
-				}
-				else {
-					result = 1;
-				}
-			}
-			else if (rightLanguage != null) {
-				result = -1;
-			}
+			// If we didn't get any resolution with languages, try simply comparing data types
+			result = compareDatatypes(leftLit.getDatatype(), rightLit.getDatatype());
 		}
 
 		if (result == 0) {

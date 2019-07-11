@@ -26,6 +26,8 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import org.openrdf.model.Literal;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -33,6 +35,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
@@ -77,8 +80,8 @@ public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterializa
         final BigdataURI dt = (BigdataURI) asValue(datatype);
 
         final Literal lit = asLiteral(iv);
-        
-        if (lit.getDatatype() != null || lit.getLanguage() != null) {
+
+      if (!QueryEvaluationUtil.isSimpleLiteral(lit)) {
             throw new SparqlTypeErrorException();
         }
         

@@ -381,6 +381,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core-test</artifactId>
       <version>${project.version}</version>
+      <classifier>tests</classifier>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>

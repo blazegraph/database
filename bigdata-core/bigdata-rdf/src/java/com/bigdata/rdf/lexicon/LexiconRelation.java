@@ -59,6 +59,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -1850,8 +1851,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                  * LexiconConfiguration.
                  */
                 final URI dt = ((BigdataLiteral) v).getDatatype();
-                if (dt == null || dt.equals(XSD.STRING)) {
-                    // always text index strings, even inline ones
+                if (dt == null || dt.equals(XSD.STRING) || dt.equals(RDF.LANGSTRING)) {
+                    // always text index strings, even inline ones, datatyped and langtagged
                     textIndex.add(v);
                 } else if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
                     textIndex.add(v);

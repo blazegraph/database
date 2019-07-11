@@ -191,7 +191,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
                 : null);
 
     }
-    
+
     /**
      * Lifted directly from Sesame's EvaluationStrategyImpl.
      * 
@@ -216,13 +216,13 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         }
         
         //BLZG-1200 changed to isPlainLiteral
-		if (QueryEvaluationUtil.isPlainLiteral(arg)
+		if (QueryEvaluationUtil.isStringLiteral(arg)
 				// BLZG-1780:  Query Hint to cast to string
 				|| matchNonString ) {
 
             final String text; 
 
-            if(QueryEvaluationUtil.isPlainLiteral(arg)) {
+            if(QueryEvaluationUtil.isStringLiteral(arg)) {
             	text = ((Literal) arg).getLabel();
             } else { //Query Hint Override with explicit conversion
             	text = arg.stringValue();
@@ -291,8 +291,8 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         }
         
         //BLZG-1200 Literals with language types are not included in REGEX
-        if (QueryEvaluationUtil.isPlainLiteral(parg)
-                && (farg == null || QueryEvaluationUtil.isPlainLiteral(farg))) {
+        if (QueryEvaluationUtil.isStringLiteral(parg)
+                && (farg == null || QueryEvaluationUtil.isStringLiteral(farg))) {
 
             final String ptn = ((Literal) parg).getLabel();
             String flags = "";
@@ -341,8 +341,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
                         throw new IllegalArgumentException();
                 }
             }
-            final Pattern pattern = Pattern.compile(ptn, f);
-            return pattern;
+            return Pattern.compile(ptn, f);
         }
         
         throw new IllegalArgumentException();

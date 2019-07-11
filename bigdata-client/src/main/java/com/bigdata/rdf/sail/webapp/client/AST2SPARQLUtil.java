@@ -162,13 +162,12 @@ public class AST2SPARQLUtil {
         if (languageCode != null) {
             sb.append('@');
             sb.append(languageCode);
+        } else {
+            if (datatypeURI != null && !XMLSchema.STRING.equals(datatypeURI)) {
+                sb.append("^^");
+                sb.append(datatypeStr);
+            }
         }
-
-        if (datatypeURI != null) {
-            sb.append("^^");
-            sb.append(datatypeStr);
-        }
-
         return sb.toString();
 
     }

@@ -38,6 +38,8 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
@@ -50,6 +52,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.FullTextIndex;
@@ -267,7 +270,10 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
 
             final Literal lit = (Literal) val;
 
-            if (!indexDatatypeLiterals && lit.getDatatype() != null) {
+            if (!indexDatatypeLiterals && lit.getDatatype() != null
+                    // Since Sesame 2.8 upgrade, xsd:string and rdf:langString literals are processed
+                    // the same as plain literals, so we are not considering them as datatyped for the FTS
+                    && !QueryEvaluationUtil.isStringLiteral(lit)) {
 
                 // do not index datatype literals in this manner.
                 continue;

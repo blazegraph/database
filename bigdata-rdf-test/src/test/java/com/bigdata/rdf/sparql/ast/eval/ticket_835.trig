@@ -1,7 +1,7 @@
 @prefix : <http://example.com/data/> .   
-@prefix base: <http://example.com/> .
+@prefix gbase: <http://example.com/> .
 
-base:graph1
+gbase:graph1
 {
 :person3                                                                                  
     a :Person ; 
@@ -11,7 +11,7 @@ base:graph1
                                                                                   
 }
 
-base:graph2
+gbase:graph2
 {
 :person3                                                                                  
     a :Person ; 

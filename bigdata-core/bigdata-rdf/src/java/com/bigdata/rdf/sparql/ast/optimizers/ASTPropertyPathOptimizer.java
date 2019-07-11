@@ -492,7 +492,9 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 		ArrayList<ConstantNode> back = null;
 		
 		for (BOp child : pathNPS.args()) {
-			
+			if (!(child instanceof PathOneInPropertySet)) {
+				continue;
+			}
 			final PathOneInPropertySet pathOIPS = (PathOneInPropertySet) child;
 			
 			final ConstantNode iri = (ConstantNode) pathOIPS.get(0);
@@ -537,10 +539,12 @@ public class ASTPropertyPathOptimizer extends AbstractJoinGroupOptimizer
 			
 			addNegateds(group, forward, ppInfo, alpNode, ppNode);
 			
-		} else {
+		} else if (back != null) {
 			
 			addNegateds(group, back, ppInfo.inverse(), alpNode, ppNode);
 			
+		} else {
+			// NOP
 		}
 
     }

@@ -54,6 +54,8 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 /**
  * A literal. Use {@link BigdataValueFactory} to create instances of this class.
@@ -81,19 +83,24 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         super(valueFactory, null);
 
         if (label == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("Label cannot be null");
 
-        if (language != null && datatype != null)
-            throw new IllegalArgumentException();
-        
         this.label = label;
-        
-        // force to lowercase (Sesame does this too).
-        this.language = (language != null ? language.toLowerCase().intern() : null);
-//        this.language = language;
-        
-        this.datatype = datatype;
-        
+
+        if (language != null) {
+            if (datatype != null && !datatype.equals(RDF.LANGSTRING)) {
+                throw new IllegalArgumentException("Language literals cannot have data type other than rdf:langString");
+            }
+            this.datatype = (datatype == null ? valueFactory.getLangStringURI() : datatype);
+            // force to lowercase (Sesame does this too).
+            this.language = language.toLowerCase().intern();
+        } else {
+            if (RDF.LANGSTRING.equals(datatype)) {
+                throw new IllegalArgumentException("Language tagged literals cannot have a null language tag");
+            }
+            this.language = null;
+            this.datatype = (datatype == null ? valueFactory.getXSDStringURI() : datatype);
+        }
     }
 
     @Override
@@ -113,7 +120,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
             
             sb.append(language);
             
-        } else if (datatype != null) {
+        } else if (datatype != null && !XMLSchema.STRING.equals(datatype)) {
         
             sb.append("^^<");
             
@@ -156,9 +163,15 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
     }
 
     final public int hashCode() {
-        
-        return label.hashCode();
-        
+        int hashCode = label.hashCode();
+        if (language != null) {
+            hashCode = 31 * hashCode + language.hashCode();
+        }
+        if (datatype != null) {
+            hashCode = 31 * hashCode + datatype.hashCode();
+
+        }
+        return hashCode;
     }
     
     final public boolean equals(Object o) {
@@ -208,11 +221,11 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         } else if (o.getDatatype() != null) {
 
             return false;
-            
+
         }
-        
+
         return true;
-        
+
     }
     
     /*

@@ -22,9 +22,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +37,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.util.ModelUtil;
+import org.openrdf.model.util.Models;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
@@ -52,14 +50,16 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.contextaware.ContextAwareConnection;
-import org.openrdf.repository.contextaware.ContextAwareRepository;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.memory.MemoryStore;
 
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
+
 /**
- * A SPARQL 1.1 Update test, created by reading in a W3C working-group style manifest.  
+ * A SPARQL 1.1 Update test, created by reading in a W3C working-group style
+ * manifest.
  *
  * @author Jeen Broekstra
  */
@@ -98,7 +98,8 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 	 *--------------*/
 
 	public SPARQLUpdateConformanceTest(String testURI, String name, String requestFile, URI defaultGraphURI,
-			Map<String, URI> inputNamedGraphs, URI resultDefaultGraphURI, Map<String, URI> resultNamedGraphs)
+			Map<String, URI> inputNamedGraphs, URI resultDefaultGraphURI,
+			Map<String, URI> resultNamedGraphs)
 	{
 		super(name);
 
@@ -109,21 +110,22 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 		this.resultDefaultGraph = resultDefaultGraphURI;
 		this.resultNamedGraphs = resultNamedGraphs;
 
-		if (this.inputNamedGraphs.size() > 0) {
-			DatasetImpl ds = new DatasetImpl();
-			ds.addDefaultGraph(null);
-			ds.addDefaultRemoveGraph(null);
-			ds.setDefaultInsertGraph(null);
+		final DatasetImpl ds = new DatasetImpl();
 
+		// This ensures that the repository operates in 'exclusive
+		// mode': the default graph _only_ consists of the null-context (instead
+		// of the entire repository).
+		ds.addDefaultGraph(null);
+		ds.addDefaultRemoveGraph(null);
+		ds.setDefaultInsertGraph(null);
+
+		if (this.inputNamedGraphs.size() > 0) {
 			for (String ng : inputNamedGraphs.keySet()) {
 				URI namedGraph = new URIImpl(ng);
 				ds.addNamedGraph(namedGraph);
 			}
-			this.dataset = ds;
 		}
-		else {
-			this.dataset = null;
-		}
+		this.dataset = ds;
 	}
 
 	/*---------*
@@ -207,11 +209,6 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 			dataRep.shutDown();
 			dataRep = null;
 		}
-		
-		if (expectedResultRepo != null) {
-			expectedResultRepo.shutDown();
-			expectedResultRepo = null;
-		}
 	}
 
 	@Override
@@ -224,16 +221,13 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 			String updateString = readUpdateString();
 
 			con.begin();
-//			con.setReadContexts((URI)null);
-			
+
 			Update update = con.prepareUpdate(QueryLanguage.SPARQL, updateString, requestFileURL);
-			if (this.dataset != null) {
-				update.setDataset(this.dataset);
-			}
+			update.setDataset(dataset);
 			update.execute();
 
 			con.commit();
-			
+
 			// check default graph
 			logger.info("checking default graph");
 			compareGraphs(Iterations.asList(con.getStatements(null, null, null, true, (Resource)null)),
@@ -246,8 +240,8 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 						Iterations.asList(erCon.getStatements(null, null, null, true, contextURI)));
 			}
 		}
-		catch(Exception e) {
-			if(con.isActive()) {
+		catch (Exception e) {
+			if (con.isActive()) {
 				con.rollback();
 			}
 			throw e;
@@ -258,40 +252,34 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 		}
 	}
 
-	protected void compareGraphs(Iterable<? extends Statement> actual, Iterable<? extends Statement> expected)
+	private void compareGraphs(Iterable<? extends Statement> actual, Iterable<? extends Statement> expected)
 		throws Exception
 	{
-		if (!ModelUtil.equals(expected, actual)) {
-            StringBuilder message = new StringBuilder(128);
-            message.append("\n=========================================\n");
-            message.append(getName());
-            message.append("\n");
-            message.append(testURI);
-            message.append("\n=========================================\n");
-            
-            message.append("Expected results: \n");
-            for (Statement bs : expected) {
-                message.append(bs);
-                message.append("\n");
-            }
-            message.append("=========================================\n");
+		if (!Models.isomorphic(expected, actual)) {
+			StringBuilder message = new StringBuilder(128);
+			message.append("\n============ ");
+			message.append(getName());
+			message.append(" =======================\n");
+			message.append("Expected result: \n");
+			for (Statement st : expected) {
+				message.append(st.toString());
+				message.append("\n");
+			}
+			message.append("=============");
+			StringUtil.appendN('=', getName().length(), message);
+			message.append("========================\n");
 
-            message.append("Bigdata results: \n");
-            for (Statement bs : actual) {
-                message.append(bs);
-                message.append("\n");
-            }
-            message.append("=========================================\n");
+			message.append("Actual result: \n");
+			for (Statement st : actual) {
+				message.append(st.toString());
+				message.append("\n");
+			}
+			message.append("=============");
+			StringUtil.appendN('=', getName().length(), message);
+			message.append("========================\n");
 
-            final String queryStr = readUpdateString();
-            message.append("Query:\n"+queryStr);
-            message.append("\n=========================================\n");
-
-//            message.append("Data:\n"+readInputData(dataset));
-//            message.append("\n=========================================\n");
-
-            logger.error(message.toString());
-            fail(message.toString());
+			logger.error(message.toString());
+			fail(message.toString());
 		}
 	}
 
@@ -337,10 +325,12 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 
 		suite.setName(getManifestName(manifestRep, con, manifestFileURL));
 
-		// Extract test case information from the manifest file. Note that we only
+		// Extract test case information from the manifest file. Note that we
+		// only
 		// select those test cases that are mentioned in the list.
 		StringBuilder query = new StringBuilder(512);
-		query.append(" SELECT DISTINCT testURI, testName, result, action, requestFile, defaultGraph, resultDefaultGraph ");
+		query.append(
+				" SELECT DISTINCT testURI, testName, result, action, requestFile, defaultGraph, resultDefaultGraph ");
 		query.append(" FROM {} rdf:first {testURI} rdf:type {mf:UpdateEvaluationTest}; ");
 		if (approvedOnly) {
 			query.append("                          dawgt:approval {dawgt:Approved}; ");
@@ -416,8 +406,8 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 			}
 
 			SPARQLUpdateConformanceTest test = factory.createSPARQLUpdateConformanceTest(testURI.toString(),
-					testName, requestFile.toString(), defaultGraphURI, inputNamedGraphs, resultDefaultGraphURI,
-					resultNamedGraphs);
+					testName, requestFile.toString(), defaultGraphURI, inputNamedGraphs,
+					resultDefaultGraphURI, resultNamedGraphs);
 
 			if (test != null) {
 				suite.addTest(test);
@@ -434,7 +424,7 @@ public abstract class SPARQLUpdateConformanceTest extends TestCase {
 
 	protected static String getManifestName(Repository manifestRep, RepositoryConnection con,
 			String manifestFileURL)
-		throws QueryEvaluationException, RepositoryException, MalformedQueryException
+				throws QueryEvaluationException, RepositoryException, MalformedQueryException
 	{
 		// Try to extract suite name from manifest file
 		TupleQuery manifestNameQuery = con.prepareTupleQuery(QueryLanguage.SERQL,

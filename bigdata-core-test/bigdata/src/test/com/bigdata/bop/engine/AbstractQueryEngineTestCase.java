@@ -772,7 +772,13 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
         message.append("\n============ ");
         message.append(name);
         message.append(" =======================\n");
-        message.append("Expected result: \n");
+        message.append("Expected result [")
+            .append(expectedResultTable.size())
+            .append("] not equal to query result [")
+            .append(queryResultTable.size())
+            .append("] \n");
+        message.append(" =======================\n");
+        message.append("Expected result [").append(expectedResultTable.size()).append("]: \n");
         while (expectedResultTable.hasNext()) {
             message.append(expectedResultTable.next());
             message.append("\n");
@@ -780,7 +786,7 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
         message.append("=============");
         StringUtil.appendN('=', name.length(), message);
         message.append("========================\n");
-        message.append("Query result: \n");
+        message.append("Query result [").append(queryResultTable.size()).append("]: \n");
         while (queryResultTable.hasNext()) {
             message.append(queryResultTable.next());
             message.append("\n");

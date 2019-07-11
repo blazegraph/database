@@ -355,7 +355,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);
@@ -386,7 +386,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);
@@ -419,7 +419,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);
@@ -451,7 +451,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);
@@ -482,7 +482,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);
@@ -513,7 +513,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);
@@ -544,7 +544,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);
@@ -575,7 +575,7 @@ public class TestTicket1893 extends
         assertEquals(0, searchEngine.count(query("true")));
         assertEquals(0, searchEngine.count(query("false")));
         assertEquals(1, searchEngine.count(query("plain")));
-        assertEquals(0, searchEngine.count(query("datatyped")));
+        assertEquals(1, searchEngine.count(query("datatyped")));
         assertEquals(1, searchEngine.count(query("english")));
         
         endTest(cxn);

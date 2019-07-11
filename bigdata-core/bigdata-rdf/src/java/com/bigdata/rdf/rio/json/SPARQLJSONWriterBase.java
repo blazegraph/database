@@ -41,6 +41,7 @@ import org.openrdf.query.resultio.QueryResultWriterBase;
 import org.openrdf.rio.RioSetting;
 import org.openrdf.rio.helpers.BasicWriterSettings;
 
+import com.bigdata.rdf.internal.XSD;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 
@@ -352,11 +353,12 @@ abstract class SPARQLJSONWriterBase extends QueryResultWriterBase implements Que
 			// BasicWriterSettings.RDF_LANGSTRING_TO_LANG_LITERAL here
 			if (lit.getLanguage() != null) {
 				jg.writeObjectField("xml:lang", lit.getLanguage());
-			}
-			// TODO: Implement support for
-			// BasicWriterSettings.XSD_STRING_TO_PLAIN_LITERAL here
-			if (lit.getDatatype() != null) {
-				jg.writeObjectField("datatype", lit.getDatatype().stringValue());
+			} else {
+				// TODO: Implement support for
+				// BasicWriterSettings.XSD_STRING_TO_PLAIN_LITERAL here
+				if (lit.getDatatype() != null && !lit.getDatatype().equals(XSD.STRING)) {
+					jg.writeObjectField("datatype", lit.getDatatype().stringValue());
+				}
 			}
 
 			jg.writeObjectField("type", "literal");

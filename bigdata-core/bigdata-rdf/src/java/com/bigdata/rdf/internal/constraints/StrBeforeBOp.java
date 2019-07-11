@@ -28,14 +28,13 @@ import java.util.Map;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
@@ -158,48 +157,9 @@ public class StrBeforeBOp extends IVValueExpression<IV> implements INeedsMateria
     private void checkCompatibility(final Literal arg1, final Literal arg2)
     		throws SparqlTypeErrorException {
 
-    	checkLanguage(arg1, arg2);
-    	
-    	checkDatatype(arg1, arg2);
-    	
+        if (!QueryEvaluationUtil.compatibleArguments(arg1, arg2)) {
+            throw new SparqlTypeErrorException();
+        }
     }
-    	
-    private void checkLanguage(final Literal arg1, final Literal arg2)
-    		throws SparqlTypeErrorException {
-
-    	final String lang1 = arg1.getLanguage();
-    	
-    	final String lang2 = arg2.getLanguage();
-
-    	if (lang1 == null && lang2 == null)
-    		return;
-    	
-    	if (lang1 != null && lang2 == null)
-    		return;
-    	
-    	if (lang1 == null && lang2 != null)
-    		throw new SparqlTypeErrorException();
-    	
-    	// both non-null, must be the same
-    	if (!lang1.equals(lang2))
-    		throw new SparqlTypeErrorException();
-    	
-    }
-
-    private void checkDatatype(final Literal arg1, final Literal arg2)
-    		throws SparqlTypeErrorException {
-
-		final URI dt1 = arg1.getDatatype();
-
-		final URI dt2 = arg2.getDatatype();
-
-		if (dt1 != null && !dt1.stringValue().equals(XSD.STRING.stringValue()))
-			throw new SparqlTypeErrorException();
-
-		if (dt2 != null && !dt2.stringValue().equals(XSD.STRING.stringValue()))
-			throw new SparqlTypeErrorException();
-
-
-	}
 
 }

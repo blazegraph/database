@@ -211,7 +211,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         try {
 
             doAddTermTest(store, new LiteralImpl("abc"));
-            doAddTermTest(store, new LiteralImpl("abc", XMLSchema.STRING));
+            // Under RDF 1.1, this one is the same as previous one
+            // doAddTermTest(store, new LiteralImpl("abc", XMLSchema.STRING));
             doAddTermTest(store, new LiteralImpl("abc", "en"));
     
             doAddTermTest(store, new URIImpl("http://www.bigdata.com"));

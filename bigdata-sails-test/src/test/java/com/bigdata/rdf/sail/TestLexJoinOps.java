@@ -104,7 +104,8 @@ public class TestLexJoinOps extends QuadsTestCase {
             final URI X = vf.createURI(BD.NAMESPACE + "X");
             final URI dt = vf.createURI(BD.NAMESPACE + "myDatatype");
             final Literal _1 = vf.createLiteral("foo");
-            final Literal _2 = vf.createLiteral("foo", XSD.STRING);
+            // Since Sesame 2.8 upgrade, xsd:string is the same as plain literal
+//            final Literal _2 = vf.createLiteral("foo", XSD.STRING);
             final Literal _3 = vf.createLiteral("foo", dt);
             final Literal _4 = vf.createLiteral("foo", "EN");
             final Literal _5 = vf.createLiteral(true);
@@ -115,7 +116,7 @@ public class TestLexJoinOps extends QuadsTestCase {
              */
             cxn.add(X, RDF.TYPE, RDFS.RESOURCE);
             cxn.add(X, RDFS.LABEL, _1);
-            cxn.add(X, RDFS.LABEL, _2);
+//            cxn.add(X, RDFS.LABEL, _2);
             cxn.add(X, RDFS.LABEL, _3);
             cxn.add(X, RDFS.LABEL, _4);
             cxn.add(X, RDFS.LABEL, _5);
@@ -167,9 +168,9 @@ public class TestLexJoinOps extends QuadsTestCase {
                 answer.add(createBindingSet(
                         new BindingImpl("o", _1)
                         ));
-                answer.add(createBindingSet(
-                        new BindingImpl("o", _2)
-                        ));
+//                answer.add(createBindingSet(
+//                        new BindingImpl("o", _2)
+//                        ));
                 answer.add(createBindingSet(
                         new BindingImpl("o", _3)
                         ));
@@ -217,7 +218,8 @@ public class TestLexJoinOps extends QuadsTestCase {
           final URI X = vf.createURI(BD.NAMESPACE + "X");
           final URI dt = vf.createURI(BD.NAMESPACE + "myDatatype");
           final Literal _1 = vf.createLiteral("foo");
-          final Literal _2 = vf.createLiteral("foo", XSD.STRING);
+          // Since Sesame 2.8 upgrade, xsd:string is the same as plain literal
+//          final Literal _2 = vf.createLiteral("foo", XSD.STRING);
           final Literal _3 = vf.createLiteral("foo", dt);
           final Literal _4 = vf.createLiteral("foo", "EN");
           final Literal _5 = vf.createLiteral(true);
@@ -228,7 +230,7 @@ public class TestLexJoinOps extends QuadsTestCase {
            */
           cxn.add(X, RDF.TYPE, RDFS.RESOURCE);
           cxn.add(X, RDFS.LABEL, _1);
-          cxn.add(X, RDFS.LABEL, _2);
+//          cxn.add(X, RDFS.LABEL, _2);
           cxn.add(X, RDFS.LABEL, _3);
           cxn.add(X, RDFS.LABEL, _4);
           cxn.add(X, RDFS.LABEL, _5);
@@ -281,9 +283,9 @@ public class TestLexJoinOps extends QuadsTestCase {
               answer.add(createBindingSet(
                       new BindingImpl("o", _1)
                       ));
-              answer.add(createBindingSet(
-                      new BindingImpl("o", _2)
-                      ));
+//              answer.add(createBindingSet(
+//                      new BindingImpl("o", _2)
+//                      ));
               answer.add(createBindingSet(
                       new BindingImpl("o", _3)
                       ));

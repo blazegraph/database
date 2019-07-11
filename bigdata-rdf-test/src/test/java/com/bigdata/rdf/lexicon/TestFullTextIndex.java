@@ -27,11 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.lexicon;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.AssertionFailedError;
 
@@ -735,6 +737,17 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                 store = reopenStore(store);
 
+            } else {
+                // we need to manually recreate SearchEngine, as reopening is not supported for temp store
+                store.getLexiconRelation().getSearchEngine().destroy();
+                try {
+                    Field field = store.getLexiconRelation().getClass().getDeclaredField("viewRef");
+                    field.setAccessible(true);
+                    ((AtomicReference<?>)field.get(store.getLexiconRelation())).set(null);
+                    store.getLexiconRelation().getSearchEngine().create();
+                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
+                    log.error("Error recreating SearchEngine for temp store", e);
+                }
             }
 
             // Ruin full text index
