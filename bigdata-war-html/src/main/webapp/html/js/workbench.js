@@ -1628,9 +1628,12 @@ function showPage(n) {
                linkText = escapeHTML(text).replace(/\n/g, '<br>');
                if(binding.type == 'typed-literal') {
                   tdData = ' class="literal" data-datatype="' + binding.datatype + '"';
+                  text = linkText;
                } else {
                   if(binding.type == 'uri' || binding.type == 'sid') {
                      text = '<a href="' + buildExploreHash(text) + '">' + linkText + '</a>';
+                  } else {
+                     text = linkText;
                   }
                   tdData = ' class="' + binding.type + '"';
                   if(binding['xml:lang']) {
@@ -1693,7 +1696,7 @@ function exploreSubmit(e) {
 }
 
 function buildExploreHash(uri) {
-   return '#explore:' + NAMESPACE + ':' + uri;
+   return '#explore:' + NAMESPACE + ':' + encodeURIComponent(uri);
 }
 
 function loadURI(target) {
