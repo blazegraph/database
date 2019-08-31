@@ -1104,6 +1104,15 @@ function handleExplain() {
    }
 }
 
+function handleQueryInference() {
+   if(this.checked) {
+      $('#query-disable-inference').prop('checked', true);
+   }
+   else {
+      $('#query-disable-inference').prop('checked', false);
+   }
+}
+
 function handleDetails() {
    if(this.checked) {
       $('#query-explain').prop('checked', true);
@@ -1222,6 +1231,11 @@ function submitQuery(e) {
    };
 
    if(!$('#query-explain').is(':checked')) {
+       if ($('#query-disable-inference').is(':checked')) {
+            console.log('Checked')
+            settings.data += '&includeInferred=false'
+            console.log(settings.data)
+       }
      $('#query-response').show().html('Query running...');
      $('#query-pagination').hide();
 
@@ -1236,7 +1250,7 @@ function submitQuery(e) {
    if($('#query-explain').is(':checked')) {
       settings = {
          type: 'POST',
-         data: $('#query-form').serialize() + '&explain=' + ($('#query-details').is(':checked') ? 'details' : 'true'),
+         data: $('#query-form').serialize() + '&explain=' + ($('#query-details').is(':checked') ? 'details' : 'true') + ($('#query-disable-inference').is(':checked') ? '&includeInferred=false' : ''),
          dataType: 'html',
          success: showQueryExplanation,
          error: queryResultsError
@@ -2249,6 +2263,7 @@ function setupHandlers() {
    $('#query-form').submit(submitQuery);
    $('#query-explain').change(handleExplain);
    $('#query-details').change(handleDetails);
+   $('#query-disable-inference').change(handleQueryInference);
    $('#query-history').on('click', '.query a', loadHistory);
    $('#query-history').on('click', '.query-execution-time a', showRunningQueries);
    $('#query-history').on('click', '.query-delete a', deleteHistoryRow);
