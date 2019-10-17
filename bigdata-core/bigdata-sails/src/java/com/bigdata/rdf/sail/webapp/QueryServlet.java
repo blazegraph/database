@@ -235,7 +235,12 @@ public class QueryServlet extends BigdataRDFServlet {
          * rather than always directed to the quorum leader.
          */
 
-        if (req.getParameter(ATTR_UPDATE) != null) {
+       if (RESTServlet.hasMimeType(req, MIME_SPARQL_QUERY) || req.getParameter(ATTR_QUERY) != null) {
+
+            // SPARQL Query.
+            doSparqlQuery(req, resp);
+
+        } else if (req.getParameter(ATTR_UPDATE) != null) {
             
             // SPARQL 1.1 UPDATE.
             doSparqlUpdate(req, resp);
