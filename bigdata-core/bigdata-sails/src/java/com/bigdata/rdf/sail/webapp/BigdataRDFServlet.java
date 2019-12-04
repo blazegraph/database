@@ -48,7 +48,6 @@ import javax.servlet.Servlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -60,6 +59,8 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rdf.properties.PropertiesFormat;
@@ -83,7 +84,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      */
     private static final long serialVersionUID = 1L;
 
-    static private final transient Logger log = Logger.getLogger(BigdataRDFServlet.class);
+    static private final transient Logger log = LoggerFactory.getLogger(BigdataRDFServlet.class);
 
     /**
      * The name of the <code>UTF-8</code> character encoding.
@@ -211,7 +212,11 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         final boolean isQuery = queryStr != null && queryStr.length() > 0;
         try {
             // log an error for the service.
-            log.error("cause=" + t + (isQuery ? ", query=" + queryStr : ""), t);
+            if (isQuery) {
+                log.error("cause={}, query={}", t, queryStr, t);
+            } else {
+                log.error("cause={}", t, t);
+            }
         } finally {
             // ignore any problems here.
         }
@@ -572,10 +577,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
 		if (writerFactory == null) {
 
-			if (log.isDebugEnabled()) {
-				log.debug("No writer for format: format=" + format
-						+ ", Accept=\"" + acceptStr + "\"");
-			}
+			log.debug("No writer for format: format={}, Accept=\"{}\"", format, acceptStr);
 
 			format = RDFFormat.RDFXML;
 			
