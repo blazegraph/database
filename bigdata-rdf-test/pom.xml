@@ -308,7 +308,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
-      <version>3.4.5</version>
+      <version>${zookeeper.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>

@@ -308,7 +308,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
-      <version>3.4.5</version>
+      <version>${zookeeper.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
