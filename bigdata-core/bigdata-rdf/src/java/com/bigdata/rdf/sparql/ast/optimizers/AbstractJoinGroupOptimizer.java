@@ -33,6 +33,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -250,6 +251,16 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
                 optimize(ctx, sa, bSets, childGroup);
             	
+            } else if (child instanceof AssignmentNode) {
+                // This optimize execution is needed to process expression value,
+                // for example, property paths inside EXISTS
+                // Ref: Test_Ticket_T173243
+                final AssignmentNode assignmentNode = (AssignmentNode) child;
+
+                final IValueExpressionNode valueExpressionNode = assignmentNode.getValueExpressionNode();
+
+                optimize(ctx, sa, bSets, valueExpressionNode);
+
             }
             
         }
