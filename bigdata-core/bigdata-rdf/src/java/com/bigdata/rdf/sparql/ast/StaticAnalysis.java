@@ -2047,29 +2047,20 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 
                 final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
                                
-                final Set<IVariable<IV>> t = getVarsFromArguments(bop);
+                final Collection<IVariable<IV>> varsFromArguments = getVarsFromArguments(bop);
+                // Need to collect vars into a new set, as adding referenced vars into the original one (varsFromArguments)
+                // results in ConcurrentModificationException. The use of recursive method collectVarsFromExpressions also
+                // fixes references of derived vars, for example ?a+?b AS ?c, 1+?c AS ?d
+                // Ref: Test_Ticket_T172113
+                final Collection<IVariable<IV>> t = new LinkedHashSet<>(varsFromArguments);
                 
                 // https://jira.blazegraph.com/browse/BLZG-2083 (str() produces NotMaterializedException when using group by/sample)
                 // NotMaterializedException can be thrown by a function referenced in group by, to avoid that all variables referenced
                 // in group by expressions should be materialized, as MemoryGroupByOp needs real IVs. To avoid excessive adding of
                 // unneeded variables, varMap is provided as a reference of variables which might need materialization.
                 if (varMap != null) {
-                    
-                    for (IVariable<IV> key : t) {
-                        
-                        IValueExpression expr = varMap.get(key);
-                        
-                        if (expr != null) {
-                            
-                            Set<IVariable<IV>> vars = getVarsFromArguments(expr);
-                            
-                            t.addAll(vars);
-                            
-                        }
-                        
-                     }
-                    
-                 }
+                    collectVarsFromExpressions(varMap, varsFromArguments, t);
+                }
                 
                 if (t.size() > 0) {
                     
@@ -2094,6 +2085,26 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         return materialize ? (always ? Requirement.ALWAYS
                 : Requirement.SOMETIMES) : Requirement.NEVER;
     
+    }
+
+    @SuppressWarnings({ "rawtypes" })
+    private static void collectVarsFromExpressions(Map<IVariable<?>, IValueExpression<?>> varMap,
+            Collection<IVariable<IV>> varsFromArguments, Collection<IVariable<IV>> result) {
+        for (IVariable<IV> key : varsFromArguments) {
+            
+            IValueExpression expr = varMap.get(key);
+            
+            if (expr != null) {
+                
+                Set<IVariable<IV>> vars = getVarsFromArguments(expr);
+
+                collectVarsFromExpressions(varMap, vars, result);
+
+                result.addAll(vars);
+                
+            }
+
+         }
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
