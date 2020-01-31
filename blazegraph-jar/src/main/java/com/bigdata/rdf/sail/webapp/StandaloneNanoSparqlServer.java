@@ -140,14 +140,8 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         
         //Set the resource base to inside of the jar file
 
-
-	Class localClass = StandaloneNanoSparqlServer.class;
-
-	System.err.println("/war: " + localClass.getResource("/com/bigdata/war"));
-	System.err.println("/war externalForm: " + localClass.getResource("/com/bigdata/war").toExternalForm());
-
-		System.setProperty("jetty.home",
-				StandaloneNanoSparqlServer.class.getResource("/war").toExternalForm());
+	System.setProperty("jetty.home",
+		StandaloneNanoSparqlServer.class.getResource("/war").toExternalForm());
 
         // Create the service.
         final Server server = StandaloneNanoSparqlServer.newInstance(port, jettyXml,
