@@ -2546,8 +2546,19 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         if (groupBy != null && !groupBy.isEmpty())
             return true;
 
-        if (having != null && !having.isEmpty())
-            return true;
+        // Need to check if HAVING expressions are indeed aggregates, 
+        // as fastRangeCount might be used instead of real count aggregation
+        // resulting in false positive check while using named subquery with aggregates
+        // in com.bigdata.bop.solutions.GroupByState.isAggregate
+        // Ref: Test_Ticket_T165559
+        if (having != null && !having.isEmpty()) {
+            for (BOp arg: having.args()) {
+                if (arg instanceof IValueExpressionNode && 
+                        isAggregateExpressionNode((IValueExpressionNode) arg)) {
+                    return true;
+                }
+            }
+        }
 
         if (projection != null) {
 
