@@ -289,6 +289,13 @@ public class Bigdata2Sesame2BindingSetIterator implements
             
             final Object val = c.get();
 
+            // Anonymous variables are not materialized at this point, as there is no need them to be projected,
+            // so we neither need to add them to binding set, nor could add them as they don't have associated BigdataValue
+            // Ref: Test_Ticket_T168741
+            if (v.isAnonymous() && val instanceof IV && !((IV)val).hasValue()) { // Skip adding anonymous vars to binding set
+                continue;
+            }
+
             final BigdataValue value;
             if (val instanceof IV) {
                 /*
