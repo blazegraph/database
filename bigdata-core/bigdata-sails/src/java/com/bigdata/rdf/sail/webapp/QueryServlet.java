@@ -1305,6 +1305,10 @@ public class QueryServlet extends BigdataRDFServlet {
 
             }
 
+            // Flush parts that can be done without waiting for query to finish.
+            // Also open <pre> tag so if the exception happens we're getting nice backtrace.
+            w.write("<pre>");
+            w.flush();
             try {
                 
                 /*
@@ -1338,7 +1342,9 @@ public class QueryServlet extends BigdataRDFServlet {
                 // Fall through and paint the query stats table(s).
                 
             }
-            
+
+            w.write("</pre>");
+            w.flush();
             
 			current.node("h2", "Query Evaluation Statistics");
 			
