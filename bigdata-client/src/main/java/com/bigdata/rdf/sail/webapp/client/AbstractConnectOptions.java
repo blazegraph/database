@@ -227,6 +227,9 @@ public class AbstractConnectOptions implements IMimeTypes {
         if (requestParams == null)
             return;
         boolean first = true;
+        if (urlString.indexOf("?") >= 0) {
+            first = false;
+        }
         for (Map.Entry<String, String[]> e : requestParams.entrySet()) {
             final String name = e.getKey();
             final String[] vals = e.getValue();
