@@ -27,6 +27,7 @@ import java.security.MessageDigest;
 import java.util.Map;
 
 import org.openrdf.model.Literal;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -146,9 +147,7 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
         //Recreate since they are not thread safe
         MessageDigest md = null;
         final Literal lit = asLiteral(iv);
-        if (lit.getLanguage() == null &&
-            (lit.getDatatype() == null || lit.getDatatype().equals(XSD.STRING))) {
-            
+        if (QueryEvaluationUtil.isStringLiteral(lit)) {
             try {
                 String label = lit.getLabel();
                 switch (op()) {

@@ -147,8 +147,8 @@ public class TestIVComparator extends TestCase2 {
             noninline_languageCode_en_lit2.setValue(f.createLiteral("systap","en"));
             noninline_languageCode_de_lit1.setValue(f.createLiteral("bigdata","de"));
             noninline_languageCode_de_lit2.setValue(f.createLiteral("systap","de"));
-            noninline_xsd_string_lit1.setValue(f.createLiteral("bigdata",XSD.STRING));
-            noninline_xsd_string_lit2.setValue(f.createLiteral("systap",XSD.STRING));
+            noninline_xsd_string_lit1.setValue(f.createLiteral("bigdata", XSD.STRING));
+            noninline_xsd_string_lit2.setValue(f.createLiteral("systap", XSD.STRING));
             
             noninline_uri1.setValue(f.createURI("http://www.bigdata.com/"));
             noninline_uri2.setValue(f.createURI("http://www.bigdata.com/blog/"));
@@ -287,8 +287,7 @@ public class TestIVComparator extends TestCase2 {
     }
 
     /**
-     * Unit test of the broad ordering of literals (plain LT language code LT
-     * datatype).
+     * Unit test of the broad ordering of literals (plain LT language code).
      */
     public void test_literal_ordering_plain_languageCode_datatype() {
 
@@ -298,9 +297,6 @@ public class TestIVComparator extends TestCase2 {
 
         // plain LT languageCode
         assertLT(c.compare(v.noninline_plain_lit1, v.noninline_languageCode_de_lit1));
-
-        // languageCode LT datatype
-        assertLT(c.compare(v.noninline_plain_lit1, v.noninline_xsd_string_lit1));
 
     }
     
@@ -351,6 +347,7 @@ public class TestIVComparator extends TestCase2 {
      *              - xsd:string
      *              - RDF term (equal and unequal only)
      * </pre>
+     * However, since in RDF 1.1 simple strings are xsd:string, all strings are sorted first.
      */
     public void test_datatype_ordering() {
         
@@ -359,14 +356,18 @@ public class TestIVComparator extends TestCase2 {
         final IVComparator c = new IVComparator();
 
         // plain literal LT numeric
+        assertLT(c.compare(v.noninline_languageCode_en_lit1, v.inline_xsd_int1));
         assertLT(c.compare(v.noninline_plain_lit1, v.inline_xsd_int1));
 
         // numeric LT boolean
         assertLT(c.compare(v.inline_xsd_int1, v.inline_xsd_boolean_true));
 
+//        assertLT(c.compare(v.inline_xsd_int1, v.inline_xsd_dateTime1));
 //        assertLT(c.compare(v.inline_xsd_boolean_true, v.inline_xsd_dateTime1));
 
-        assertLT(c.compare(v.inline_xsd_dateTime1, v.noninline_xsd_string_lit1));
+        // In RDF 1.1, xsd:string is simple string
+        assertLT(c.compare(v.noninline_xsd_string_lit1, v.inline_xsd_dateTime1));
+        assertLT(c.compare(v.noninline_plain_lit1, v.inline_xsd_dateTime1));
 
     }
 

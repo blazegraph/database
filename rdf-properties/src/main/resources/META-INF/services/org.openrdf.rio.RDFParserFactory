@@ -11,4 +11,4 @@ org.openrdf.rio.trig.TriGParserFactory
 org.openrdf.rio.trix.TriXParserFactory
 org.openrdf.rio.turtle.TurtleParserFactory
 org.semarglproject.sesame.rdf.rdfa.SesameRDFaParserFactory
-com.github.jsonldjava.sesame.SesameJSONLDParserFactory
+org.openrdf.rio.jsonld.JSONLDParserFactory

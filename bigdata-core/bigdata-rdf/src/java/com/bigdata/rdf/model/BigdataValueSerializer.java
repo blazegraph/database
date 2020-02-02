@@ -37,6 +37,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
@@ -44,6 +45,7 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.ShortPacker;
 import com.bigdata.io.compression.NoCompressor;
 import com.bigdata.io.compression.UnicodeHelper;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 
 /**
@@ -192,7 +194,7 @@ public class BigdataValueSerializer<V extends Value> {
             if (lit.getLanguage() != null)
                 return ITermIndexCodes.TERM_CODE_LCL;
 
-            if (lit.getDatatype() != null)
+            if (lit.getDatatype() != null && !XSD.STRING.equals(lit.getDatatype()))
                 return ITermIndexCodes.TERM_CODE_DTL;
 
             return ITermIndexCodes.TERM_CODE_LIT;
@@ -706,7 +708,7 @@ public class BigdataValueSerializer<V extends Value> {
     
             final String label = value.getLabel();
     
-            final int datatypeLength = value.getDatatype() == null ? 0 : value
+            final int datatypeLength = value.getDatatype() == null || RDF.LANGSTRING.equals(value.getDatatype()) ? 0 : value
                     .getDatatype().stringValue().length();
     
             final int languageLength = value.getLanguage() == null ? 0 : value

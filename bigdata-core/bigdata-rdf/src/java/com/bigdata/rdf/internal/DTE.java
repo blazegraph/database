@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -378,6 +379,10 @@ public enum DTE {
         if (datatype.equals(XSD.UUID))
             return UUID;
         if (datatype.equals(XSD.STRING))
+            return XSDString;
+        if (datatype.equals(RDF.LANGSTRING))
+            // Sesame 2.8 upgrade: RDF.LANGSTRING is converted to DTE.XSDString with termCode TERM_CODE_LCL
+            // so DTE and lang tag is stored in the key and decoded back in IVUtility.decodeInlineUnicodeLiteral
             return XSDString;
         /*
          * Not a known DTE datatype.

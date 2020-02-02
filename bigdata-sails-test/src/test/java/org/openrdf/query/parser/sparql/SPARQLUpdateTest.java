@@ -14,19 +14,31 @@
  * implied. See the License for the specific language governing permissions
  * and limitations under the License.
  */
-/*
- * Pulled in to extend TestCase.
- */
 package org.openrdf.query.parser.sparql;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
 
-import junit.framework.TestCase;
-
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.bigdata.journal.ITx;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+
+import junit.framework.TestCase;
+
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -50,10 +62,6 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.bigdata.rdf.store.BD;
 
 /**
  * Tests for SPARQL 1.1 Update functionality.
@@ -512,82 +520,63 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertFalse(con.hasStatement(bob, age, inCorrectAgeValue, true));
 	}
 
-	/**
-	 * This test fails for two reasons.
-	 * 
-	 * (1) It appears that openrdf does not imply a commit() when execute() is
-	 * invoked on a prepared SPARQL UPDATE. However, bigdata does a commit() as
-	 * the last action for the SPARQL UPDATE.
-	 * 
-	 * (2) It relies on different transaction semantics. The snapshot isolation
-	 * semantics of bigdata read-only connections mean that con2 will never see
-	 * the mutation from con.
-	 * 
-	 * Since we can not "fix" (2) (it is not an error - we have better
-	 * transaction semantics), I am going to comment out this test.
-	 * 
-	 * It is an open question whether we want to fix (1). I prefer our
-	 * interpretation that SPARQL UPDATE execute() implies a commit().
-	 * 
-	 * Bryan 11/11/2014
-	 */
-//	@Test
-//	public void testAutoCommitHandling()
-//		throws Exception
-//	{
-//		logger.debug("executing test testAutoCommitHandling");
-//
-//		StringBuilder update = new StringBuilder();
-//		update.append(getNamespaceDeclarations());
-//		update.append("DELETE { ?x foaf:name ?y } INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
-//
-//		try {
-//			con.begin();
-//			Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-//
-//			assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
-//			assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
-//
-//			operation.execute();
-//
-//			// update should be visible to own connection.
-//			assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
-//			assertTrue(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
-//
-//			assertFalse(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-//			assertFalse(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-//
-//			RepositoryConnection con2 = rep.getConnection();
-//			try {
-//				// update should not yet be visible to separate connection
-//				assertFalse(con2.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
-//				assertFalse(con2.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
-//
-//				assertTrue(con2.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-//				assertTrue(con2.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-//
-//				con.commit();
-//
-//				// after commit, update should be visible to separate connection.
-//				assertTrue(con2.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
-//				assertTrue(con2.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
-//
-//				assertFalse(con2.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-//				assertFalse(con2.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-//			}
-//			finally {
-//				con2.close();
-//			}
-//		}
-//		catch (Exception e) {
-//			if (con.isActive()) {
-//				con.rollback();
-//			}
-//		}
-//		finally {
-//			con.close();
-//		}
-//	}
+	@Test
+	public void testAutoCommitHandling()
+		throws Exception
+	{
+		logger.debug("executing test testAutoCommitHandling");
+
+		StringBuilder update = new StringBuilder();
+		update.append(getNamespaceDeclarations());
+		update.append("DELETE { ?x foaf:name ?y } INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
+
+		try {
+			con.begin();
+			Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+			assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+			assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+			operation.execute();
+
+			// update should be visible to own connection.
+			assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+			assertTrue(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+			assertFalse(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+			assertFalse(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+			RepositoryConnection con2 = rep.getConnection();
+			try {
+				// update should not yet be visible to separate connection
+				assertFalse(con2.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+				assertFalse(con2.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+				assertTrue(con2.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+				assertTrue(con2.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+				con.commit();
+
+				// after commit, update should be visible to separate connection.
+				assertTrue(con2.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+				assertTrue(con2.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+				assertFalse(con2.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+				assertFalse(con2.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+			}
+			finally {
+				con2.close();
+			}
+		}
+		catch (Exception e) {
+			if (con.isActive()) {
+				con.rollback();
+			}
+		}
+		finally {
+			con.close();
+		}
+	}
 
 	@Test
 	public void testConsecutiveUpdatesInSameTransaction()
@@ -695,6 +684,35 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
 		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph1));
 		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph2));
+		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+	}
+	
+	@Test
+	@Ignore("Fails due to WITH graph is used to evaluate WHERE clause instead of USING graph")
+	// It is a new test added during update to Sesame 2.8, but fail is not introduced with the Sesame update,
+	// it was rather not supported functionality already. Should be fixed as a separate commit.
+	public void _testInsertWhereUsingWith()
+		throws Exception
+	{
+
+		logger.debug("executing testInsertWhereUsingWith");
+		StringBuilder update = new StringBuilder();
+		update.append(getNamespaceDeclarations());
+		update.append("WITH ex:graph2 INSERT {?x rdfs:label ?y . } USING ex:graph1 WHERE {?x foaf:name ?y }");
+
+		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+		operation.execute();
+		con.commit();
+		
+		System.out.println(
+				((BigdataSailRepositoryConnection)con).getTripleStore().dumpStore()
+				);
+//				.getSail().getIndexManager())
+//		.getJournal(ITx.UNISOLATED).get..getIn.dump();
+		String message = "label should have been inserted in graph2, for ex:bob only";
+		assertTrue(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob", XSD.STRING), true, graph2));
+		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph1));
 		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
 	}
 
@@ -833,15 +851,112 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 		URI book1 = f.createURI(EX_NS, "book1");
 
-		assertFalse(con.hasStatement(book1, DC.TITLE, f.createLiteral("the number four", XMLSchema.INTEGER), true));
+		assertFalse(con.hasStatement(book1, DC.TITLE, f.createLiteral("the number four", XMLSchema.INTEGER),
+				true));
 
 		operation.execute();
 
 		String msg = "new statement about ex:book1 should have been inserted";
 
-		assertTrue(msg, con.hasStatement(book1, DC.TITLE, f.createLiteral("the number four", XMLSchema.INTEGER), true));
+		assertTrue(msg,
+				con.hasStatement(book1, DC.TITLE, f.createLiteral("the number four", XMLSchema.INTEGER), true));
 	}
-	
+
+	@Test
+	public void testInsertDataLangTaggedLiteral()
+		throws Exception
+	{
+		logger.debug("executing testInsertDataLangTaggedLiteral");
+
+		StringBuilder update = new StringBuilder();
+		update.append(getNamespaceDeclarations());
+		update.append("INSERT DATA { ex:book1 dc:title \"book 1\"@en . } ");
+
+		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+		URI book1 = f.createURI(EX_NS, "book1");
+
+		assertFalse(con.hasStatement(book1, DC.TITLE, f.createLiteral("book 1", "en"), true));
+
+		operation.execute();
+
+		String msg = "new statement about ex:book1 should have been inserted";
+		assertTrue(msg, con.hasStatement(book1, DC.TITLE, f.createLiteral("book 1", "en"), true));
+	}
+
+	@Test
+	public void testInsertDataGraph1()
+		throws Exception
+	{
+		logger.debug("executing testInsertDataGraph1");
+
+		StringBuilder update = new StringBuilder();
+		update.append("INSERT DATA { \n");
+		update.append("GRAPH <urn:g1> { <urn:s1> <urn:p1> <urn:o1> . } \n");
+		update.append("<urn:s1> a <urn:C1> . \n");
+		update.append("}");
+
+		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+		assertFalse(con.hasStatement(f.createURI("urn:s1"), RDF.TYPE, null, true, (Resource)null));
+		assertFalse(con.hasStatement(f.createURI("urn:s1"), f.createURI("urn:p1"), f.createURI("urn:o1"), true,
+				f.createURI("urn:g1")));
+		operation.execute();
+		assertTrue(con.hasStatement(f.createURI("urn:s1"), RDF.TYPE, null, true, (Resource)null));
+		assertTrue(con.hasStatement(f.createURI("urn:s1"), f.createURI("urn:p1"), f.createURI("urn:o1"), true,
+				f.createURI("urn:g1")));
+	}
+
+	@Test
+	public void testInsertDataGraph2()
+		throws Exception
+	{
+		logger.debug("executing testInsertDataGraph2");
+
+		StringBuilder update = new StringBuilder();
+		update.append("INSERT DATA { \n");
+		update.append("<urn:s1> a <urn:C1> . \n");
+		update.append("GRAPH <urn:g1> { <urn:s1> <urn:p1> <urn:o1> . } \n");
+		update.append("}");
+
+		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+		assertFalse(con.hasStatement(f.createURI("urn:s1"), RDF.TYPE, null, true, (Resource)null));
+		assertFalse(con.hasStatement(f.createURI("urn:s1"), f.createURI("urn:p1"), f.createURI("urn:o1"), true,
+				f.createURI("urn:g1")));
+		operation.execute();
+		assertTrue(con.hasStatement(f.createURI("urn:s1"), RDF.TYPE, null, true, (Resource)null));
+		assertTrue(con.hasStatement(f.createURI("urn:s1"), f.createURI("urn:p1"), f.createURI("urn:o1"), true,
+				f.createURI("urn:g1")));
+	}
+
+	@Test
+	public void testInsertDataGraph3()
+		throws Exception
+	{
+		logger.debug("executing testInsertDataGraph3");
+
+		StringBuilder update = new StringBuilder();
+		update.append("INSERT DATA { \n");
+		update.append("<urn:s1> a <urn:C1> . \n");
+		update.append("GRAPH <urn:g1>{ <urn:s1> <urn:p1> <urn:o1> . <urn:s2> <urn:p2> <urn:o2> } \n");
+		update.append("<urn:s2> a <urn:C2> \n");
+		update.append("}");
+
+		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+		assertFalse(con.hasStatement(f.createURI("urn:s1"), RDF.TYPE, null, true, (Resource)null));
+		assertFalse(con.hasStatement(f.createURI("urn:s1"), f.createURI("urn:p1"), f.createURI("urn:o1"), true,
+				f.createURI("urn:g1")));
+
+		assertFalse(con.hasStatement(f.createURI("urn:s2"), f.createURI("urn:p2"), f.createURI("urn:o2"), true,
+				f.createURI("urn:g1")));
+		operation.execute();
+		assertTrue(con.hasStatement(f.createURI("urn:s1"), RDF.TYPE, null, true, (Resource)null));
+		assertTrue(con.hasStatement(f.createURI("urn:s2"), RDF.TYPE, null, true, (Resource)null));
+		assertTrue(con.hasStatement(f.createURI("urn:s1"), f.createURI("urn:p1"), f.createURI("urn:o1"), true,
+				f.createURI("urn:g1")));
+		assertTrue(con.hasStatement(f.createURI("urn:s2"), f.createURI("urn:p2"), f.createURI("urn:o2"), true,
+				f.createURI("urn:g1")));
+	}
+
 	@Test
 	public void testInsertDataBlankNode()
 		throws Exception
@@ -987,6 +1102,28 @@ public abstract class SPARQLUpdateTest extends TestCase {
 	}
 
 	@Test
+	public void testDeleteDataUnicode()
+		throws Exception
+	{
+		URI i18n = con.getValueFactory().createURI(EX_NS, "東京");
+		
+		con.add(i18n, FOAF.KNOWS, bob);
+		
+		logger.debug("executing testDeleteData");
+		StringBuilder update = new StringBuilder();
+		update.append(getNamespaceDeclarations());
+		update.append("DELETE DATA { ex:東京 foaf:knows ex:bob. } ");
+
+		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+		assertTrue(con.hasStatement(i18n, FOAF.KNOWS, bob, true));
+		operation.execute();
+
+		String msg = "statement should have been deleted.";
+		assertFalse(msg, con.hasStatement(i18n, FOAF.KNOWS, bob, true));
+	}
+	
+	@Test
 	public void testDeleteDataMultiplePatterns()
 		throws Exception
 	{
@@ -1088,7 +1225,9 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		}
 		catch (UpdateExecutionException e) {
 			// expected behavior
-			con.rollback();
+			if (con.isActive()) {
+				con.rollback();
+			}
 		}
 	}
 
@@ -1597,7 +1736,6 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 		// replace the standard dataset with one specific to this case.
 		con.clear();
-		con.commit();
 		loadDataset("/testdata-update/dataset-update-example9.trig");
 
 		URI book1 = f.createURI("http://example/book1");
@@ -1701,7 +1839,6 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		declarations.append("PREFIX foaf: <" + FOAF.NAMESPACE + "> \n");
 		declarations.append("PREFIX ex: <" + EX_NS + "> \n");
 		declarations.append("PREFIX xsd: <" + XMLSchema.NAMESPACE + "> \n");
-        declarations.append("PREFIX bd: <" + BD.NAMESPACE + "> \n");
 		declarations.append("\n");
 
 		return declarations.toString();

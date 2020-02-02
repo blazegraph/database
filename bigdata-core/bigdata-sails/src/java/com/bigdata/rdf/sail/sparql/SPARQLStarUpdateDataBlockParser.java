@@ -100,7 +100,11 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 		if (checkSparqlStarSyntax()) {
 			return parseStmtValue();
 		}
-		return super.parseValue();
+		try {
+			return super.parseValue();
+		} catch (RDFHandlerException e) {
+			throw new IOException(e);
+		}
 	}
 	
 	private boolean checkSparqlStarSyntax() throws IOException {
@@ -195,4 +199,17 @@ public class SPARQLStarUpdateDataBlockParser extends SPARQLUpdateDataBlockParser
 		super.setNamespace(prefix, namespace);
 	}
 
+	/**
+	 * BC method.
+	 */
+	protected int read() throws IOException {
+		return readCodePoint();
+	}
+
+	/**
+	 * BC method.
+	 */
+	protected int peek() throws IOException {
+		return peekCodePoint();
+	}
 }

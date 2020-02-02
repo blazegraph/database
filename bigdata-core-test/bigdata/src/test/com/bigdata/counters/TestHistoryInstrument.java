@@ -83,7 +83,7 @@ public class TestHistoryInstrument extends TestCase2 {
         if(log.isInfoEnabled()) log.info("\n"+h.toString());
         
         // add the first sample.
-        h.add(t0,12d);
+        h.add(t0+1,12d);
 
         assertEquals(1,h.size());
         assertEquals(60,h.capacity());
