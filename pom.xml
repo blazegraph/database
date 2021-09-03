@@ -216,7 +216,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <apache.commons_fileupload.version>1.3.1</apache.commons_fileupload.version>
     <apache.commons_io.version>2.1</apache.commons_io.version>
     <apache.commons_logging.version>1.1.1</apache.commons_logging.version>
-    <apache.httpclient.version>4.4</apache.httpclient.version>
+    <apache.httpclient.version>4.5.13</apache.httpclient.version>
     <apache.httpclient_cache.version>4.4</apache.httpclient_cache.version>
     <apache.httpcore.version>4.4</apache.httpcore.version>
     <apache.httpmime.version>4.4</apache.httpmime.version>
