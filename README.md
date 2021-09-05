@@ -1,5 +1,5 @@
 ## Welcome to the Blazegraph Database ##
-Blazegraph™ DB is a ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.  It is supporting key [Precision Medicine](http://www.syapse.com) applications and has wide-spread usage for life science applications.  It is used extensively to support Cyber anaytics in commercial and government applications.  It powers the Wikimedia Foundation's [Wikidata Query Service](https://query.wikidata.org/). 
+Blazegraph™ DB is a ultra-high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.  It is supporting key [Precision Medicine](http://www.syapse.com) applications and has wide-spread usage for life science applications.  It is used extensively to support Cyber analytics in commercial and government applications.  It powers the Wikimedia Foundation's [Wikidata Query Service](https://query.wikidata.org/). 
 
 ![image](http://blog.blazegraph.com/wp-content/uploads/2015/07/blazegraph_by_systap_favicon.png)
 
@@ -29,9 +29,9 @@ Note that the Blazegraph namespace feature for [multi-tenancy](https://wiki.blaz
 
 There are three basic options:
 
-1. **Configuring Jetty Authentication for a standalone Jetty deployment**:  Follow the [jetty](http://www.eclipse.org/jetty/documentation/9.2.22.v20170531/configuring-security-authentication.html) guide to configure authentication for the [jetty.xml](blazegraph-jar/src/main/resources/jetty.xml) you use to deploy the server by uncommenting the `<Get name="securityHandler">` section. You'll need to create a [realm.properties](blazegraph-jar/src/main/resources/realm.properties) and update the jetty.xml to point to its location on the filesystem.  Then configure the [web.xml](bigdata-war-html/src/main/webapp/WEB-INF/web.xml) to uncomment the security-constraint.
+1. **Configuring Jetty Authentication for a standalone Jetty deployment**:  Follow the [jetty](http://www.eclipse.org/jetty/documentation/9.2.22.v20170531/configuring-security-authentication.html) guide to configuring authentication for the [jetty.xml](blazegraph-jar/src/main/resources/jetty.xml) you use to deploy the server by uncommenting the `<Get name="securityHandler">` section. You'll need to create a [realm.properties](blazegraph-jar/src/main/resources/realm.properties) and update the jetty.xml to point to its location on the filesystem.  Then configure the [web.xml](bigdata-war-html/src/main/webapp/WEB-INF/web.xml) to uncomment the security-constraint.
 1. **Configuring Tomcat Authentication for a standalone Tomcat deployment**:  First configure a Tomcat [Realm](https://tomcat.apache.org/tomcat-7.0-doc/realm-howto.html) with your choice of authentication method (JDBC, JNDI, etc.). Then configure the [web.xml](bigdata-war-html/src/main/webapp/WEB-INF/web.xml) to uncomment the security-constraint.
-1. **Setup a reverse-proxy configuration with authentication**:  You can setup an http or https reverse proxy configuration that has authentication and forward requests to the local Blazegraph instance (typically running on localhost:9999). This is a good option with [Nginx](https://community.openhab.org/t/using-nginx-reverse-proxy-authentication-and-https/14542) and [Apache](https://stackoverflow.com/questions/5011102/apache-reverse-proxy-with-basic-authentication). 
+1. **Setup a reverse-proxy configuration with authentication**:  You can set up an HTTP or HTTPS reverse proxy configuration that has authentication and forward requests to the local Blazegraph instance (typically running on localhost:9999). This is a good option with [Nginx](https://community.openhab.org/t/using-nginx-reverse-proxy-authentication-and-https/14542) and [Apache](https://stackoverflow.com/questions/5011102/apache-reverse-proxy-with-basic-authentication). 
 
 ##### Mitigating Cross-Site Request Forgery (CSRF) #####
 If you enable authentication and expose the Blazegraph workbench, you should also take steps to protect against CSRF. Tomcat8 provides a [CSRF filter](https://tomcat.apache.org/tomcat-8.0-doc/config/filter.html#CSRF_Prevention_Filter_for_REST_APIs) that can be configured. For Jetty, if you configure authentication the default value for `SecurityHandler.setSessionRenewedOnAuthentication(true)` can also be used. CSRF protection may require REST clients to implement HTTP headers to be used to interact with the service.
@@ -47,7 +47,7 @@ If you build with Java 7, you need to add Maven options for TLS 1.2, i.e. `expor
 There are code samples and examples to get started with the Blazegraph Database [here] (https://github.com/blazegraph/blazegraph-samples).  Tinkerpop3 examples are included directly within the Tinkerpop3 repository per below.
 
 ### Javadocs ###
-Click here to view the lastest [API Javadocs](https://blazegraph.github.io/database/apidocs/index.html).
+Click here to view the latest [API Javadocs](https://blazegraph.github.io/database/apidocs/index.html).
 
 ### Maven Central ###
 Starting with the 2.0.0 release, the Blazegraph Database is available on Maven Central.  To include the core platform and dependencies, include the artifact below in your dependencies.   [Developing with Maven](https://wiki.blazegraph.com/wiki/index.php/MavenNotes) has notes on developing with Blazegraph Database source code and Maven.
@@ -83,7 +83,7 @@ Starting with 2.0.0, the default context path for deployment is `http://localhos
 The `bigdata-war` and `bigdata-jar` artifacts are included for legacy purposes and use the `/bigdata/` context path.
 
 ### Tinkerpop3 ###
-Tinkerpop3 supports requires Java 1.8 and is now in a separate repository.  See [Tinkerpop3](https://github.com/blazegraph/tinkerpop3).  It is also available as Maven Central artifact.
+Tinkerpop3 supports requires Java 1.8 and is now in a separate repository.  See [Tinkerpop3](https://github.com/blazegraph/tinkerpop3).  It is also available as a Maven Central artifact.
 
 ```
     <dependency>
