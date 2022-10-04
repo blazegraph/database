@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
@@ -362,11 +363,8 @@ public class TestDataLoader extends AbstractTripleStoreTestCase {
 	private void doDurableQueueTest(final DataLoader dataLoader) throws IOException {
 		
 		// temporary directory where we setup the test.
-		final File tmpDir = File.createTempFile(getClass().getName(), ".tmp");
-		try {
-			
-			tmpDir.delete(); // delete random file name.
-			tmpDir.mkdir(); // recreate it as a directory.
+		final File tmpDir = Files.createTempDirectory(getClass().getName() + ".tmp").toFile();
+		try { // recreate it as a directory.
 		
 			// Setup directory with files.
 			final File goodFile = new File(tmpDir, "good.ttl");
