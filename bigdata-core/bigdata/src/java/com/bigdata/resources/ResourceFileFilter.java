@@ -3,6 +3,7 @@ package com.bigdata.resources;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.nio.file.Paths;
 
 import org.apache.log4j.Logger;
 
@@ -82,7 +83,7 @@ public class ResourceFileFilter implements FileFilter {
 
             }
 
-            if (!fc.startsWith(resourceManager.getDataDir().getPath())) {
+            if (!Paths.get(fc).normalize().startsWith(resourceManager.getDataDir().getPath())) {
 
                 throw new RuntimeException("File not in data directory: file="
                         + f + ", dataDir=" + resourceManager.dataDir);
