@@ -246,6 +246,7 @@ public class TestInlineURIs extends AbstractTripleStoreTestCase {
                 UNSIGNED_INT_NAMESPACE + Short.MAX_VALUE, true,//
                 UNSIGNED_INT_NAMESPACE + Integer.MAX_VALUE, true,//
                 UNSIGNED_INT_NAMESPACE + Long.MAX_VALUE, true,//
+                UNSIGNED_INT_NAMESPACE + "12148449524915690527", true,//
                 UNSIGNED_INT_NAMESPACE + "19223372036854775807", true,//
                 UNSIGNED_INT_NAMESPACE + "foo", false);
     }
