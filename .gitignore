@@ -26,6 +26,8 @@
 /target
 .classpath
 .project
+*.iml
+.idea
 
 # /bigdata/
 /bigdata/bin
