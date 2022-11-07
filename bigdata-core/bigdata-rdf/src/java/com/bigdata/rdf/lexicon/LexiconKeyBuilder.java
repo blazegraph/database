@@ -116,15 +116,8 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
         if (value == null)
             throw new IllegalArgumentException();
 
-        if (false && datatype.equals(XMLSchema.STRING)) {
-
-            /*
-             * @todo xsd:string is explicitly mapped by RDF Semantics onto plain
-             * literals (they entail one another). However, it breaks the SPARQL
-             * unit tests if you map them onto the same key.
-             */
+        if (datatype.equals(XMLSchema.STRING)) {
             return plainLiteral2key(value);
-            
         }
 
         /*

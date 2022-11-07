@@ -58,5 +58,12 @@ public class BigdataSPARQLUpdateTxTest extends BigdataSPARQLUpdateTest {
         return props;
 
     }
+    
+    @Override
+    public void testAutoCommitHandling() throws Exception {
+        // NOP
+        // disabling autocommit test for BigdataSailRWTxConnection, which is backed 
+        // by a read/write transaction and does not support begin/end nested semantics
+    }
 
 }

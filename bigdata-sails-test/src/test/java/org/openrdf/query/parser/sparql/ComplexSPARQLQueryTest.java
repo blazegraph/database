@@ -21,14 +21,20 @@ package org.openrdf.query.parser.sparql;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.util.List;
 import java.util.Set;
 
-import junit.framework.TestCase;
-
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import junit.framework.ComparisonFailure;
+import junit.framework.TestCase;
+
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Model;
@@ -39,9 +45,11 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.DCTERMS;
 import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.OWL;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.SESAME;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQuery;
 import org.openrdf.query.QueryEvaluationException;
@@ -50,15 +58,15 @@ import org.openrdf.query.QueryResults;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.TupleQueryResultHandlerBase;
+import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.query.parser.sparql.manifest.SPARQL11ManifestTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A set of compliance tests on SPARQL query functionality which can not be
@@ -149,15 +157,101 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 
 				assertNotNull(s);
 				assertFalse(bob.equals(s)); // should not be present in default
-														// graph
-				assertFalse(alice.equals(s)); // should not be present in default
-														// graph
+				// graph
+				assertFalse(alice.equals(s)); // should not be present in
+				// default
+				// graph
 			}
 			result.close();
 		}
 		catch (QueryEvaluationException e) {
 			e.printStackTrace();
 			fail(e.getMessage());
+		}
+	}
+
+	@Test
+	public void testSES2373SubselectOptional()
+		throws Exception
+	{
+		conn.prepareUpdate(QueryLanguage.SPARQL,
+				"insert data {" + "<u:1> <u:r> <u:subject> ." + "<u:1> <u:v> 1 ." + "<u:1> <u:x> <u:x1> ."
+						+ "<u:2> <u:r> <u:subject> ." + "<u:2> <u:v> 2 ." + "<u:2> <u:x> <u:x2> ."
+						+ "<u:3> <u:r> <u:subject> ." + "<u:3> <u:v> 3 ." + "<u:3> <u:x> <u:x3> ."
+						+ "<u:4> <u:r> <u:subject> ." + "<u:4> <u:v> 4 ." + "<u:4> <u:x> <u:x4> ."
+						+ "<u:5> <u:r> <u:subject> ." + "<u:5> <u:v> 5 ." + "<u:5> <u:x> <u:x5> ."
+						+ "}").execute();
+
+		StringBuilder qb = new StringBuilder();
+		qb.append("select ?x { \n");
+		qb.append(" { select ?v { ?v <u:r> <u:subject> filter (?v = <u:1>) } }.\n");
+		qb.append("  optional {  select ?val { ?v <u:v> ?val .} }\n");
+		qb.append("  ?v <u:x> ?x \n");
+		qb.append("}\n");
+
+		TupleQueryResult res = conn.prepareTupleQuery(QueryLanguage.SPARQL, qb.toString()).evaluate();
+		assertTrue("The query should return a result", res.hasNext());
+		BindingSet b = res.next();
+		assertTrue("?x is from the mandatory part of the query and should be bound", b.hasBinding("x"));
+	}
+
+	@Test
+	public void testSES2154SubselectOptional()
+		throws Exception
+	{
+		StringBuilder ub = new StringBuilder();
+		ub.append("insert data { \n");
+		ub.append(" <urn:s1> a <urn:C> .  \n");
+		ub.append(" <urn:s2> a <urn:C> .  \n");
+		ub.append(" <urn:s3> a <urn:C> .  \n");
+		ub.append(" <urn:s4> a <urn:C> .  \n");
+		ub.append(" <urn:s5> a <urn:C> .  \n");
+		ub.append(" <urn:s6> a <urn:C> .  \n");
+		ub.append(" <urn:s7> a <urn:C> .  \n");
+		ub.append(" <urn:s8> a <urn:C> .  \n");
+		ub.append(" <urn:s9> a <urn:C> .  \n");
+		ub.append(" <urn:s10> a <urn:C> .  \n");
+		ub.append(" <urn:s11> a <urn:C> .  \n");
+		ub.append(" <urn:s12> a <urn:C> .  \n");
+
+		ub.append(" <urn:s1> <urn:p> \"01\" .  \n");
+		ub.append(" <urn:s2> <urn:p> \"02\" .  \n");
+		ub.append(" <urn:s3> <urn:p> \"03\" .  \n");
+		ub.append(" <urn:s4> <urn:p> \"04\" .  \n");
+		ub.append(" <urn:s5> <urn:p> \"05\" .  \n");
+		ub.append(" <urn:s6> <urn:p> \"06\" .  \n");
+		ub.append(" <urn:s7> <urn:p> \"07\" .  \n");
+		ub.append(" <urn:s8> <urn:p> \"08\" .  \n");
+		ub.append(" <urn:s9> <urn:p> \"09\" .  \n");
+		ub.append(" <urn:s10> <urn:p> \"10\" .  \n");
+		ub.append(" <urn:s11> <urn:p> \"11\" .  \n");
+		ub.append(" <urn:s12> <urn:p> \"12\" .  \n");
+		ub.append("} \n");
+		
+		conn.prepareUpdate(QueryLanguage.SPARQL, ub.toString()).execute();
+
+		StringBuilder qb = new StringBuilder();
+		qb.append("SELECT ?s ?label\n");
+		qb.append("WHERE { \n");
+		qb.append(" 	  ?s a <urn:C> \n .\n");
+		qb.append(" 	  OPTIONAL  { {SELECT ?label  WHERE { \n");
+		qb.append("                     ?s <urn:p> ?label . \n");
+		qb.append("   	      } ORDER BY ?label LIMIT 2 \n");
+		qb.append("		    }\n");
+		qb.append("       }\n");
+		qb.append("}\n");
+		qb.append("ORDER BY ?s\n");
+		qb.append("LIMIT 10 \n");
+
+		TupleQueryResult res = conn.prepareTupleQuery(QueryLanguage.SPARQL, qb.toString()).evaluate();
+		assertTrue("The query should return a result", res.hasNext());
+
+		List<BindingSet> result = QueryResults.asList(res);
+		assertEquals(10, result.size());
+		for (BindingSet bs : result) {
+			Literal label = (Literal)bs.getValue("label");
+			assertTrue("wrong label value (expected '01' or '02', but got '" + label.stringValue() + "')",
+					label.stringValue().equals("01") || label.stringValue().equals("02"));
 		}
 	}
 
@@ -186,9 +280,10 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 
 				assertNotNull(s);
 				assertFalse(bob.equals(s)); // should not be present in default
-														// graph
-				assertFalse(alice.equals(s)); // should not be present in default
-														// graph
+				// graph
+				assertFalse(alice.equals(s)); // should not be present in
+				// default
+				// graph
 			}
 			result.close();
 		}
@@ -375,6 +470,114 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 				}
 			}
 		}
+	}
+
+	@Test
+	public void testDescribeMultipleA()
+		throws Exception
+	{
+		String update = "insert data { <urn:1> <urn:p1> <urn:v> . [] <urn:blank> <urn:1> . <urn:2> <urn:p2> <urn:3> . } ";
+		conn.prepareUpdate(QueryLanguage.SPARQL, update).execute();
+
+		StringBuilder query = new StringBuilder();
+		query.append(getNamespaceDeclarations());
+		query.append("DESCRIBE <urn:1> <urn:2> ");
+
+		GraphQuery gq = conn.prepareGraphQuery(QueryLanguage.SPARQL, query.toString());
+
+		ValueFactory vf = conn.getValueFactory();
+		URI urn1 = vf.createURI("urn:1");
+		URI p1 = vf.createURI("urn:p1");
+		URI p2 = vf.createURI("urn:p2");
+		URI urn2 = vf.createURI("urn:2");
+		URI blank = vf.createURI("urn:blank");
+
+		Model result = QueryResults.asModel(gq.evaluate());
+		assertTrue(result.contains(urn1, p1, null));
+		assertTrue(result.contains(null, blank, urn1));
+		assertTrue(result.contains(urn2, p2, null));
+	}
+
+	@Test
+	public void testDescribeMultipleB()
+		throws Exception
+	{
+		String update = "insert data { <urn:1> <urn:p1> <urn:v> . <urn:1> <urn:blank> [] . <urn:2> <urn:p2> <urn:3> . } ";
+		conn.prepareUpdate(QueryLanguage.SPARQL, update).execute();
+
+		StringBuilder query = new StringBuilder();
+		query.append(getNamespaceDeclarations());
+		query.append("DESCRIBE <urn:1> <urn:2> ");
+
+		GraphQuery gq = conn.prepareGraphQuery(QueryLanguage.SPARQL, query.toString());
+
+		ValueFactory vf = conn.getValueFactory();
+		URI urn1 = vf.createURI("urn:1");
+		URI p1 = vf.createURI("urn:p1");
+		URI p2 = vf.createURI("urn:p2");
+		URI urn2 = vf.createURI("urn:2");
+		URI blank = vf.createURI("urn:blank");
+		Model result = QueryResults.asModel(gq.evaluate());
+
+		assertTrue(result.contains(urn1, p1, null));
+		assertTrue(result.contains(urn1, blank, null));
+		assertTrue(result.contains(urn2, p2, null));
+	}
+
+	@Test
+	public void testDescribeMultipleC()
+		throws Exception
+	{
+		String update = "insert data { <urn:1> <urn:p1> <urn:v> . [] <urn:blank> <urn:1>. <urn:1> <urn:blank> [] . <urn:2> <urn:p2> <urn:3> . } ";
+		conn.prepareUpdate(QueryLanguage.SPARQL, update).execute();
+
+		StringBuilder query = new StringBuilder();
+		query.append(getNamespaceDeclarations());
+		query.append("DESCRIBE <urn:1> <urn:2> ");
+
+		GraphQuery gq = conn.prepareGraphQuery(QueryLanguage.SPARQL, query.toString());
+
+		ValueFactory vf = conn.getValueFactory();
+		URI urn1 = vf.createURI("urn:1");
+		URI p1 = vf.createURI("urn:p1");
+		URI p2 = vf.createURI("urn:p2");
+		URI urn2 = vf.createURI("urn:2");
+		URI blank = vf.createURI("urn:blank");
+		Model result = QueryResults.asModel(gq.evaluate());
+
+		assertTrue(result.contains(urn1, p1, null));
+		assertTrue(result.contains(urn1, blank, null));
+		assertTrue(result.contains(null, blank, urn1));
+		assertTrue(result.contains(urn2, p2, null));
+	}
+
+	@Test
+	public void testDescribeMultipleD()
+		throws Exception
+	{
+		String update = "insert data { <urn:1> <urn:p1> <urn:v> . [] <urn:blank> <urn:1>. <urn:2> <urn:p2> <urn:3> . [] <urn:blank> <urn:2> . <urn:4> <urn:p2> <urn:3> . <urn:4> <urn:blank> [] .} ";
+		conn.prepareUpdate(QueryLanguage.SPARQL, update).execute();
+
+		StringBuilder query = new StringBuilder();
+		query.append(getNamespaceDeclarations());
+		query.append("DESCRIBE <urn:1> <urn:2> <urn:4> ");
+
+		GraphQuery gq = conn.prepareGraphQuery(QueryLanguage.SPARQL, query.toString());
+
+		ValueFactory vf = conn.getValueFactory();
+		URI urn1 = vf.createURI("urn:1");
+		URI p1 = vf.createURI("urn:p1");
+		URI p2 = vf.createURI("urn:p2");
+		URI urn2 = vf.createURI("urn:2");
+		URI urn4 = vf.createURI("urn:4");
+		URI blank = vf.createURI("urn:blank");
+		Model result = QueryResults.asModel(gq.evaluate());
+
+		assertTrue(result.contains(urn1, p1, null));
+		assertTrue(result.contains(null, blank, urn1));
+		assertTrue(result.contains(urn2, p2, null));
+		assertTrue(result.contains(urn4, p2, null));
+		assertTrue(result.contains(urn4, blank, null));
 	}
 
 	@Test
@@ -681,6 +884,48 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 	}
 
 	@Test
+	public void testSES1685propPathSameVar()
+		throws Exception
+	{
+		final String queryStr = "PREFIX : <urn:> SELECT ?x WHERE {?x :p+ ?x}";
+
+		conn.add(new StringReader("@prefix : <urn:> . :a :p :b . :b :p :a ."), "", RDFFormat.TURTLE);
+
+		TupleQuery query = conn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+		TupleQueryResult result = query.evaluate();
+
+		assertNotNull(result);
+
+		int count = 0;
+		while (result.hasNext()) {
+			result.next();
+			count++;
+		}
+		// result should be both a and b.
+		assertEquals(2, count);
+	}
+
+	@Test
+	public void testSES2104ConstructBGPSameURI()
+		throws Exception
+	{
+		final String queryStr = "PREFIX : <urn:> CONSTRUCT {:x :p :x } WHERE {} ";
+
+		conn.add(new StringReader("@prefix : <urn:> . :a :p :b . "), "", RDFFormat.TURTLE);
+
+		final URI x = conn.getValueFactory().createURI("urn:x");
+		final URI p = conn.getValueFactory().createURI("urn:p");
+
+		GraphQuery query = conn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+		Model result = QueryResults.asModel(query.evaluate());
+
+		assertNotNull(result);
+		assertFalse(result.isEmpty());
+		assertTrue(result.contains(x, p, x));
+
+	}
+
+	@Test
 	public void testSES1898LeftJoinSemantics2()
 		throws Exception
 	{
@@ -723,7 +968,8 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 		queryBuilder.append("{ ?publisher <http://purl.org/dc/elements/1.1/publisher> ?publisher }");
 
 		conn.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate(
-				new TupleQueryResultHandlerBase() {
+				new TupleQueryResultHandlerBase()
+		{
 
 					public void handleSolution(BindingSet bindingSet) {
 						fail("nobody is self published");
@@ -794,13 +1040,90 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 	}
 
 	@Test
+	public void testSES2121URIFunction()
+		throws Exception
+	{
+		String query = "SELECT (URI(\"foo bar\") as ?uri) WHERE {}";
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+		TupleQueryResult result = tq.evaluate();
+		assertNotNull(result);
+		assertTrue(result.hasNext());
+		BindingSet bs = result.next();
+		URI uri = (URI)bs.getValue("uri");
+		assertTrue("uri result for invalid URI should be unbound", uri == null);
+
+		query = "BASE <http://example.org/> SELECT (URI(\"foo bar\") as ?uri) WHERE {}";
+		tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+		result = tq.evaluate();
+		assertNotNull(result);
+		assertTrue(result.hasNext());
+		bs = result.next();
+		uri = (URI)bs.getValue("uri");
+		assertTrue("uri result for valid URI reference should be bound", uri != null);
+	}
+
+	@Test
+	@Ignore("Fails due to several NOW function executions produce different results")
+	// It is a new test added during update to Sesame 2.8, but fail is not introduced with the Sesame update,
+	// it was rather not supported functionality already. Should be fixed as a separate commit.
+	public void _testSES869ValueOfNow()
+		throws Exception
+	{
+		StringBuilder query = new StringBuilder();
+		query.append("SELECT ?p ( NOW() as ?n ) { BIND (NOW() as ?p ) }");
+
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
+
+		TupleQueryResult result = tq.evaluate();
+		assertNotNull(result);
+		assertTrue(result.hasNext());
+
+		BindingSet bs = result.next();
+		Value p = bs.getValue("p");
+		Value n = bs.getValue("n");
+
+		assertNotNull(p);
+		assertNotNull(n);
+		assertEquals(p, n);
+
+	}
+
+	@Test
+	public void testSES2136()
+		throws Exception
+	{
+		loadTestData("/testcases-sparql-1.1-w3c/bindings/data02.ttl");
+		StringBuilder query = new StringBuilder();
+		query.append("PREFIX : <http://example.org/>\n");
+		query.append("SELECT ?s ?o { \n");
+		query.append(" { SELECT * WHERE { ?s ?p ?o . } }\n");
+		query.append("	VALUES (?o) { (:b) }\n");
+		query.append("}\n");
+
+		ValueFactory vf = conn.getValueFactory();
+		final URI a = vf.createURI("http://example.org/a");
+		final URI b = vf.createURI("http://example.org/b");
+
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
+
+		TupleQueryResult result = tq.evaluate();
+		assertNotNull(result);
+		assertTrue(result.hasNext());
+		BindingSet bs = result.next();
+		assertFalse("only one result expected", result.hasNext());
+		assertEquals(a, bs.getValue("s"));
+		assertEquals(b, bs.getValue("o"));
+	}
+
+	@Test
 	public void testValuesInOptional()
 		throws Exception
 	{
 		loadTestData("/testdata-query/dataset-ses1692.trig");
 		StringBuilder query = new StringBuilder();
 		query.append(" PREFIX : <http://example.org/>\n");
-		query.append(" SELECT DISTINCT ?a ?name ?isX WHERE { ?b :p1 ?a . ?a :name ?name. OPTIONAL { ?a a :X . VALUES(?isX) { (:X) } } } ");
+		query.append(
+				" SELECT DISTINCT ?a ?name ?isX WHERE { ?b :p1 ?a . ?a :name ?name. OPTIONAL { ?a a :X . VALUES(?isX) { (:X) } } } ");
 
 		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
 
@@ -829,6 +1152,70 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 	}
 
 	@Test
+	public void testSES2052If1()
+		throws Exception
+	{
+		loadTestData("/testdata-query/dataset-query.trig");
+		StringBuilder query = new StringBuilder();
+		query.append("SELECT ?p \n");
+		query.append("WHERE { \n");
+		query.append("         ?s ?p ?o . \n");
+		query.append(
+				"        FILTER(IF(BOUND(?p), ?p = <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>, false)) \n");
+		query.append("}");
+
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
+		try {
+			TupleQueryResult result = tq.evaluate();
+			assertNotNull(result);
+			while (result.hasNext()) {
+				BindingSet bs = result.next();
+
+				URI p = (URI)bs.getValue("p");
+				assertNotNull(p);
+				assertEquals(RDF.TYPE, p);
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			fail(e.getMessage());
+		}
+
+	}
+
+	@Test
+	public void testSES2052If2()
+		throws Exception
+	{
+		loadTestData("/testdata-query/dataset-query.trig");
+		StringBuilder query = new StringBuilder();
+		query.append("SELECT ?p \n");
+		query.append("WHERE { \n");
+		query.append("         ?s ?p ?o . \n");
+		query.append(
+				"        FILTER(IF(!BOUND(?p), false , ?p = <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>)) \n");
+		query.append("}");
+
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
+		try {
+			TupleQueryResult result = tq.evaluate();
+			assertNotNull(result);
+			while (result.hasNext()) {
+				BindingSet bs = result.next();
+
+				URI p = (URI)bs.getValue("p");
+				assertNotNull(p);
+				assertEquals(RDF.TYPE, p);
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			fail(e.getMessage());
+		}
+
+	}
+
+	@Test
 	public void testSameTermRepeatInUnion()
 		throws Exception
 	{
@@ -854,16 +1241,16 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 
 			int count = 0;
 			while (result.hasNext()) {
-			   BindingSet bs = result.next();
+				BindingSet bs = result.next();
 				count++;
 				assertNotNull(bs);
-				
+
 				System.out.println(bs);
-				
+
 				Value mbox = bs.getValue("mbox");
 				Value x = bs.getValue("x");
-				
-				assertTrue(mbox instanceof Literal || x instanceof URI);				
+
+				assertTrue(mbox instanceof Literal || x instanceof URI);
 			}
 			result.close();
 
@@ -993,7 +1380,7 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 		query.append("          foaf:mbox ?mbox . ");
 		query.append("       FILTER(EXISTS { ");
 		query.append("            FILTER(REGEX(?name, \"Bo\") && REGEX(?mbox, \"bob\")) ");
-		// query.append("            FILTER(REGEX(?mbox, \"bob\")) ");
+		// query.append(" FILTER(REGEX(?mbox, \"bob\")) ");
 		query.append("            } )");
 		query.append(" } ");
 
@@ -1531,7 +1918,8 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 		StringBuilder query = new StringBuilder();
 		query.append(getNamespaceDeclarations());
 		query.append("SELECT ?parent ?child ");
-		query.append("WHERE { ?child a owl:Class . ?child rdfs:subClassOf+ ?parent . FILTER (?parent = owl:Thing) }");
+		query.append(
+				"WHERE { ?child a owl:Class . ?child rdfs:subClassOf+ ?parent . FILTER (?parent = owl:Thing) }");
 
 		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
 
@@ -1628,6 +2016,47 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 	}
 
 	@Test
+	public void testSES2147PropertyPathsWithIdenticalSubsPreds()
+		throws Exception
+	{
+
+		StringBuilder data = new StringBuilder();
+		data.append("<urn:s1> <urn:p> <urn:s2> .\n");
+		data.append("<urn:s2> <urn:p> <urn:s3> .\n");
+		data.append("<urn:s3> <urn:q> <urn:s4> .\n");
+		data.append("<urn:s1> <urn:p> <urn:s5> .\n");
+		data.append("<urn:s5> <urn:q> <urn:s6> .\n");
+
+		conn.begin();
+		conn.add(new StringReader(data.toString()), "", RDFFormat.NTRIPLES);
+		conn.commit();
+
+		StringBuilder query = new StringBuilder();
+		query.append(getNamespaceDeclarations());
+		query.append("SELECT ?x \n");
+		query.append("WHERE { ?x <urn:p>*/<urn:q> <urn:s4> . \n");
+		query.append("        ?x <urn:p>*/<urn:q> <urn:s6> . \n");
+		query.append("} \n");
+
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
+
+		try {
+			TupleQueryResult result = tq.evaluate();
+			assertNotNull(result);
+			assertTrue(result.hasNext());
+
+			Value x = result.next().getValue("x");
+			assertNotNull(x);
+			assertTrue(x instanceof URI);
+			assertEquals("urn:s1", x.stringValue());
+		}
+		catch (QueryEvaluationException e) {
+			e.printStackTrace();
+			fail(e.getMessage());
+		}
+	}
+
+	@Test
 	public void testSES1991UUIDEvaluation()
 		throws Exception
 	{
@@ -1702,7 +2131,8 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 			assertNotNull(r1);
 
 			// there is a small chance that two successive calls to the random
-			// number generator will generate the exact same value, so we check for
+			// number generator will generate the exact same value, so we check
+			// for
 			// three successive calls (still theoretically possible to be
 			// identical, but phenomenally unlikely).
 			assertFalse(r1.equals(r2) && r1.equals(r3));
@@ -1743,9 +2173,11 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 	}
 
 	@Test
-	public void testSES2024PropertyPathAnonVarSharing() throws Exception {
+	public void testSES2024PropertyPathAnonVarSharing()
+		throws Exception
+	{
 		loadTestData("/testdata-query/dataset-ses2024.trig");
-		String query = "PREFIX : <http://example.org/> SELECT * WHERE { ?x1 :p/:lit ?l1 . ?x1 :diff ?x2 . ?x2 :p/:lit ?l2 . }" ;
+		String query = "PREFIX : <http://example.org/> SELECT * WHERE { ?x1 :p/:lit ?l1 . ?x1 :diff ?x2 . ?x2 :p/:lit ?l2 . }";
 
 		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
 
@@ -1766,6 +2198,145 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 			e.printStackTrace();
 			fail(e.getMessage());
 		}
+	}
+
+	@Test
+	public void testSES2361UndefMin()
+		throws Exception
+	{
+		String query = "SELECT (MIN(?v) as ?min) WHERE { VALUES ?v { 1 2 undef 3 4 }}";
+		TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
+		try {
+			assertNotNull(result);
+			assertTrue(result.hasNext());
+			assertEquals("1", result.next().getValue("min").stringValue());
+			assertFalse(result.hasNext());
+		}
+		finally {
+			result.close();
+		}
+	}
+
+	@Test
+	public void testSES2361UndefMax()
+		throws Exception
+	{
+		String query = "SELECT (MAX(?v) as ?max) WHERE { VALUES ?v { 1 2 7 undef 3 4 }}";
+		TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
+		try {
+			assertNotNull(result);
+			assertTrue(result.hasNext());
+			assertEquals("7", result.next().getValue("max").stringValue());
+			assertFalse(result.hasNext());
+		}
+		finally {
+			result.close();
+		}
+	}
+
+	@Test
+	public void testSES2361UndefCount()
+		throws Exception
+	{
+		String query = "SELECT (COUNT(?v) as ?c) WHERE { VALUES ?v { 1 2 undef 3 4 }}";
+		TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
+		try {
+			assertNotNull(result);
+			assertTrue(result.hasNext());
+			assertEquals("4", result.next().getValue("c").stringValue());
+			assertFalse(result.hasNext());
+		}
+		finally {
+			result.close();
+		}
+	}
+
+	@Test
+	public void testSES2361UndefCountWildcard()
+		throws Exception
+	{
+		String query = "SELECT (COUNT(*) as ?c) WHERE { VALUES ?v { 1 2 undef 3 4 }}";
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+		TupleQueryResult result = tq.evaluate();
+		try {
+			assertNotNull(result);
+			assertTrue(result.hasNext());
+			assertEquals("4", result.next().getValue("c").stringValue());
+			assertFalse(result.hasNext());
+		} catch (ComparisonFailure e) {
+			System.out.println(tq);
+			e.printStackTrace();
+			fail(e.getMessage());
+		}
+		finally {
+			result.close();
+		}
+	}
+
+	@Test
+	public void testSES2361UndefSum()
+		throws Exception
+	{
+		String query = "SELECT (SUM(?v) as ?s) WHERE { VALUES ?v { 1 2 undef 3 4 }}";
+		TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
+		try {
+			assertNotNull(result);
+			assertTrue(result.hasNext());
+			assertEquals("10", result.next().getValue("s").stringValue());
+			assertFalse(result.hasNext());
+		}
+		finally {
+			result.close();
+		}
+	}
+
+	@Test
+	@Ignore("Failing due to unsupported negated property path modifiers")
+	// It is a new test added during update to Sesame 2.8, but fail is not introduced with the Sesame update,
+	// it was rather not supported functionality already. Should be fixed as a separate commit.
+	public void _testSES2336NegatedPropertyPathMod()
+		throws Exception
+	{
+		loadTestData("/testdata-query/dataset-ses2336.trig");
+		String query = "prefix : <http://example.org/> select * where { ?s a :Test ; ! :p ? ?o . }";
+
+		ValueFactory vf = conn.getValueFactory();
+		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+
+		try {
+			List<BindingSet> result = QueryResults.asList(tq.evaluate());
+			assertNotNull(result);
+
+			URI a = vf.createURI(EX_NS, "a");
+			URI b = vf.createURI(EX_NS, "b");
+			URI c = vf.createURI(EX_NS, "c");
+			URI d = vf.createURI(EX_NS, "d");
+			URI e = vf.createURI(EX_NS, "e");
+			URI test = vf.createURI(EX_NS, "Test");
+
+			assertTrue(containsSolution(result, new BindingImpl("s", a), new BindingImpl("o", a)));
+			assertTrue(containsSolution(result, new BindingImpl("s", a), new BindingImpl("o", test)));
+			assertTrue(containsSolution(result, new BindingImpl("s", a), new BindingImpl("o", c)));
+			assertTrue(containsSolution(result, new BindingImpl("s", d), new BindingImpl("o", d)));
+			assertTrue(containsSolution(result, new BindingImpl("s", d), new BindingImpl("o", e)));
+			assertTrue(containsSolution(result, new BindingImpl("s", d), new BindingImpl("o", test)));
+
+			assertFalse(containsSolution(result, new BindingImpl("s", a), new BindingImpl("o", b)));
+
+		}
+		catch (QueryEvaluationException e) {
+			e.printStackTrace();
+			fail(e.getMessage());
+		}
+
+	}
+
+	private boolean containsSolution(List<BindingSet> result, Binding... solution) {
+		final MapBindingSet bs = new MapBindingSet();
+		for (Binding b : solution) {
+			bs.addBinding(b);
+		}
+		return result.contains(bs);
 	}
 
 	/* private / protected methods */

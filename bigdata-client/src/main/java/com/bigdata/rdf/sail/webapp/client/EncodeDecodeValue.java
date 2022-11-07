@@ -34,6 +34,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 /**
  * Utility class to encode/decode RDF {@link Value}s for interchange with the
@@ -413,16 +415,29 @@ public class EncodeDecodeValue {
         if (v instanceof Literal) {
             final Literal lit = (Literal) v;
             final StringBuilder sb = new StringBuilder();
+            URI datatype = lit.getDatatype();
             sb.append("\"");
             sb.append(lit.getLabel());
             sb.append("\"");
             if (lit.getLanguage() != null) {
                 sb.append("@");
                 sb.append(lit.getLanguage());
+                if (RDF.LANGSTRING.equals(datatype)) {
+                    datatype = null;
+                } else {
+                    if (datatype != null) {
+                        // This violates RDF 1.1, language literals should have LangString type.
+                        throw new IllegalArgumentException("Language literals must be rdf:langString");
+                    }
+                }
+            } else {
+                if (XMLSchema.STRING.equals(datatype)) {
+                    datatype = null;
+                }
             }
-            if (lit.getDatatype() != null) {
+            if (datatype != null) {
                 sb.append("^^");
-                sb.append(encodeValue(lit.getDatatype()));
+                sb.append(encodeValue(datatype));
             }
             return sb.toString();
         }

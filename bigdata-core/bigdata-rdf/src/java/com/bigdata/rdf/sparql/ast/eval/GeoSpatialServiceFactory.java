@@ -46,6 +46,7 @@ import java.util.concurrent.FutureTask;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
@@ -2459,7 +2460,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             IGeoSpatialLiteralSerializer serializer = null;
             GeoSpatialDatatypeConfiguration pconfig = null;
 
-            if (lit.getDatatype() != null) {
+            if (!QueryEvaluationUtil.isSimpleLiteral(lit)) {
                 // If we have datatype that can extract coordinates, use it to exteract
                 pconfig = geoSpatialConfig.getConfigurationForDatatype(lit.getDatatype());
                 if (pconfig.hasLat() && pconfig.hasLon()) {

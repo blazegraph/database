@@ -74,7 +74,11 @@ public class BigdataTurtleParser extends TurtleParser {
         }
         else if (c == '"' || c == '\'') {
             // quoted literal, e.g. "foo" or """foo""" or 'foo' or '''foo'''
-            return parseQuotedLiteral();
+            try {
+                return parseQuotedLiteral();
+            } catch (RDFHandlerException e) {
+                throw new IOException(e);
+            }
         }
         else if (ASCIIUtil.isNumber(c) || c == '.' || c == '+' || c == '-') {
             // integer or double, e.g. 123 or 1.2e3
@@ -230,4 +234,17 @@ public class BigdataTurtleParser extends TurtleParser {
         return createBNode(name.toString());
     }
 
+    /**
+     * BC method.
+     */
+    protected int read() throws IOException {
+        return readCodePoint();
+    }
+
+    /**
+     * BC method.
+     */
+    protected int peek() throws IOException {
+        return peekCodePoint();
+    }
 }

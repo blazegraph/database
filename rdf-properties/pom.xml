@@ -93,11 +93,15 @@ ga('send', 'pageview');
     <!-- jsonld -->
     <dependency>
       <groupId>com.github.jsonld-java</groupId>
-      <artifactId>jsonld-java-sesame</artifactId>
+      <artifactId>jsonld-java</artifactId>
       <version>${jsonld.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.openrdf.sesame</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
