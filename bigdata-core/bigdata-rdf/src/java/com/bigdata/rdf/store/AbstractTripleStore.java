@@ -3671,12 +3671,19 @@ abstract public class AbstractTripleStore extends
     final public String toString(final IV s, final IV p, final IV o,
             final IV c) {
 
+        System.out.println("AbstractTripleStore toSring 2");
+        System.out.println("classof to/Sring 2 "+ this.getClass()+" "+toString(s));
+        
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o)
                 + ", " + toString(c) + " >");
 
     }
 
     final public String toString(final ISPO spo) {
+
+        System.out.println("AbstractTripleStore toSring 1");
+        System.out.println(" class of SPO:" + (spo.s()).getClass() + 
+        " "+ toString(spo.s()));
 
         return toString(spo.s(), spo.p(), spo.o(), spo.c());
 
@@ -3702,6 +3709,8 @@ abstract public class AbstractTripleStore extends
 	
 	        if (v == null)
 	            return "<NOT_FOUND#" + iv + ">";
+
+            System.out.println(" $$$ at Abst-tTripleStore:" + v.toString ());
 	
 	        s = (v instanceof URI ? abbrev((URI) v) : v.toString());
 	        

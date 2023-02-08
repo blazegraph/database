@@ -1,0 +1,126 @@
+
+
+Javarevisited
+
+Learn Java, Programming, Spring, Hibernate throw tutorials, examples, and interview questions
+
+    core java
+    spring
+    hibernate
+    collections
+    multithreading
+    design patterns
+    interview questions
+    coding
+    data structure
+    OOP
+    java 8
+    books
+    About Me
+    Java Certifications
+    JDBC
+    jsp-servlet
+    JSON
+    SQL
+    Linux
+    Courses
+    online resources
+    jvm-internals
+    REST
+    Eclipse
+    jQuery
+    Java IO
+    Java XML
+
+Disclosure: This article may contain affiliate links. When you purchase, we may earn a small commission.
+How to Iterate through ConcurrentHashMap and print all keys and values in Java? Example
+Suppose you have a ConcurrentHashMap of String and Integer and you want to print all keys and values, how do you do that? This is a common, day-to-day programming task for Java programmers and there are many ways to do it. The Map interface provides several view methods e.g. keySet(), values(), and entrySet() to retrieve all keys, values, and all key and value pairs as entries. You can use respective methods to print all keys, all values, or all key values pairs. For printing
+, you also have multiple choices like you can either use enhanced for loop or Iterator, though later also provide you the facility to remove key-value pairs while printing if needed.
+Powered By
+VDO.AI
+
+Though you should remember that these views are backed by Map, so when you remove a key-value pair
+from the entry set it will also be removed by the ConcurrentHashMap.
+
+This technique is also the standard way to iterate over Map and print all key-value pairs. You can use this technique to print all keys, values, or entries with any Map implementations including HashMap, Hashtable, LinkedHashMap, EnumMap, IdentityHashMap, WeakHashMap, or any other future implementations. How is that possible? because we are using the methods defined on Map interface and not on ConcurrentHashMap.
+
+It's guaranteed that the new Map implementation will implement the java.util.Map interface hence it will have the keySet(), values(), and entrySet() method, which means this code will work there.
+
+This is also the beauty of programming for interfaces than implementations, one of the important object-oriented design principles. and you should always do that in Java or any other object-oriented programming language. To read more about it I strongly suggest reading the first few chapters of Head First object-oriented Analysis and design book.
+
+
+
+Top 5 Courses to Learn Eclipse IDE for Java Programmers - Best of Lot
+10 examples of grep command in UNIX and Linux
+Top 5 Books to Learn DevOps for Developers - Best of Lot
+10 Examples of cURL command in UNIX and Linux
+VDO.AI
+
+
+Print all keys and values of ConcurrentHashMap
+Here is our sample Java program to print all entries from ConcurrentHashMap. I have initially created a Map with String as keys and Integer as values. It actually contains the price of popular tablets and Kindle devices. Later I had shown how to print all keys using keySet() and all key and value pairs using entrySet() in combination with for loop and Iterator.
+
+Btw, if you are not familiar with concurrent collections e.g. ConcurrentHashMap, and want to learn how they are different from traditional HashMap then I suggest you refer to Core Java Volume 1 - Fundamentals by Cay S. Horstmann, one of the great books to learn the basics of Java.
+
+How to print all keys and values of ConcurrentHashMap in Java
+
+
+
+Java Program to iterate and print keys and values of ConcurrentHashMap
+
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/*
+ * Java Program to print
+
+ all key-value pairs of ConcurrentHashMap 
+ * There are multiple ways to do this e.g. by using keySet(), entrySet()
+ * in combination of for loop and iterator.
+ */
+
+public class ConcurrentHashMapDemo {
+
+  public static void main(String[] args) {
+
+    Map<String, Integer> map = new ConcurrentHashMap<String, Integer>();
+    map.put("Kindle", 99);
+    map.put("Samsung tablet", 200);
+    map.put("iPad", 1000);
+    map.put("iPad Mini", 600);
+
+    // printing all keys
+
+ of ConcurrentHashMap
+    System.out.println("All keys of ConcurrentHashMap");
+    for (String key : map.keySet()) {
+      System.out.println(key + " : " + map.get(key));
+    }
+
+    // printing all keys
+
+ and values pairs of ConcurrentHashMap
+    System.out.println("Printing all keys and values of ConcurrentHashMap");
+    for (Map.Entry<String, Integer> entry : map.entrySet()) {
+      String key = entry.getKey().toString();
+      Integer value = entry.getValue();
+      System.out.println("key: " + key + " value: " + value);
+    }
+
+    // you can also use Iterator with EntrySet as shown below
+    Set<Map.Entry<String, Integer>> entrySet = map.entrySet();
+    Iterator<Map.Entry<String, Integer>> itr = entrySet.iterator();
+
+    while (itr.hasNext()) {
+      Map.Entry<String, Integer> entry = itr.next();
+      String key = entry.getKey();
+      Integer value = entry.getValue();
+      System.out.println("key: " + key + " value: " + value);
+    }
+
+  }
+
+}
+

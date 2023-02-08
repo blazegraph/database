@@ -1,0 +1,2400 @@
+#
+@prefix : <http://sunflower.test/> .
+@prefix geoliteral: <http://www.bigdata.com/rdf/geospatial/literals/v1#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix vcard: <http://www.w3.org/2006/vcard/ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:Address a rdfs:Class .
+
+:Asn a rdfs:Class .
+
+:AsnCidr a rdfs:Class .
+
+:City a rdfs:Class .
+
+:Country a rdfs:Class .
+
+:Handle a rdfs:Class .
+
+:Org a rdfs:Class .
+
+:Phone a rdfs:Class .
+
+:Registry a rdfs:Class .
+
+:ZipCode a rdfs:Class .
+
+:abuse_c a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range :Handle .
+
+<http://sunflower.test/addr_city:> a rdf:Property ;
+    rdfs:domain :Address ;
+    rdfs:range :City .
+
+<http://sunflower.test/addr_country:> a rdf:Property ;
+    rdfs:domain :Address ;
+    rdfs:range :Country .
+
+:admin_c a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range :Handle .
+
+<http://sunflower.test/asn_country:> a rdf:Property ;
+    rdfs:domain :Asn ;
+    rdfs:range :Country .
+
+:asn_date a rdf:Property ;
+    rdfs:domain :Asn ;
+    rdfs:range xsd:datetime .
+
+:asn_name a rdf:Property ;
+    rdfs:domain :Asn ;
+    rdfs:range xsd:string .
+
+:asn_registry a rdf:Property ;
+    rdfs:domain :Asn ;
+    rdfs:range :Registry .
+
+:cidr a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range xsd:string .
+
+<http://sunflower.test/cidr_country:> a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range :Country .
+
+:cidr_last_modified a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range xsd:datetime .
+
+:city_location a rdf:Property ;
+    rdfs:domain :City ;
+    rdfs:range geoliteral:lat-lon .
+
+:city_name a rdf:Property ;
+    rdfs:domain :City ;
+    rdfs:range xsd:string .
+
+:connected a rdf:Property ;
+    rdfs:domain :Asn ;
+    rdfs:range :Org .
+
+:contains a rdf:Property ;
+    rdfs:domain :Asn ;
+    rdfs:range :AsnCidr .
+
+:country_code a rdf:Property ;
+    rdfs:domain :Country ;
+    rdfs:range xsd:string .
+
+:country_name a rdf:Property ;
+    rdfs:domain :Country ;
+    rdfs:range xsd:string .
+
+:description a rdf:Property ;
+    rdfs:domain :Asn ;
+    rdfs:range xsd:string .
+
+:end_address a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range xsd:string .
+
+:exact_match a rdf:Property ;
+    rdfs:domain :Address ;
+    rdfs:range xsd:boolean .
+
+<http://sunflower.test/handle/ADC-XELENT-MNT> a :Handle ;
+    :handle_last_modified "2021-07-27T09:45:43+00:00"^^xsd:dateTime ;
+    :handle_name "ADC-XELENT-MNT" ;
+    :source "RIPE" .
+
+<http://sunflower.test/handle/ALTAITELECOM-RIPE-MNT> a :Handle ;
+    :handle_last_modified "2015-07-13T09:49:30+00:00"^^xsd:dateTime ;
+    :handle_name "ALTAITELECOM-RIPE-MNT" ;
+    :source "RIPE" .
+
+<http://sunflower.test/handle/AS12418-MNT> a :Handle ;
+    :handle_last_modified "2016-11-02T15:14:34+00:00"^^xsd:dateTime ;
+    :handle_name "AS12418-MNT" ;
+    :source "RIPE" .
+
+<http://sunflower.test/handle/AS210546-MNT> a :Handle ;
+    :handle_last_modified "2022-03-23T15:45:30+00:00"^^xsd:dateTime ;
+    :handle_name "AS210546-MNT" ;
+    :source "RIPE" .
+
+<http://sunflower.test/handle/AS3216-MNT> a :Handle ;
+    :handle_last_modified "2018-10-12T14:23:16+00:00"^^xsd:dateTime ;
+    :handle_name "AS3216-MNT" ;
+    :source "RIPE" .
+
+<http://sunflower.test/handle/AS5563-MNT> a :Handle ;
+    :handle_last_modified "2021-01-12T11:57:29+00:00"^^xsd:dateTime ;
+    :handle_name "AS5563-MNT" ;
+    :source "RIPE" .
+
+
+<http://sunflower.test/handle/vissado-mnt> a :Handle ;
+    :handle_last_modified "2017-07-18T07:48:13+00:00"^^xsd:dateTime ;
+    :handle_name "vissado-mnt" ;
+    :source "RIPE" .
+
+:handle_city a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range :City .
+
+:handle_country a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range :Country .
+
+:handle_email a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range xsd:string .
+
+:handle_last_modified a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range xsd:datetime .
+
+:handle_name a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range xsd:string .
+
+:has_address a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range :Address .
+
+:has_phone a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range :Phone .
+
+:has_zip_code a rdf:Property ;
+    rdfs:domain :Address ;
+    rdfs:range :ZipCode .
+
+:ip_version a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range xsd:string .
+
+:is_valid a rdf:Property ;
+    rdfs:domain :Phone ;
+    rdfs:range xsd:string .
+
+:location a rdf:Property ;
+    rdfs:domain :Address ;
+    rdfs:range geoliteral:lat-lon .
+
+:name a rdf:Property ;
+    rdfs:domain :Org ;
+    rdfs:range xsd:string .
+
+:netname a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range xsd:string .
+
+<http://sunflower.test/not_parsed:> a rdf:Property ;
+    rdfs:domain :Address ;
+    rdfs:range xsd:boolean .
+
+:operator a rdf:Property ;
+    rdfs:domain :Phone ;
+    rdfs:range xsd:string .
+
+:org_key a rdf:Property ;
+    rdfs:domain :Org ;
+    rdfs:range xsd:string .
+
+:org_last_modified a rdf:Property ;
+    rdfs:domain :Org ;
+    rdfs:range xsd:datetime .
+
+<http://sunflower.test/phone_country:> a rdf:Property ;
+    rdfs:domain :Phone ;
+    rdfs:range :Country .
+
+:raw_zip_code a rdf:Property ;
+    rdfs:domain :ZipCode ;
+    rdfs:range xsd:string .
+
+:source a rdf:Property ;
+    rdfs:domain :Handle ;
+    rdfs:range xsd:string .
+
+:start_address a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range xsd:string .
+
+:status a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range xsd:string .
+
+:tech_c a rdf:Property ;
+    rdfs:domain :AsnCidr ;
+    rdfs:range :Handle .
+
+:types a rdf:Property ;
+    rdfs:domain :Phone ;
+    rdfs:range xsd:string .
+
+<http://sunflower.test/address/%22amtel+svyaz+jsc%22+cable+and+broadband+telecom+provider_80_37_+leningradky+prospekt_moscow_+125130_+russia> a :Address ;
+    :addr_city <http://sunflower.test/city/Moskva_55.7_37.7> ;
+    :exact_match true ;
+    :has_zip_code <http://sunflower.test/zip_code/125315> ;
+    :is_address_of <http://sunflower.test/handle/SK324-RIPE> ;
+    :location "55.809239#37.51216400000001"^^geoliteral:lat-lon ;
+    :raw_address """"Amtel Svyaz JSC" cable and broadband telecom provider
+80/37, Leningradky prospekt
+Moscow, 125130, Russia""" ;
+    vcard:hasCountryName <http://sunflower.test/country/RU> ;
+    vcard:latitude "55.809239"^^xsd:string ;
+    vcard:longitude "37.51216400000001"^^xsd:string .
+
+<http://sunflower.test/address/%22sibirtelecom%22+co__+altai+branch_+62a_+dimitrova+ul__+656099__+barnaul_+russia> a :Address ;
+    :is_address_of <http://sunflower.test/handle/ASD18-RIPE> ;
+    :not_parsed true ;
+    :raw_address "\"Sibirtelecom\" Co., Altai Branch, 62a, Dimitrova ul., 656099,, Barnaul, Russia" .
+
+<http://sunflower.test/address/%22sibirtelecom%22+co__+altai+branch_62a_+dimitrova+ul__+656099__barnaul_+russia> a :Address ;
+    :addr_city <http://sunflower.test/city/Barnaul_53.3_83.8> ;
+    :exact_match true ;
+    :is_address_of <http://sunflower.test/handle/ASD18-RIPE> ;
+    :location "53.3497499#83.78357369999999"^^geoliteral:lat-lon ;
+    :raw_address """"Sibirtelecom" Co., Altai Branch
+62a, Dimitrova ul., 656099,
+Barnaul, Russia""" ;
+    vcard:hasCountryName <http://sunflower.test/country/RU> ;
+    vcard:latitude "53.3497499"^^xsd:string ;
+    vcard:longitude "83.78357369999999"^^xsd:string .
+
+<http://sunflower.test/address/%22teleport%22+llc_157_+pushkinskaya+str__426000+izhevsk_ru> a :Address ;
+    :addr_city <http://sunflower.test/city/Izhevsk_56.9_53.2> ;
+    :exact_match true ;
+    :has_zip_code <http://sunflower.test/zip_code/426000> ;
+    :is_address_of <http://sunflower.test/handle/AR16735-RIPE> ;
+    :location "56.875901#53.206291"^^geoliteral:lat-lon ;
+    :raw_address """"TELEPORT" LLC
+157, Pushkinskaya str.
+426000 Izhevsk
+RU""" ;
+    vcard:hasCountryName <http://sunflower.test/country/RU> ;
+    vcard:latitude "56.875901"^^xsd:string ;
+    vcard:longitude "53.206291"^^xsd:string .
+
+<http://sunflower.test/address/-> a :Address ;
+    :is_address_of <http://sunflower.test/handle/SA32130-RIPE> ;
+    :not_parsed true ;
+    :raw_address "-" .
+
+<http://sunflower.test/address/1+veshnyakovsky+pr_+1s8_109456_+moscow_+russian+federation> a :Address ;
+    :addr_city <http://sunflower.test/city/Moskva_55.7_37.6> ;
+    :exact_match true ;
+    :has_zip_code <http://sunflower.test/zip_code/111538> ;
+    :is_address_of <http://sunflower.test/handle/DNOC3-RIPE> ;
+    :location "55.72275920000001#37.8243522"^^geoliteral:lat-lon ;
+    :raw_address """1 Veshnyakovsky pr, 1s8
+109456, Moscow, Russian Federation""" ;
+    vcard:hasCountryName <http://sunflower.test/country/RU> ;
+    vcard:latitude "55.72275920000001"^^xsd:string ;
+    vcard:longitude "37.8243522"^^xsd:string .
+
+<http://sunflower.test/address/1-st+frezernaya+str_+2_1+korp_+2> a :Address ;
+    :is_address_of <http://sunflower.test/handle/HTL31-RIPE> ;
+    :not_parsed true ;
+    :raw_address "1-st Frezernaya str. 2/1 korp. 2" .
+
+<http://sunflower.test/address/10+shilkinskaya+st_+apt+115_++vladivostok_+russia> a :Address ;
+    :is_address_of <http://sunflower.test/handle/IKA9-RIPE> ;
+    :not_parsed true ;
+    :raw_address "10 Shilkinskaya st, apt 115,  Vladivostok, Russia" .
+
+<http://sunflower.test/asn/48080> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "48080" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/87.251.64.0%2F24> ;
+    :created "2005-09-12"^^xsd:date ;
+    :description "ORG-DP125-RIPE, RU" .
+
+<http://sunflower.test/asn/48261> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "48261" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/89.104.97.0%2F25> ;
+    :created "2006-03-09"^^xsd:date ;
+    :description "OY-SERVICE-AS, RU" .
+
+<http://sunflower.test/asn/49877> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "49877" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/87.251.70.0%2F23> ;
+    :created "2005-09-12"^^xsd:date ;
+    :description "ASTORE-TRADING-LLC, UA" .
+
+<http://sunflower.test/asn/49980> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "49980" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/88.204.108.0%2F23> ;
+    :created "2005-11-25"^^xsd:date ;
+    :description "ARIEL-AS, RU" .
+
+<http://sunflower.test/asn/50289> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "50289" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/88.84.208.0%2F24> ;
+    :created "2006-01-23"^^xsd:date ;
+    :description "WELLCOM-L, RU" .
+
+<http://sunflower.test/asn/51764> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "51764" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/91.102.204.0%2F22> ;
+    :created "2006-11-07"^^xsd:date ;
+    :description "AMTEL-AS, RU" .
+
+<http://sunflower.test/asn/56679> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "56679" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/85.143.156.0%2F23> ;
+    :created "2004-12-17"^^xsd:date ;
+    :description "TECOM-AS, RU" .
+
+<http://sunflower.test/asn/56806> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "56806" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/88.210.57.0%2F24> ;
+    :created "2005-11-24"^^xsd:date ;
+    :description "ASCOM4S, RU" .
+
+<http://sunflower.test/asn/59574> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "59574" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/89.188.168.0%2F22> ;
+    :created "2006-05-17"^^xsd:date ;
+    :description "AS-STUPINO-NET, RU" .
+
+<http://sunflower.test/asn/59714> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "59714" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/85.143.32.0%2F22> ;
+    :created "2004-12-17"^^xsd:date ;
+    :description "KSU-AS, RU" .
+
+<http://sunflower.test/asn/61178> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "61178" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/89.208.31.0%2F24> ;
+    :created "2006-04-18"^^xsd:date ;
+    :description "CYMRG-AS2, CY" .
+
+<http://sunflower.test/asn/8371> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "8371" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/88.81.32.0%2F24> ;
+    :created "2009-10-02"^^xsd:date ;
+    :description "VIMPELCOM-NN Vimpelcom, Nizhniy Novgorod branch, fixed network, RU" .
+
+<http://sunflower.test/asn/8905> a :Asn ;
+    :asn_country <http://sunflower.test/country/RU> ;
+    :asn_name "8905" ;
+    :asn_registry <http://sunflower.test/registry/ripencc> ;
+    :contains <http://sunflower.test/asn_cidr/91.188.181.0%2F24> ;
+    :created "2006-12-28"^^xsd:date ;
+    :description "DIGIT1-AS Digit One Moscow Network, RU" .
+
+<http://sunflower.test/country/DE> a :Country ;
+    :country_code "DE" .
+
+<http://sunflower.test/handle/AA39263-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/TMWB-RIPE> .
+
+<http://sunflower.test/handle/AAG103-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/Ec2530-RIPE> .
+
+<http://sunflower.test/handle/AAG51-RIPE> a :Handle ;
+    :is_admin_c_of <http://sunflower.test/asn_cidr/89.221.48.0%2F20> .
+
+<http://sunflower.test/handle/AC28769-RIPE> a :Handle ;
+    :is_abuse_c_of <http://sunflower.test/asn_cidr/89.248.231.0%2F24> .
+
+<http://sunflower.test/handle/AD11605-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/NOC211-RIPE> .
+
+
+<http://sunflower.test/handle/LEHA-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/TLNT-ORG> .
+
+<http://sunflower.test/handle/MA14315-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Novosibirsk_55.0_82.9> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "netadmin@sib.mts.ru" ;
+    :handle_last_modified "2020-12-03T07:40:26+00:00"^^xsd:dateTime ;
+    :handle_name "MA14315-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/630027> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/mts+pjsc_+mr+sibir_90_1_+bogdana+khmelnitskogo_630110_+novosibirsk_+russia> ;
+    vcard:hasEmail <mailto:netadmin@sib.mts.ru> .
+
+<http://sunflower.test/handle/MAK38-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/MCN1-RIPE> .
+
+<http://sunflower.test/handle/MAZ19-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/VOL2006-RIPE> .
+
+<http://sunflower.test/handle/ME3174-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/CMFT> .
+
+
+<http://sunflower.test/handle/ORG-LG87-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Saint+Petersburg_60.0_30.3> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "abuse@hexcore.ru" ;
+    :handle_last_modified "2019-11-18T12:39:35+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-LG87-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/198329> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/198329_+russia_+saint-petersburg_+st_+otvazhnikh+2_2_+flat+41> ;
+    vcard:hasEmail <mailto:abuse@hexcore.ru> .
+
+<http://sunflower.test/handle/ORG-MA1461-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Sankt-Peterburg_60.0_30.3> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "support@meadioperator.ru" ;
+    :handle_last_modified "2018-10-25T08:30:48+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-MA1461-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/195220> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/195220_+russia_+saint-petersburg_+nepokoryonnykh+pr_+49_+office+610_> ;
+    vcard:hasEmail <mailto:support@meadioperator.ru> .
+
+<http://sunflower.test/handle/ORG-MBL18-RIPE> a :Handle ;
+    :handle_email "support@62yun.com" ;
+    :handle_last_modified "2022-01-06T17:27:28+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-MBL18-RIPE" ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/siu+ying+commercial+building+12-578> ;
+    vcard:hasEmail <mailto:support@62yun.com> .
+
+<http://sunflower.test/handle/ORG-MnL9-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Smolensk_54.8_32.1> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "admin@mannet.ru" ;
+    :handle_last_modified "2019-03-21T14:59:41+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-MnL9-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/214031> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/russia_+smolensk_+industrialnaya+str__+h_2_+office+805g> ;
+    vcard:hasEmail <mailto:admin@mannet.ru> .
+
+<http://sunflower.test/handle/ORG-NL393-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Volzhskiy_48.8_44.8> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "admin@powernet.com.ru" ;
+    :handle_last_modified "2020-06-02T06:57:34+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-NL393-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/404127> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/gen_+karbysheva+127_volzhskiy_+404132_+russia> ;
+    vcard:hasEmail <mailto:admin@powernet.com.ru> .
+
+<http://sunflower.test/handle/ORG-NSPL1-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Bratsk_56.3_101.7> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "vvs@nsplus.ru" ;
+    :handle_last_modified "2014-08-03T10:38:48+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-NSPL1-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/665702> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/665702+russia_+bratsk_+gidrostroitelei+str__+53_+office+410> ;
+    vcard:hasEmail <mailto:vvs@nsplus.ru> .
+
+<http://sunflower.test/handle/ORG-OA163-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Simferopol_45.0_34.1> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "noc@farline.net" ;
+    :handle_last_modified "2022-03-18T09:38:51+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-OA163-RIPE" ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/ul_+samokisha_+d_+16_+kab_+17_295011+simferopol_russia> ;
+    vcard:hasEmail <mailto:noc@farline.net> .
+
+<http://sunflower.test/handle/ORG-PAKT1-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Saint+Petersburg_60.0_30.5> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "noc@pakt.spb.ru" ;
+    :handle_last_modified "2008-07-18T09:26:48+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-PAKT1-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/194295> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/ivana+fomina+14+k2_+194295_+st_+petersburg_+russia_> ;
+    vcard:hasEmail <mailto:noc@pakt.spb.ru> .
+
+<http://sunflower.test/handle/ORG-PVT1-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Magnitogorsk_53.4_59.0> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "admin@mgnhost.ru" ;
+    :handle_last_modified "2020-06-12T22:58:44+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-PVT1-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/455044> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/mgnhost_k_+marksa+107-50_455044+magnitogorsk_russian+federation> ;
+    vcard:hasEmail <mailto:admin@mgnhost.ru> .
+
+<http://sunflower.test/handle/ORG-RGL17-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/London_51.5_-0.1> ;
+    :handle_country <http://sunflower.test/country/GB> ;
+    :handle_email "info@antiddos.solutions" ;
+    :handle_last_modified "2021-02-07T15:09:40+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-RGL17-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/EC1V+2NX> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/capital+office_+kemp+house_152+-+160+city+road_+london_+united+kingdom> ;
+    vcard:hasEmail <mailto:info@antiddos.solutions> .
+
+<http://sunflower.test/handle/ORG-SL1085-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Krasnodar_45.0_39.0> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "united_office@inbox.ru" ;
+    :handle_last_modified "2021-11-25T05:02:50+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-SL1085-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/350015> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/350042_+russian+federation_+krasnodar_kolhoznya_+str__+3+liter+a_+1st+floor_+ap_+41> ;
+    vcard:hasEmail <mailto:united_office@inbox.ru> .
+
+<http://sunflower.test/handle/ORG-SVU2-RIPE> a :Handle ;
+    :handle_email "vsokirkin@yandex.ru" ;
+    :handle_last_modified "2019-08-29T11:02:52+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-SVU2-RIPE" ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/mo_+pavlovsky+pasad_+ul_+kalyaeva_+10> ;
+    vcard:hasEmail <mailto:vsokirkin@yandex.ru> .
+
+<http://sunflower.test/handle/ORG-VL345-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Sankt-Peterburg_59.9_30.3> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "info@vvlon.ru" ;
+    :handle_last_modified "2020-10-01T10:22:23+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-VL345-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/195267> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/saint-petersburg_+grazhdanskiy+pr_+22+lit_+a+of_605> ;
+    vcard:hasEmail <mailto:info@vvlon.ru> .
+
+<http://sunflower.test/handle/ORG-VLSU1-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Vladimir_56.1_40.4> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "sergey.roshchin@vlsu.ru" ;
+    :handle_last_modified "2018-08-08T20:05:32+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-VLSU1-RIPE" ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/regional+center+of+new+information+technologies_87_+gorkogo+st__+vladimir_russia> ;
+    vcard:hasEmail <mailto:sergey.roshchin@vlsu.ru> .
+
+<http://sunflower.test/handle/ORG-YATA3-RIPE> a :Handle ;
+    :handle_city <http://sunflower.test/city/Zaporizhzhia_47.9_35.2> ;
+    :handle_country <http://sunflower.test/country/UA> ;
+    :handle_email "noc@AS210546.net" ;
+    :handle_last_modified "2022-03-18T21:44:20+00:00"^^xsd:dateTime ;
+    :handle_name "ORG-YATA3-RIPE" ;
+    :handle_zip_code <http://sunflower.test/zip_code/69000> ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/69120_+ukraine_+zaporizhia_+voronina+str+31_+apartment+41> ;
+    vcard:hasEmail <mailto:noc@AS210546.net> .
+
+<http://sunflower.test/handle/PK2069-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/NOC211-RIPE> .
+
+<http://sunflower.test/handle/POOF-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/CMFT> .
+
+<http://sunflower.test/handle/RK10446-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/UN1646-RIPE> .
+
+<http://sunflower.test/handle/SB10139-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/MSU-RIPE> .
+
+<http://sunflower.test/handle/SK4049-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/FCIP-RIPE> .
+
+<http://sunflower.test/handle/SNI-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/ESRV-RIPE> .
+
+<http://sunflower.test/handle/SV67-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/DIN-RIPE> .
+
+<http://sunflower.test/handle/TA2344-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/UYAS1-RIPE> .
+
+<http://sunflower.test/handle/TA8042-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/BNO2-RIPE> .
+
+<http://sunflower.test/handle/TORR1-RIPE> a :Handle ;
+    :is_tech_c_of <http://sunflower.test/asn_cidr/91.102.220.0%2F22> .
+
+<http://sunflower.test/handle/URI2-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/DIN-RIPE> .
+
+<http://sunflower.test/handle/VK2323-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/FCIP-RIPE> .
+
+<http://sunflower.test/handle/VO1179-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/UN1646-RIPE> .
+
+<http://sunflower.test/handle/VPS3-RIPE> a :Handle ;
+    :is_handle_admin_c_of <http://sunflower.test/handle/EV75-RIPE> .
+
+<http://sunflower.test/handle/VYY9-RIPE> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/BNO2-RIPE> .
+
+<http://sunflower.test/handle/fsy-ripe> a :Handle ;
+    :is_handle_tech_c_of <http://sunflower.test/handle/FRD-RIPE> .
+
+<http://sunflower.test/org/ORG-AMB8-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/213220> ;
+    :name "Alexander M. Belov" ;
+    :org_key "ORG-AMB8-RIPE" ;
+    :org_last_modified "2020-12-14T07:33:06+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-AX9-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/199860> ;
+    :name "Atomdata-Center Xelent" ;
+    :org_key "ORG-AX9-RIPE" ;
+    :org_last_modified "2021-07-01T10:37:47+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-BL256-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/207168> ;
+    :name "BT-Telecom Ltd." ;
+    :org_key "ORG-BL256-RIPE" ;
+    :org_last_modified "2021-04-20T07:24:52+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-BTL36-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/42148> ;
+    :name "Beirel Telecom LLC" ;
+    :org_key "ORG-BTL36-RIPE" ;
+    :org_last_modified "2020-12-16T13:32:56+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-CCM2-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/49342> ;
+    :name "OOO \"MediaSeti\"" ;
+    :org_key "ORG-CCM2-RIPE" ;
+    :org_last_modified "2021-09-10T15:41:11+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-CHTB3-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/56981> ;
+    :name "JSC \"ER-Telecom Holding\" Tomsk Branch" ;
+    :org_key "ORG-CHTB3-RIPE" ;
+    :org_last_modified "2019-10-18T13:11:48+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-CHYB1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/51604> ;
+    :name "JSC \"ER-Telecom Holding\" Yekaterinburg Branch" ;
+    :org_key "ORG-CHYB1-RIPE" ;
+    :org_last_modified "2019-10-16T05:13:07+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-CJSC19-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/20870> ;
+    :name "Joint Stock Company TransTeleCom" ;
+    :org_key "ORG-CJSC19-RIPE" ;
+    :org_last_modified "2022-04-08T10:40:37+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-CNL7-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/40995> ;
+    :name "Sibirskie Seti Ltd." ;
+    :org_key "ORG-CNL7-RIPE" ;
+    :org_last_modified "2020-12-16T13:28:59+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-DL43-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/50668> ;
+    :name "Dialog-K LLC" ;
+    :org_key "ORG-DL43-RIPE" ;
+    :org_last_modified "2018-10-08T20:12:23+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-DL440-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/213220> ;
+    :name "DATAMAX-M, LLC" ;
+    :org_key "ORG-DL440-RIPE" ;
+    :org_last_modified "2021-11-04T10:10:45+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-DNJ1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/12695> ;
+    :name "LLC Digital Network" ;
+    :org_key "ORG-DNJ1-RIPE" ;
+    :org_last_modified "2021-05-11T18:08:25+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-EA385-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/39927> ;
+    :name "E-Light-Telecom Ltd." ;
+    :org_key "ORG-EA385-RIPE" ;
+    :org_last_modified "2020-12-16T13:23:27+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-EA40-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/20597> ;
+    :name "now PAO Vimpelcom - formely ZAO \"ELTEL\"" ;
+    :org_key "ORG-EA40-RIPE" ;
+    :org_last_modified "2022-03-02T11:17:36+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-ESRV1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/42244> ;
+    :name "Hosting Operator eServer.ru Ltd." ;
+    :org_key "ORG-ESRV1-RIPE" ;
+    :org_last_modified "2021-04-28T21:40:36+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-FA1050-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/29076> ;
+    :name "FILANCO-SPB-LLC" ;
+    :org_key "ORG-FA1050-RIPE" ;
+    :org_last_modified "2020-01-10T14:24:43+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-GD26-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/57031> ;
+    :name "Grid Dynamics LLC" ;
+    :org_key "ORG-GD26-RIPE" ;
+    :org_last_modified "2014-07-31T10:10:06+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-GL395-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/47196> ;
+    :name "Garant-Park-Internet LLC" ;
+    :org_key "ORG-GL395-RIPE" ;
+    :org_last_modified "2021-07-21T13:57:28+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-HTL17-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/207651> ;
+    :name "Hosting technology LTD" ;
+    :org_key "ORG-HTL17-RIPE" ;
+    :org_last_modified "2022-03-21T10:53:40+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-JSCC8-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/212869> ;
+    :name "Joint stock Company commercial bank Lanta-Bank" ;
+    :org_key "ORG-JSCC8-RIPE" ;
+    :org_last_modified "2020-07-23T15:08:53+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-JT30-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/50716> ;
+    :name "Telecom.ru Ltd" ;
+    :org_key "ORG-JT30-RIPE" ;
+    :org_last_modified "2020-01-11T12:18:00+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-KnL7-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/51042> ;
+    :name "Klimovsk network Ltd" ;
+    :org_key "ORG-KnL7-RIPE" ;
+    :org_last_modified "2014-11-17T22:31:22+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-LA482-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/58310> ;
+    :name "\"TELEPORT\" LLC" ;
+    :org_key "ORG-LA482-RIPE" ;
+    :org_last_modified "2021-07-21T13:39:39+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-LG87-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/203004> ;
+    :name "GlavTel ltd" ;
+    :org_key "ORG-LG87-RIPE" ;
+    :org_last_modified "2019-11-18T12:39:35+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-LP7-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/29303> ;
+    :name "Ltd PermInterCom" ;
+    :org_key "ORG-LP7-RIPE" ;
+    :org_last_modified "2021-02-03T10:58:45+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-MA1461-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/39033> ;
+    :name "Mediaoperator LLC" ;
+    :org_key "ORG-MA1461-RIPE" ;
+    :org_last_modified "2018-10-25T08:30:48+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-MA30-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/25532> ;
+    :name "LLC \"MASTERHOST\"" ;
+    :org_key "ORG-MA30-RIPE" ;
+    :org_last_modified "2021-08-18T08:33:47+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-MBL18-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/57416> ;
+    :name "MY BUHO LIMITED" ;
+    :org_key "ORG-MBL18-RIPE" ;
+    :org_last_modified "2022-01-06T17:27:28+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-ML281-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/201776> ;
+    :name "Miranda-Media Ltd" ;
+    :org_key "ORG-ML281-RIPE" ;
+    :org_last_modified "2022-04-06T07:14:16+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-ML62-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/41816> ;
+    :name "Megalog-Plus Ltd" ;
+    :org_key "ORG-ML62-RIPE" ;
+    :org_last_modified "2020-12-16T12:56:01+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-ML76-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/48642> ;
+    :name "Mizar-Project Ltd." ;
+    :org_key "ORG-ML76-RIPE" ;
+    :org_last_modified "2020-12-15T15:23:12+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-MLL14-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/206728> ;
+    :name "Media Land LLC" ;
+    :org_key "ORG-MLL14-RIPE" ;
+    :org_last_modified "2022-04-03T19:55:15+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-MnL9-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/47118> ;
+    :name "MAN net Ltd." ;
+    :org_key "ORG-MnL9-RIPE" ;
+    :org_last_modified "2019-03-21T14:59:41+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-NEVP1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/39785> ;
+    :name "Nemerov Evgeniy Vladimirovish PE" ;
+    :org_key "ORG-NEVP1-RIPE" ;
+    :org_last_modified "2021-07-21T13:47:54+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-NL393-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/51032> ;
+    :name "Powernet Ltd" ;
+    :org_key "ORG-NL393-RIPE" ;
+    :org_last_modified "2020-06-02T06:57:34+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-NL73-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/34123> ;
+    :name "Netorn LLC" ;
+    :org_key "ORG-NL73-RIPE" ;
+    :org_last_modified "2021-04-15T19:58:41+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-NSPL1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/42574> ;
+    :name "Novaya Sibir Plus Ltd." ;
+    :org_key "ORG-NSPL1-RIPE" ;
+    :org_last_modified "2014-08-03T10:38:48+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-OA163-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/42239> ;
+    :name "Ltd. \"Cypher\"" ;
+    :org_key "ORG-OA163-RIPE" ;
+    :org_last_modified "2022-03-18T09:38:51+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-OA269-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/48711> ;
+    :name "OOO \"Matritsa\"" ;
+    :org_key "ORG-OA269-RIPE" ;
+    :org_last_modified "2019-05-28T07:39:25+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-OS214-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/31430> ;
+    :name "OOO Suntel" ;
+    :org_key "ORG-OS214-RIPE" ;
+    :org_last_modified "2021-07-21T13:45:40+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-OT4-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/28840> ;
+    :name "PJSC \"TATTELECOM\"" ;
+    :org_key "ORG-OT4-RIPE" ;
+    :org_last_modified "2021-08-18T08:34:28+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-OY1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/25880> ;
+    :name "Public joint-stock company \"RUTELEKOM\"" ;
+    :org_key "ORG-OY1-RIPE" ;
+    :org_last_modified "2021-07-21T13:39:06+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-PVT1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/202423> ;
+    :name "PE Viktor Tyurin" ;
+    :org_key "ORG-PVT1-RIPE" ;
+    :org_last_modified "2020-06-12T22:58:44+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-RA21-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/5563> ;
+    :name "JSC \"ER-Telecom Holding\"" ;
+    :org_key "ORG-RA21-RIPE" ;
+    :org_last_modified "2021-05-17T06:43:35+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-RGL17-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/206980> ;
+    :name "React Group LP" ;
+    :org_key "ORG-RGL17-RIPE" ;
+    :org_last_modified "2021-02-07T15:09:40+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-SL1085-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/41106> ;
+    :name "Sprint-S Ltd." ;
+    :org_key "ORG-SL1085-RIPE" ;
+    :org_last_modified "2021-11-25T05:02:50+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-SL18-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/31323> ;
+    :name "JSC \"Severen-Telecom\"" ;
+    :org_key "ORG-SL18-RIPE" ;
+    :org_last_modified "2021-12-14T13:46:25+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-SL744-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/61400> ;
+    :name "Start2 LLC" ;
+    :org_key "ORG-SL744-RIPE" ;
+    :org_last_modified "2021-11-11T08:05:02+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-STUI1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/49929> ;
+    :name "State Technological University \"Moscow Institute of Steel and Alloys\" Telecommunications Center - Metaltelecom Ltd." ;
+    :org_key "ORG-STUI1-RIPE" ;
+    :org_last_modified "2020-06-17T18:52:46+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-SVU2-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/208300> ;
+    :name "Sokirkin Vasilij Yur'evich" ;
+    :org_key "ORG-SVU2-RIPE" ;
+    :org_last_modified "2019-08-29T11:02:52+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-TSL64-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/212345> ;
+    :name "Tech Solutions LLC" ;
+    :org_key "ORG-TSL64-RIPE" ;
+    :org_last_modified "2022-03-03T09:54:55+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-VL345-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/212566> ;
+    :name "Vavilon Ltd." ;
+    :org_key "ORG-VL345-RIPE" ;
+    :org_last_modified "2020-10-01T10:22:23+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-VLSU1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/51352> ;
+    :name "State Educational Institution of higher professional Education 'Vladimir State University'" ;
+    :org_key "ORG-VLSU1-RIPE" ;
+    :org_last_modified "2018-08-08T20:05:32+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-VtLL1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/43267> ;
+    :name "Vysokie tehnologii Limited Liability Company" ;
+    :org_key "ORG-VtLL1-RIPE" ;
+    :org_last_modified "2021-07-21T13:39:15+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-YATA3-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/210546> ;
+    :name "Miglovets Egor Andreevich" ;
+    :org_key "ORG-YATA3-RIPE" ;
+    :org_last_modified "2022-03-18T21:44:20+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/org/ORG-nrRL1-RIPE> a :Org ;
+    :asn_relation <http://sunflower.test/asn/197695> ;
+    :name "\"Domain names registrar REG.RU\", Ltd" ;
+    :org_key "ORG-nrRL1-RIPE" ;
+    :org_last_modified "2022-04-13T11:05:43+00:00"^^xsd:dateTime .
+
+<http://sunflower.test/phone/%2B+7+863+2797519> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NNK9-RIPE> ;
+    :is_valid true ;
+    :phone "+78632797519" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+ 7 863 2797519" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B07+3823+771999> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/OVS3-RIPE> ;
+    :is_valid false ;
+    :phone "073823771999" ;
+    :raw_phone "+07 3823 771999" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B1+267+8000316> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SSL86-RIPE> ;
+    :is_valid true ;
+    :phone "+12678000316" ;
+    :phone_country <http://sunflower.test/country/US> ;
+    :raw_phone "+1 267 8000316" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B1-917-709-5906> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NA6833-RIPE> ;
+    :is_valid true ;
+    :phone "+19177095906" ;
+    :phone_country <http://sunflower.test/country/US> ;
+    :raw_phone "+1-917-709-5906" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B14164560126> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/JK15406-RIPE> ;
+    :is_valid true ;
+    :phone "+14164560126" ;
+    :phone_country <http://sunflower.test/country/CA> ;
+    :raw_phone "+14164560126" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B15086149210> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CD9211-RIPE> ;
+    :is_valid true ;
+    :phone "+15086149210" ;
+    :phone_country <http://sunflower.test/country/US> ;
+    :raw_phone "+15086149210" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B16134310223> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MB52452-RIPE> ;
+    :is_valid true ;
+    :phone "+16134310223" ;
+    :phone_country <http://sunflower.test/country/CA> ;
+    :raw_phone "+16134310223" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B31203698990> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SC16774-RIPE> ;
+    :is_valid true ;
+    :phone "+31203698990" ;
+    :phone_country <http://sunflower.test/country/NL> ;
+    :raw_phone "+31203698990" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B37052716350> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AV12030-RIPE> ;
+    :is_valid true ;
+    :phone "+37052716350" ;
+    :phone_country <http://sunflower.test/country/LT> ;
+    :raw_phone "+37052716350" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B3726991543> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SENT1-RIPE> ;
+    :is_valid true ;
+    :phone "+3726991543" ;
+    :phone_country <http://sunflower.test/country/EE> ;
+    :raw_phone "+3726991543" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B37360804015> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/EM13731-RIPE> ;
+    :is_valid true ;
+    :operator "Orange" ;
+    :phone "+37360804015" ;
+    :phone_country <http://sunflower.test/country/MD> ;
+    :raw_phone "+37360804015" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B380935734033> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/BS12196-RIPE> ;
+    :is_valid true ;
+    :operator "lifecell" ;
+    :phone "+380935734033" ;
+    :phone_country <http://sunflower.test/country/UA> ;
+    :raw_phone "+380935734033" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B44+208+150+6334> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/RHD7-RIPE> ;
+    :is_valid true ;
+    :phone "+442081506334" ;
+    :phone_country <http://sunflower.test/country/GB> ;
+    :raw_phone "+44 208 150 6334" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7%283412%29+956-200> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/VY248-RIPE> ;
+    :is_valid true ;
+    :phone "+73412956200" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7(3412) 956-200" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7%283424%29292300> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MAX1978-RIPE> ;
+    :is_valid true ;
+    :phone "+73424292300" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7(3424)292300" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7%28495%29983-0404> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/RRS6-RIPE> ;
+    :is_valid true ;
+    :phone "+74959830404" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7(495)983-0404" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7%288672%29500001> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SVS14-RIPE> ;
+    :is_valid true ;
+    :phone "+78672500001" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7(8672)500001" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+%28495%29+491-55-53> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/RGRU-RIPE> ;
+    :is_valid true ;
+    :phone "+74954915553" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (495) 491-55-53" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+%28495%29+580-11-11> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/RGRU-RIPE> ;
+    :is_valid true ;
+    :phone "+74955801111" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (495) 580-11-11" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+%28495%29+662+5430> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NC2391-RIPE> ;
+    :is_valid true ;
+    :phone "+74956625430" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (495) 662 5430" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+%28495%29+737+5194> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NC2391-RIPE> ;
+    :is_valid true ;
+    :phone "+74957375194" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (495) 737 5194" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+%28495%29+748-7957> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/EXPT-RIPE> ;
+    :is_valid true ;
+    :phone "+74957487957" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (495) 748-7957" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+%28495%29+980-6000> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/DL8617-RIPE> ;
+    :is_valid true ;
+    :phone "+74959806000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (495) 980-6000" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+%28499%29+940+0044> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NC2391-RIPE> ;
+    :is_valid true ;
+    :phone "+74999400044" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (499) 940 0044" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+%28812%29+386+20+20> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MK5687-RIPE> ;
+    :is_valid true ;
+    :phone "+78123862020" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (812) 386 20 20" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+%288793%29+328240> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AZ2795-RIPE> ;
+    :is_valid true ;
+    :phone "+78793328240" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (8793) 328240" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+%288793%29+380926> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AZ2795-RIPE> ;
+    :is_valid true ;
+    :phone "+78793380926" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 (8793) 380926" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3412+912000> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/INT11-RIPE> ;
+    :is_valid true ;
+    :phone "+73412912000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3412 912000" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+3412+912299> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/INT11-RIPE> ;
+    :is_valid true ;
+    :phone "+73412912299" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3412 912299" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+342+2+195+100> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ERTH70-RIPE> ;
+    :is_valid true ;
+    :phone "+73422195100" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 342 2 195 100" ;
+    :type "",
+        "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+342+2195+104> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-CHTB3-RIPE> ;
+    :is_valid true ;
+    :phone "+73422195104" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 342 2195 104" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+342+2195024> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-RA21-RIPE> ;
+    :is_valid true ;
+    :phone "+73422195024" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 342 2195024" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+342+2402001> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-LP7-RIPE> ;
+    :is_valid true ;
+    :phone "+73422402001" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 342 2402001" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+342+2462+367> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-CHTB3-RIPE> ;
+    :is_valid true ;
+    :phone "+73422462367" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 342 2462 367" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+342+2463344> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/RAID1-RIPE> ;
+    :is_valid true ;
+    :phone "+73422463344" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 342 2463344" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3422+196300> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MDA24-RIPE> ;
+    :is_valid true ;
+    :phone "+73422196300" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3422 196300" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+3422+200403> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AVR42-RIPE> ;
+    :is_valid true ;
+    :phone "+73422200403" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3422 200403" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+3422+460044> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MDA24-RIPE> ;
+    :is_valid true ;
+    :phone "+73422460044" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3422 460044" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3422+640638> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AVR42-RIPE> ;
+    :is_valid true ;
+    :phone "+73422640638" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3422 640638" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+343+2166465> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-ML76-RIPE> ;
+    :is_valid true ;
+    :phone "+73432166465" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 2166465" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+343+2201257> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-ML76-RIPE> ;
+    :is_valid true ;
+    :phone "+73432201257" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 2201257" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+343+2207722> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KTEL1-RIPE> ;
+    :is_valid true ;
+    :phone "+73432207722" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 2207722" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+343+2533620> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/FCIP-RIPE> ;
+    :is_valid true ;
+    :phone "+73432533620" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 2533620" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+343+2784551> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KTEL1-RIPE> ;
+    :is_valid true ;
+    :phone "+73432784551" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 2784551" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+343+2786060> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AT8170-RIPE> ;
+    :is_valid true ;
+    :phone "+73432786060" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 2786060" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+343+345+03+40> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/URAL1-RIPE> ;
+    :is_valid true ;
+    :phone "+73433450340" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 345 03 40" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+343+3652230> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CCUB1-RIPE> ;
+    :is_valid true ;
+    :phone "+73433652230" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 3652230" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+343+379-12-07> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/IL154-RIPE> ;
+    :is_valid true ;
+    :phone "+73433791207" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 343 379-12-07" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+34365+99996> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MVA27-RIPE> ;
+    :is_valid true ;
+    :phone "+73436599996" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 34365 99996" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+34365+99998> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MVA27-RIPE> ;
+    :is_valid true ;
+    :phone "+73436599998" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 34365 99998" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+3452+522016> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/TYUM-RIPE> ;
+    :is_valid true ;
+    :phone "+73452522016" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3452 522016" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3452+522017> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/TYUM-RIPE> ;
+    :is_valid true ;
+    :phone "+73452522017" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3452 522017" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+34671+91150> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KA2902-RIPE> ;
+    :is_valid true ;
+    :phone "+73467191150" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 34671 91150" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+34671+91250> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/DE2673-RIPE> ;
+    :is_valid true ;
+    :phone "+73467191250" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 34671 91250" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+34922+30412> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KYAR-RIPE> ;
+    :is_valid true ;
+    :phone "+73492230412" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 34922 30412" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+34922+40081> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KYAR-RIPE> ;
+    :is_valid true ;
+    :phone "+73492240081" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 34922 40081" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3496+351424> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KLMA-RIPE> ;
+    :is_valid true ;
+    :phone "+73496351424" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3496 351424" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+351+2396555> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/EDV> ;
+    :is_valid true ;
+    :phone "+73512396555" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 351 2396555" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+351+2396565> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/EDV> ;
+    :is_valid true ;
+    :phone "+73512396565" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 351 2396565" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+3522+432051> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/EGL-RIPE> ;
+    :is_valid true ;
+    :phone "+73522432051" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3522 432051" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3522+432573> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/EGL-RIPE> ;
+    :is_valid true ;
+    :phone "+73522432573" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3522 432573" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+38+52+352956> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ASD18-RIPE> ;
+    :is_valid true ;
+    :phone "+73852352956" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 38 52 352956" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+38+52+356833> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ASD18-RIPE> ;
+    :is_valid true ;
+    :phone "+73852356833" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 38 52 356833" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3812+310683> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SK1804-RIPE> ;
+    :is_valid true ;
+    :phone "+73812310683" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3812 310683" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+3822+282888> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/TLT-RIPE> ;
+    :is_valid true ;
+    :phone "+73822282888" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3822 282888" ;
+    :type "",
+        "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+3822+559876> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/DIN-RIPE> ;
+    :is_valid true ;
+    :phone "+73822559876" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3822 559876" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+3822+662506> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/DIN-RIPE> ;
+    :is_valid true ;
+    :phone "+73822662506" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3822 662506" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+3822+662510> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/DIN-RIPE> ;
+    :is_valid true ;
+    :phone "+73822662510" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3822 662510" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+3822+765320> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MN675-RIPE> ;
+    :is_valid true ;
+    :phone "+73822765320" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3822 765320" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+383+2050000> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NOC211-RIPE> ;
+    :is_valid true ;
+    :phone "+73832050000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 383 2050000" ;
+    :type "",
+        "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+383-2048-123> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/YOL1-RIPE> ;
+    :is_valid true ;
+    :phone "+73832048123" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 383-2048-123" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+390+229+7411> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/EL2071-RIPE> ;
+    :is_valid true ;
+    :phone "+73902297411" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 390 229 7411" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+390+229+7472> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AS10456-RIPE> ;
+    :is_valid true ;
+    :phone "+73902297472" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 390 229 7472" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+391+2055555> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/HAL87-RIPE> ;
+    :is_valid true ;
+    :phone "+73912055555" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 391 2055555" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+3952+200057> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/VAM3-RIPE> ;
+    :is_valid true ;
+    :phone "+73952200057" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3952 200057" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3952+200181> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/VAM3-RIPE> ;
+    :is_valid true ;
+    :phone "+73952200181" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3952 200181" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+3952+505101> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AAZH1-RIPE> ;
+    :is_valid true ;
+    :phone "+73952505101" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3952 505101" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+3952+707055> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AAZH1-RIPE> ;
+    :is_valid true ;
+    :phone "+73952707055" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 3952 707055" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+4012+705+705> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/IP46-RU> ;
+    :is_valid true ;
+    :phone "+74012705705" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4012 705 705" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+423+226+73+10> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NRA1-RIPE> ;
+    :is_valid true ;
+    :phone "+74232267310" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 423 226 73 10" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+423+2403802> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MAXM1-RIPE> ;
+    :is_valid true ;
+    :phone "+74232403802" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 423 2403802" ;
+    :type "",
+        "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+4232+340010> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/TD880-RIPE> ;
+    :is_valid true ;
+    :phone "+74232340010" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4232 340010" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+4232+406029> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/POL-RIPE> ;
+    :is_valid true ;
+    :phone "+74232406029" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4232 406029" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+4232+420576> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/DS1083-RIPE> ;
+    :is_valid true ;
+    :phone "+74232420576" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4232 420576" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+4232+532031> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/GUR77-RIPE> ;
+    :is_valid true ;
+    :phone "+74232532031" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4232 532031" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+4232+613177> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/GUR77-RIPE> ;
+    :is_valid true ;
+    :phone "+74232613177" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4232 613177" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+42337+45810> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/FEA3-RIPE> ;
+    :is_valid true ;
+    :phone "+74233745810" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 42337 45810" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+42337+46463> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/FEA3-RIPE> ;
+    :is_valid true ;
+    :phone "+74233746463" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 42337 46463" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+42361+52838> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KRN12-RIPE> ;
+    :is_valid true ;
+    :phone "+74236152838" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 42361 52838" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+42366+31731> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AVG42-RIPE> ;
+    :is_valid true ;
+    :phone "+74236631731" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 42366 31731" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+42366+33999> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AVG42-RIPE> ;
+    :is_valid true ;
+    :phone "+74236633999" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 42366 33999" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+42375-92396> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/PSI15-RIPE> ;
+    :is_valid true ;
+    :phone "+74237592396" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 42375-92396" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+4242+460018> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AVC7-RIPE> ;
+    :is_valid true ;
+    :phone "+74242460018" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4242 460018" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+4732+339352> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/VSI8-RIPE> ;
+    :is_valid true ;
+    :phone "+74732339352" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4732 339352" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+4732+531789> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/VSI8-RIPE> ;
+    :is_valid true ;
+    :phone "+74732531789" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4732 531789" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+4852+328992> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AAV26-RIPE> ;
+    :is_valid true ;
+    :phone "+74852328992" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4852 328992" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+4852+452042> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AAV26-RIPE> ;
+    :is_valid true ;
+    :phone "+74852452042" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4852 452042" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+4852+459438> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AAD75-RIPE> ;
+    :is_valid true ;
+    :phone "+74852459438" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4852 459438" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+4872+700777> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NCT-RIPE> ;
+    :is_valid true ;
+    :phone "+74872700777" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4872 700777" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+4912+932520+ext.+94469> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AP25920-RIPE> ;
+    :is_valid true ;
+    :phone "+74912932520" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4912 932520 ext. 94469" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+4922+479668> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SVR43-RIPE> ;
+    :is_valid true ;
+    :phone "+74922479668" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4922 479668" ;
+    :type "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+4932+269680> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/DD5551-RIPE> ;
+    :is_valid true ;
+    :phone "+74932269680" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4932 269680" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+4932+581581> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NVN-RIPE> ;
+    :is_valid true ;
+    :phone "+74932581581" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 4932 581581" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+0331081> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/TMWB-RIPE> ;
+    :is_valid true ;
+    :phone "+74950331081" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 0331081" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+111+9595> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NET4-RIPE> ;
+    :is_valid true ;
+    :phone "+74951119595" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 111 9595" ;
+    :type "",
+        "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+2263742> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/BA3466-RIPE> ;
+    :is_valid true ;
+    :phone "+74952263742" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 2263742" ;
+    :type "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+2409229> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AK10080-RIPE> ;
+    :is_valid true ;
+    :phone "+74952409229" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 2409229" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+280-3723> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SLN5-RIPE> ;
+    :is_valid true ;
+    :phone "+74952803723" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 280-3723" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+339+11+22> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-JR8-RIPE> ;
+    :is_valid true ;
+    :phone "+74953391122" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 339 11 22" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+3630542> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CNOC8-RIPE> ;
+    :is_valid true ;
+    :phone "+74953630542" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 3630542" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+4939149> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/VSL6-RIPE> ;
+    :is_valid true ;
+    :phone "+74954939149" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 4939149" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+5140400> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/GPI-RIPE> ;
+    :is_valid true ;
+    :phone "+74955140400" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 5140400" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+565+39+40> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/GGN13-RIPE> ;
+    :is_valid true ;
+    :phone "+74955653940" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 565 39 40" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+6385017> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MCN1-RIPE> ;
+    :is_valid true ;
+    :phone "+74956385017" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 6385017" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+6415300> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/FRD-RIPE> ;
+    :is_valid true ;
+    :phone "+74956415300" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 6415300" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+6415303> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/FRD-RIPE> ;
+    :is_valid true ;
+    :phone "+74956415303" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 6415303" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+6637742> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CNOC8-RIPE> ;
+    :is_valid true ;
+    :phone "+74956637742" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 6637742" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+7107164> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CTLN1-RIPE> ;
+    :is_valid true ;
+    :phone "+74957107164" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7107164" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+7107171> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CTLN1-RIPE> ;
+    :is_valid true ;
+    :phone "+74957107171" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7107171" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+721-34-99> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MTU1-RIPE> ;
+    :is_valid true ;
+    :phone "+74957213499" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 721-34-99" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7254300> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SVNT2-RIPE> ;
+    :is_valid true ;
+    :phone "+74957254300" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7254300" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+7265935> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AM40607-RIPE> ;
+    :is_valid true ;
+    :phone "+74957265935" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7265935" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+7272027> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/OA2479-RIPE> ;
+    :is_valid true ;
+    :phone "+74957272027" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7272027" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7292568> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SOUR-RIPE> ;
+    :is_valid true ;
+    :phone "+74957292568" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7292568" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7555552> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SYF2-RIPE> ;
+    :is_valid true ;
+    :phone "+74957555552" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7555552" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+7729720> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MHST-RIPE> ;
+    :is_valid true ;
+    :phone "+74957729720" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7729720" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7729723> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MHST-RIPE> ;
+    :is_valid true ;
+    :phone "+74957729723" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7729723" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+775-55-52> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/BUG5-RIPE> ;
+    :is_valid true ;
+    :phone "+74957755552" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 775-55-52" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+7832970> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MAA31-RIPE> ;
+    :is_valid true ;
+    :phone "+74957832970" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7832970" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7846670> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KTTK-RIPE> ;
+    :is_valid true ;
+    :phone "+74957846670" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7846670" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7846671> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KTTK-RIPE> ;
+    :is_valid true ;
+    :phone "+74957846671" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7846671" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+7846677> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KTTK-RIPE> ;
+    :is_valid true ;
+    :phone "+74957846677" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7846677" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+785+3699> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/IINF-RIPE> ;
+    :is_valid true ;
+    :phone "+74957853699" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 785 3699" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+787+0777> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MTEL1-RIPE> ;
+    :is_valid true ;
+    :phone "+74957870777" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 787 0777" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+7871000> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SVNT2-RIPE> ;
+    :is_valid true ;
+    :phone "+74957871000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7871000" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7871010> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SVNT1-RIPE> ;
+    :is_valid true ;
+    :phone "+74957871010" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7871010" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+7874200> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/JTC13-RIPE> ;
+    :is_valid true ;
+    :phone "+74957874200" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7874200" ;
+    :type "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7874208> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/AL5467-RIPE> ;
+    :is_valid true ;
+    :phone "+74957874208" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7874208" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+7898346> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MAA31-RIPE> ;
+    :is_valid true ;
+    :phone "+74957898346" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 7898346" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+939-2829> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MSU-RIPE> ;
+    :is_valid true ;
+    :phone "+74959392829" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 939-2829" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+495+9505678> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MCN1-RIPE> ;
+    :is_valid true ;
+    :phone "+74959505678" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 9505678" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+9505679> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MCN1-RIPE> ;
+    :is_valid true ;
+    :phone "+74959505679" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 9505679" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+955+00+87> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ANP12-RIPE> ;
+    :is_valid true ;
+    :phone "+74959550087" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 955 00 87" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+9550054> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-STUI1-RIPE> ;
+    :is_valid true ;
+    :phone "+74959550054" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 9550054" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+956-00-00> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MAB8359-RIPE> ;
+    :is_valid true ;
+    :phone "+74959560000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 956-00-00" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+9560000> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CTN-RIPE> ;
+    :is_valid true ;
+    :phone "+74959560000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 9560000" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+9560795> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/CTN-RIPE> ;
+    :is_valid true ;
+    :phone "+74959560795" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 9560795" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+495+974+1088> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/NA3048-RIPE> ;
+    :is_valid true ;
+    :phone "+74959741088" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 974 1088" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+495+983+04+04> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SK324-RIPE> ;
+    :is_valid true ;
+    :phone "+74959830404" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 983 04 04" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+495+983+04+05> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SK324-RIPE> ;
+    :is_valid true ;
+    :phone "+74959830405" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 495 983 04 05" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+496+500+0050> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/BTN-RIPE> ;
+    :is_valid true ;
+    :phone "+74965000050" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 496 500 0050" ;
+    :type "",
+        "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+496+54657224> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MGLS2-RIPE> ;
+    :is_valid false ;
+    :phone "749654657224" ;
+    :raw_phone "+7 496 54657224" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+496+7566000> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/MS21348-RIPE> ;
+    :is_valid true ;
+    :phone "+74967566000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 496 7566000" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+499+405+50+50> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SB9080-RIPE> ;
+    :is_valid true ;
+    :phone "+74994055050" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 499 405 50 50" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+499+9550165> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-STUI1-RIPE> ;
+    :is_valid true ;
+    :phone "+74999550165" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 499 9550165" ;
+    :type "fax" .
+
+<http://sunflower.test/phone/%2B7+8112-70-00-00> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/KAL29-RIPE> ;
+    :is_valid true ;
+    :phone "+78112700000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 8112-70-00-00" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+81162+974202> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SS17822-RIPE> ;
+    :is_valid false ;
+    :phone "781162974202" ;
+    :raw_phone "+7 81162 974202" ;
+    :type "" .
+
+<http://sunflower.test/phone/%2B7+812+2481081> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/TMWB-RIPE> ;
+    :is_valid true ;
+    :phone "+78122481081" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 812 2481081" ;
+    :type "",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+812+3364000> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/PAS-RIPE> ;
+    :is_valid true ;
+    :phone "+78123364000" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 812 3364000" ;
+    :type "",
+        "fax",
+        "voice" .
+
+<http://sunflower.test/phone/%2B7+812+412+69+74> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/RNA-RIPE> ;
+    :is_valid true ;
+    :phone "+78124126974" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 812 412 69 74" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+812+4486913> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/SS24611-RIPE> ;
+    :is_valid true ;
+    :phone "+78124486913" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 812 4486913" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+812+4488551> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/IK3184-RIPE> ;
+    :is_valid true ;
+    :phone "+78124488551" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 812 4488551" ;
+    :type "voice" .
+
+<http://sunflower.test/phone/%2B7+812+4490065> a :Phone ;
+    :belongs_to <http://sunflower.test/handle/ORG-MLL14-RIPE> ;
+    :is_valid true ;
+    :phone "+78124490065" ;
+    :phone_country <http://sunflower.test/country/RU> ;
+    :raw_phone "+7 812 4490065" ;
+    :type "voice" .
+
+<http://sunflower.test/handle/VT-RU> a :Handle ;
+    :fax_no "+7 831 4199707" ;
+    :handle_admin_c <http://sunflower.test/handle/ASV77-RIPE> ;
+    :handle_city <http://sunflower.test/city/Nizhny+Novgorod_56.3_44.0> ;
+    :handle_country <http://sunflower.test/country/RU> ;
+    :handle_email "noc@volga.rt.ru" ;
+    :handle_last_modified "2021-09-14T10:42:37+00:00"^^xsd:dateTime ;
+    :handle_name "VT-RU" ;
+    :handle_tech_c <http://sunflower.test/handle/ASV77-RIPE> ;
+    :handle_zip_code <http://sunflower.test/zip_code/603022> ;
+    :has_phone <http://sunflower.test/phone/%2B7+831+4199707>,
+        <http://sunflower.test/phone/%2B7+831+4360222> ;
+    :is_admin_c_of <http://sunflower.test/asn_cidr/87.119.224.0%2F20>,
+        <http://sunflower.test/asn_cidr/89.109.44.0%2F23>,
+        <http://sunflower.test/asn_cidr/89.109.45.0%2F24> ;
+    :is_tech_c_of <http://sunflower.test/asn_cidr/87.119.224.0%2F20>,
+        <http://sunflower.test/asn_cidr/89.109.44.0%2F23>,
+        <http://sunflower.test/asn_cidr/89.109.45.0%2F24> ;
+    :role "OJSC Rostelecom, Nizhny Novgorod" ;
+    :source "RIPE" ;
+    vcard:hasAddress <http://sunflower.test/address/3_+sq_marshala+zhukova_+603022_+nizhny+novgorod_+russia>,
+        <http://sunflower.test/address/3_+sq_marshala+zhukova_603022_+nizhny+novgorod_russia> ;
+    vcard:hasEmail <mailto:noc@volga.rt.ru> .
+
+<http://sunflower.test/country/RU> a :Country ;
+    :country_code "RU" ;
+    :country_name "Russia" .
+

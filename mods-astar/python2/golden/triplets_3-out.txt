@@ -1,0 +1,76 @@
+"<Response [200]>"
+----------------------
+{
+    "head": {
+        "vars": [
+            "depth",
+            "predecessor",
+            "linkType",
+            "out"
+        ]
+    },
+    "results": {
+        "bindings": [
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/87.117.128.0%2F21"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "1"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/country/RU"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "2"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/87.117.128.0%2F21"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/AR17051-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "3"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/country/RU"
+                }
+            }
+        ]
+    }
+}
+http://sunflower.test/handle/IS111-RIPE <--( )--<<  
+http://sunflower.test/asn_cidr/87.117.128.0%2F21 <--( )--<< http://sunflower.test/handle/IS111-RIPE
+http://sunflower.test/country/RU <--( )--<< http://sunflower.test/asn_cidr/87.117.128.0%2F21
+http://sunflower.test/handle/AR17051-RIPE <--( )--<< http://sunflower.test/country/RU

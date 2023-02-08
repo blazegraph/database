@@ -1,0 +1,676 @@
+"<Response [200]>"
+----------------------
+{
+    "head": {
+        "vars": [
+            "depth",
+            "predecessor",
+            "linkType",
+            "out"
+        ]
+    },
+    "results": {
+        "bindings": [
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/86.102.140.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/86.102.143.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/86.102.188.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/86.102.213.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/86.102.234.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/86.102.91.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/87.117.128.0%2F21"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/87.253.207.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/87.253.24.0%2F21"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/88.83.192.0%2F19"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.110.0.0%2F18"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.151.128.0%2F18"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.17.36.0%2F22"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.17.40.0%2F22"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.17.50.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.221.192.0%2F22"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.221.197.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.221.199.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.221.205.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.223.101.0%2F24"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.223.108.0%2F22"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.239.128.0%2F18"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/89.254.192.0%2F18"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.154.0.0%2F19"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.154.104.0%2F21"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.154.108.0%2F22"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.157.22.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.157.66.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.157.76.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.157.80.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/90.157.84.0%2F23"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/admin_c"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/87.117.128.0%2F21"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "1"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/is_admin_c_of"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/country/RU"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "2"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/asn_cidr/87.117.128.0%2F21"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/cidr_country"
+                }
+            }
+        ]
+    }
+}
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/86.102.140.0%2F23
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/86.102.143.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/86.102.188.0%2F23
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/86.102.213.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/86.102.234.0%2F23
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/86.102.91.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/87.117.128.0%2F21
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/87.253.207.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/87.253.24.0%2F21
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/88.83.192.0%2F19
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.110.0.0%2F18
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.151.128.0%2F18
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.17.36.0%2F22
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.17.40.0%2F22
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.17.50.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.221.192.0%2F22
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.221.197.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.221.199.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.221.205.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.223.101.0%2F24
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.223.108.0%2F22
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.239.128.0%2F18
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/89.254.192.0%2F18
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.154.0.0%2F19
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.154.104.0%2F21
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.154.108.0%2F22
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.157.22.0%2F23
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.157.66.0%2F23
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.157.76.0%2F23
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.157.80.0%2F23
+http://sunflower.test/handle/IS111-RIPE <--(http://sunflower.test/admin_c)--<< http://sunflower.test/asn_cidr/90.157.84.0%2F23
+http://sunflower.test/asn_cidr/87.117.128.0%2F21 <--(http://sunflower.test/is_admin_c_of)--<< http://sunflower.test/handle/IS111-RIPE
+http://sunflower.test/country/RU <--(http://sunflower.test/cidr_country)--<< http://sunflower.test/asn_cidr/87.117.128.0%2F21

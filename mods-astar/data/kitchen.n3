@@ -1,0 +1,66 @@
+PREFIX : <http://local.com/> 
+PREFIX schema: <http://schema.org/>
+	
+:mixer     a  		schema:Product;
+          schema:brand	:generic;
+          :productOf	:unknownCompany;
+	  :implemets	:mixing . 
+          
+:Bosch	    a           schema:Organization .
+
+:mixerBosch a		:mixer;
+	   schema:brand	:Bosch;
+ 	   :productOf	<htts://www.bosch.com/>;
+	   :implements	:mixing .
+
+:Moulinex   a		schema:Organization .
+
+:mixerMoulinex a	:mixer;
+	   schema:brand	:Moulinex;
+	   :productOf	<http://www.GroupeSEB.com/>;
+	   :implements	:mixing .
+	   
+
+:teaPot	   a		:kitchenDevice;
+	   schema:brand	:generic;
+	   :productOf	:uknownCompany;
+	   :implements	:heating .
+	  
+:Arison    a            schema:Organization .
+
+:teaPotAriston a	:teaPot;
+	   schema:brand	:Ariston;
+	   :productOf	<http://www.ariston.com>;
+	   :implements	:heating .
+	    
+:skillet   a            :kitchenDevice;
+	   schema:brand	:generic;
+	   :productOf	:unknownCompany;
+	   :implements	:frying .
+
+:Tefal     a            schema:Organization .
+
+:skilletTefal a		:skillet;
+	   schema:brand	:Tefal;
+	   :productOf	<http://tefal.com>
+	   :implements	:frying .
+
+
+:grill	   a           	:kitchenDevice;
+	   schema:brand	:generic;
+	   :productOf	:unknownCompany;
+	   :implements	:frying .
+
+:grillTefal a		:grill;
+	   schema:brand	:Tefal;
+	   :productOf	<http://tefal.com>;
+	   :implements	:frying .
+
+:Delonghi  a	        schema:Organization .
+
+:grillDelonghi a        :grill;
+	   schema:brand :Delonghi;
+	   :productOf	<http://delonghi.com>;
+	   :implements	:frying .
+
+

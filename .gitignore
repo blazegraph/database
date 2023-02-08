@@ -375,3 +375,5 @@ bigdata-rdf-test/test_small.out
 
 **/blazegraph.jnl
 **/bigdata.jnl
+
+mods-astar/targets

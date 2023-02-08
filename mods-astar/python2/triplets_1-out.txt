@@ -1,0 +1,59 @@
+"<Response [200]>"
+----------------------
+{
+    "head": {
+        "vars": [
+            "depth",
+            "out",
+            "predecessor"
+        ]
+    },
+    "results": {
+        "bindings": [
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "0"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/Handle"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "1"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/IS111-RIPE"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/handle/AR17051-RIPE"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "2"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://sunflower.test/Handle"
+                }
+            }
+        ]
+    }
+}
+http://sunflower.test/handle/IS111-RIPE <--()--<<  
+http://sunflower.test/Handle <--()--<< http://sunflower.test/handle/IS111-RIPE
+http://sunflower.test/handle/AR17051-RIPE <--()--<< http://sunflower.test/Handle

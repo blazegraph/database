@@ -116,6 +116,14 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     private final AtomicInteger maxIterationsAfterTargets = new AtomicInteger(
             Integer.MAX_VALUE);
+
+    // GS
+    /**
+     * A collection of edges to avoid.
+     */
+    private final Set<Value> epv = 
+    		Collections.synchronizedSet(new LinkedHashSet<Value>());
+    
     
     /**
      * 
@@ -169,6 +177,17 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         return graphAccessor;
     }
 
+    public static void print_frontier(IStaticFrontier f){
+        System.out.println( " print_frontier:" );
+        /*
+        Iterator<Value> iterator = f.iterator();
+        while(iterator.hasNext()) {
+            Value elem = iterator.next();
+            System.out.println( elem );
+        }
+        */
+    }
+
     @Override
     public IGASStats call() throws Exception {
 
@@ -181,8 +200,24 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 			log.trace("max iterations after targets: " + maxIterationsAfterTargets.get());
 		}
 
-        while (!gasState.frontier().isEmpty()) {
+        System.out.println("GAS Context point 1 /GASProgram.call() ");
+        System.out.println("     -> # of targets: " + targetVertices.size());
+        System.out.println("     -> max iterations after targets: " + maxIterationsAfterTargets.get());
+        System.out.println("Eneterihg while loop " + maxIterationsAfterTargets.get());
 
+
+        while (!gasState.frontier().isEmpty()) {
+            System.out.println(" --> while loop iteration");
+            System.out.println(" --> gasState.frontier():");
+            /*
+            Iterator<Value> iterator = gasState.frontier().iterator();
+            while(iterator.hasNext()) {
+                Value elem = iterator.next();
+                System.out.println( elem );
+            }
+            */
+            print_frontier(gasState.frontier());
+            System.out.println(gasState.frontier().toString());
             /*
              * Check halting conditions.
              * 
@@ -236,9 +271,14 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
             }
             
             final GASStats roundStats = new GASStats();
+            
+            System.out.println("before doRound");
+            print_frontier(gasState.frontier());
 
             doRound(roundStats);
 
+            System.out.println("after doRound");
+            print_frontier(gasState.frontier());
             total.add(roundStats);
 
         }
@@ -286,9 +326,10 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     @Override
     public boolean  doRound(final IGASStats stats) throws InterruptedException,
             ExecutionException, Exception {
-
         // The fontier for this round.
         final IStaticFrontier f = gasState.frontier();
+        System.out.println("  ## inside doRound:");
+        print_frontier(f);
 
         // Conditionally log the computation state.
         gasState.traceState();
@@ -337,6 +378,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         /*
          * GATHER
          */
+        System.out.println("  ## Going to GATHER");
 
         final long beginGather = System.nanoTime();
 
@@ -351,21 +393,22 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
                     pushDownApplyInGather);
 
         }
+        print_frontier(f);
+
 
         final long elapsedGather = System.nanoTime() - beginGather;
 
         /*
          * APPLY
          */
+        System.out.println("  ## Going to APPLY");
 
         final long elapsedApply;
 
         if (runApplyStage) {
 
             final long beginApply = System.nanoTime();
-
             apply(f);
-
             elapsedApply = System.nanoTime() - beginApply;
 
         } else {
@@ -373,10 +416,12 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
             elapsedApply = 0L;
 
         }
-
+        print_frontier(f);
         /*
          * SCATTER
          */
+        System.out.println("  ## Going to SCATTER");
+
 
         final long beginScatter = System.nanoTime();
 
@@ -393,7 +438,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
                     pushDownApplyInScatter);
 
         }
-
+        print_frontier(f);
         final long elapsedScatter = System.nanoTime() - beginScatter;
 
         /*
@@ -442,13 +487,17 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         }
 
         // End the round, advance the counter, and compact new frontier.
+        System.out.println("endRound(), compact frontier");
+
         gasState.endRound();
-        
+        print_frontier(f);
+
         /*
          * Handshake with the GASProgram. If it votes to continue -OR- the new
          * frontier is not empty, then we will do another round.
          */
 
+        System.out.println("CHecking nextRound()");
         final boolean nextRound = program.nextRound(this);
 
         if(nextRound) {
@@ -745,6 +794,8 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
             final Iterator<Statement> eitr = graphAccessor.getEdges(
                     GASContext.this, u, getEdgesEnum());
 
+            System.out.println("Iterating over edges");
+
             try {
 
                 while (eitr.hasNext()) {
@@ -753,7 +804,12 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
                     final Statement e = eitr.next();
 
                     nedges++;
-
+                    
+                    System.out.println(" iterating edge e="+gasState.toString(e)+" | "+e.toString());
+                    
+                    System.out.println("    e.getClass() local ="+e.getClass());
+                    System.out.println("    gasState.getClass() local ="+gasState.getClass());
+                    
                     if (TRACE) // TODO Batch resolve if @ TRACE
                         log.trace("e=" + gasState.toString(e));
 
@@ -965,7 +1021,21 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
         
     }
 
+    //GS
+    
+    @Override
+    public void setEpv(final Value[] epv_in) {
+    	
+    	this.epv.addAll(Arrays.asList(epv_in));
+    	
+    }
 
+    @Override
+    public Set<Value> getEpv() {
+    	
+    	return this.epv;
+    	
+    }
 
 //    /**
 //     * {@inheritDoc}

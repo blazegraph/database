@@ -17,6 +17,9 @@ package com.bigdata.rdf.graph.impl.scheduler;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+import java.util.Iterator;
+import java.util.Map;
+
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.IGASSchedulerImpl;

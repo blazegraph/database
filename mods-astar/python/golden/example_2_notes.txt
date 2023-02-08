@@ -1,0 +1,34 @@
+{
+	'head': 
+	{
+		'vars': ['depth', 'out', 'predecessor']
+	}, 
+	'results': 
+	{
+		'bindings': [
+				{
+					'out': {'type': 'uri', 'value': 'http://sunflower.test/handle/IS111-RIPE'}, 
+					'depth': {'datatype': 'http://www.w3.org/2001/XMLSchema#int', 'type': 'literal', 'value': '0'}
+				}, 
+				{
+					'out': {'type': 'uri', 'value': 'http://sunflower.test/asn_cidr/87.117.128.0%2F21'}, 
+					'depth': {'datatype': 'http://www.w3.org/2001/XMLSchema#int', 'type': 'literal', 'value': '1'},
+					'predecessor': {'type': 'uri', 'value': 'http://sunflower.test/handle/IS111-RIPE'}
+				}, 
+				{
+					'out': {'type': 'uri', 'value': 'http://sunflower.test/country/RU'}, 
+					'depth': {'datatype': 'http://www.w3.org/2001/XMLSchema#int', 'type': 'literal', 'value': '2'},
+					'predecessor': {'type': 'uri', 'value': 'http://sunflower.test/asn_cidr/87.117.128.0%2F21'}
+				}, 
+				{	
+					'out': {'type': 'uri', 'value': 'http://sunflower.test/handle/AR17051-RIPE'}, 
+					'depth': {'datatype': 'http://www.w3.org/2001/XMLSchema#int', 'type': 'literal', 'value':
+'3'}, 					'predecessor': {'type': 'uri', 'value': 'http://sunflower.test/country/RU'}
+				}
+		]
+	}
+}
+
+
+Also- note that now we exclude: 
+List<String> rej = Arrays.asList("rdf:type","http://sunflower\\.test/is_admin_c_of");

@@ -1,0 +1,669 @@
+﻿Cases for ASTAR
+
+       1. Case #1
+
+- path from Handle to handle on database
+- no constrains
+- query:
+
+# example 1
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/AR17051-RIPE> . # only retain vertices along paths to these target vertices.
+     #gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 500 . # optional limit on the #of visited vertices.
+     gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+     gas:program gas:nthreads 1 .             
+  }
+} 
+order by ?depth
+
+Result (as expected)
+
+depth	predecessor	out
+0	" "	<http://sunflower.test/handle/IS111-RIPE>
+1	<http://sunflower.test/handle/IS111-RIPE>	<http://sunflower.test/Handle>
+2	<http://sunflower.test/Handle>	<http://sunflower.test/handle/AR17051-RIPE>
+
+for comparison - same request using BFS - 
+
+same result
+
+depth	predecessor	out
+0	" "	<http://sunflower.test/handle/IS111-RIPE>
+1	<http://sunflower.test/handle/IS111-RIPE>	<http://sunflower.test/Handle>
+2	<http://sunflower.test/Handle>	<http://sunflower.test/handle/AR17051-RIPE>
+
+
+
+2. case #2
+
+I wish to print link - 
+adding it:
+
+
+# example 2
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?linkType ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/AR17051-RIPE> . # only retain vertices along paths to these target vertices.
+     #gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 500 . # optional limit on the #of visited vertices.
+     gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+     gas:program gas:nthreads 1 .             
+  }
+  ?predecessor ?linkType ?out
+} 
+output is unexpected:
+depth
+predecessor
+linkType
+out
+0
+<http://sunflower.test/asn_cidr/86.102.140.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.143.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.188.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.213.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.234.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.91.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.253.207.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.253.24.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/88.83.192.0%2F19>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.110.0.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.151.128.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.36.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.40.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.50.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.192.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.197.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.199.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.205.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.223.101.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.223.108.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.239.128.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.254.192.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.0.0%2F19>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.104.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.108.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.22.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.66.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.76.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.80.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.84.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+1
+<http://sunflower.test/handle/IS111-RIPE>
+rdf:type
+<http://sunflower.test/Handle>
+
+Strange things
+a) Many predecessors – but ok
+b) where is last line like
+	2	<http://sunflower.test/Handle>	“  “  <http://sunflower.test/handle/AR17051-RIPE>
+?
+
+3. case #3
+
+adding rules to exclude rdf:type
+
+List<String> rej = Arrays.asList("rdf:type");
+
+3-1) repeat request without linkType:
+
+# example 3
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?linkType ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/AR17051-RIPE> . # only retain vertices along paths to these target vertices.
+     #gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 50 . # optional limit on the #of visited vertices.
+     gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+     gas:program gas:nthreads 1 .
+  }
+} 
+order by ?depth
+
+result is as expected:
+
+depth
+predecessor
+linkType
+out
+0
+
+
+<http://sunflower.test/handle/IS111-RIPE>
+1
+<http://sunflower.test/handle/IS111-RIPE>
+
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+2
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+
+<http://sunflower.test/country/RU>
+3
+<http://sunflower.test/country/RU>
+
+<http://sunflower.test/handle/AR17051-RIPE>
+
+
+3-2) adding linkType:
+
+# example 3-1
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?linkType ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/AR17051-RIPE> . # only retain vertices along paths to these target vertices.
+     #gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 50 . # optional limit on the #of visited vertices.
+     gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+     gas:program gas:nthreads 1 .
+  }
+  ?predecessor ?linkType ?out
+} 
+order by ?depth
+
+result is : 
+
+depth
+predecessor
+linkType
+out
+0
+<http://sunflower.test/asn_cidr/86.102.140.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.143.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.188.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.213.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.234.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.91.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.253.207.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.253.24.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/88.83.192.0%2F19>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.110.0.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.151.128.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.36.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.40.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.50.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.192.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.197.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.199.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.205.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.223.101.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.223.108.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.239.128.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.254.192.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.0.0%2F19>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.104.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.108.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.22.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.66.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.76.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.80.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.84.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+1
+<http://sunflower.test/handle/IS111-RIPE>
+<http://sunflower.test/is_admin_c_of>
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+2
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+<http://sunflower.test/cidr_country>
+<http://sunflower.test/country/RU>
+
+Again:
+a)many predecessos
+b) no last line (expected like in casee 3-1)
+
+
+4. Case 4
+
+adding one more rule – exclude is_admin_c_of
+
+List<String> rej = Arrays.asList("rdf:type","http://sunflower.test/is_admin_c_of");
+
+4-1) Without linkType  - 
+# example 4-1
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?linkType ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/AR17051-RIPE> . # only retain vertices along paths to these target vertices.
+     #gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 50 . # optional limit on the #of visited vertices.
+     gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+     gas:program gas:nthreads 1 .
+  }
+} 
+order by ?depth
+
+we have found new connection:
+
+depth
+predecessor
+linkType
+out
+0
+
+
+<http://sunflower.test/handle/IS111-RIPE>
+1
+<http://sunflower.test/handle/IS111-RIPE>
+
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+2
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+
+<http://sunflower.test/country/RU>
+3
+<http://sunflower.test/country/RU>
+
+<http://sunflower.test/handle/AR17051-RIPE>
+
+
+
+
+4-2) Now lets print with linkType:
+
+# example 4-2
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?linkType ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/AR17051-RIPE> . # only retain vertices along paths to these target vertices.
+     #gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 50 . # optional limit on the #of visited vertices.
+     gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+     gas:program gas:nthreads 1 .
+    # EP - exclude predicate
+    # gas:program gas:epstring "abracadabra" .
+    # gas:program gas:epv <http://sunflower.test/Handle>
+    # gas:program gas:epv <rdf:type>  
+  }
+  ?predecessor ?linkType ?out
+} 
+order by ?depth
+
+and results are:
+
+
+depth
+predecessor
+linkType
+out
+0
+<http://sunflower.test/asn_cidr/86.102.140.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.143.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.188.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.213.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.234.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/86.102.91.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.253.207.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/87.253.24.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/88.83.192.0%2F19>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.110.0.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.151.128.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.36.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.40.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.17.50.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.192.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.197.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.199.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.221.205.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.223.101.0%2F24>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.223.108.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.239.128.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/89.254.192.0%2F18>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.0.0%2F19>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.104.0%2F21>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.154.108.0%2F22>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.22.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.66.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.76.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.80.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+0
+<http://sunflower.test/asn_cidr/90.157.84.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+1
+<http://sunflower.test/handle/IS111-RIPE>
+<http://sunflower.test/is_admin_c_of>
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+2
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+<http://sunflower.test/cidr_country>
+<http://sunflower.test/country/RU>
+
+Again – some strange things:
+
+1) many predecessors (ok)
+
+2) not complete listing (RU→ Handle again is lost)
+
+and now – new phenomena: 
+
+0
+<http://sunflower.test/asn_cidr/90.157.84.0%2F23>
+<http://sunflower.test/admin_c>
+<http://sunflower.test/handle/IS111-RIPE>
+1
+<http://sunflower.test/handle/IS111-RIPE>
+<http://sunflower.test/is_admin_c_of>
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+2
+<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+<http://sunflower.test/cidr_country>
+<http://sunflower.test/country/RU>
+
+It is locked  - we cannot follow that edge.
+
+
+ * * * 

@@ -1,0 +1,30 @@
+# example taken from https://stackoverflow[label= p]com/questions/28900290/querying-a-graph-path-in-sparql
+# original
+# node:x edge:y node:z  ->   x -> z [label=y]
+# @prefix [label= p][label= p][label= p]  -> 
+#
+#@prefix  node: <http://prism[label= p]uvsq[label= p]fr/>[label= p]
+#@prefix   edge:<http://prism[label= p]uvsq[label= p]fr#>[label= p]
+digraph stack_ov_1 {
+a -> b[label= p color=green]
+a -> f[label= q color=blue]
+a -> g[label= p color=green]
+b -> c[label= p color=green]
+c -> h[label= q color=blue]
+c -> i[label= p color=green]
+c -> d[label= p color=green]
+d -> e[label= p color=green]
+f -> g[label= p color=green]
+f -> l[label= q color=blue]
+f -> k[label= p color=green]
+g -> c[label= p color=green]
+g -> f[label= p color=green]
+h -> n[label= p color=green]
+i -> j[label= q color=blue]
+j -> o[label= p color=green]
+j -> n[label= q color=blue]
+k -> l[label= p color=green]
+l -> g[label= p color=green]
+m -> g[label= q color=blue]
+n -> m[label= p color=green]
+}

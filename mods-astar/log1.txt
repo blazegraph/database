@@ -1,0 +1,853 @@
+GAS Context point 1 /GASProgram.call()				GASContext.java / GASContext.call / ln 194
+     -> # of targets: 1
+     -> max iterations after targets: 2147483647
+Eneterihg while loop 2147483647
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ --> while loop iteration					*** While loop starts -----------------------------------------
+ --> gasState.frontier():
+ print_frontier:
+TermId(2U)[http://prism.uvsq.fr/a]				GASContext.java / GASContext.call /  ln 210
+com.bigdata.rdf.graph.impl.frontier.StaticFrontier2{size=1,compact=true,capacity=128}
+before doRound							GASContext.java / GASContext.call /  ln 266
+ print_frontier:						GASContext.java / print_frontier()/ ln 172
+TermId(2U)[http://prism.uvsq.fr/a]									
+  ## inside doRound:						-> CASContext.java / doRound()      ln  322 
+ print_frontier:						-> CASContext.java / doRound()      ln  323
+TermId(2U)[http://prism.uvsq.fr/a]
+  ## Going to GATHER						-> CASContext.java / doRound()      ln 359(?) 372
+ print_frontier:
+TermId(2U)[http://prism.uvsq.fr/a]
+  ## Going to APPLY						-> CASContext.java / doRound()      ln 359(?) 395
+ print_frontier:
+TermId(2U)[http://prism.uvsq.fr/a]
+  ## Going to SCATTER                                           -> CASContext.java / doRound()      ln 432(?) 414 ========================
+  
+Iterating over edges						->*-> GASContext.java / scatterEdges() [ScatterTask.call()] ln 788
+BigdataGASState toString < TermId(2U), TermId(17U), TermId(3U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/a(TermId(2U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/a(TermId(2U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/b
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=									    GASContext.java / ScatterTask.call() /ln 799
+ < http://prism.uvsq.fr/a(TermId(2U)), http://prism.uvsq.fr#p(TermId(17U)), 
+ http://prism.uvsq.fr/b(TermId(3U)), 
+ file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > 
+ | < TermId(2U), TermId(17U), TermId(3U), TermId(19U) : Explicit >
+
+    e.getClass() local =class com.bigdata.rdf.spo.SPO                                     GASContext.java /ScatterTask.call() /ln 801
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState        GASContext.java /ScatterTask.call()/ln 802
+ ==scatter==                                                                              GASContext.java /ScatterTask.call()/call it @807
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(2U)[http://prism.uvsq.fr/a]
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(2U), TermId(17U), TermId(3U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(3U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(2U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(2U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/a(TermId(2U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/a(TermId(2U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/a(TermId(2U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/g(TermId(8U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(2U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(2U)[http://prism.uvsq.fr/a]
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(2U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(2U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(2U), TermId(18U), TermId(7U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/a(TermId(2U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/a(TermId(2U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/a
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#q
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/a(TermId(2U)), http://prism.uvsq.fr#q(TermId(18U)), http://prism.uvsq.fr/f(TermId(7U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(2U), TermId(18U), TermId(7U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(2U)[http://prism.uvsq.fr/a]
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(2U), TermId(18U), TermId(7U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(2U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(18U)
+    
+    
+ print_frontier:							-> GASContext.java / doRound / ln 432=============================
+TermId(2U)[http://prism.uvsq.fr/a]
+endRound(), compact frontier						-> GASContext.java / doRound / ln 481
+  ## frontier before compactFrontier					->*-> somewhere endRound().. GASState.java/endRound()ln 346
+ print_frontier:														350
+TermId(2U)[http://prism.uvsq.fr/a]
+class com.bigdata.rdf.graph.impl.scheduler.CHMScheduler                                                                         351
+CHM Scheduler - vertex array                                            ->*->*-> scheduler.compactFrontier 352/
+  iter:    
+TermId(8U)=
+TermId(8U) : class com.bigdata.rdf.internal.impl.TermId : 
+TermId(8U) | class com.bigdata.rdf.internal.impl.TermId : 
+TermId(8U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : 
+TermId(8U)=TermId(8U)
+  iter:    TermId(3U)=TermId(3U) : class com.bigdata.rdf.internal.impl.TermId : TermId(3U) | class com.bigdata.rdf.internal.impl.TermId : TermId(3U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(3U)=TermId(3U)
+  iter:    TermId(7U)=TermId(7U) : class com.bigdata.rdf.internal.impl.TermId : TermId(7U) | class com.bigdata.rdf.internal.impl.TermId : TermId(7U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(7U)=TermId(7U)
+-- =delete all except 1st key---
+  remove : TermId(3U) / TermId(3U) 
+  remove : TermId(7U) / TermId(7U) 
+  iter2 : TermId(8U) / TermId(8U) 
+  iter2 : TermId(3U) / TermId(3U) 
+  iter2 : TermId(7U) / TermId(7U) 
+  ## frontier after compactFrontier                                                                                             353
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+CHecking nextRound()							-> GASContext.java / doRound / ln 491
+GS : next round
+after doRound								   ->GASContext.java / call /ln 271
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ --> while loop iteration  					*** While loop starts -----------------------------------------
+ --> gasState.frontier():
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+com.bigdata.rdf.graph.impl.frontier.StaticFrontier2{size=3,compact=true,capacity=128}
+before doRound
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+  ## inside doRound:
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+  ## Going to GATHER
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+  ## Going to APPLY
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+  ## Going to SCATTER
+Iterating over edges
+Iterating over edges
+BigdataGASState toString < TermId(3U), TermId(17U), TermId(4U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+BigdataGASState toString < TermId(7U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+Iterating over edges
+BigdataGASState toString < TermId(8U), TermId(17U), TermId(4U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/g(TermId(8U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/g(TermId(8U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/b
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/b(TermId(3U))
+AbstractTripleStore toSring 2
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/f(TermId(7U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/b
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/b(TermId(3U))
+ iterating edge e=< http://prism.uvsq.fr/g(TermId(8U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/c(TermId(4U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(8U), TermId(17U), TermId(4U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(8U), TermId(17U), TermId(4U), TermId(19U) : Explicit >
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/b
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/f(TermId(7U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(8U), TermId(17U), TermId(7U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/g(TermId(8U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/g(TermId(8U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/g(TermId(8U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/f(TermId(7U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(8U), TermId(17U), TermId(7U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(8U), TermId(17U), TermId(7U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/f(TermId(7U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/g(TermId(8U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(7U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+ iterating edge e=< http://prism.uvsq.fr/b(TermId(3U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/c(TermId(4U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(3U), TermId(17U), TermId(4U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(7U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(7U), TermId(17U), TermId(12U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/f(TermId(7U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/f(TermId(7U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/k
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/f(TermId(7U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/k(TermId(12U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(7U), TermId(17U), TermId(12U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(7U), TermId(17U), TermId(12U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(12U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(7U), TermId(18U), TermId(13U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/f(TermId(7U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/f(TermId(7U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/f
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#q
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/l
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(3U)
+ iterating edge e=< http://prism.uvsq.fr/f(TermId(7U)), http://prism.uvsq.fr#q(TermId(18U)), http://prism.uvsq.fr/l(TermId(13U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(7U), TermId(18U), TermId(13U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(3U), TermId(17U), TermId(4U), TermId(19U) : Explicit >
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(7U), TermId(18U), TermId(13U), TermId(19U) : Explicit >
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(3U)
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(13U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(7U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(18U)
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+endRound(), compact frontier
+  ## frontier before compactFrontier
+ print_frontier:
+TermId(3U)
+TermId(7U)
+TermId(8U)
+class com.bigdata.rdf.graph.impl.scheduler.CHMScheduler
+CHM Scheduler - vertex array
+  iter:    TermId(4U)=TermId(4U) : class com.bigdata.rdf.internal.impl.TermId : TermId(4U) | class com.bigdata.rdf.internal.impl.TermId : TermId(4U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(4U)=TermId(4U)
+  iter:    TermId(12U)=TermId(12U) : class com.bigdata.rdf.internal.impl.TermId : TermId(12U) | class com.bigdata.rdf.internal.impl.TermId : TermId(12U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(12U)=TermId(12U)
+  iter:    TermId(13U)=TermId(13U) : class com.bigdata.rdf.internal.impl.TermId : TermId(13U) | class com.bigdata.rdf.internal.impl.TermId : TermId(13U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(13U)=TermId(13U)
+-- =delete all except 1st key---
+  remove : TermId(12U) / TermId(12U) 
+  remove : TermId(13U) / TermId(13U) 
+  iter2 : TermId(4U) / TermId(4U) 
+  iter2 : TermId(12U) / TermId(12U) 
+  iter2 : TermId(13U) / TermId(13U) 
+  ## frontier after compactFrontier
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+CHecking nextRound()
+GS : next round
+after doRound
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+ --> while loop iteration   					*** While loop starts -----------------------------------------
+ --> gasState.frontier():
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+com.bigdata.rdf.graph.impl.frontier.StaticFrontier2{size=3,compact=true,capacity=128}
+before doRound
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+  ## inside doRound:
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+  ## Going to GATHER
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+  ## Going to APPLY
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+  ## Going to SCATTER
+Iterating over edges
+Iterating over edges
+BigdataGASState toString < TermId(4U), TermId(17U), TermId(5U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+BigdataGASState toString < TermId(13U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/l
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/l(TermId(13U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/l
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/l(TermId(13U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/l
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/l(TermId(13U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/g(TermId(8U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(13U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(13U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(13U), TermId(17U), TermId(8U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(13U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+Iterating over edges
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/c(TermId(4U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+BigdataGASState toString < TermId(12U), TermId(17U), TermId(13U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/c(TermId(4U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/k
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/k(TermId(12U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/k
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/d
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/c(TermId(4U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/d(TermId(5U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(4U), TermId(17U), TermId(5U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(4U), TermId(17U), TermId(5U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(5U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(4U), TermId(17U), TermId(10U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/c(TermId(4U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/c(TermId(4U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/i
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/c(TermId(4U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/i(TermId(10U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(4U), TermId(17U), TermId(10U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(4U), TermId(17U), TermId(10U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(10U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(4U), TermId(18U), TermId(9U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/c(TermId(4U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/c(TermId(4U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/c
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#q
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/h
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/c(TermId(4U)), http://prism.uvsq.fr#q(TermId(18U)), http://prism.uvsq.fr/h(TermId(9U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(4U), TermId(18U), TermId(9U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(4U), TermId(18U), TermId(9U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(9U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(4U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(18U)
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/k(TermId(12U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/k
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/l
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/k(TermId(12U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/l(TermId(13U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(12U), TermId(17U), TermId(13U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(12U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(12U), TermId(17U), TermId(13U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(13U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(12U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+endRound(), compact frontier
+  ## frontier before compactFrontier
+ print_frontier:
+TermId(4U)
+TermId(12U)
+TermId(13U)
+class com.bigdata.rdf.graph.impl.scheduler.CHMScheduler
+CHM Scheduler - vertex array
+  iter:    TermId(9U)=TermId(9U) : class com.bigdata.rdf.internal.impl.TermId : TermId(9U) | class com.bigdata.rdf.internal.impl.TermId : TermId(9U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(9U)=TermId(9U)
+  iter:    TermId(10U)=TermId(10U) : class com.bigdata.rdf.internal.impl.TermId : TermId(10U) | class com.bigdata.rdf.internal.impl.TermId : TermId(10U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(10U)=TermId(10U)
+  iter:    TermId(5U)=TermId(5U) : class com.bigdata.rdf.internal.impl.TermId : TermId(5U) | class com.bigdata.rdf.internal.impl.TermId : TermId(5U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(5U)=TermId(5U)
+-- =delete all except 1st key---
+  remove : TermId(10U) / TermId(10U) 
+  remove : TermId(5U) / TermId(5U) 
+  iter2 : TermId(9U) / TermId(9U) 
+  iter2 : TermId(10U) / TermId(10U) 
+  iter2 : TermId(5U) / TermId(5U) 
+  ## frontier after compactFrontier
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+CHecking nextRound()
+GS : next round
+after doRound
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+ --> while loop iteration    					*** While loop starts -----------------------------------------
+ --> gasState.frontier():
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+com.bigdata.rdf.graph.impl.frontier.StaticFrontier2{size=3,compact=true,capacity=128}
+before doRound
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+  ## inside doRound:
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+  ## Going to GATHER
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+  ## Going to APPLY
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+  ## Going to SCATTER
+Iterating over edges
+Iterating over edges
+BigdataGASState toString < TermId(9U), TermId(17U), TermId(15U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+BigdataGASState toString < TermId(5U), TermId(17U), TermId(6U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/h
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/d
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/d(TermId(5U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/d
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/d(TermId(5U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/d
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/e
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/d(TermId(5U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/e(TermId(6U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(5U), TermId(17U), TermId(6U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(5U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(5U), TermId(17U), TermId(6U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(6U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(5U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+Iterating over edges
+BigdataGASState toString < TermId(10U), TermId(18U), TermId(11U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/i
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/i(TermId(10U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/i
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/i(TermId(10U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/i
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#q
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/j
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/i(TermId(10U)), http://prism.uvsq.fr#q(TermId(18U)), http://prism.uvsq.fr/j(TermId(11U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(10U), TermId(18U), TermId(11U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(10U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(10U), TermId(18U), TermId(11U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(11U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(10U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(18U)
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/h(TermId(9U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/h
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/h(TermId(9U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/h
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/n
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/h(TermId(9U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/n(TermId(15U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(9U), TermId(17U), TermId(15U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(9U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(9U), TermId(17U), TermId(15U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(15U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(9U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+endRound(), compact frontier
+  ## frontier before compactFrontier
+ print_frontier:
+TermId(5U)
+TermId(9U)
+TermId(10U)
+class com.bigdata.rdf.graph.impl.scheduler.CHMScheduler
+CHM Scheduler - vertex array
+  iter:    TermId(11U)=TermId(11U) : class com.bigdata.rdf.internal.impl.TermId : TermId(11U) | class com.bigdata.rdf.internal.impl.TermId : TermId(11U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(11U)=TermId(11U)
+  iter:    TermId(6U)=TermId(6U) : class com.bigdata.rdf.internal.impl.TermId : TermId(6U) | class com.bigdata.rdf.internal.impl.TermId : TermId(6U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(6U)=TermId(6U)
+  iter:    TermId(15U)=TermId(15U) : class com.bigdata.rdf.internal.impl.TermId : TermId(15U) | class com.bigdata.rdf.internal.impl.TermId : TermId(15U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(15U)=TermId(15U)
+-- =delete all except 1st key---
+  remove : TermId(6U) / TermId(6U) 
+  remove : TermId(15U) / TermId(15U) 
+  iter2 : TermId(11U) / TermId(11U) 
+  iter2 : TermId(6U) / TermId(6U) 
+  iter2 : TermId(15U) / TermId(15U) 
+  ## frontier after compactFrontier
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+CHecking nextRound()
+GS : next round
+after doRound
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+ --> while loop iteration
+ --> gasState.frontier():
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+com.bigdata.rdf.graph.impl.frontier.StaticFrontier2{size=3,compact=true,capacity=128}
+before doRound
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+  ## inside doRound:
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+  ## Going to GATHER
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+  ## Going to APPLY
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+  ## Going to SCATTER
+Iterating over edges
+Iterating over edges
+BigdataGASState toString < TermId(11U), TermId(17U), TermId(16U), TermId(19U) : Explicit >
+Iterating over edges
+AbstractTripleStore toSring 1
+BigdataGASState toString < TermId(15U), TermId(17U), TermId(14U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/j
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/n
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/j(TermId(11U))
+AbstractTripleStore toSring 2
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/n(TermId(15U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/j
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/j(TermId(11U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/j
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/o
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/j(TermId(11U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/o(TermId(16U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(11U), TermId(17U), TermId(16U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(11U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(11U), TermId(17U), TermId(16U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(16U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(11U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+BigdataGASState toString < TermId(11U), TermId(18U), TermId(15U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/j
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/j(TermId(11U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/j
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/j(TermId(11U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/j
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#q
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/n
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/j(TermId(11U)), http://prism.uvsq.fr#q(TermId(18U)), http://prism.uvsq.fr/n(TermId(15U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(11U), TermId(18U), TermId(15U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(11U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(11U), TermId(18U), TermId(15U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(15U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(11U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(18U)
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/n
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/n(TermId(15U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/n
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#p
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/m
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/n(TermId(15U)), http://prism.uvsq.fr#p(TermId(17U)), http://prism.uvsq.fr/m(TermId(14U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(15U), TermId(17U), TermId(14U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(15U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(15U), TermId(17U), TermId(14U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(14U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(15U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(17U)
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+endRound(), compact frontier
+  ## frontier before compactFrontier
+ print_frontier:
+TermId(6U)
+TermId(11U)
+TermId(15U)
+class com.bigdata.rdf.graph.impl.scheduler.CHMScheduler
+CHM Scheduler - vertex array
+  iter:    TermId(16U)=TermId(16U) : class com.bigdata.rdf.internal.impl.TermId : TermId(16U) | class com.bigdata.rdf.internal.impl.TermId : TermId(16U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(16U)=TermId(16U)
+  iter:    TermId(14U)=TermId(14U) : class com.bigdata.rdf.internal.impl.TermId : TermId(14U) | class com.bigdata.rdf.internal.impl.TermId : TermId(14U) / class java.util.concurrent.ConcurrentHashMap$MapEntry : TermId(14U)=TermId(14U)
+-- =delete all except 1st key---
+  remove : TermId(14U) / TermId(14U) 
+  iter2 : TermId(16U) / TermId(16U) 
+  iter2 : TermId(14U) / TermId(14U) 
+  ## frontier after compactFrontier
+ print_frontier:
+TermId(14U)
+TermId(16U)
+ print_frontier:
+TermId(14U)
+TermId(16U)
+CHecking nextRound()
+GS : next round
+after doRound
+ print_frontier:
+TermId(14U)
+TermId(16U)
+ --> while loop iteration
+ --> gasState.frontier():
+ print_frontier:
+TermId(14U)
+TermId(16U)
+com.bigdata.rdf.graph.impl.frontier.StaticFrontier2{size=2,compact=true,capacity=128}
+before doRound
+ print_frontier:
+TermId(14U)
+TermId(16U)
+  ## inside doRound:
+ print_frontier:
+TermId(14U)
+TermId(16U)
+  ## Going to GATHER
+ print_frontier:
+TermId(14U)
+TermId(16U)
+  ## Going to APPLY
+ print_frontier:
+TermId(14U)
+TermId(16U)
+  ## Going to SCATTER
+Iterating over edges
+Iterating over edges
+BigdataGASState toString < TermId(14U), TermId(18U), TermId(8U), TermId(19U) : Explicit >
+AbstractTripleStore toSring 1
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/m
+ class of SPO:class com.bigdata.rdf.internal.impl.TermId http://prism.uvsq.fr/m(TermId(14U))
+AbstractTripleStore toSring 2
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/m
+classof to/Sring 2 class com.bigdata.rdf.store.LocalTripleStore http://prism.uvsq.fr/m(TermId(14U))
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/m
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr#q
+ $$$ at Abst-tTripleStore:http://prism.uvsq.fr/g
+ $$$ at Abst-tTripleStore:file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl
+ iterating edge e=< http://prism.uvsq.fr/m(TermId(14U)), http://prism.uvsq.fr#q(TermId(18U)), http://prism.uvsq.fr/g(TermId(8U)), file:/home/gserdyuk/epddp/database-astr/mods-astar/data/stack-ov-1.ttl(TermId(19U)) > | < TermId(14U), TermId(18U), TermId(8U), TermId(19U) : Explicit >
+    e.getClass() local =class com.bigdata.rdf.spo.SPO
+    gasState.getClass() local =class com.bigdata.rdf.graph.impl.bd.BigdataGASState
+ ==scatter== 
+    *** Value_u         = class com.bigdata.rdf.internal.impl.TermId TermId(14U)
+    *** Statement_e     = class com.bigdata.rdf.spo.SPO < TermId(14U), TermId(18U), TermId(8U), TermId(19U) : Explicit >
+    *** e.getObject()   = class com.bigdata.rdf.internal.impl.TermId TermId(8U)
+    *** e.getSubject()  = class com.bigdata.rdf.internal.impl.TermId TermId(14U)
+    *** e.getPredicate()= class com.bigdata.rdf.internal.impl.TermId TermId(18U)
+ print_frontier:
+TermId(14U)
+TermId(16U)
+endRound(), compact frontier
+  ## frontier before compactFrontier
+ print_frontier:
+TermId(14U)
+TermId(16U)
+class com.bigdata.rdf.graph.impl.scheduler.CHMScheduler
+CHM Scheduler - vertex array
+-- =delete all except 1st key---
+  ## frontier after compactFrontier
+ print_frontier:
+ print_frontier:
+CHecking nextRound()
+GS : next round
+after doRound
+ print_frontier:
+
+
+> Set deferred breakpoint com.bigdata.rdf.store.AbstractTripleStore:3714
+Set deferred breakpoint com.bigdata.rdf.graph.analytics.ASTAR:259
+
+Breakpoint hit: "thread=GASEngine1", com.bigdata.rdf.store.AbstractTripleStore.toString(), line=3,714 bci=49
+
+GASEngine1[1] where
+  [1] com.bigdata.rdf.store.AbstractTripleStore.toString (AbstractTripleStore.java:3,714)
+  [2] com.bigdata.rdf.store.AbstractTripleStore.toString (AbstractTripleStore.java:3,687)
+  [3] com.bigdata.rdf.graph.impl.bd.BigdataGASState.toString (BigdataGASState.java:110)
+  [4] com.bigdata.rdf.graph.impl.GASContext$ScatterTask.call (GASContext.java:799)
+  [5] com.bigdata.rdf.graph.impl.GASContext$ScatterTask.call (GASContext.java:740)
+  [6] java.util.concurrent.FutureTask.run (FutureTask.java:266)
+  [7] java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1,149)
+  [8] java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:624)
+  [9] java.lang.Thread.run (Thread.java:750)
+GASEngine1[1] cont
+> 
+Breakpoint hit: "thread=GASEngine1", com.bigdata.rdf.store.AbstractTripleStore.toString(), line=3,714 bci=49
+
+GASEngine1[1] clear com.bigdata.rdf.store.AbstractTripleStore:3714
+Removed: breakpoint com.bigdata.rdf.store.AbstractTripleStore:3714
+GASEngine1[1] cont
+> 
+Breakpoint hit: "thread=GASEngine1", com.bigdata.rdf.graph.analytics.ASTAR.scatter(), line=259 bci=90
+
+GASEngine1[1] where
+  [1] com.bigdata.rdf.graph.analytics.ASTAR.scatter (ASTAR.java:259)
+  [2] com.bigdata.rdf.graph.impl.GASContext$ScatterTask.call (GASContext.java:807)
+  [3] com.bigdata.rdf.graph.impl.GASContext$ScatterTask.call (GASContext.java:740)
+  [4] java.util.concurrent.FutureTask.run (FutureTask.java:266)
+  [5] java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1,149)
+  [6] java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:624)
+  [7] java.lang.Thread.run (Thread.java:750)
+GASEngine1[1] 
+
+
+good:
+
+GASEngine1[1] where
+  [1] com.bigdata.rdf.store.AbstractTripleStore.toString (AbstractTripleStore.java:3,714)
+  [2] com.bigdata.rdf.store.AbstractTripleStore.toString (AbstractTripleStore.java:3,678)
+  [3] com.bigdata.rdf.store.AbstractTripleStore.toString (AbstractTripleStore.java:3,689)
+  [4] com.bigdata.rdf.graph.impl.bd.BigdataGASState.toString (BigdataGASState.java:110)
+  [5] com.bigdata.rdf.graph.impl.GASContext$ScatterTask.call (GASContext.java:799)
+  [6] com.bigdata.rdf.graph.impl.GASContext$ScatterTask.call (GASContext.java:740)
+  [7] java.util.concurrent.FutureTask.run (FutureTask.java:266)
+  [8] java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1,149)
+  [9] java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:624)
+  [10] java.lang.Thread.run (Thread.java:750)
+GASEngine1[1] 
+

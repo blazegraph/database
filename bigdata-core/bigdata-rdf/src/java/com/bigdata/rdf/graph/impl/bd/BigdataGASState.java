@@ -104,6 +104,8 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
 
     @Override
     public String toString(final Statement e) {
+        
+        System.out.println("BigdataGASState toString "+((ISPO) e).toString());
 
         return getGraphAccessor().getKB().toString((ISPO) e);
 

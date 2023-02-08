@@ -315,6 +315,14 @@ public class GASService extends CustomServiceFactoryBase {
 
         URI OUT9 = new URIImpl(NAMESPACE + "out9");
         
+        /**
+         * Magic predicate used to specify one (or more) predicates as excluded predictes
+         * <p>
+         * Note: 
+         * EPV- Exlcuded Predicate as Value
+         */
+        URI EPV = new URIImpl(NAMESPACE + "epv");
+
     }
 
     static private transient final Logger log = Logger
@@ -429,6 +437,9 @@ public class GASService extends CustomServiceFactoryBase {
         private final Value[] initialFrontier;
         private final Value[] targetVertices;
         private final IVariable<?>[] outVars;
+    //  GS    
+        private final Value[] epv;    
+    // GS    private final String[] eps;
 
         public GASServiceCall(final AbstractTripleStore store,
                 final ServiceNode serviceNode,
@@ -485,12 +496,12 @@ public class GASService extends CustomServiceFactoryBase {
             this.linkAttrType = (URI) getOnlyArg(Options.PROGRAM,
                     Options.LINK_ATTR_TYPE, null/* default */);
 
+            // GS - via String 
             // GASProgram (required)
             {
                 
                 final Literal tmp = (Literal) getOnlyArg(Options.PROGRAM,
                         Options.GAS_CLASS);
-
                 if (tmp == null)
                     throw new IllegalArgumentException(
                             "Required predicate not specified: "
@@ -549,6 +560,9 @@ public class GASService extends CustomServiceFactoryBase {
             
             // Initial frontier.
             this.initialFrontier = getArg(Options.PROGRAM, Options.IN);
+
+            //predicates to exclude
+            this.epv = getArg(Options.PROGRAM, Options.EPV);
 
             // Target vertices
             this.targetVertices = getArg(Options.PROGRAM, Options.TARGET);
@@ -840,7 +854,21 @@ public class GASService extends CustomServiceFactoryBase {
                     gasState.setFrontier(gasContext, tmp);
 
                 }
+              
+                //GS 
+                //passing epv to gasContext
+                if (epv != null) {
+                    gasContext.setEpv(epv);
+                // try to pass it to gasState - gasState is visibpe from scatter
+                    gasState.setEpv(gasContext, epv);
+
+                    System.out.println(" ####1 epv=");
+                    for (Value v: epv) {
+                        System.out.println(" v[i]="+v);
+                    }
+                }
                 
+
                 // Run the analytic.
                 final IGASStats stats = (IGASStats) gasContext.call();
 

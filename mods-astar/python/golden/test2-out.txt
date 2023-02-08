@@ -1,0 +1,116 @@
+"<Response [200]>"
+----------------------
+{
+    "head": {
+        "vars": [
+            "depth",
+            "predecessor",
+            "linkType",
+            "out"
+        ]
+    },
+    "results": {
+        "bindings": [
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/m"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "5"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/n"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr#p"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/n"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "4"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/i"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr#p"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/i"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "3"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/c"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr#p"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/c"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "2"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/g"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr#p"
+                }
+            },
+            {
+                "out": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/g"
+                },
+                "depth": {
+                    "datatype": "http://www.w3.org/2001/XMLSchema#int",
+                    "type": "literal",
+                    "value": "1"
+                },
+                "predecessor": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr/a"
+                },
+                "linkType": {
+                    "type": "uri",
+                    "value": "http://prism.uvsq.fr#p"
+                }
+            }
+        ]
+    }
+}
+http://prism.uvsq.fr/m <--(http://prism.uvsq.fr#p)--<< http://prism.uvsq.fr/n
+http://prism.uvsq.fr/n <--(http://prism.uvsq.fr#p)--<< http://prism.uvsq.fr/i
+http://prism.uvsq.fr/i <--(http://prism.uvsq.fr#p)--<< http://prism.uvsq.fr/c
+http://prism.uvsq.fr/c <--(http://prism.uvsq.fr#p)--<< http://prism.uvsq.fr/g
+http://prism.uvsq.fr/g <--(http://prism.uvsq.fr#p)--<< http://prism.uvsq.fr/a

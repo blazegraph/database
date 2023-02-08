@@ -1,0 +1,27 @@
+PREFIX : <http://local.com/>		# means local url
+PREFIX schema: <http://schema.org/>
+
+
+:systap a schema:Organization ;
+		schema:owns :blazegraph .
+:blazegraph a schema:Product ;
+			schema:brand :systap;
+			:productOf <http://systap.com/>;
+			:implements <http://rdf4j.org>, <http://blueprints.tinkerpop.com> .
+			
+	
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+  

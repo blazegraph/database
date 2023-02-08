@@ -1,0 +1,29 @@
+depth	predecessor	linkType	out
+7	<http://prism.uvsq.fr/n>	<http://prism.uvsq.fr#p>	<http://prism.uvsq.fr/m>
+6	<http://prism.uvsq.fr/o>	<http://prism.uvsq.fr#p>	<http://prism.uvsq.fr/n>
+5	<http://prism.uvsq.fr/e>	<http://prism.uvsq.fr#p>	<http://prism.uvsq.fr/o>
+4	<http://prism.uvsq.fr/d>	<http://prism.uvsq.fr#p>	<http://prism.uvsq.fr/e>
+3	<http://prism.uvsq.fr/c>	<http://prism.uvsq.fr#p>	<http://prism.uvsq.fr/d>
+2	<http://prism.uvsq.fr/b>	<http://prism.uvsq.fr#p>	<http://prism.uvsq.fr/c>
+1	<http://prism.uvsq.fr/a>	<http://prism.uvsq.fr#p>	<http://prism.uvsq.fr/b>
+
+
+test3
+# use with test3.ttl
+PREFIX prism: <http://prism.uvsq.fr/>
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?linkType ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in prism:a . # one or more times, specifies the initial frontier.
+     gas:program gas:target prism:m . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIterations 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 2000 . # optional limit on the #of visited vertices.
+  }
+  ?predecessor ?linkType ?out . # figure out what link type(s) connect a vertex with a predecessor
+} 
+order by desc(?depth)
+limit 100

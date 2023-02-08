@@ -259,4 +259,14 @@ public interface IGASContext<VS, ES, ST> extends Callable<IGASStats> {
      */
     int getMaxIterationsAfterTargets();
 
+    // GS
+    /**
+     * 
+     */
+    Value[] getEpv();
+
+    /**
+     * 
+     */
+    void setEpv(Value[] epv);
 }

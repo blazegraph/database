@@ -66,6 +66,25 @@ public interface IGASState<VS,ES, ST> {
     void setFrontier(IGASContext<VS, ES, ST> ctx, Value... v);
 
     /**
+     *
+     * 
+     * @param ctx
+     *            The execution context.
+     * @param v
+     *            One or more vertices that will be included in the initial
+     *            frontier.
+     * 
+     * @throws IllegalArgumentException
+     *             if no vertices are specified.
+     */
+    void setEpv(IGASContext<VS, ES, ST> ctx, Value... v);
+
+    /** 
+     * access to epv
+     */
+    public Set<Value> getEpv();
+
+    /**
      * Discard computation state (the frontier, vertex state, and edge state)
      * and reset the round counter.
      * <p>

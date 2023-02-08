@@ -1,0 +1,30 @@
+# example taken from https://stackoverflow.com/questions/28900290/querying-a-graph-path-in-sparql
+# original
+# node:x edge:y node: z  ->   x -> z [label=y]
+# @prefix ...  -> 
+#
+@prefix node: <http://prism.uvsq.fr/>.
+@prefix edge: <http://prism.uvsq.fr#>.
+node:a edge:p node:b.
+node:a edge:q node:f.
+node:a edge:p node:g.
+node:b edge:p node:c.
+node:c edge:q node:h.
+node:c edge:p node:i.
+node:c edge:p node:d.
+node:d edge:p node:e.
+node:f edge:p node:g.
+node:f edge:q node:l.
+node:f edge:p node:k.
+node:g edge:p node:c.
+node:g edge:p node:f.
+node:h edge:p node:n.
+node:i edge:q node:j.
+node:j edge:p node:o.
+node:j edge:q node:n.
+node:k edge:p node:l.
+node:l edge:p node:g.
+node:m edge:q node:g.
+node:n edge:p node:m.
+node:e edge:p node:o.
+node:o edge:p node:n.

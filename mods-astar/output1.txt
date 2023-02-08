@@ -1,0 +1,142 @@
+# example 2
+PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+SELECT ?depth ?out ?predecessor{
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/RTNC-RIPE> . # only retain vertices along paths to these target vertices.
+     gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 5 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 20 . # optional limit on the #of visited vertices.
+     #gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+  }
+} 
+order by ?depth
+
+shortly from to:
+gas:in 		<http://sunflower.test/handle/IS111-RIPE>
+gas:target 	<http://sunflower.test/handle/RTNC-RIPE>
+
+Result (logfile.txt):
+
+Advanced features
+depth	out	predecessor
+0	<http://sunflower.test/handle/IS111-RIPE>	
+1	<http://sunflower.test/asn_cidr/86.102.213.0%2F24>	<http://sunflower.test/handle/IS111-RIPE>
+2	<http://sunflower.test/handle/RTNC-RIPE>	<http://sunflower.test/asn_cidr/86.102.213.0%2F24>
+
+--------------------------
+
+GS: 	blocked 86.102.213.0
+	Result (logfile2.txt):
+
+depth	out	predecessor
+0	<http://sunflower.test/handle/IS111-RIPE>	
+1	<http://sunflower.test/asn_cidr/86.102.140.0%2F23>	<http://sunflower.test/handle/IS111-RIPE>
+2	<http://sunflower.test/handle/RTNC-RIPE>	<http://sunflower.test/asn_cidr/86.102.140.0%2F23>
+
+--------------------------
+
+GS: 	blocked 86.102.140.0
+	Result (logfile3.txt)::
+
+depth	out	predecessor
+0	<http://sunflower.test/handle/IS111-RIPE>	
+1	<http://sunflower.test/asn_cidr/86.102.188.0%2F23>	<http://sunflower.test/handle/IS111-RIPE>
+2	<http://sunflower.test/handle/RTNC-RIPE>	<http://sunflower.test/asn_cidr/86.102.188.0%2F23> 
+
+-----------------------------
+
+GS:     unlock 'Undirected': 
+	Result (logfile4.txt)::
+
+depth	out	predecessor
+0	<http://sunflower.test/handle/IS111-RIPE>	
+1	<http://sunflower.test/asn_cidr/86.102.188.0%2F23>	<http://sunflower.test/handle/IS111-RIPE>
+2	<http://sunflower.test/handle/RTNC-RIPE>	<http://sunflower.test/asn_cidr/86.102.188.0%2F23>
+
+
+-----------------------------
+
+GS:     blocked 86.102: 
+	Result (logfile5.txt):
+	
+	
+depth	out	predecessor
+0	<http://sunflower.test/handle/IS111-RIPE>	
+1	<http://sunflower.test/asn_cidr/87.253.24.0%2F21>	<http://sunflower.test/handle/IS111-RIPE>
+2	<http://sunflower.test/handle/RTNC-RIPE>	<http://sunflower.test/asn_cidr/87.253.24.0%2F21>
+
+-----------------------------
+
+GS:     blocked asn_cidr: 
+	Result (logfile6.txt):
+
+depth	out	predecessor
+0	<http://sunflower.test/handle/IS111-RIPE>	
+1	<http://sunflower.test/Handle>	<http://sunflower.test/handle/IS111-RIPE>
+2	<http://sunflower.test/handle/RTNC-RIPE>	<http://sunflower.test/Handle>
+
+-------------------------------
+
+GS:     blocked Handle: 
+	Re  sult (logfile7.txt):
+	21
+	-----
+	
+-----------------------------
+
+GS:     left only block of Handle, cidr opened:
+	from to:
+	shortly from to:
+	gas:in 		<http://sunflower.test/handle/IS111-RIPE>
+	gas:target 	<http://sunflower.test/handle/AR17051-RIPE>
+	Result (logfile8.txt):
+	
+	depth	out	predecessor
+0	<http://sunflower.test/handle/IS111-RIPE>	
+1	<http://sunflower.test/asn_cidr/87.117.128.0%2F21>	<http://sunflower.test/handle/IS111-RIPE>
+2	<http://sunflower.test/country/RU>	<http://sunflower.test/asn_cidr/87.117.128.0%2F21>
+3	<http://sunflower.test/handle/AR17051-RIPE>	<http://sunflower.test/country/RU>
+
+
+==================================
+change reques
+-----------------------------
+
+
+
+===========================================
+exclude predicate
+
+# example 2
+  PREFIX gas: <http://www.bigdata.com/rdf/gas#>
+  SELECT ?depth ?predecessor ?linkType ?out {
+  SERVICE gas:service {
+     gas:program gas:gasClass "com.bigdata.rdf.graph.analytics.ASTAR" .
+     gas:program gas:in <http://sunflower.test/handle/IS111-RIPE> . # one or more times, specifies the initial frontier.
+     gas:program gas:target <http://sunflower.test/handle/AR17051-RIPE> . # only retain vertices along paths to these target vertices.
+     #gas:program gas:target <http://sunflower.test/handle/> . # only retain vertices along paths to these target vertices.
+     gas:program gas:out ?out . # exactly once - will be bound to the visited vertices.
+     gas:program gas:out1 ?depth . # exactly once - will be bound to the depth of the visited vertices.
+     gas:program gas:out2 ?predecessor . # exactly once - will be bound to the predecessor.
+     gas:program gas:maxIteration 10 . # optional limit on breadth first expansion.
+     gas:program gas:maxVisited 500 . # optional limit on the #of visited vertices.
+     gas:program gas:traversalDirection 'Undirected' . # optional limit on the #of visited vertices.
+     gas:program gas:nthreads 1 .
+    # EP - exclude predicate
+    # gas:program gas:epstring "abracadabra" .
+     gas:program gas:epv <http://sunflower.test/Handle>
+     gas:program gas:epv <rdf:type>
+                 
+  }
+  ?predecessor ?linkType ?out .
+} 
+order by ?depth
+
+
+	

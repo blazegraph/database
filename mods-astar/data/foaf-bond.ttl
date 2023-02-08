@@ -1,0 +1,47 @@
+# First, we declare some useful URL prefixes.
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix :     <http://example.org/stuff/> .
+
+# Second, we declare enough of a class hierarchy to get us somewhere.
+
+foaf:Agent a rdfs:Class ;
+  rdfs:subClassOf rdf:Resource .
+
+foaf:Person a rdfs:Class ;
+  rdfs:subClassOf foaf:Agent .
+
+foaf:Organization a rdfs:Class ;
+  rdfs:subClassOf foaf:Agent .
+
+# Finally, we're ready to declare our data.
+
+:HMSS a foaf:Organization ;
+  foaf:name "Her Majesty's Secret Service" ;
+  foaf:nick "HMSS" ;
+  foaf:member :M ;
+  foaf:member :Q ;
+  foaf:member :Bond ;
+  foaf:member :Kerim .
+
+:M a foaf:Person ;
+  foaf:name "M" ;
+  foaf:knows :Q ;
+  foaf:knows :Bond ;
+  foaf:knows :Kerim .
+
+:Q a foaf:Person ;
+  foaf:name "Q" ;
+  foaf:knows :M ;
+  foaf:knows :Bond .
+
+:Bond a foaf:Person ;
+  foaf:name "James Bond" ;
+  foaf:knows :M ;
+  foaf:knows :Q .
+
+:Kerim a foaf:Person ;
+  foaf:name "Darko Kerim" ;
+  foaf:knows :M .
