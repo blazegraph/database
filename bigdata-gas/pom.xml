@@ -110,6 +110,11 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+      <version>${apache.httpclient.version}</version>
+    </dependency>
+    <dependency>
       <!-- log4j is the primary logger for bigdata. -->
       <groupId>log4j</groupId>
       <artifactId>log4j</artifactId>
